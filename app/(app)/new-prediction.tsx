@@ -14,13 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuth } from '../../lib/auth';
-import {
-  formatCountdown,
-  formatRevealAt,
-  parseRevealAt,
-  toDateInput,
-  toTimeInput,
-} from '../../lib/datetime';
+import { formatCountdown, formatRevealAt, parseRevealAt } from '../../lib/datetime';
 import {
   MAX_CONTENT_LENGTH,
   MIN_REVEAL_DELAY_MS,
@@ -28,52 +22,32 @@ import {
   predictionErrorMessage,
 } from '../../lib/predictions';
 
-/**
- * Raccourcis de saisie, en décalage depuis maintenant plutôt qu'en heure fixe.
- *
- * Un « ce soir 20 h » serait dans le passé pour qui ouvre l'écran à 23 h : le
- * bouton remplirait alors une date que la validation refuse juste après.
- */
-const PRESETS: { label: string; ms: number }[] = [
-  { label: 'Dans 1 heure', ms: 60 * 60 * 1000 },
-  { label: 'Demain', ms: 24 * 60 * 60 * 1000 },
-  { label: 'Dans 1 semaine', ms: 7 * 24 * 60 * 60 * 1000 },
-];
-
-const DEFAULT_DELAY_MS = 24 * 60 * 60 * 1000;
-
 export default function NewPredictionScreen() {
   const { session } = useAuth();
   const router = useRouter();
 
   const [content, setContent] = useState('');
-  // Par défaut demain à la même heure : une date valide dès l'ouverture, que
-  // l'utilisateur n'a qu'à ajuster.
-  const [dateInput, setDateInput] = useState(() =>
-    toDateInput(new Date(Date.now() + DEFAULT_DELAY_MS))
-  );
-  const [timeInput, setTimeInput] = useState(() =>
-    toTimeInput(new Date(Date.now() + DEFAULT_DELAY_MS))
-  );
+  // Champs vides au départ, et aucun raccourci de délai : le moment de la
+  // révélation est un choix libre de l'auteur, pas quelque chose que l'écran
+  // oriente. Une valeur pré-remplie suggérerait un horizon par défaut.
+  const [dateInput, setDateInput] = useState('');
+  const [timeInput, setTimeInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const trimmedContent = content.trim();
   const revealAt = parseRevealAt(dateInput, timeInput);
   const remaining = MAX_CONTENT_LENGTH - trimmedContent.length;
-
-  function applyPreset(ms: number) {
-    const target = new Date(Date.now() + ms);
-    setDateInput(toDateInput(target));
-    setTimeInput(toTimeInput(target));
-    setError(null);
-  }
+  const revealTouched = dateInput.trim() !== '' || timeInput.trim() !== '';
 
   /** Vérifications locales, pour éviter un aller-retour réseau inutile. */
   function validate(): string | null {
     if (!trimmedContent) return 'Écris ta prédiction.';
     if (trimmedContent.length > MAX_CONTENT_LENGTH) {
       return `La prédiction ne peut pas dépasser ${MAX_CONTENT_LENGTH} caractères.`;
+    }
+    if (!revealTouched) {
+      return 'Choisis la date et l’heure de la révélation.';
     }
     if (!revealAt) {
       return 'Date ou heure invalide. Format attendu : JJ/MM/AAAA et HH:MM.';
@@ -165,19 +139,9 @@ export default function NewPredictionScreen() {
           </Text>
 
           <Text style={[styles.label, styles.sectionLabel]}>Révélation</Text>
-
-          <View style={styles.presets}>
-            {PRESETS.map((preset) => (
-              <Pressable
-                key={preset.label}
-                onPress={() => applyPreset(preset.ms)}
-                disabled={submitting}
-                style={({ pressed }) => [styles.preset, pressed && styles.presetPressed]}
-              >
-                <Text style={styles.presetText}>{preset.label}</Text>
-              </Pressable>
-            ))}
-          </View>
+          <Text style={styles.sectionHint}>
+            Le moment que tu veux, à la minute près.
+          </Text>
 
           <View style={styles.row}>
             <View style={styles.flex}>
@@ -206,16 +170,19 @@ export default function NewPredictionScreen() {
             </View>
           </View>
 
+          {/* Rien tant que les deux champs sont vides : à l'ouverture, un
+              « date incomplète » se lirait comme une erreur alors que
+              l'utilisateur n'a encore rien saisi. */}
           {revealAt ? (
             <Text style={styles.preview}>
               Se révélera {formatRevealAt(revealAt)} —{' '}
               {formatCountdown(revealAt, new Date())}.
             </Text>
-          ) : (
+          ) : revealTouched ? (
             <Text style={styles.previewInvalid}>
               Date incomplète — format attendu : JJ/MM/AAAA et HH:MM.
             </Text>
-          )}
+          ) : null}
 
           {error && <Text style={styles.error}>{error}</Text>}
 
@@ -273,16 +240,7 @@ const styles = StyleSheet.create({
   counter: { fontSize: 12, color: '#9ca3af', marginTop: 6, textAlign: 'right' },
   counterLow: { color: '#b45309' },
   hint: { fontSize: 13, color: '#6b7280', marginTop: 10, lineHeight: 18 },
-  presets: { flexDirection: 'row', gap: 8, marginBottom: 16, flexWrap: 'wrap' },
-  preset: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  presetPressed: { backgroundColor: '#f3f4f6' },
-  presetText: { fontSize: 13, fontWeight: '600', color: '#374151' },
+  sectionHint: { fontSize: 13, color: '#6b7280', marginBottom: 14, lineHeight: 18 },
   row: { flexDirection: 'row', gap: 12 },
   timeField: { width: 110 },
   preview: { fontSize: 14, color: '#166534', marginTop: 14 },
