@@ -1,4 +1,4 @@
--- Predict — table `profiles` et politiques RLS
+-- Predict — tables `profiles` et `predictions`, et politiques RLS
 --
 -- À exécuter dans le SQL Editor du dashboard Supabase.
 --
@@ -216,3 +216,104 @@ $$;
 -- rôles qui en ont besoin.
 revoke all on function public.is_username_available(text) from public;
 grant execute on function public.is_username_available(text) to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 7. Table `predictions`
+-- ---------------------------------------------------------------------------
+
+-- `author_id` référence public.profiles et non auth.users, alors que les deux
+-- donneraient la même intégrité (profiles.id est lui-même une clé étrangère
+-- vers auth.users). C'est ce qui permettra au fil d'actualité de récupérer le
+-- pseudo de l'auteur en une requête — PostgREST ne sait embarquer
+-- `profiles(username)` que s'il voit une clé étrangère vers cette table :
+--
+--   select('*, author:profiles(username)')
+--
+-- Une référence vers auth.users obligerait à une seconde requête. La cascade
+-- reste complète : suppression du compte → du profil → de ses prédictions.
+create table if not exists public.predictions (
+  id uuid primary key default gen_random_uuid(),
+  author_id uuid not null references public.profiles (id) on delete cascade,
+  content text not null,
+  reveal_at timestamptz not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- `drop` puis `add` : Postgres n'a pas d'`add constraint if not exists`, c'est
+-- ce qui rend la ligne relançable.
+--
+-- `btrim` et non `char_length(content)` seul : sans ça, une prédiction faite
+-- uniquement d'espaces passerait la contrainte. Le client trim aussi, la
+-- contrainte est le garde-fou si un jour il oublie.
+alter table public.predictions drop constraint if exists predictions_content_length;
+alter table public.predictions add constraint predictions_content_length
+  check (char_length(btrim(content)) between 1 and 280);
+
+-- La liste « mes prédictions » filtre sur author_id et trie sur reveal_at ;
+-- l'index couvre les deux d'un coup.
+create index if not exists predictions_author_reveal_idx
+  on public.predictions (author_id, reveal_at desc);
+
+-- Pour le futur fil d'actualité, qui lira les prédictions révélées les plus
+-- récentes sans filtrer par auteur.
+create index if not exists predictions_reveal_at_idx
+  on public.predictions (reveal_at desc);
+
+drop trigger if exists predictions_set_updated_at on public.predictions;
+create trigger predictions_set_updated_at
+  before update on public.predictions
+  for each row execute function public.set_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- 8. Row Level Security des prédictions
+-- ---------------------------------------------------------------------------
+
+alter table public.predictions enable row level security;
+
+-- LE MÉCANISME DE RÉVÉLATION EST ICI, et nulle part ailleurs.
+--
+-- Une prédiction non révélée n'est lisible que par son auteur. C'est la base
+-- qui compare reveal_at à son horloge : le client ne peut pas voir la
+-- prédiction d'un autre avant l'heure, même en forgeant la requête à la main
+-- avec la clé anon. Ne jamais déplacer ce filtre côté client — ce serait
+-- masquer un contenu que l'API renverrait quand même.
+drop policy if exists "predictions_select_visible" on public.predictions;
+create policy "predictions_select_visible"
+  on public.predictions
+  for select
+  to authenticated
+  using (author_id = auth.uid() or reveal_at <= now());
+
+-- `reveal_at > now()` : on ne peut pas créer une prédiction déjà révélée, ce
+-- qui reviendrait à publier après coup en se donnant l'air d'avoir prédit.
+-- C'est aussi ce qui remonte en 42501 côté client si la date saisie est
+-- passée ; d'où la marge d'une minute imposée à la saisie.
+drop policy if exists "predictions_insert_own" on public.predictions;
+create policy "predictions_insert_own"
+  on public.predictions
+  for insert
+  to authenticated
+  with check (author_id = auth.uid() and reveal_at > now());
+
+-- Modification réservée à l'auteur, et seulement avant révélation : une fois
+-- dévoilée, une prédiction est un engagement, la réécrire n'aurait pas de sens.
+-- Le `using` porte sur la ligne avant modification, le `with check` sur la
+-- ligne après : les deux sont nécessaires, sinon on pourrait repousser
+-- reveal_at indéfiniment ou changer d'auteur.
+drop policy if exists "predictions_update_own_before_reveal" on public.predictions;
+create policy "predictions_update_own_before_reveal"
+  on public.predictions
+  for update
+  to authenticated
+  using (author_id = auth.uid() and reveal_at > now())
+  with check (author_id = auth.uid() and reveal_at > now());
+
+-- Suppression autorisée à tout moment, y compris après révélation : c'est le
+-- seul recours de l'auteur sur un contenu qui parle de quelqu'un d'autre.
+drop policy if exists "predictions_delete_own" on public.predictions;
+create policy "predictions_delete_own"
+  on public.predictions
+  for delete
+  to authenticated
+  using (author_id = auth.uid());

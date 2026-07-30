@@ -38,7 +38,9 @@ lancer `npx expo start --tunnel`.
 1. Copier `.env.example` en `.env` et renseigner `EXPO_PUBLIC_SUPABASE_URL` et
    `EXPO_PUBLIC_SUPABASE_ANON_KEY` (Settings → API dans le dashboard).
 2. Coller `supabase/schema.sql` dans le SQL Editor et l'exécuter. Le script est
-   idempotent, il peut être relancé après chaque modification.
+   idempotent, il peut être relancé après chaque modification — et il **doit**
+   l'être à chaque fois qu'il change, sinon l'app tourne contre un schéma
+   incomplet. Symptôme : « Table `predictions` introuvable » sur l'accueil.
 3. **Développement — désactiver la confirmation d'email** : Authentication →
    Sign In / Providers → Email → décocher « Confirm email ».
 
