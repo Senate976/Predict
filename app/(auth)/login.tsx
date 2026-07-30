@@ -50,6 +50,13 @@ function authErrorMessage(error: AuthError): string {
       return 'Trop de tentatives. Réessaie dans quelques minutes.';
     case 'signup_disabled':
       return 'Les inscriptions sont désactivées pour le moment.';
+    // Erreur côté base pendant la création de l'utilisateur. Le seul traitement
+    // base branché sur auth.users est le trigger on_auth_user_created, et la
+    // seule contrainte qu'il peut violer est l'unicité du pseudo : deux
+    // inscriptions simultanées passent toutes les deux la vérification
+    // préalable, puis l'index unique en recale une.
+    case 'unexpected_failure':
+      return 'Ce pseudo vient d’être pris, choisis-en un autre.';
     default:
       return error.message;
   }
@@ -62,6 +69,26 @@ function profileErrorMessage(error: PostgrestError): string {
     return 'Ce pseudo est déjà pris, choisis-en un autre.';
   }
   return `Compte créé, mais le profil n'a pas pu être enregistré : ${error.message}`;
+}
+
+/**
+ * Indique si le pseudo est libre, ou `null` si la vérification n'a pas abouti.
+ *
+ * Passe par la RPC `is_username_available` et non par un select sur `profiles` :
+ * on est encore anonyme à ce stade, et la policy de lecture est réservée aux
+ * utilisateurs connectés — un select direct renverrait 0 ligne pour n'importe
+ * quel pseudo et les déclarerait tous libres.
+ *
+ * En cas d'échec on renvoie `null` plutôt que de bloquer l'inscription : c'est
+ * un contrôle de confort, l'index unique côté base reste le vrai garde-fou.
+ */
+async function checkUsernameAvailable(candidate: string): Promise<boolean | null> {
+  const { data, error } = await supabase.rpc('is_username_available', {
+    candidate,
+  });
+
+  if (error || typeof data !== 'boolean') return null;
+  return data;
 }
 
 export default function LoginScreen() {
@@ -105,6 +132,14 @@ export default function LoginScreen() {
 
   async function handleSignUp() {
     const trimmedUsername = username.trim();
+
+    // Avant signUp : sans ça, un pseudo déjà pris fait échouer le trigger
+    // on_auth_user_created, ce qui annule la création du compte et ne remonte
+    // qu'une erreur opaque.
+    if ((await checkUsernameAvailable(trimmedUsername)) === false) {
+      setError('Ce pseudo est déjà pris, choisis-en un autre.');
+      return;
+    }
 
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: email.trim(),
