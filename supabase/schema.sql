@@ -321,9 +321,49 @@ create table if not exists public.friendships (
   updated_at timestamptz not null default now()
 );
 
+-- Si une table `friendships` existait déjà avec d'autres noms de colonnes
+-- (`user_id`/`friend_id`, plan initial avant cette migration), le `create
+-- table if not exists` ci-dessus est un no-op et laisse ces anciens noms en
+-- place. On les renomme ici plutôt que d'obliger à tout supprimer — chaque
+-- renommage ne s'exécute que si l'ancienne colonne existe et la nouvelle pas
+-- encore, donc sans effet sur une table déjà à jour.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'friendships' and column_name = 'user_id'
+  ) and not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'friendships' and column_name = 'requester_id'
+  ) then
+    execute 'alter table public.friendships rename column user_id to requester_id';
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'friendships' and column_name = 'friend_id'
+  ) and not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'friendships' and column_name = 'addressee_id'
+  ) then
+    execute 'alter table public.friendships rename column friend_id to addressee_id';
+  end if;
+end;
+$$;
+
+-- Rattrape les colonnes manquantes si la table préexistante n'avait que
+-- `user_id`/`friend_id`/`status` (plan initial), sans `created_at`/`updated_at`.
+alter table public.friendships add column if not exists status text not null default 'pending';
+alter table public.friendships add column if not exists created_at timestamptz not null default now();
+alter table public.friendships add column if not exists updated_at timestamptz not null default now();
+
 alter table public.friendships drop constraint if exists friendships_no_self;
 alter table public.friendships add constraint friendships_no_self
   check (requester_id <> addressee_id);
+
+alter table public.friendships drop constraint if exists friendships_status_valid;
+alter table public.friendships add constraint friendships_status_valid
+  check (status in ('pending', 'accepted'));
 
 -- Une seule relation entre deux personnes, indépendamment du sens : sans ce
 -- `least`/`greatest`, Alice pourrait demander Bob alors que Bob a déjà demandé
