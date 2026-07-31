@@ -239,7 +239,7 @@ export default function NewPredictionScreen() {
             </Text>
           ) : null}
 
-          <Text style={[styles.label, styles.sectionLabel]}>Qui peut la voir</Text>
+          <Text style={[styles.label, styles.sectionLabel]}>Visible par</Text>
           <View style={styles.scopeRow}>
             <Pressable
               onPress={() => setScope('circle')}
@@ -337,7 +337,12 @@ const styles = StyleSheet.create({
   headerSpacer: { width: 56 },
   cancel: { fontSize: 15, color: colors.gold, width: 56 },
   scroll: { padding: spacing.lg, paddingBottom: 40 },
-  label: { fontSize: 13, fontWeight: '600', color: colors.textMuted, marginBottom: 6 },
+  label: {
+    fontFamily: fonts.serif,
+    fontSize: 19,
+    color: colors.text,
+    marginBottom: 6,
+  },
   sectionLabel: { marginTop: spacing.lg },
   subLabel: { fontSize: 12, color: colors.textFaint, marginBottom: 6 },
   input: {
