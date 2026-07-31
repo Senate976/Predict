@@ -20,20 +20,18 @@ import { fetchFriendships, otherProfile, type FriendProfile } from '../../lib/fr
 import {
   MAX_CONTENT_LENGTH,
   MAX_TEASER_LENGTH,
-  MAX_TITLE_LENGTH,
   MIN_REVEAL_DELAY_MS,
   createPrediction,
   predictionErrorMessage,
   type PredictionScope,
 } from '../../lib/predictions';
-import { colors, radius, spacing } from '../../lib/theme';
+import { colors, fonts, radius, spacing } from '../../lib/theme';
 
 export default function NewPredictionScreen() {
   const { session } = useAuth();
   const router = useRouter();
   const userId = session?.user.id;
 
-  const [title, setTitle] = useState('');
   const [teaser, setTeaser] = useState('');
   const [content, setContent] = useState('');
   // Champs vides au départ, et aucun raccourci de délai : le moment de la
@@ -58,7 +56,6 @@ export default function NewPredictionScreen() {
     });
   }, [userId]);
 
-  const trimmedTitle = title.trim();
   const trimmedTeaser = teaser.trim();
   const trimmedContent = content.trim();
   const revealAt = parseRevealAt(dateInput, timeInput);
@@ -76,10 +73,6 @@ export default function NewPredictionScreen() {
 
   /** Vérifications locales, pour éviter un aller-retour réseau inutile. */
   function validate(): string | null {
-    if (!trimmedTitle) return 'Donne un titre à ta prédiction.';
-    if (trimmedTitle.length > MAX_TITLE_LENGTH) {
-      return `Le titre ne peut pas dépasser ${MAX_TITLE_LENGTH} caractères.`;
-    }
     if (!trimmedTeaser) return 'Écris un teaser : l’accroche que verront tes destinataires.';
     if (trimmedTeaser.length > MAX_TEASER_LENGTH) {
       return `Le teaser ne peut pas dépasser ${MAX_TEASER_LENGTH} caractères.`;
@@ -120,7 +113,6 @@ export default function NewPredictionScreen() {
     setSubmitting(true);
     try {
       const { error: insertError } = await createPrediction({
-        title: trimmedTitle,
         teaser: trimmedTeaser,
         content: trimmedContent,
         revealAt,
@@ -168,17 +160,7 @@ export default function NewPredictionScreen() {
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.label}>Titre</Text>
-          <TextInput
-            value={title}
-            onChangeText={setTitle}
-            placeholder="Le pari de l’été"
-            editable={!submitting}
-            maxLength={MAX_TITLE_LENGTH}
-            style={styles.input}
-          />
-
-          <Text style={[styles.label, styles.sectionLabel]}>Teaser</Text>
+          <Text style={styles.label}>Teaser</Text>
           <Text style={styles.sectionHint}>
             Visible tout de suite par tes destinataires — le contenu secret, lui,
             reste scellé.
@@ -328,7 +310,7 @@ export default function NewPredictionScreen() {
             ]}
           >
             {submitting ? (
-              <ActivityIndicator color={colors.background} />
+              <ActivityIndicator color={colors.text} />
             ) : (
               <Text style={styles.submitText}>Sceller la prédiction</Text>
             )}
@@ -351,7 +333,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  headerTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
+  headerTitle: { fontFamily: fonts.serif, fontSize: 18, color: colors.text },
   headerSpacer: { width: 56 },
   cancel: { fontSize: 15, color: colors.gold, width: 56 },
   scroll: { padding: spacing.lg, paddingBottom: 40 },
@@ -390,7 +372,7 @@ const styles = StyleSheet.create({
   },
   scopeOptionActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
   scopeText: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
-  scopeTextActive: { color: colors.goldBright },
+  scopeTextActive: { color: colors.gold },
   friendsBox: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: spacing.md },
   searchLoader: { marginTop: spacing.sm },
   friendChip: {
@@ -403,7 +385,7 @@ const styles = StyleSheet.create({
   },
   friendChipActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
   friendChipText: { fontSize: 13, color: colors.textMuted, fontWeight: '600' },
-  friendChipTextActive: { color: colors.goldBright },
+  friendChipTextActive: { color: colors.gold },
   error: {
     color: colors.danger,
     backgroundColor: colors.dangerSoft,
@@ -423,5 +405,5 @@ const styles = StyleSheet.create({
   },
   submitPressed: { backgroundColor: colors.goldBright },
   submitDisabled: { opacity: 0.6 },
-  submitText: { color: colors.background, fontSize: 16, fontWeight: '700' },
+  submitText: { color: colors.text, fontSize: 16, fontWeight: '700' },
 });

@@ -1,9 +1,15 @@
+import {
+  InstrumentSerif_400Regular,
+  InstrumentSerif_400Regular_Italic,
+} from '@expo-google-fonts/instrument-serif';
+import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { AuthProvider, useAuth } from '../lib/auth';
+import { colors } from '../lib/theme';
 
 function RootNavigator() {
   const { session, loading } = useAuth();
@@ -27,7 +33,7 @@ function RootNavigator() {
   if (loading) {
     return (
       <View style={styles.loader}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color={colors.gold} />
       </View>
     );
   }
@@ -41,9 +47,26 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
+  // Chargée ici, une fois : le nom de police passé à useFonts (la clé de cet
+  // objet) doit correspondre exactement à `fonts.serif` dans lib/theme.ts,
+  // sinon React Native retombe silencieusement sur la police système sans
+  // avertir.
+  const [fontsLoaded] = useFonts({
+    InstrumentSerif_400Regular,
+    InstrumentSerif_400Regular_Italic,
+  });
+
+  if (!fontsLoaded) {
+    return (
+      <View style={styles.loader}>
+        <ActivityIndicator size="large" color={colors.gold} />
+      </View>
+    );
+  }
+
   return (
     <AuthProvider>
-      <StatusBar style="auto" />
+      <StatusBar style="dark" />
       <RootNavigator />
     </AuthProvider>
   );
@@ -54,6 +77,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
 });

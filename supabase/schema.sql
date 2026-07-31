@@ -419,7 +419,7 @@ create policy "friendships_delete_own"
   using (auth.uid() = requester_id or auth.uid() = addressee_id);
 
 -- ---------------------------------------------------------------------------
--- 10. Prédictions scellées — titre, teaser, audience
+-- 10. Prédictions scellées — teaser, audience
 -- ---------------------------------------------------------------------------
 --
 -- Le contenu secret quitte la table `predictions` pour vivre dans
@@ -431,9 +431,14 @@ create policy "friendships_delete_own"
 -- la ligne de `prediction_contents` a sa propre policy qui, elle, vérifie
 -- vraiment `reveal_at`. C'est le même principe que pour `predictions` :
 -- le mécanisme de révélation doit rester en base, jamais côté client.
-alter table public.predictions add column if not exists title text;
 alter table public.predictions add column if not exists teaser text;
 alter table public.predictions add column if not exists scope text;
+
+-- Pas de titre séparé : uniquement un teaser et le contenu scellé. Si une
+-- exécution précédente de ce script avait ajouté `title` (avant ce
+-- changement), on la retire — sans perte pour le teaser ou le contenu, qui
+-- vivent chacun dans leur propre colonne/table.
+alter table public.predictions drop column if exists title;
 
 -- Le contenu secret lui-même. Une ligne par prédiction (clé primaire =
 -- clé étrangère), jamais créée ni lue en dehors de la fonction
@@ -447,7 +452,7 @@ create table if not exists public.prediction_contents (
 );
 
 -- Migre le contenu déjà présent dans `predictions.content` (schéma d'avant
--- cette migration) vers la nouvelle table, et backfille title/teaser/scope au
+-- cette migration) vers la nouvelle table, et backfille teaser/scope au
 -- passage — avant de retirer la colonne. `execute` en dynamique : sur un
 -- projet neuf, la colonne `content` n'a jamais existé, et y référencer
 -- directement dans une requête statique échouerait à la compilation même si
@@ -467,10 +472,9 @@ begin
     execute $sql$
       update public.predictions
       set
-        title = coalesce(title, 'Prédiction'),
         teaser = coalesce(teaser, left(btrim(content), 80)),
         scope = coalesce(scope, 'circle')
-      where title is null or teaser is null or scope is null
+      where teaser is null or scope is null
     $sql$;
 
     execute 'alter table public.predictions drop column content';
@@ -478,23 +482,17 @@ begin
 end;
 $$;
 
--- Filet de sécurité si, pour une autre raison, title/teaser/scope restaient
--- null (ex : colonnes ajoutées sans ligne `content` préexistante).
+-- Filet de sécurité si, pour une autre raison, teaser/scope restaient null
+-- (ex : colonnes ajoutées sans ligne `content` préexistante).
 update public.predictions
 set
-  title = coalesce(title, 'Prédiction'),
   teaser = coalesce(teaser, 'Une prédiction est en cours…'),
   scope = coalesce(scope, 'circle')
-where title is null or teaser is null or scope is null;
+where teaser is null or scope is null;
 
-alter table public.predictions alter column title set not null;
 alter table public.predictions alter column teaser set not null;
 alter table public.predictions alter column scope set not null;
 alter table public.predictions alter column scope set default 'circle';
-
-alter table public.predictions drop constraint if exists predictions_title_length;
-alter table public.predictions add constraint predictions_title_length
-  check (char_length(btrim(title)) between 1 and 80);
 
 alter table public.predictions drop constraint if exists predictions_teaser_length;
 alter table public.predictions add constraint predictions_teaser_length
@@ -673,8 +671,13 @@ create policy "prediction_contents_update_before_reveal"
 -- qui, sinon, demanderaient au client de gérer une transaction lui-même. Si
 -- une des policies refuse (ex : ami non accepté dans `p_friend_ids`), toute la
 -- fonction échoue et rien n'est créé — jamais de prédiction à moitié posée.
+--
+-- `drop function` avant : Postgres refuse un `create or replace` qui change
+-- la liste des paramètres (ici, `p_title` en moins par rapport à une version
+-- antérieure de ce script).
+drop function if exists public.create_prediction(text, text, text, timestamptz, text, uuid[]);
+
 create or replace function public.create_prediction(
-  p_title text,
   p_teaser text,
   p_content text,
   p_reveal_at timestamptz,
@@ -690,8 +693,8 @@ declare
   v_id uuid;
   v_recipient uuid;
 begin
-  insert into public.predictions (author_id, title, teaser, reveal_at, scope)
-  values (auth.uid(), p_title, p_teaser, p_reveal_at, p_scope)
+  insert into public.predictions (author_id, teaser, reveal_at, scope)
+  values (auth.uid(), p_teaser, p_reveal_at, p_scope)
   returning id into v_id;
 
   insert into public.prediction_contents (prediction_id, content)
@@ -720,8 +723,8 @@ begin
 end;
 $$;
 
-revoke all on function public.create_prediction(text, text, text, timestamptz, text, uuid[]) from public;
-grant execute on function public.create_prediction(text, text, text, timestamptz, text, uuid[]) to authenticated;
+revoke all on function public.create_prediction(text, text, timestamptz, text, uuid[]) from public;
+grant execute on function public.create_prediction(text, text, timestamptz, text, uuid[]) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- 13. Vue de lecture — teaser toujours visible, contenu masqué avant reveal_at
@@ -736,12 +739,16 @@ grant execute on function public.create_prediction(text, text, text, timestamptz
 -- la ligne de contenu que si l'appelant y a droit. Si elle est refusée, le
 -- `left join` ne fabrique pas une erreur mais un `content` à `null` — c'est
 -- exactement le comportement voulu : teaser lisible, contenu absent.
-create or replace view public.predictions_feed
+-- `drop view` avant : Postgres refuse qu'un `create or replace view` retire
+-- une colonne (ici `title`) d'une vue déjà créée par une version antérieure de
+-- ce script.
+drop view if exists public.predictions_feed;
+
+create view public.predictions_feed
 with (security_invoker = true) as
 select
   p.id,
   p.author_id,
-  p.title,
   p.teaser,
   pc.content,
   p.reveal_at,

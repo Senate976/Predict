@@ -25,7 +25,7 @@ import {
   type Friendship,
   type FriendProfile,
 } from '../../lib/friends';
-import { colors, radius, spacing } from '../../lib/theme';
+import { colors, fonts, radius, spacing } from '../../lib/theme';
 
 type Relation =
   | { kind: 'none' }
@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  headerTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
+  headerTitle: { fontFamily: fonts.serif, fontSize: 20, color: colors.text },
   headerSpacer: { width: 56 },
   back: { fontSize: 15, color: colors.gold, width: 56 },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  pillGoldText: { color: colors.background, fontSize: 13, fontWeight: '700' },
+  pillGoldText: { color: colors.text, fontSize: 13, fontWeight: '700' },
   pillOutline: {
     borderWidth: 1,
     borderColor: colors.border,

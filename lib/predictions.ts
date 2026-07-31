@@ -15,7 +15,6 @@ export type PredictionScope = 'circle' | 'selected';
 export type PredictionFeedItem = {
   id: string;
   author_id: string;
-  title: string;
   teaser: string;
   content: string | null;
   /** ISO 8601, en UTC. */
@@ -26,7 +25,6 @@ export type PredictionFeedItem = {
 };
 
 /** Doivent rester alignés sur les contraintes `predictions_*_length` du SQL. */
-export const MAX_TITLE_LENGTH = 80;
 export const MAX_TEASER_LENGTH = 160;
 export const MAX_CONTENT_LENGTH = 280;
 
@@ -70,9 +68,6 @@ export function predictionErrorMessage(error: PostgrestError): string {
   switch (error.code) {
     // Violation d'une des contraintes check (longueur ou portée invalide).
     case '23514':
-      if (error.message.includes('predictions_title_length')) {
-        return `Le titre doit faire entre 1 et ${MAX_TITLE_LENGTH} caractères.`;
-      }
       if (error.message.includes('predictions_teaser_length')) {
         return `Le teaser doit faire entre 1 et ${MAX_TEASER_LENGTH} caractères.`;
       }
@@ -97,13 +92,12 @@ export function predictionErrorMessage(error: PostgrestError): string {
 export async function fetchPredictionsFeed() {
   return supabase
     .from('predictions_feed')
-    .select('id, author_id, title, teaser, content, reveal_at, scope, created_at, is_revealed')
+    .select('id, author_id, teaser, content, reveal_at, scope, created_at, is_revealed')
     .order('reveal_at', { ascending: false })
     .returns<PredictionFeedItem[]>();
 }
 
 export async function createPrediction(input: {
-  title: string;
   teaser: string;
   content: string;
   revealAt: Date;
@@ -111,7 +105,6 @@ export async function createPrediction(input: {
   friendIds: string[];
 }) {
   return supabase.rpc('create_prediction', {
-    p_title: input.title.trim(),
     p_teaser: input.teaser.trim(),
     p_content: input.content.trim(),
     p_reveal_at: input.revealAt.toISOString(),

@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { supabase } from '../../lib/supabase';
-import { colors, radius, spacing } from '../../lib/theme';
+import { colors, fonts, radius, spacing } from '../../lib/theme';
 
 type Mode = 'signIn' | 'signUp';
 
@@ -304,7 +304,7 @@ export default function LoginScreen() {
             ]}
           >
             {submitting ? (
-              <ActivityIndicator color={colors.background} />
+              <ActivityIndicator color={colors.text} />
             ) : (
               <Text style={styles.submitText}>
                 {isSignUp ? 'Créer mon compte' : 'Se connecter'}
@@ -330,14 +330,19 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: spacing.lg },
   brand: {
-    fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: 3,
+    fontFamily: fonts.serif,
+    fontSize: 18,
+    letterSpacing: 4,
     color: colors.gold,
     textTransform: 'uppercase',
     marginBottom: 8,
   },
-  title: { fontSize: 26, fontWeight: '700', color: colors.text, marginBottom: 28 },
+  title: {
+    fontFamily: fonts.serif,
+    fontSize: 34,
+    color: colors.text,
+    marginBottom: 28,
+  },
   field: { marginBottom: spacing.md },
   label: { fontSize: 13, fontWeight: '600', color: colors.textMuted, marginBottom: 6 },
   input: {
@@ -377,7 +382,7 @@ const styles = StyleSheet.create({
   },
   submitPressed: { backgroundColor: colors.goldBright },
   submitDisabled: { opacity: 0.6 },
-  submitText: { color: colors.background, fontSize: 16, fontWeight: '700' },
+  submitText: { color: colors.text, fontSize: 16, fontWeight: '700' },
   switch: { marginTop: 18, alignItems: 'center' },
   switchText: { color: colors.gold, fontSize: 14, fontWeight: '600' },
 });

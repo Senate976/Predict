@@ -20,7 +20,7 @@ import {
   type PredictionFeedItem,
 } from '../../lib/predictions';
 import { supabase } from '../../lib/supabase';
-import { colors, radius, spacing } from '../../lib/theme';
+import { colors, fonts, radius, spacing } from '../../lib/theme';
 
 /**
  * Période de rafraîchissement des comptes à rebours.
@@ -53,7 +53,6 @@ function PredictionCard({
       </View>
 
       {authorLabel && <Text style={styles.author}>{authorLabel}</Text>}
-      <Text style={styles.cardTitle}>{item.title}</Text>
       <Text style={styles.cardTeaser}>{item.teaser}</Text>
 
       {revealed && item.content ? (
@@ -228,8 +227,8 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   brand: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.serif,
+    fontSize: 15,
     letterSpacing: 3,
     color: colors.gold,
     textTransform: 'uppercase',
@@ -245,7 +244,12 @@ const styles = StyleSheet.create({
   circleLinkText: { fontSize: 13, fontWeight: '700', color: colors.gold },
   signOut: { fontSize: 13, color: colors.textFaint },
   scroll: { padding: spacing.lg, paddingBottom: 8, flexGrow: 1 },
-  sectionTitle: { fontSize: 13, fontWeight: '600', color: colors.textMuted, marginBottom: 12 },
+  sectionTitle: {
+    fontFamily: fonts.serif,
+    fontSize: 20,
+    color: colors.text,
+    marginBottom: 12,
+  },
   sectionSpacing: { marginTop: spacing.lg },
   loader: { marginTop: 32 },
   empty: { paddingVertical: 24, alignItems: 'center' },
@@ -282,11 +286,15 @@ const styles = StyleSheet.create({
   badgeLocked: { backgroundColor: colors.goldSoft },
   badgeOpen: { backgroundColor: colors.successSoft },
   badgeText: { fontSize: 12, fontWeight: '700' },
-  badgeTextLocked: { color: colors.goldBright },
+  badgeTextLocked: { color: colors.gold },
   badgeTextOpen: { color: colors.success },
   author: { fontSize: 12, color: colors.textFaint, marginBottom: 4 },
-  cardTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
-  cardTeaser: { fontSize: 14, color: colors.textMuted, marginTop: 4, lineHeight: 20 },
+  cardTeaser: {
+    fontFamily: fonts.serif,
+    fontSize: 20,
+    color: colors.text,
+    lineHeight: 26,
+  },
   contentBox: {
     marginTop: 12,
     paddingTop: 12,
@@ -301,7 +309,12 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 4,
   },
-  cardContent: { fontSize: 15, color: colors.text, lineHeight: 21 },
+  cardContent: {
+    fontFamily: fonts.serif,
+    fontSize: 17,
+    color: colors.text,
+    lineHeight: 23,
+  },
   sealedBox: {
     marginTop: 12,
     paddingTop: 12,
@@ -324,5 +337,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   createPressed: { backgroundColor: colors.goldBright },
-  createText: { color: colors.background, fontSize: 16, fontWeight: '700' },
+  createText: { color: colors.text, fontSize: 16, fontWeight: '700' },
 });
