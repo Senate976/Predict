@@ -2,9 +2,9 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -14,11 +14,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../lib/auth';
 import { formatCountdown, formatRevealAt } from '../../lib/datetime';
 import {
-  fetchMyPredictions,
-  isMissingTable,
+  feedErrorMessage,
+  fetchPredictionsFeed,
   isRevealed,
-  type Prediction,
+  type PredictionFeedItem,
 } from '../../lib/predictions';
+import { supabase } from '../../lib/supabase';
+import { colors, radius, spacing } from '../../lib/theme';
 
 /**
  * Période de rafraîchissement des comptes à rebours.
@@ -28,11 +30,56 @@ import {
  */
 const TICK_MS = 30_000;
 
+type AuthorNames = Record<string, string>;
+
+function PredictionCard({
+  item,
+  now,
+  authorLabel,
+}: {
+  item: PredictionFeedItem;
+  now: Date;
+  authorLabel?: string;
+}) {
+  const revealAt = new Date(item.reveal_at);
+  const revealed = isRevealed(item, now);
+
+  return (
+    <View style={styles.card}>
+      <View style={[styles.badge, revealed ? styles.badgeOpen : styles.badgeLocked]}>
+        <Text style={[styles.badgeText, revealed ? styles.badgeTextOpen : styles.badgeTextLocked]}>
+          {revealed ? 'Révélée' : formatCountdown(revealAt, now)}
+        </Text>
+      </View>
+
+      {authorLabel && <Text style={styles.author}>{authorLabel}</Text>}
+      <Text style={styles.cardTitle}>{item.title}</Text>
+      <Text style={styles.cardTeaser}>{item.teaser}</Text>
+
+      {revealed && item.content ? (
+        <View style={styles.contentBox}>
+          <Text style={styles.contentLabel}>Contenu</Text>
+          <Text style={styles.cardContent}>{item.content}</Text>
+        </View>
+      ) : (
+        <View style={styles.sealedBox}>
+          <Text style={styles.sealedText}>🔒 Contenu scellé jusqu’à la révélation</Text>
+        </View>
+      )}
+
+      <Text style={styles.cardMeta}>
+        {revealed ? 'Révélée' : 'Se révèle'} {formatRevealAt(revealAt)}
+      </Text>
+    </View>
+  );
+}
+
 export default function HomeScreen() {
   const { username, session, signOut } = useAuth();
   const router = useRouter();
 
-  const [predictions, setPredictions] = useState<Prediction[] | null>(null);
+  const [feed, setFeed] = useState<PredictionFeedItem[] | null>(null);
+  const [authorNames, setAuthorNames] = useState<AuthorNames>({});
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => new Date());
@@ -42,19 +89,31 @@ export default function HomeScreen() {
   const load = useCallback(async () => {
     if (!userId) return;
 
-    const { data, error: fetchError } = await fetchMyPredictions(userId);
+    const { data, error: fetchError } = await fetchPredictionsFeed();
 
     if (fetchError) {
-      setError(
-        isMissingTable(fetchError)
-          ? 'Table `predictions` introuvable. Exécute supabase/schema.sql dans le SQL Editor.'
-          : `Chargement impossible : ${fetchError.message}`
-      );
+      setError(feedErrorMessage(fetchError));
       return;
     }
 
     setError(null);
-    setPredictions(data ?? []);
+    const items = data ?? [];
+    setFeed(items);
+
+    const otherAuthorIds = Array.from(
+      new Set(items.filter((item) => item.author_id !== userId).map((item) => item.author_id))
+    );
+    if (otherAuthorIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, username')
+        .in('id', otherAuthorIds);
+      const names: AuthorNames = {};
+      for (const profile of profiles ?? []) {
+        names[profile.id] = profile.username;
+      }
+      setAuthorNames(names);
+    }
   }, [userId]);
 
   // Au focus et non au montage : l'écran de création revient ici par
@@ -82,6 +141,9 @@ export default function HomeScreen() {
     }
   }
 
+  const mine = (feed ?? []).filter((item) => item.author_id === userId);
+  const fromCircle = (feed ?? []).filter((item) => item.author_id !== userId);
+
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
@@ -91,64 +153,55 @@ export default function HomeScreen() {
             {username ?? session?.user.email ?? ''}
           </Text>
         </View>
+        <Pressable onPress={() => router.push('/circle')} hitSlop={8} style={styles.circleLink}>
+          <Text style={styles.circleLinkText}>Le Cercle</Text>
+        </Pressable>
         <Pressable onPress={signOut} hitSlop={8}>
           <Text style={styles.signOut}>Se déconnecter</Text>
         </Pressable>
       </View>
 
-      <FlatList
-        data={predictions ?? []}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-        ListHeaderComponent={
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.gold} />}
+      >
+        {error && <Text style={styles.error}>{error}</Text>}
+
+        {feed === null && !error ? (
+          <ActivityIndicator style={styles.loader} color={colors.gold} />
+        ) : (
           <>
             <Text style={styles.sectionTitle}>Mes prédictions</Text>
-            {error && <Text style={styles.error}>{error}</Text>}
-          </>
-        }
-        ListEmptyComponent={
-          // `predictions === null` = premier chargement en cours. Sans cette
-          // distinction, l'état vide s'afficherait une fraction de seconde
-          // avant les données.
-          predictions === null && !error ? (
-            <ActivityIndicator style={styles.loader} />
-          ) : (
-            <View style={styles.empty}>
-              <Text style={styles.emptyTitle}>Aucune prédiction pour l’instant.</Text>
-              <Text style={styles.emptyText}>
-                Écris ce que tu vois venir pour quelqu’un de ton cercle, et choisis
-                quand ça se dévoile.
-              </Text>
-            </View>
-          )
-        }
-        renderItem={({ item }) => {
-          const revealAt = new Date(item.reveal_at);
-          const revealed = isRevealed(item, now);
-
-          return (
-            <View style={styles.card}>
-              <View style={[styles.badge, revealed ? styles.badgeOpen : styles.badgeLocked]}>
-                <Text
-                  style={[
-                    styles.badgeText,
-                    revealed ? styles.badgeTextOpen : styles.badgeTextLocked,
-                  ]}
-                >
-                  {revealed ? 'Révélée' : formatCountdown(revealAt, now)}
+            {mine.length === 0 ? (
+              <View style={styles.empty}>
+                <Text style={styles.emptyTitle}>Aucune prédiction pour l’instant.</Text>
+                <Text style={styles.emptyText}>
+                  Écris ce que tu vois venir pour quelqu’un de ton cercle, et choisis
+                  quand ça se dévoile.
                 </Text>
               </View>
-              <Text style={styles.cardContent}>{item.content}</Text>
-              <Text style={styles.cardMeta}>
-                {revealed ? 'Révélée' : 'Se révèle'} {formatRevealAt(revealAt)}
+            ) : (
+              mine.map((item) => <PredictionCard key={item.id} item={item} now={now} />)
+            )}
+
+            <Text style={[styles.sectionTitle, styles.sectionSpacing]}>Le Cercle</Text>
+            {fromCircle.length === 0 ? (
+              <Text style={styles.emptyText}>
+                Rien de tes amis pour l’instant — leurs prédictions apparaîtront ici.
               </Text>
-            </View>
-          );
-        }}
-      />
+            ) : (
+              fromCircle.map((item) => (
+                <PredictionCard
+                  key={item.id}
+                  item={item}
+                  now={now}
+                  authorLabel={authorNames[item.author_id] ?? '…'}
+                />
+              ))
+            )}
+          </>
+        )}
+      </ScrollView>
 
       <View style={styles.footer}>
         <Pressable
@@ -163,81 +216,113 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
+  safe: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.lg,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-    gap: 12,
+    borderBottomColor: colors.border,
+    gap: spacing.md,
   },
   brand: {
     fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 2,
-    color: '#2563eb',
+    letterSpacing: 3,
+    color: colors.gold,
     textTransform: 'uppercase',
   },
-  greeting: { fontSize: 17, fontWeight: '700', color: '#111', marginTop: 2 },
-  signOut: { fontSize: 13, color: '#6b7280' },
-  list: { padding: 20, paddingBottom: 8, flexGrow: 1 },
-  sectionTitle: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 12 },
+  greeting: { fontSize: 17, fontWeight: '700', color: colors.text, marginTop: 2 },
+  circleLink: {
+    borderWidth: 1,
+    borderColor: colors.gold,
+    borderRadius: radius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  circleLinkText: { fontSize: 13, fontWeight: '700', color: colors.gold },
+  signOut: { fontSize: 13, color: colors.textFaint },
+  scroll: { padding: spacing.lg, paddingBottom: 8, flexGrow: 1 },
+  sectionTitle: { fontSize: 13, fontWeight: '600', color: colors.textMuted, marginBottom: 12 },
+  sectionSpacing: { marginTop: spacing.lg },
   loader: { marginTop: 32 },
-  empty: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 40 },
-  emptyTitle: { fontSize: 16, fontWeight: '600', color: '#374151', marginBottom: 6 },
+  empty: { paddingVertical: 24, alignItems: 'center' },
+  emptyTitle: { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 6 },
   emptyText: {
     fontSize: 14,
-    color: '#6b7280',
+    color: colors.textFaint,
     textAlign: 'center',
     lineHeight: 20,
-    maxWidth: 300,
   },
   error: {
-    color: '#b91c1c',
-    backgroundColor: '#fef2f2',
-    borderRadius: 8,
+    color: colors.danger,
+    backgroundColor: colors.dangerSoft,
+    borderRadius: radius.sm,
     padding: 12,
     fontSize: 14,
     marginBottom: 12,
   },
   card: {
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
     padding: 16,
     marginBottom: 12,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
   },
   badge: {
     alignSelf: 'flex-start',
-    borderRadius: 999,
+    borderRadius: radius.pill,
     paddingHorizontal: 10,
     paddingVertical: 4,
     marginBottom: 10,
   },
-  badgeLocked: { backgroundColor: '#eff6ff' },
-  badgeOpen: { backgroundColor: '#f0fdf4' },
+  badgeLocked: { backgroundColor: colors.goldSoft },
+  badgeOpen: { backgroundColor: colors.successSoft },
   badgeText: { fontSize: 12, fontWeight: '700' },
-  badgeTextLocked: { color: '#1d4ed8' },
-  badgeTextOpen: { color: '#166534' },
-  cardContent: { fontSize: 16, color: '#111', lineHeight: 22 },
-  cardMeta: { fontSize: 13, color: '#6b7280', marginTop: 10 },
+  badgeTextLocked: { color: colors.goldBright },
+  badgeTextOpen: { color: colors.success },
+  author: { fontSize: 12, color: colors.textFaint, marginBottom: 4 },
+  cardTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
+  cardTeaser: { fontSize: 14, color: colors.textMuted, marginTop: 4, lineHeight: 20 },
+  contentBox: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  contentLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.gold,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  cardContent: { fontSize: 15, color: colors.text, lineHeight: 21 },
+  sealedBox: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  sealedText: { fontSize: 13, color: colors.textFaint, fontStyle: 'italic' },
+  cardMeta: { fontSize: 12, color: colors.textFaint, marginTop: 10 },
   footer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.lg,
     paddingTop: 12,
     paddingBottom: 20,
     borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
+    borderTopColor: colors.border,
   },
   create: {
-    backgroundColor: '#2563eb',
-    borderRadius: 10,
+    backgroundColor: colors.gold,
+    borderRadius: radius.sm,
     paddingVertical: 15,
     alignItems: 'center',
   },
-  createPressed: { backgroundColor: '#1d4ed8' },
-  createText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  createPressed: { backgroundColor: colors.goldBright },
+  createText: { color: colors.background, fontSize: 16, fontWeight: '700' },
 });
