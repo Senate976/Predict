@@ -437,8 +437,10 @@ alter table public.predictions add column if not exists scope text;
 -- Pas de titre séparé : uniquement un teaser et le contenu scellé. Si une
 -- exécution précédente de ce script avait ajouté `title` (avant ce
 -- changement), on la retire — sans perte pour le teaser ou le contenu, qui
--- vivent chacun dans leur propre colonne/table.
-alter table public.predictions drop column if exists title;
+-- vivent chacun dans leur propre colonne/table. `cascade` : la vue
+-- `predictions_feed` (section 13) dépend de cette colonne ; elle est de toute
+-- façon recréée plus bas, sans `title`.
+alter table public.predictions drop column if exists title cascade;
 
 -- Le contenu secret lui-même. Une ligne par prédiction (clé primaire =
 -- clé étrangère), jamais créée ni lue en dehors de la fonction
