@@ -47,15 +47,16 @@ export function PrestigeBadge({ count, size = 'small' }: Props) {
               pour suggérer le rebord gravé de la maquette de référence. */}
           <View style={styles.bevel}>
             <View style={styles.engraving}>
-              <Text
-                style={[styles.label, styles.labelShadow, { color: badge.engraveShadow }]}
-                numberOfLines={2}
-              >
-                {badge.label.toUpperCase()}
-              </Text>
-              <Text style={[styles.label, { color: badge.engraveLight }]} numberOfLines={2}>
-                {badge.label.toUpperCase()}
-              </Text>
+              {/* Bannière sombre derrière le nom du niveau, plutôt qu'un
+                  simple contraste de gravure sur le métal : sur les métaux
+                  clairs (argent notamment) le texte gravé restait difficile à
+                  lire. Un fond sombre fixe garantit un contraste texte
+                  blanc/doré suffisant quel que soit le métal. */}
+              <View style={styles.labelBanner}>
+                <Text style={styles.label} numberOfLines={2}>
+                  {badge.label.toUpperCase()}
+                </Text>
+              </View>
               <View style={[styles.divider, { backgroundColor: badge.engraveShadow }]} />
               <Text style={[styles.monogram, { color: badge.engraveShadow }]}>P</Text>
             </View>
@@ -135,21 +136,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   engraving: { alignItems: 'center' },
+  labelBanner: {
+    backgroundColor: 'rgba(23, 21, 18, 0.62)',
+    borderRadius: 5,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    maxWidth: 78,
+  },
   label: {
     fontFamily: fonts.serif,
     fontSize: 7.5,
     lineHeight: 9,
     letterSpacing: 0.3,
     textAlign: 'center',
-    width: 74,
+    color: '#FCEDBB',
+    fontWeight: '700',
   },
-  labelShadow: {
-    position: 'absolute',
-    top: 1,
-    left: 0.6,
-    opacity: 0.65,
-  },
-  divider: { width: 18, height: 1, marginTop: 4, opacity: 0.5 },
+  divider: { width: 18, height: 1, marginTop: 6, opacity: 0.5 },
   monogram: { fontFamily: fonts.serif, fontSize: 9, marginTop: 3, opacity: 0.7 },
   highlight: {
     position: 'absolute',

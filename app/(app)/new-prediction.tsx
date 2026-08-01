@@ -20,6 +20,7 @@ import { setPredictionAudioPath, uploadPredictionAudio } from '../../lib/audio';
 import { useAuth } from '../../lib/auth';
 import { MONTHS, formatCountdown, formatRevealAt } from '../../lib/datetime';
 import { fetchFriendships, otherProfile, type FriendProfile } from '../../lib/friends';
+import { fetchGroups, type FriendGroup } from '../../lib/groups';
 import {
   MAX_CONTENT_LENGTH,
   MAX_TEASER_LENGTH,
@@ -90,6 +91,8 @@ export default function NewPredictionScreen() {
   const [scope, setScope] = useState<PredictionScope>('circle');
   const [friends, setFriends] = useState<FriendProfile[] | null>(null);
   const [selectedFriendIds, setSelectedFriendIds] = useState<Set<string>>(new Set());
+  const [groups, setGroups] = useState<FriendGroup[] | null>(null);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -101,6 +104,7 @@ export default function NewPredictionScreen() {
       const accepted = (data ?? []).filter((f) => f.status === 'accepted');
       setFriends(accepted.map((f) => otherProfile(f, userId)));
     });
+    fetchGroups(userId).then(({ data }) => setGroups(data ?? []));
   }, [userId]);
 
   // Recale le jour si le mois/année choisi en compte moins (ex. 31 puis
@@ -152,6 +156,9 @@ export default function NewPredictionScreen() {
     if (scope === 'selected' && selectedFriendIds.size === 0) {
       return 'Choisis au moins un ami, ou passe sur « Tout mon Cercle ».';
     }
+    if (scope === 'group' && !selectedGroupId) {
+      return 'Choisis un groupe.';
+    }
     return null;
   }
 
@@ -177,6 +184,7 @@ export default function NewPredictionScreen() {
         revealAt,
         scope,
         friendIds: Array.from(selectedFriendIds),
+        groupId: selectedGroupId,
       });
 
       if (insertError) {
@@ -393,7 +401,46 @@ export default function NewPredictionScreen() {
                 Amis spécifiques
               </Text>
             </Pressable>
+            <Pressable
+              onPress={() => setScope('group')}
+              disabled={submitting}
+              style={[styles.scopeOption, scope === 'group' && styles.scopeOptionActive]}
+            >
+              <Text style={[styles.scopeText, scope === 'group' && styles.scopeTextActive]}>
+                Groupe d’amis
+              </Text>
+            </Pressable>
           </View>
+
+          {scope === 'group' && (
+            <View style={styles.friendsBox}>
+              {groups === null ? (
+                <ActivityIndicator color={colors.gold} style={styles.searchLoader} />
+              ) : groups.length === 0 ? (
+                <Text style={styles.hint}>
+                  Tu n’as pas encore de groupe. Crée-en un depuis l’onglet Cercle.
+                </Text>
+              ) : (
+                groups.map((group) => {
+                  const selected = selectedGroupId === group.id;
+                  return (
+                    <Pressable
+                      key={group.id}
+                      onPress={() => setSelectedGroupId(group.id)}
+                      disabled={submitting}
+                      style={[styles.friendChip, selected && styles.friendChipActive]}
+                    >
+                      <Text
+                        style={[styles.friendChipText, selected && styles.friendChipTextActive]}
+                      >
+                        {group.name}
+                      </Text>
+                    </Pressable>
+                  );
+                })
+              )}
+            </View>
+          )}
 
           {scope === 'selected' && (
             <View style={styles.friendsBox}>

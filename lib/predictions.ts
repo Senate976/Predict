@@ -2,7 +2,7 @@ import type { PostgrestError } from '@supabase/supabase-js';
 
 import { supabase } from './supabase';
 
-export type PredictionScope = 'circle' | 'selected';
+export type PredictionScope = 'circle' | 'selected' | 'group';
 
 /**
  * Une prédiction telle que renvoyée par la vue `public.predictions_feed`.
@@ -119,6 +119,7 @@ export async function createPrediction(input: {
   revealAt: Date;
   scope: PredictionScope;
   friendIds: string[];
+  groupId?: string | null;
 }) {
   const result = await supabase.rpc('create_prediction', {
     p_teaser: input.teaser.trim(),
@@ -126,6 +127,7 @@ export async function createPrediction(input: {
     p_reveal_at: input.revealAt.toISOString(),
     p_scope: input.scope,
     p_friend_ids: input.scope === 'selected' ? input.friendIds : [],
+    p_group_id: input.scope === 'group' ? input.groupId ?? null : null,
   });
   return result as { data: string | null; error: PostgrestError | null };
 }

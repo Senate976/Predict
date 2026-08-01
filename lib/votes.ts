@@ -15,9 +15,9 @@ export type Vote = {
 export function voteErrorMessage(error: PostgrestError): string {
   switch (error.code) {
     case '42501':
-      return 'Vote refusé : seuls les destinataires peuvent voter, et seulement une fois la prédiction révélée.';
+      return 'Action refusée : seuls les destinataires peuvent se prononcer, et seulement une fois la prédiction révélée.';
     default:
-      return `Vote impossible : ${error.message}`;
+      return `Action impossible : ${error.message}`;
   }
 }
 
