@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AudioPlayerButton } from '../../../components/AudioPlayerButton';
 import { InlineComments } from '../../../components/InlineComments';
+import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { useAuth } from '../../../lib/auth';
 import { formatRevealAt } from '../../../lib/datetime';
 import { fetchFriendships, otherProfile, type FriendProfile } from '../../../lib/friends';
@@ -158,7 +159,7 @@ export default function PredictionDetailScreen() {
           <Text style={styles.back}>Retour</Text>
         </Pressable>
         <Text style={styles.headerTitle}>Prédiction</Text>
-        <View style={styles.headerSpacer} />
+        <QuickCreateButton />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -311,7 +312,6 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   headerTitle: { fontFamily: fonts.serifItalic, fontSize: 18, color: colors.text },
-  headerSpacer: { width: 56 },
   back: { fontSize: 15, color: colors.gold, width: 56 },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   loader: { marginTop: 24 },

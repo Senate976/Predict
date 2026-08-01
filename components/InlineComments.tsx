@@ -1,8 +1,10 @@
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { addComment, commentErrorMessage, fetchComments, MAX_COMMENT_LENGTH, type Comment } from '../lib/comments';
 import { colors, radius } from '../lib/theme';
+import { Avatar } from './Avatar';
 
 /**
  * Fil de commentaires directement sur la carte (Fil, Archives), façon réseau
@@ -11,17 +13,26 @@ import { colors, radius } from '../lib/theme';
  * la RLS de `prediction_comments` fait le même contrôle d'accès dans les deux
  * cas (auteur ou destinataire), sans condition de date.
  */
+const TRUNCATED_COUNT = 2;
+
 export function InlineComments({
   predictionId,
   userId,
+  truncate = false,
 }: {
   predictionId: string;
   userId: string;
+  /** Replie la liste aux `TRUNCATED_COUNT` commentaires les plus récents,
+   * derrière un bouton « Voir les X autres » — utilisé sur les cartes du Fil
+   * et des Archives. L'écran détail, lui, montre toute la discussion. */
+  truncate?: boolean;
 }) {
   const [comments, setComments] = useState<Comment[] | null>(null);
   const [input, setInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(!truncate);
+  const router = useRouter();
 
   useEffect(() => {
     let cancelled = false;
@@ -52,6 +63,10 @@ export function InlineComments({
     }
   }
 
+  const hiddenCount = comments ? Math.max(0, comments.length - TRUNCATED_COUNT) : 0;
+  const visibleComments =
+    comments && !showAll ? comments.slice(-TRUNCATED_COUNT) : comments;
+
   return (
     <View style={styles.container}>
       {comments === null ? (
@@ -59,9 +74,24 @@ export function InlineComments({
       ) : (
         comments.length > 0 && (
           <View style={styles.list}>
-            {comments.map((comment) => (
+            {hiddenCount > 0 && !showAll && (
+              <Pressable onPress={() => setShowAll(true)} style={styles.showMore}>
+                <Text style={styles.showMoreText}>
+                  Voir les {hiddenCount} autre{hiddenCount > 1 ? 's' : ''} commentaire
+                  {hiddenCount > 1 ? 's' : ''}
+                </Text>
+              </Pressable>
+            )}
+            {(visibleComments ?? []).map((comment) => (
               <View key={comment.id} style={styles.comment}>
-                <Text style={styles.commentAuthor}>{comment.author.username}</Text>
+                <Pressable
+                  onPress={() => router.push(`/profile/${comment.author_id}`)}
+                  style={styles.commentAuthorRow}
+                  hitSlop={4}
+                >
+                  <Avatar url={comment.author.avatar_url} username={comment.author.username} size={20} />
+                  <Text style={styles.commentAuthor}>{comment.author.username}</Text>
+                </Pressable>
                 <Text style={styles.commentContent}>{comment.content}</Text>
               </View>
             ))}
@@ -99,8 +129,11 @@ const styles = StyleSheet.create({
   loader: { marginVertical: 8 },
   list: { gap: 8, marginBottom: 10 },
   comment: {},
+  showMore: { alignSelf: 'flex-start', marginBottom: 2 },
+  showMoreText: { fontSize: 12, fontWeight: '600', color: colors.gold },
+  commentAuthorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' },
   commentAuthor: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
-  commentContent: { fontSize: 14, color: colors.text, marginTop: 2, lineHeight: 19 },
+  commentContent: { fontSize: 14, color: colors.text, marginTop: 4, lineHeight: 19 },
   error: { color: colors.danger, fontSize: 12, marginBottom: 6 },
   inputRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-end' },
   input: {

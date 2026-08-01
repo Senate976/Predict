@@ -10,7 +10,7 @@ export type Comment = {
   author_id: string;
   content: string;
   created_at: string;
-  author: { username: string };
+  author: { username: string; avatar_url: string | null };
 };
 
 export function commentErrorMessage(error: PostgrestError): string {
@@ -28,7 +28,7 @@ export function commentErrorMessage(error: PostgrestError): string {
 export async function fetchComments(predictionId: string) {
   return supabase
     .from('prediction_comments')
-    .select('id, prediction_id, author_id, content, created_at, author:profiles(username)')
+    .select('id, prediction_id, author_id, content, created_at, author:profiles(username, avatar_url)')
     .eq('prediction_id', predictionId)
     .order('created_at', { ascending: true })
     .returns<Comment[]>();

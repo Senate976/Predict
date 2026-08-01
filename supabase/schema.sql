@@ -1523,7 +1523,107 @@ revoke all on function public.create_prediction(text, text, timestamptz, text, u
 grant execute on function public.create_prediction(text, text, timestamptz, text, uuid[], uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 20. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 20. Photo de profil
+-- ---------------------------------------------------------------------------
+--
+-- Bucket PUBLIC, contrairement à `prediction-audio` : une photo de profil
+-- n'est pas un contenu scellé, elle doit s'afficher partout (Fil, Cercle,
+-- commentaires) sans repasser par une URL signée à chaque fois.
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do nothing;
+
+alter table public.profiles add column if not exists avatar_url text;
+
+-- Chemin de stockage attendu : `<user_id>/<fichier>`. Lecture publique
+-- (cohérente avec `public: true` sur le bucket, déclarée explicitement ici
+-- pour rester dans le même style que le reste du schéma) ; écriture réservée
+-- à son propre dossier.
+drop policy if exists "avatars_select_public" on storage.objects;
+create policy "avatars_select_public"
+  on storage.objects
+  for select
+  to public
+  using (bucket_id = 'avatars');
+
+drop policy if exists "avatars_insert_own" on storage.objects;
+create policy "avatars_insert_own"
+  on storage.objects
+  for insert
+  to authenticated
+  with check (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "avatars_update_own" on storage.objects;
+create policy "avatars_update_own"
+  on storage.objects
+  for update
+  to authenticated
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text)
+  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "avatars_delete_own" on storage.objects;
+create policy "avatars_delete_own"
+  on storage.objects
+  for delete
+  to authenticated
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ---------------------------------------------------------------------------
+-- 21. Statistiques d'un profil consultable (Cercle)
+-- ---------------------------------------------------------------------------
+--
+-- Réservé à soi-même ou à un ami accepté (même garde-fou que
+-- `get_realized_count_30d`) : un aperçu agrégé des scellés d'un ami — jamais
+-- le détail des prédictions elles-mêmes, seulement des compteurs — pour la
+-- vue "Profil d'un ami" (item 8).
+create or replace function public.get_prediction_stats(target_user uuid)
+returns table (total bigint, realized bigint, missed bigint, pending bigint)
+language sql
+security definer
+stable
+set search_path = ''
+as $$
+  select
+    count(*) as total,
+    count(*) filter (where final_status = 'realized') as realized,
+    count(*) filter (where final_status = 'missed') as missed,
+    count(*) filter (where final_status = 'pending') as pending
+  from (
+    select
+      case
+        when p.reveal_at > now() then 'pending'
+        when coalesce(sum((v.vote_value = 'realized')::int), 0)
+           > coalesce(sum((v.vote_value = 'missed')::int), 0) then 'realized'
+        when coalesce(sum((v.vote_value = 'missed')::int), 0)
+           > coalesce(sum((v.vote_value = 'realized')::int), 0) then 'missed'
+        else 'pending'
+      end as final_status
+    from public.predictions p
+    left join public.prediction_votes v on v.prediction_id = p.id
+    where p.author_id = target_user
+      and (
+        target_user = auth.uid()
+        or exists (
+          select 1 from public.friendships f
+          where f.status = 'accepted'
+            and (
+              (f.requester_id = auth.uid() and f.addressee_id = target_user)
+              or (f.addressee_id = auth.uid() and f.requester_id = target_user)
+            )
+        )
+      )
+    group by p.id, p.reveal_at
+  ) sub;
+$$;
+
+revoke all on function public.get_prediction_stats(uuid) from public;
+grant execute on function public.get_prediction_stats(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 22. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une

@@ -32,14 +32,15 @@ import { colors, fonts, spacing } from '../../../lib/theme';
  */
 const TICK_MS = 30_000;
 
-type AuthorNames = Record<string, string>;
+type AuthorInfo = { username: string; avatar_url: string | null };
+type AuthorMap = Record<string, AuthorInfo>;
 
 export default function HomeScreen() {
   const { username, session, onboarded, markOnboarded } = useAuth();
   const router = useRouter();
 
   const [feed, setFeed] = useState<PredictionFeedItem[] | null>(null);
-  const [authorNames, setAuthorNames] = useState<AuthorNames>({});
+  const [authors, setAuthors] = useState<AuthorMap>({});
   const [unreadCount, setUnreadCount] = useState(0);
   const [celebration, setCelebration] = useState<{ visible: boolean; message: string }>({
     visible: false,
@@ -76,13 +77,13 @@ export default function HomeScreen() {
     if (otherAuthorIds.length > 0) {
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, username')
+        .select('id, username, avatar_url')
         .in('id', otherAuthorIds);
-      const names: AuthorNames = {};
+      const map: AuthorMap = {};
       for (const profile of profiles ?? []) {
-        names[profile.id] = profile.username;
+        map[profile.id] = { username: profile.username, avatar_url: profile.avatar_url };
       }
-      setAuthorNames(names);
+      setAuthors(map);
     }
 
     const { data: notifications } = await fetchNotifications(userId);
@@ -182,7 +183,9 @@ export default function HomeScreen() {
               key={item.id}
               item={item}
               now={now}
-              authorLabel={item.author_id !== userId ? authorNames[item.author_id] ?? '…' : undefined}
+              authorLabel={item.author_id !== userId ? authors[item.author_id]?.username ?? '…' : undefined}
+              authorId={item.author_id !== userId ? item.author_id : undefined}
+              authorAvatarUrl={item.author_id !== userId ? authors[item.author_id]?.avatar_url : undefined}
               userId={userId!}
               onPress={() => router.push(`/prediction/${item.id}`)}
             />

@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { QuickCreateButton } from '../../components/QuickCreateButton';
 import { useAuth } from '../../lib/auth';
 import {
   fetchNotifications,
@@ -71,7 +72,7 @@ export default function NotificationsScreen() {
           <Text style={styles.back}>Retour</Text>
         </Pressable>
         <Text style={styles.headerTitle}>Notifications</Text>
-        <View style={styles.headerSpacer} />
+        <QuickCreateButton />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -122,7 +123,6 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   headerTitle: { fontFamily: fonts.serifItalic, fontSize: 18, color: colors.text },
-  headerSpacer: { width: 56 },
   back: { fontSize: 15, color: colors.gold, width: 56 },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   loader: { marginTop: 32 },

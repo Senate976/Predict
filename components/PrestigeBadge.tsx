@@ -1,70 +1,45 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { badgeForCount, badgeProgress } from '../lib/badges';
-import { colors, fonts } from '../lib/theme';
+import { colors, eyebrow, fonts } from '../lib/theme';
 
 type Props = {
   count: number;
-  /** `small` : simple médaille, à côté d'un pseudo. `large` : pièce gravée + jauge (Profil). */
+  /** `small` : simple puce, à côté d'un pseudo. `large` : médaillon + libellé + jauge (Profil). */
   size?: 'small' | 'large';
 };
 
-const SMALL_SIZE = 18;
-const LARGE_SIZE = 96;
+const SMALL_SIZE = 16;
+const LARGE_SIZE = 72;
 
+/**
+ * Un anneau doré fin plutôt qu'une pièce gravée en relief : le nom du niveau
+ * se lit en typographie (style `eyebrow`, cohérent avec le reste de
+ * l'application) sous le médaillon, jamais à l'intérieur — ce qui évite tout
+ * problème de contraste texte-sur-métal, quel que soit le niveau.
+ */
 export function PrestigeBadge({ count, size = 'small' }: Props) {
   const badge = badgeForCount(count);
   const progress = badgeProgress(count, badge);
 
   if (size === 'small') {
     return (
-      <View style={[styles.smallRing, { borderColor: badge.engraveShadow }]}>
-        <LinearGradient
-          colors={badge.gradient}
-          start={{ x: 0.2, y: 0 }}
-          end={{ x: 0.85, y: 1 }}
-          style={styles.smallFace}
-        />
+      <View style={[styles.smallRing, { borderColor: badge.color }]}>
+        <View style={[styles.smallCore, { backgroundColor: badge.color }]} />
       </View>
     );
   }
 
   return (
     <View style={styles.largeWrap}>
-      <View style={styles.coinShadowLayer}>
-        {/* Tranche de la pièce : anneau le plus sombre, légèrement plus grand
-            que la face, pour l'épaisseur vue de trois quarts. */}
-        <View style={[styles.rim, { backgroundColor: badge.engraveShadow }]} />
-
-        <LinearGradient
-          colors={badge.gradient}
-          start={{ x: 0.18, y: 0.05 }}
-          end={{ x: 0.85, y: 1 }}
-          style={styles.face}
-        >
-          {/* Biseau intérieur : simple cercle inset avec une bordure claire,
-              pour suggérer le rebord gravé de la maquette de référence. */}
-          <View style={styles.bevel}>
-            <View style={styles.engraving}>
-              {/* Bannière sombre derrière le nom du niveau, plutôt qu'un
-                  simple contraste de gravure sur le métal : sur les métaux
-                  clairs (argent notamment) le texte gravé restait difficile à
-                  lire. Un fond sombre fixe garantit un contraste texte
-                  blanc/doré suffisant quel que soit le métal. */}
-              <View style={styles.labelBanner}>
-                <Text style={styles.label} numberOfLines={2}>
-                  {badge.label.toUpperCase()}
-                </Text>
-              </View>
-              <View style={[styles.divider, { backgroundColor: badge.engraveShadow }]} />
-              <Text style={[styles.monogram, { color: badge.engraveShadow }]}>P</Text>
-            </View>
-          </View>
-
-          <View style={styles.highlight} />
-        </LinearGradient>
+      <View style={[styles.medallion, { borderColor: badge.color }]}>
+        <View style={[styles.innerRing, { borderColor: badge.color }]} />
+        {/* Reflet subtil, façon verre — un simple arc clair en haut à gauche. */}
+        <View style={styles.gloss} />
+        <View style={[styles.core, { backgroundColor: badge.color }]} />
       </View>
+
+      <Text style={[styles.label, { color: badge.color }]}>{badge.label}</Text>
 
       {badge.next ? (
         <>
@@ -92,81 +67,64 @@ const styles = StyleSheet.create({
     width: SMALL_SIZE,
     height: SMALL_SIZE,
     borderRadius: SMALL_SIZE / 2,
-    borderWidth: 1,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.surface,
   },
-  smallFace: {
-    width: SMALL_SIZE - 4,
-    height: SMALL_SIZE - 4,
-    borderRadius: (SMALL_SIZE - 4) / 2,
+  smallCore: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    opacity: 0.85,
   },
   largeWrap: { alignItems: 'center' },
-  coinShadowLayer: {
-    width: LARGE_SIZE + 6,
-    height: LARGE_SIZE + 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.28,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  rim: {
-    position: 'absolute',
-    width: LARGE_SIZE + 6,
-    height: LARGE_SIZE + 6,
-    borderRadius: (LARGE_SIZE + 6) / 2,
-  },
-  face: {
+  medallion: {
     width: LARGE_SIZE,
     height: LARGE_SIZE,
     borderRadius: LARGE_SIZE / 2,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.surface,
   },
-  bevel: {
+  innerRing: {
+    position: 'absolute',
     width: LARGE_SIZE - 10,
     height: LARGE_SIZE - 10,
     borderRadius: (LARGE_SIZE - 10) / 2,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.35)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    opacity: 0.35,
   },
-  engraving: { alignItems: 'center' },
-  labelBanner: {
-    backgroundColor: 'rgba(23, 21, 18, 0.62)',
-    borderRadius: 5,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    maxWidth: 78,
+  gloss: {
+    position: 'absolute',
+    width: LARGE_SIZE - 18,
+    height: (LARGE_SIZE - 18) / 2,
+    top: 8,
+    borderTopLeftRadius: (LARGE_SIZE - 18) / 2,
+    borderTopRightRadius: (LARGE_SIZE - 18) / 2,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.9)',
+    opacity: 0.5,
+  },
+  core: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    opacity: 0.9,
   },
   label: {
+    ...eyebrow,
+    marginTop: 12,
     fontFamily: fonts.serif,
-    fontSize: 7.5,
-    lineHeight: 9,
-    letterSpacing: 0.3,
-    textAlign: 'center',
-    color: '#FCEDBB',
-    fontWeight: '700',
-  },
-  divider: { width: 18, height: 1, marginTop: 6, opacity: 0.5 },
-  monogram: { fontFamily: fonts.serif, fontSize: 9, marginTop: 3, opacity: 0.7 },
-  highlight: {
-    position: 'absolute',
-    width: 30,
-    height: 14,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.32)',
-    top: 12,
-    left: 16,
-    transform: [{ rotate: '-25deg' }],
+    fontSize: 13,
+    letterSpacing: 1.2,
+    textTransform: 'none',
+    fontWeight: '600',
   },
   track: {
     width: 150,
-    height: 4,
+    height: 3,
     borderRadius: 2,
     backgroundColor: colors.border,
     marginTop: 12,

@@ -2,7 +2,7 @@ import type { PostgrestError } from '@supabase/supabase-js';
 
 import { supabase } from './supabase';
 
-export type FriendProfile = { id: string; username: string };
+export type FriendProfile = { id: string; username: string; avatar_url: string | null };
 
 export type FriendshipStatus = 'pending' | 'accepted';
 
@@ -80,7 +80,7 @@ export async function fetchFriendships(userId: string) {
 
   const { data: profiles, error: profilesError } = await supabase
     .from('profiles')
-    .select('id, username')
+    .select('id, username, avatar_url')
     .in('id', otherIds);
 
   if (profilesError) {
@@ -88,7 +88,8 @@ export async function fetchFriendships(userId: string) {
   }
 
   const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
-  const profileOrFallback = (id: string): FriendProfile => byId.get(id) ?? { id, username: '…' };
+  const profileOrFallback = (id: string): FriendProfile =>
+    byId.get(id) ?? { id, username: '…', avatar_url: null };
 
   const friendships: Friendship[] = data.map((f) => ({
     ...f,
@@ -111,7 +112,7 @@ export async function searchProfilesByUsername(query: string, excludeUserId: str
 
   return supabase
     .from('profiles')
-    .select('id, username')
+    .select('id, username, avatar_url')
     .ilike('username', `%${trimmed}%`)
     .neq('id', excludeUserId)
     .order('username', { ascending: true })
@@ -125,6 +126,16 @@ export async function sendFriendRequest(requesterId: string, addresseeId: string
     .insert({ requester_id: requesterId, addressee_id: addresseeId })
     .select('id')
     .single();
+}
+
+/** Le profil public d'un utilisateur quelconque — pour la vue "Profil d'un ami". */
+export async function fetchProfileById(userId: string) {
+  return supabase
+    .from('profiles')
+    .select('id, username, avatar_url')
+    .eq('id', userId)
+    .maybeSingle()
+    .returns<FriendProfile>();
 }
 
 /** Accepter une demande reçue — passe son statut à 'accepted'. */
