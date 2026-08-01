@@ -874,3 +874,184 @@ $$;
 
 revoke all on function public.generate_reveal_notifications() from public;
 grant execute on function public.generate_reveal_notifications() to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 15. Votes et commentaires après révélation
+-- ---------------------------------------------------------------------------
+--
+-- Un vote par destinataire (contrainte unique). L'auteur ne vote pas : il
+-- n'est jamais dans `prediction_access`, et la policy d'insert plus bas exige
+-- d'y être — un auteur ne peut donc pas juger sa propre prédiction.
+create table if not exists public.prediction_votes (
+  id uuid primary key default gen_random_uuid(),
+  prediction_id uuid not null references public.predictions (id) on delete cascade,
+  voter_id uuid not null references public.profiles (id) on delete cascade,
+  vote_value text not null check (vote_value in ('realized', 'missed')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index if not exists prediction_votes_unique_voter
+  on public.prediction_votes (prediction_id, voter_id);
+
+drop trigger if exists prediction_votes_set_updated_at on public.prediction_votes;
+create trigger prediction_votes_set_updated_at
+  before update on public.prediction_votes
+  for each row execute function public.set_updated_at();
+
+alter table public.prediction_votes enable row level security;
+
+-- Lecture ouverte à l'auteur et aux destinataires : le débat est transparent
+-- dans le Cercle, personne ne vote dans le noir face à un simple total caché.
+drop policy if exists "prediction_votes_select" on public.prediction_votes;
+create policy "prediction_votes_select"
+  on public.prediction_votes
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1 from public.prediction_access pa
+      where pa.prediction_id = prediction_votes.prediction_id and pa.user_id = auth.uid()
+    )
+    or exists (
+      select 1 from public.predictions p
+      where p.id = prediction_votes.prediction_id and p.author_id = auth.uid()
+    )
+  );
+
+-- Voter : seulement un destinataire (present dans prediction_access), sur son
+-- propre id, et seulement une fois révélée — avant, il n'y a rien à juger.
+drop policy if exists "prediction_votes_insert" on public.prediction_votes;
+create policy "prediction_votes_insert"
+  on public.prediction_votes
+  for insert
+  to authenticated
+  with check (
+    voter_id = auth.uid()
+    and exists (
+      select 1 from public.prediction_access pa
+      where pa.prediction_id = prediction_votes.prediction_id and pa.user_id = auth.uid()
+    )
+    and exists (
+      select 1 from public.predictions p
+      where p.id = prediction_votes.prediction_id and p.reveal_at <= now()
+    )
+  );
+
+-- Changer son propre vote reste possible (l'unique porte sur une ligne par
+-- destinataire, pas sur son contenu) — un débat peut faire changer d'avis.
+drop policy if exists "prediction_votes_update_own" on public.prediction_votes;
+create policy "prediction_votes_update_own"
+  on public.prediction_votes
+  for update
+  to authenticated
+  using (voter_id = auth.uid())
+  with check (voter_id = auth.uid());
+
+-- Les commentaires suivent la même logique d'accès que les votes : auteur et
+-- destinataires, seulement après révélation.
+create table if not exists public.prediction_comments (
+  id uuid primary key default gen_random_uuid(),
+  prediction_id uuid not null references public.predictions (id) on delete cascade,
+  author_id uuid not null references public.profiles (id) on delete cascade,
+  content text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.prediction_comments drop constraint if exists prediction_comments_length;
+alter table public.prediction_comments add constraint prediction_comments_length
+  check (char_length(btrim(content)) between 1 and 500);
+
+create index if not exists prediction_comments_prediction_idx
+  on public.prediction_comments (prediction_id, created_at);
+
+alter table public.prediction_comments enable row level security;
+
+drop policy if exists "prediction_comments_select" on public.prediction_comments;
+create policy "prediction_comments_select"
+  on public.prediction_comments
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1 from public.prediction_access pa
+      where pa.prediction_id = prediction_comments.prediction_id and pa.user_id = auth.uid()
+    )
+    or exists (
+      select 1 from public.predictions p
+      where p.id = prediction_comments.prediction_id and p.author_id = auth.uid()
+    )
+  );
+
+-- Commenter : auteur ou destinataire, seulement après révélation — avant, il
+-- n'y a que le teaser, rien à débattre.
+drop policy if exists "prediction_comments_insert" on public.prediction_comments;
+create policy "prediction_comments_insert"
+  on public.prediction_comments
+  for insert
+  to authenticated
+  with check (
+    author_id = auth.uid()
+    and exists (
+      select 1 from public.predictions p
+      where p.id = prediction_comments.prediction_id and p.reveal_at <= now()
+    )
+    and (
+      exists (
+        select 1 from public.prediction_access pa
+        where pa.prediction_id = prediction_comments.prediction_id and pa.user_id = auth.uid()
+      )
+      or exists (
+        select 1 from public.predictions p
+        where p.id = prediction_comments.prediction_id and p.author_id = auth.uid()
+      )
+    )
+  );
+
+-- Chacun peut retirer son propre commentaire — aucune autre modification.
+drop policy if exists "prediction_comments_delete_own" on public.prediction_comments;
+create policy "prediction_comments_delete_own"
+  on public.prediction_comments
+  for delete
+  to authenticated
+  using (author_id = auth.uid());
+
+-- ---------------------------------------------------------------------------
+-- 16. Statut final d'une prédiction — majorité des votes des destinataires
+-- ---------------------------------------------------------------------------
+--
+-- 'pending' tant qu'elle n'est pas révélée, ou révélée mais sans majorité
+-- claire (aucun vote, ou égalité) ; 'realized'/'missed' dès qu'un camp
+-- l'emporte. Alimente les 4 compteurs du Profil (Total/Réalisées/Manquées/
+-- En cours) et l'affichage du verdict sur l'écran détail.
+--
+-- `security_invoker = true` : la RLS de `predictions` et `prediction_votes`
+-- s'applique avec les droits de qui lit la vue, pas ceux qui l'ont créée —
+-- un auteur ne voit les votes en détail que sur ses propres prédictions,
+-- exactement comme en interrogeant les tables directement.
+drop view if exists public.prediction_outcomes;
+
+create view public.prediction_outcomes
+with (security_invoker = true) as
+select
+  p.id as prediction_id,
+  p.author_id,
+  p.teaser,
+  p.reveal_at,
+  p.created_at,
+  (p.reveal_at <= now()) as is_revealed,
+  coalesce(sum((v.vote_value = 'realized')::int), 0) as realized_votes,
+  coalesce(sum((v.vote_value = 'missed')::int), 0) as missed_votes,
+  case
+    when p.reveal_at > now() then 'pending'
+    when coalesce(sum((v.vote_value = 'realized')::int), 0)
+       > coalesce(sum((v.vote_value = 'missed')::int), 0) then 'realized'
+    when coalesce(sum((v.vote_value = 'missed')::int), 0)
+       > coalesce(sum((v.vote_value = 'realized')::int), 0) then 'missed'
+    else 'pending'
+  end as final_status
+from public.predictions p
+left join public.prediction_votes v on v.prediction_id = p.id
+group by p.id, p.author_id, p.teaser, p.reveal_at, p.created_at;
+
+grant select on public.prediction_outcomes to authenticated;

@@ -164,3 +164,46 @@ export async function removeRecipient(predictionId: string, userId: string) {
     .eq('prediction_id', predictionId)
     .eq('user_id', userId);
 }
+
+export type PredictionOutcomeStatus = 'pending' | 'realized' | 'missed';
+
+/**
+ * Une prédiction de l'auteur avec son statut final, tel que calculé par la
+ * vue `public.prediction_outcomes` (majorité des votes des destinataires).
+ * Alimente les 4 compteurs et l'historique filtrable du Profil.
+ */
+export type PredictionOutcome = {
+  prediction_id: string;
+  author_id: string;
+  teaser: string;
+  reveal_at: string;
+  created_at: string;
+  is_revealed: boolean;
+  realized_votes: number;
+  missed_votes: number;
+  final_status: PredictionOutcomeStatus;
+};
+
+/** Le statut d'une prédiction précise — auteur ou destinataire, peu importe. */
+export async function fetchPredictionOutcome(predictionId: string) {
+  return supabase
+    .from('prediction_outcomes')
+    .select(
+      'prediction_id, author_id, teaser, reveal_at, created_at, is_revealed, realized_votes, missed_votes, final_status'
+    )
+    .eq('prediction_id', predictionId)
+    .maybeSingle()
+    .returns<PredictionOutcome>();
+}
+
+/** Réservé à la lecture de ses propres prédictions (RLS de `predictions`). */
+export async function fetchPredictionOutcomes(authorId: string) {
+  return supabase
+    .from('prediction_outcomes')
+    .select(
+      'prediction_id, author_id, teaser, reveal_at, created_at, is_revealed, realized_votes, missed_votes, final_status'
+    )
+    .eq('author_id', authorId)
+    .order('created_at', { ascending: false })
+    .returns<PredictionOutcome[]>();
+}

@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { supabase } from '../../lib/supabase';
-import { colors, fonts, radius, spacing } from '../../lib/theme';
+import { colors, eyebrow, fonts, radius, spacing } from '../../lib/theme';
 
 type Mode = 'signIn' | 'signUp';
 
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
     marginBottom: 28,
   },
   field: { marginBottom: spacing.md },
-  label: { fontSize: 13, fontWeight: '600', color: colors.textMuted, marginBottom: 6 },
+  label: { ...eyebrow, marginBottom: 6 },
   input: {
     borderWidth: 1,
     borderColor: colors.border,

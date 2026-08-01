@@ -11,18 +11,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { SealBadge } from '../../components/SealBadge';
-import { useAuth } from '../../lib/auth';
-import { formatCountdown, formatRevealAt } from '../../lib/datetime';
-import { fetchNotifications } from '../../lib/notifications';
+import { PredictionCard } from '../../../components/PredictionCard';
+import { useAuth } from '../../../lib/auth';
+import { fetchNotifications } from '../../../lib/notifications';
 import {
   feedErrorMessage,
   fetchPredictionsFeed,
-  isRevealed,
   type PredictionFeedItem,
-} from '../../lib/predictions';
-import { supabase } from '../../lib/supabase';
-import { colors, fonts, radius, spacing } from '../../lib/theme';
+} from '../../../lib/predictions';
+import { supabase } from '../../../lib/supabase';
+import { colors, fonts, spacing } from '../../../lib/theme';
 
 /**
  * Période de rafraîchissement des comptes à rebours.
@@ -34,63 +32,8 @@ const TICK_MS = 30_000;
 
 type AuthorNames = Record<string, string>;
 
-function PredictionCard({
-  item,
-  now,
-  authorLabel,
-  onPress,
-}: {
-  item: PredictionFeedItem;
-  now: Date;
-  authorLabel?: string;
-  onPress?: () => void;
-}) {
-  const revealAt = new Date(item.reveal_at);
-  const revealed = isRevealed(item, now);
-
-  const card = (
-    <View style={styles.card}>
-      <View style={styles.cardTop}>
-        {!revealed && <SealBadge />}
-        <View style={[styles.badge, revealed ? styles.badgeOpen : styles.badgeLocked]}>
-          <Text style={[styles.badgeText, revealed ? styles.badgeTextOpen : styles.badgeTextLocked]}>
-            {revealed ? 'Révélée' : formatCountdown(revealAt, now)}
-          </Text>
-        </View>
-      </View>
-
-      {authorLabel && <Text style={styles.author}>{authorLabel}</Text>}
-      <Text style={styles.cardTeaser}>{item.teaser}</Text>
-
-      {revealed && item.content ? (
-        <View style={styles.contentBox}>
-          <Text style={styles.contentLabel}>Contenu</Text>
-          <Text style={styles.cardContent}>{item.content}</Text>
-        </View>
-      ) : (
-        <View style={styles.sealedBox}>
-          <Text style={styles.sealedText}>Contenu scellé jusqu’à la révélation</Text>
-        </View>
-      )}
-
-      <Text style={styles.cardMeta}>
-        {revealed ? 'Révélée' : 'Se révèle'} {formatRevealAt(revealAt)}
-        {onPress ? ' · Gérer les destinataires' : ''}
-      </Text>
-    </View>
-  );
-
-  if (!onPress) return card;
-
-  return (
-    <Pressable onPress={onPress} style={({ pressed }) => pressed && styles.cardPressed}>
-      {card}
-    </Pressable>
-  );
-}
-
 export default function HomeScreen() {
-  const { username, session, signOut } = useAuth();
+  const { username, session } = useAuth();
   const router = useRouter();
 
   const [feed, setFeed] = useState<PredictionFeedItem[] | null>(null);
@@ -182,12 +125,6 @@ export default function HomeScreen() {
             </View>
           )}
         </Pressable>
-        <Pressable onPress={() => router.push('/circle')} hitSlop={8} style={styles.circleLink}>
-          <Text style={styles.circleLinkText}>Le Cercle</Text>
-        </Pressable>
-        <Pressable onPress={signOut} hitSlop={8}>
-          <Text style={styles.signOut}>Se déconnecter</Text>
-        </Pressable>
       </View>
 
       <ScrollView
@@ -213,9 +150,7 @@ export default function HomeScreen() {
               item={item}
               now={now}
               authorLabel={item.author_id !== userId ? authorNames[item.author_id] ?? '…' : undefined}
-              onPress={
-                item.author_id === userId ? () => router.push(`/prediction/${item.id}`) : undefined
-              }
+              onPress={() => router.push(`/prediction/${item.id}`)}
             />
           ))
         )}
@@ -268,15 +203,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   badgeDotText: { fontSize: 10, fontWeight: '700', color: colors.background },
-  circleLink: {
-    borderWidth: 1,
-    borderColor: colors.gold,
-    borderRadius: radius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  circleLinkText: { fontSize: 13, fontWeight: '700', color: colors.gold },
-  signOut: { fontSize: 13, color: colors.textFaint },
   scroll: { padding: spacing.lg, paddingBottom: 8, flexGrow: 1 },
   loader: { marginTop: 32 },
   empty: { paddingVertical: 24, alignItems: 'center' },
@@ -290,67 +216,11 @@ const styles = StyleSheet.create({
   error: {
     color: colors.danger,
     backgroundColor: colors.dangerSoft,
-    borderRadius: radius.sm,
+    borderRadius: 8,
     padding: 12,
     fontSize: 14,
     marginBottom: 12,
   },
-  card: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    padding: 16,
-    marginBottom: 12,
-    backgroundColor: colors.surface,
-  },
-  cardPressed: { opacity: 0.85 },
-  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
-  badge: {
-    alignSelf: 'flex-start',
-    borderRadius: radius.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  badgeLocked: { backgroundColor: colors.goldSoft },
-  badgeOpen: { backgroundColor: colors.successSoft },
-  badgeText: { fontSize: 12, fontWeight: '700' },
-  badgeTextLocked: { color: colors.gold },
-  badgeTextOpen: { color: colors.success },
-  author: { fontSize: 12, color: colors.textFaint, marginBottom: 4 },
-  cardTeaser: {
-    fontFamily: fonts.serif,
-    fontSize: 20,
-    color: colors.text,
-    lineHeight: 26,
-  },
-  contentBox: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  contentLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.gold,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  cardContent: {
-    fontFamily: fonts.serif,
-    fontSize: 17,
-    color: colors.text,
-    lineHeight: 23,
-  },
-  sealedBox: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  sealedText: { fontSize: 13, color: colors.textFaint, fontStyle: 'italic' },
-  cardMeta: { fontSize: 12, color: colors.textFaint, marginTop: 10 },
   footer: {
     paddingHorizontal: spacing.lg,
     paddingTop: 12,
@@ -360,7 +230,7 @@ const styles = StyleSheet.create({
   },
   create: {
     backgroundColor: colors.gold,
-    borderRadius: radius.sm,
+    borderRadius: 8,
     paddingVertical: 15,
     alignItems: 'center',
   },

@@ -1,5 +1,5 @@
 import type { PostgrestError } from '@supabase/supabase-js';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { useAuth } from '../../lib/auth';
+import { useAuth } from '../../../lib/auth';
 import {
   acceptFriendRequest,
   fetchFriendships,
@@ -24,8 +24,8 @@ import {
   sendFriendRequest,
   type Friendship,
   type FriendProfile,
-} from '../../lib/friends';
-import { colors, fonts, radius, spacing } from '../../lib/theme';
+} from '../../../lib/friends';
+import { colors, eyebrow, fonts, radius, spacing } from '../../../lib/theme';
 
 type Relation =
   | { kind: 'none' }
@@ -35,7 +35,6 @@ type Relation =
 
 export default function CircleScreen() {
   const { session } = useAuth();
-  const router = useRouter();
   const userId = session?.user.id;
 
   const [friendships, setFriendships] = useState<Friendship[] | null>(null);
@@ -138,15 +137,12 @@ export default function CircleScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={8}>
-          <Text style={styles.back}>Retour</Text>
-        </Pressable>
+        <Text style={styles.eyebrow}>Cercle</Text>
         <Text style={styles.headerTitle}>Le Cercle</Text>
-        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <Text style={styles.label}>Ajouter quelqu’un</Text>
+        <Text style={styles.eyebrow}>Ajouter quelqu’un</Text>
         <TextInput
           value={query}
           onChangeText={setQuery}
@@ -194,7 +190,7 @@ export default function CircleScreen() {
 
         {incoming.length > 0 && (
           <>
-            <Text style={[styles.label, styles.sectionLabel]}>Demandes reçues</Text>
+            <Text style={[styles.eyebrow, styles.sectionLabel]}>Demandes reçues</Text>
             {incoming.map((f) => {
               const profile = otherProfile(f, userId!);
               return (
@@ -224,7 +220,7 @@ export default function CircleScreen() {
 
         {outgoing.length > 0 && (
           <>
-            <Text style={[styles.label, styles.sectionLabel]}>Demandes envoyées</Text>
+            <Text style={[styles.eyebrow, styles.sectionLabel]}>Demandes envoyées</Text>
             {outgoing.map((f) => {
               const profile = otherProfile(f, userId!);
               return (
@@ -243,7 +239,7 @@ export default function CircleScreen() {
           </>
         )}
 
-        <Text style={[styles.label, styles.sectionLabel]}>
+        <Text style={[styles.eyebrow, styles.sectionLabel]}>
           Mes amis {accepted.length > 0 ? `(${accepted.length})` : ''}
         </Text>
         {friendships === null && !loadError ? (
@@ -277,20 +273,16 @@ export default function CircleScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingVertical: 14,
+    paddingTop: 14,
+    paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  headerTitle: { fontFamily: fonts.serif, fontSize: 20, color: colors.text },
-  headerSpacer: { width: 56 },
-  back: { fontSize: 15, color: colors.gold, width: 56 },
+  eyebrow: { ...eyebrow, marginBottom: 4 },
+  headerTitle: { fontFamily: fonts.serif, fontSize: 26, color: colors.text },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
-  label: { fontSize: 13, fontWeight: '600', color: colors.textMuted, marginBottom: 8 },
-  sectionLabel: { marginTop: spacing.lg },
+  sectionLabel: { marginTop: spacing.lg, marginBottom: 8 },
   input: {
     borderWidth: 1,
     borderColor: colors.border,

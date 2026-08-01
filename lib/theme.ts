@@ -27,6 +27,10 @@ export const radius = {
   sm: 8,
   md: 12,
   lg: 18,
+  // Coins très prononcés — cartes d'info, cartes de statistiques, la carte
+  // « à sceller » des écrans profil/accueil. `lg` reste pour les éléments plus
+  // petits (chips, champs).
+  xl: 28,
   pill: 999,
 } as const;
 
@@ -50,3 +54,18 @@ export const fonts = {
   serif: 'InstrumentSerif_400Regular',
   serifItalic: 'InstrumentSerif_400Regular_Italic',
 } as const;
+
+/**
+ * Style partagé pour les petits libellés de section (« TEASER »,
+ * « VOS SCELLÉS »...) : majuscules, tracking marqué, épuré. Référence visuelle
+ * globale — tous les écrans l'utilisent au lieu de coder leur propre variante.
+ * Un objet exporté plutôt qu'un composant : il se glisse tel quel dans un
+ * tableau de `style`, sans imposer de structure JSX.
+ */
+export const eyebrow = {
+  fontSize: 11,
+  fontWeight: '700' as const,
+  letterSpacing: 1.6,
+  textTransform: 'uppercase' as const,
+  color: colors.textFaint,
+};
