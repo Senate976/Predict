@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CelebrationBurst } from '../../../components/CelebrationBurst';
 import { PredictionCard } from '../../../components/PredictionCard';
+import { WelcomeOnboarding } from '../../../components/WelcomeOnboarding';
 import { useAuth } from '../../../lib/auth';
 import { fetchNotifications, markNotificationRead } from '../../../lib/notifications';
 import {
@@ -34,7 +35,7 @@ const TICK_MS = 30_000;
 type AuthorNames = Record<string, string>;
 
 export default function HomeScreen() {
-  const { username, session } = useAuth();
+  const { username, session, onboarded, markOnboarded } = useAuth();
   const router = useRouter();
 
   const [feed, setFeed] = useState<PredictionFeedItem[] | null>(null);
@@ -128,8 +129,15 @@ export default function HomeScreen() {
     }
   }
 
+  async function handleStartFirstPrediction() {
+    await markOnboarded();
+    router.push('/new-prediction');
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
+      <WelcomeOnboarding visible={onboarded === false} onStart={handleStartFirstPrediction} />
+
       <CelebrationBurst
         visible={celebration.visible}
         message={celebration.message}

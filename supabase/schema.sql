@@ -57,6 +57,9 @@ $$;
 alter table public.profiles add column if not exists username text;
 alter table public.profiles add column if not exists created_at timestamptz not null default now();
 alter table public.profiles add column if not exists updated_at timestamptz not null default now();
+-- `false` par défaut : c'est ce qui déclenche l'écran de bienvenue juste
+-- après l'inscription (lib/auth.tsx), avant que l'utilisateur ne le ferme.
+alter table public.profiles add column if not exists onboarded boolean not null default false;
 
 -- ---------------------------------------------------------------------------
 -- 2. Unicité du pseudo

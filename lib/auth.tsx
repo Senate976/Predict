@@ -69,6 +69,15 @@ type AuthContextValue = {
   session: Session | null;
   /** Username lu dans la table `profiles`, null tant qu'il n'est pas chargé. */
   username: string | null;
+  /**
+   * `false` juste après l'inscription (valeur par défaut en base) : c'est ce
+   * qui déclenche l'écran de bienvenue. `null` tant que le profil n'est pas
+   * encore chargé — ne rien afficher dans ce cas, pour ne pas faire clignoter
+   * la modale à l'ouverture.
+   */
+  onboarded: boolean | null;
+  /** Marque l'accueil comme vu : à appeler à la fermeture de la modale. */
+  markOnboarded: () => Promise<void>;
   /** true pendant la restauration de la session au démarrage. */
   loading: boolean;
   signOut: () => Promise<void>;
@@ -87,6 +96,7 @@ export function useAuth() {
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
   const [username, setUsername] = useState<string | null>(null);
+  const [onboarded, setOnboarded] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -120,6 +130,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     if (!userId) {
       setUsername(null);
+      setOnboarded(null);
       return;
     }
 
@@ -127,7 +138,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     supabase
       .from('profiles')
-      .select('username')
+      .select('username, onboarded')
       .eq('id', userId)
       .maybeSingle()
       .then(({ data, error }) => {
@@ -135,6 +146,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         if (error) {
           console.warn('Lecture du profil impossible :', error.message);
           setUsername(null);
+          setOnboarded(null);
           return;
         }
         // Repli sur les metadata : utile juste après une inscription avec
@@ -142,6 +154,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         // trigger qui n'a pas encore tourné.
         const metadataUsername = session?.user.user_metadata?.username;
         setUsername(data?.username ?? metadataUsername ?? null);
+        setOnboarded(data?.onboarded ?? false);
       });
 
     return () => {
@@ -154,8 +167,17 @@ export function AuthProvider({ children }: PropsWithChildren) {
     if (error) throw error;
   };
 
+  const markOnboarded = async () => {
+    if (!userId) return;
+    setOnboarded(true);
+    const { error } = await supabase.from('profiles').update({ onboarded: true }).eq('id', userId);
+    if (error) console.warn('Marquage de l’accueil impossible :', error.message);
+  };
+
   return (
-    <AuthContext.Provider value={{ session, username, loading, signOut }}>
+    <AuthContext.Provider
+      value={{ session, username, onboarded, markOnboarded, loading, signOut }}
+    >
       {children}
     </AuthContext.Provider>
   );
