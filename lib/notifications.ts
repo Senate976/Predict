@@ -2,7 +2,7 @@ import type { PostgrestError } from '@supabase/supabase-js';
 
 import { supabase } from './supabase';
 
-export type NotificationType = 'new_teaser' | 'prediction_revealed';
+export type NotificationType = 'new_teaser' | 'prediction_revealed' | 'prediction_approved';
 
 /**
  * Une notification telle que renvoyée par `public.notifications`, avec le

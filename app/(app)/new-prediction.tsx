@@ -13,7 +13,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PredictionRecorder } from '../../components/PredictionRecorder';
 import { PredictionSeal } from '../../components/PredictionSeal';
+import { setPredictionAudioPath, uploadPredictionAudio } from '../../lib/audio';
 import { useAuth } from '../../lib/auth';
 import { formatCountdown, formatRevealAt, parseRevealAt } from '../../lib/datetime';
 import { fetchFriendships, otherProfile, type FriendProfile } from '../../lib/friends';
@@ -27,13 +29,20 @@ import {
 } from '../../lib/predictions';
 import { colors, fonts, radius, spacing } from '../../lib/theme';
 
+type ContentMode = 'text' | 'audio';
+
+/** Contenu écrit à la place du texte quand la prédiction est uniquement vocale. */
+const AUDIO_PLACEHOLDER = '🎙️ Message vocal';
+
 export default function NewPredictionScreen() {
   const { session } = useAuth();
   const router = useRouter();
   const userId = session?.user.id;
 
   const [teaser, setTeaser] = useState('');
+  const [contentMode, setContentMode] = useState<ContentMode>('text');
   const [content, setContent] = useState('');
+  const [audioUri, setAudioUri] = useState<string | null>(null);
   // Champs vides au départ, et aucun raccourci de délai : le moment de la
   // révélation est un choix libre de l'auteur, pas quelque chose que l'écran
   // oriente. Une valeur pré-remplie suggérerait un horizon par défaut.
@@ -77,9 +86,13 @@ export default function NewPredictionScreen() {
     if (trimmedTeaser.length > MAX_TEASER_LENGTH) {
       return `Le teaser ne peut pas dépasser ${MAX_TEASER_LENGTH} caractères.`;
     }
-    if (!trimmedContent) return 'Écris le contenu secret de ta prédiction.';
-    if (trimmedContent.length > MAX_CONTENT_LENGTH) {
-      return `Le contenu secret ne peut pas dépasser ${MAX_CONTENT_LENGTH} caractères.`;
+    if (contentMode === 'text') {
+      if (!trimmedContent) return 'Écris le contenu secret de ta prédiction.';
+      if (trimmedContent.length > MAX_CONTENT_LENGTH) {
+        return `Le contenu secret ne peut pas dépasser ${MAX_CONTENT_LENGTH} caractères.`;
+      }
+    } else if (!audioUri) {
+      return 'Enregistre ta prédiction avant de la sceller.';
     }
     if (!revealTouched) {
       return 'Choisis la date et l’heure de la révélation.';
@@ -112,9 +125,9 @@ export default function NewPredictionScreen() {
 
     setSubmitting(true);
     try {
-      const { error: insertError } = await createPrediction({
+      const { data: predictionId, error: insertError } = await createPrediction({
         teaser: trimmedTeaser,
-        content: trimmedContent,
+        content: contentMode === 'text' ? trimmedContent : AUDIO_PLACEHOLDER,
         revealAt,
         scope,
         friendIds: Array.from(selectedFriendIds),
@@ -123,6 +136,22 @@ export default function NewPredictionScreen() {
       if (insertError) {
         setError(predictionErrorMessage(insertError));
         return;
+      }
+
+      // La prédiction existe déjà à ce stade (le texte ou son placeholder est
+      // scellé) ; le message vocal s'y ajoute en deux étapes séparées, faute
+      // de pouvoir connaître son identifiant avant sa création.
+      if (contentMode === 'audio' && audioUri && predictionId) {
+        const { path, error: uploadError } = await uploadPredictionAudio(predictionId, audioUri);
+        if (uploadError || !path) {
+          setError(`Prédiction créée, mais l’envoi de l’audio a échoué : ${uploadError?.message ?? 'erreur inconnue'}`);
+          return;
+        }
+        const { error: pathError } = await setPredictionAudioPath(predictionId, path);
+        if (pathError) {
+          setError(`Prédiction créée, mais l’association de l’audio a échoué : ${pathError.message}`);
+          return;
+        }
       }
 
       setShowSeal(true);
@@ -176,21 +205,51 @@ export default function NewPredictionScreen() {
           />
 
           <Text style={[styles.label, styles.sectionLabel]}>Ma prédiction</Text>
-          <TextInput
-            value={content}
-            onChangeText={setContent}
-            placeholder="Dans un mois, Léa aura adopté un chat."
-            multiline
-            editable={!submitting}
-            maxLength={MAX_CONTENT_LENGTH}
-            style={[styles.input, styles.contentInput]}
-          />
-          <Text style={[styles.counter, remaining < 20 && styles.counterLow]}>
-            {remaining} caractères restants
-          </Text>
+          <View style={styles.scopeRow}>
+            <Pressable
+              onPress={() => setContentMode('text')}
+              disabled={submitting}
+              style={[styles.scopeOption, contentMode === 'text' && styles.scopeOptionActive]}
+            >
+              <Text style={[styles.scopeText, contentMode === 'text' && styles.scopeTextActive]}>
+                Texte
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setContentMode('audio')}
+              disabled={submitting}
+              style={[styles.scopeOption, contentMode === 'audio' && styles.scopeOptionActive]}
+            >
+              <Text style={[styles.scopeText, contentMode === 'audio' && styles.scopeTextActive]}>
+                Message vocal
+              </Text>
+            </Pressable>
+          </View>
+
+          {contentMode === 'text' ? (
+            <>
+              <TextInput
+                value={content}
+                onChangeText={setContent}
+                placeholder="Dans un mois, Léa aura adopté un chat."
+                multiline
+                editable={!submitting}
+                maxLength={MAX_CONTENT_LENGTH}
+                style={[styles.input, styles.contentInput, styles.fieldSpacing]}
+              />
+              <Text style={[styles.counter, remaining < 20 && styles.counterLow]}>
+                {remaining} caractères restants
+              </Text>
+            </>
+          ) : (
+            <View style={styles.fieldSpacing}>
+              <PredictionRecorder uri={audioUri} onChange={setAudioUri} disabled={submitting} />
+            </View>
+          )}
+
           <Text style={styles.hint}>
-            Personne ne le verra avant l’heure de révélation, pas même la personne
-            concernée.
+            Personne ne le verra (ni ne l’écoutera) avant l’heure de révélation, pas
+            même la personne concernée.
           </Text>
 
           <Text style={[styles.label, styles.sectionLabel]}>Révélation</Text>
@@ -344,6 +403,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   sectionLabel: { marginTop: spacing.lg },
+  fieldSpacing: { marginTop: spacing.md },
   subLabel: { fontSize: 12, color: colors.textFaint, marginBottom: 6 },
   input: {
     borderWidth: 1,

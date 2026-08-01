@@ -17,6 +17,8 @@ export type PredictionFeedItem = {
   author_id: string;
   teaser: string;
   content: string | null;
+  /** Chemin dans le bucket `prediction-audio`, ou `null` sans message vocal. Soumis à la même RLS que `content`. */
+  audio_path: string | null;
   /** ISO 8601, en UTC. */
   reveal_at: string;
   scope: PredictionScope;
@@ -92,10 +94,12 @@ export function predictionErrorMessage(error: PostgrestError): string {
  * Tri par `created_at` et non `reveal_at` : c'est un fil d'actualité — l'ordre
  * dans lequel les choses ont été publiées, pas celui de leur révélation.
  */
+const FEED_COLUMNS = 'id, author_id, teaser, content, audio_path, reveal_at, scope, created_at, is_revealed';
+
 export async function fetchPredictionsFeed() {
   return supabase
     .from('predictions_feed')
-    .select('id, author_id, teaser, content, reveal_at, scope, created_at, is_revealed')
+    .select(FEED_COLUMNS)
     .order('created_at', { ascending: false })
     .returns<PredictionFeedItem[]>();
 }
@@ -103,7 +107,7 @@ export async function fetchPredictionsFeed() {
 export async function fetchPrediction(predictionId: string) {
   return supabase
     .from('predictions_feed')
-    .select('id, author_id, teaser, content, reveal_at, scope, created_at, is_revealed')
+    .select(FEED_COLUMNS)
     .eq('id', predictionId)
     .maybeSingle()
     .returns<PredictionFeedItem>();
@@ -116,13 +120,14 @@ export async function createPrediction(input: {
   scope: PredictionScope;
   friendIds: string[];
 }) {
-  return supabase.rpc('create_prediction', {
+  const result = await supabase.rpc('create_prediction', {
     p_teaser: input.teaser.trim(),
     p_content: input.content.trim(),
     p_reveal_at: input.revealAt.toISOString(),
     p_scope: input.scope,
     p_friend_ids: input.scope === 'selected' ? input.friendIds : [],
   });
+  return result as { data: string | null; error: PostgrestError | null };
 }
 
 /**

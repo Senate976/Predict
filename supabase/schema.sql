@@ -1055,3 +1055,197 @@ left join public.prediction_votes v on v.prediction_id = p.id
 group by p.id, p.author_id, p.teaser, p.reveal_at, p.created_at;
 
 grant select on public.prediction_outcomes to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 17. Gamification — célébration et badges de prestige
+-- ---------------------------------------------------------------------------
+
+-- Nouveau type de notification, réservé à l'auteur (les précédents sont tous
+-- pour un destinataire) : le moment où sa prédiction bascule sur « Réalisée ».
+alter table public.notifications drop constraint if exists notifications_type_check;
+alter table public.notifications add constraint notifications_type_check
+  check (type in ('new_teaser', 'prediction_revealed', 'prediction_approved'));
+
+-- Se déclenche à chaque vote (pose ou changement), recalcule la majorité, et
+-- notifie l'auteur la première fois qu'elle penche pour 'realized'. La
+-- contrainte unique de la table absorbe les appels suivants (`on conflict do
+-- nothing`) : un vote qui repasse ensuite côté 'missed' puis revient sur
+-- 'realized' ne redéclenche pas une deuxième célébration.
+--
+-- `security definer` : la notification est pour l'auteur, pas pour qui vote —
+-- exactement ce que la policy insert normale de `notifications` interdit.
+create or replace function public.notify_prediction_approved()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_realized int;
+  v_missed int;
+  v_author uuid;
+begin
+  select
+    coalesce(sum((vote_value = 'realized')::int), 0),
+    coalesce(sum((vote_value = 'missed')::int), 0)
+  into v_realized, v_missed
+  from public.prediction_votes
+  where prediction_id = new.prediction_id;
+
+  if v_realized > v_missed then
+    select author_id into v_author from public.predictions where id = new.prediction_id;
+
+    insert into public.notifications (user_id, prediction_id, type)
+    values (v_author, new.prediction_id, 'prediction_approved')
+    on conflict (user_id, prediction_id, type) do nothing;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists prediction_votes_notify_approved on public.prediction_votes;
+create trigger prediction_votes_notify_approved
+  after insert or update on public.prediction_votes
+  for each row execute function public.notify_prediction_approved();
+
+-- Nombre de prédictions d'un utilisateur passées 'realized' (majorité des
+-- votes) et révélées dans les 30 derniers jours — la mesure qui détermine son
+-- badge de prestige. `security definer` pour pouvoir compter les prédictions
+-- de quelqu'un d'autre (un ami) sans que l'appelant ait besoin d'être
+-- destinataire de chacune ; la garde se fait explicitement dans le `where`
+-- (soi-même, ou un ami accepté) plutôt qu'en s'appuyant sur la RLS des tables
+-- sous-jacentes — sans elle, n'importe qui pourrait sonder le score de
+-- n'importe qui.
+--
+-- Renvoie un compte agrégé, jamais le contenu ni l'identité des prédictions
+-- comptées : rien de sensible n'est exposé au-delà de ce nombre.
+create or replace function public.get_realized_count_30d(target_user uuid)
+returns integer
+language sql
+security definer
+stable
+set search_path = ''
+as $$
+  select count(*)::int
+  from public.predictions p
+  where p.author_id = target_user
+    and p.reveal_at >= now() - interval '30 days'
+    and (
+      target_user = auth.uid()
+      or exists (
+        select 1 from public.friendships f
+        where f.status = 'accepted'
+          and (
+            (f.requester_id = auth.uid() and f.addressee_id = target_user)
+            or (f.addressee_id = auth.uid() and f.requester_id = target_user)
+          )
+      )
+    )
+    and exists (
+      select 1
+      from public.prediction_votes v
+      where v.prediction_id = p.id
+      group by v.prediction_id
+      having coalesce(sum((v.vote_value = 'realized')::int), 0)
+           > coalesce(sum((v.vote_value = 'missed')::int), 0)
+    );
+$$;
+
+revoke all on function public.get_realized_count_30d(uuid) from public;
+grant execute on function public.get_realized_count_30d(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 18. Prédictions vocales — bucket de stockage et politiques
+-- ---------------------------------------------------------------------------
+--
+-- Un bucket privé (`public: false`) : les fichiers ne sont accessibles que via
+-- les policies ci-dessous, jamais par une URL publique devinable.
+insert into storage.buckets (id, name, public)
+values ('prediction-audio', 'prediction-audio', false)
+on conflict (id) do nothing;
+
+-- Chemin de stockage attendu : `<prediction_id>/<fichier>`. C'est ce premier
+-- segment (`storage.foldername(name)`) que les policies comparent à
+-- `predictions.id` pour appliquer exactement les mêmes règles de visibilité
+-- que le contenu texte.
+alter table public.prediction_contents add column if not exists audio_path text;
+
+-- La RLS de `storage.objects` est déjà activée par Supabase (table gérée par
+-- `supabase_storage_admin` — notre rôle n'en est pas propriétaire et ne peut
+-- pas exécuter `alter table ... enable row level security` dessus). On ajoute
+-- seulement nos policies.
+drop policy if exists "prediction_audio_select" on storage.objects;
+create policy "prediction_audio_select"
+  on storage.objects
+  for select
+  to authenticated
+  using (
+    bucket_id = 'prediction-audio'
+    and exists (
+      select 1 from public.predictions p
+      where p.id::text = (storage.foldername(name))[1]
+        and (
+          p.author_id = auth.uid()
+          or exists (
+            select 1 from public.prediction_access pa
+            where pa.prediction_id = p.id
+              and pa.user_id = auth.uid()
+              and p.reveal_at <= now()
+          )
+        )
+    )
+  );
+
+-- Écriture réservée à l'auteur, et seulement avant la révélation — même
+-- fenêtre que la modification du contenu texte
+-- (`prediction_contents_update_before_reveal`).
+drop policy if exists "prediction_audio_insert" on storage.objects;
+create policy "prediction_audio_insert"
+  on storage.objects
+  for insert
+  to authenticated
+  with check (
+    bucket_id = 'prediction-audio'
+    and exists (
+      select 1 from public.predictions p
+      where p.id::text = (storage.foldername(name))[1]
+        and p.author_id = auth.uid()
+        and p.reveal_at > now()
+    )
+  );
+
+drop policy if exists "prediction_audio_delete" on storage.objects;
+create policy "prediction_audio_delete"
+  on storage.objects
+  for delete
+  to authenticated
+  using (
+    bucket_id = 'prediction-audio'
+    and exists (
+      select 1 from public.predictions p
+      where p.id::text = (storage.foldername(name))[1]
+        and p.author_id = auth.uid()
+    )
+  );
+
+-- La vue expose le chemin du fichier (pas son contenu) : c'est au client de
+-- demander une URL signée, qui elle-même repasse par les policies ci-dessus.
+drop view if exists public.predictions_feed;
+
+create view public.predictions_feed
+with (security_invoker = true) as
+select
+  p.id,
+  p.author_id,
+  p.teaser,
+  pc.content,
+  pc.audio_path,
+  p.reveal_at,
+  p.scope,
+  p.created_at,
+  (p.reveal_at <= now()) as is_revealed
+from public.predictions p
+left join public.prediction_contents pc on pc.prediction_id = p.id;
+
+grant select on public.predictions_feed to authenticated;

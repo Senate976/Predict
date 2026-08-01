@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PrestigeBadge } from '../../../components/PrestigeBadge';
+import { fetchRealizedCount30d } from '../../../lib/badges';
 import { useAuth } from '../../../lib/auth';
 import {
   acceptFriendRequest,
@@ -38,6 +40,7 @@ export default function CircleScreen() {
   const userId = session?.user.id;
 
   const [friendships, setFriendships] = useState<Friendship[] | null>(null);
+  const [friendBadges, setFriendBadges] = useState<Record<string, number>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [query, setQuery] = useState('');
@@ -59,7 +62,19 @@ export default function CircleScreen() {
       return;
     }
     setLoadError(null);
-    setFriendships(data ?? []);
+    const list = data ?? [];
+    setFriendships(list);
+
+    const acceptedIds = list
+      .filter((f) => f.status === 'accepted')
+      .map((f) => otherProfile(f, userId).id);
+    const entries = await Promise.all(
+      acceptedIds.map(async (id) => {
+        const { data: count } = await fetchRealizedCount30d(id);
+        return [id, typeof count === 'number' ? count : 0] as const;
+      })
+    );
+    setFriendBadges(Object.fromEntries(entries));
   }, [userId]);
 
   useFocusEffect(
@@ -253,7 +268,10 @@ export default function CircleScreen() {
             const profile = otherProfile(f, userId!);
             return (
               <View key={f.id} style={styles.row}>
-                <Text style={styles.username}>{profile.username}</Text>
+                <View style={styles.usernameRow}>
+                  <PrestigeBadge count={friendBadges[profile.id] ?? 0} size="small" />
+                  <Text style={styles.username}>{profile.username}</Text>
+                </View>
                 <Pressable
                   onPress={() => handleRemove(f.id)}
                   disabled={pendingActionId === f.id}
@@ -305,6 +323,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   username: { fontSize: 15, color: colors.text, fontWeight: '600' },
+  usernameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   actions: { flexDirection: 'row', gap: 8 },
   pillGold: {
     backgroundColor: colors.gold,
