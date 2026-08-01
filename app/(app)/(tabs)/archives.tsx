@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   eyebrow: { ...eyebrow, marginBottom: 4 },
-  title: { fontFamily: fonts.serif, fontSize: 26, color: colors.text },
+  title: { fontFamily: fonts.serifItalic, fontSize: 26, color: colors.text },
   scroll: { padding: spacing.lg, paddingBottom: 24, flexGrow: 1 },
   loader: { marginTop: 32 },
   empty: { fontSize: 14, color: colors.textFaint, textAlign: 'center', marginTop: 32 },

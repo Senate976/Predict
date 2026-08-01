@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
   scroll: { padding: spacing.lg, paddingBottom: 40 },
   eyebrow: { ...eyebrow },
   sectionSpacing: { marginTop: spacing.xl },
-  brand: { fontFamily: fonts.serif, fontSize: 40, color: colors.text, marginTop: 2 },
+  brand: { fontFamily: fonts.serifItalic, fontSize: 40, color: colors.text, marginTop: 2 },
   identityCard: {
     marginTop: spacing.lg,
     padding: 18,
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  username: { fontFamily: fonts.serif, fontSize: 22, color: colors.text, marginTop: 6 },
+  username: { fontFamily: fonts.serifItalic, fontSize: 22, color: colors.text, marginTop: 6 },
   email: { fontSize: 13, color: colors.textFaint, marginTop: 4 },
   loader: { marginTop: 24 },
   statsRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statCardActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
-  statValue: { fontFamily: fonts.serif, fontSize: 26, color: colors.text },
+  statValue: { fontFamily: fonts.serifItalic, fontSize: 26, color: colors.text },
   statValueRealized: { color: colors.success },
   statValueMissed: { color: colors.danger },
   statLabel: {
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  historyTeaser: { fontFamily: fonts.serif, fontSize: 17, color: colors.text },
+  historyTeaser: { fontFamily: fonts.serifItalic, fontSize: 17, color: colors.text },
   historyMeta: { fontSize: 12, color: colors.textFaint, marginTop: 4 },
   error: {
     color: colors.danger,

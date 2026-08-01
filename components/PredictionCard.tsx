@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
   badgeTextOpen: { color: colors.success },
   author: { fontSize: 12, color: colors.textFaint, marginBottom: 4 },
   cardTeaser: {
-    fontFamily: fonts.serif,
+    fontFamily: fonts.serifItalic,
     fontSize: 20,
     color: colors.text,
     lineHeight: 26,
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   cardContent: {
-    fontFamily: fonts.serif,
+    fontFamily: fonts.serifItalic,
     fontSize: 17,
     color: colors.text,
     lineHeight: 23,

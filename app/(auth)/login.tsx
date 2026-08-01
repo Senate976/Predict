@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: spacing.lg },
   brand: {
-    fontFamily: fonts.serif,
+    fontFamily: fonts.serifItalic,
     fontSize: 18,
     letterSpacing: 4,
     color: colors.gold,
@@ -338,7 +338,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   title: {
-    fontFamily: fonts.serif,
+    fontFamily: fonts.serifItalic,
     fontSize: 34,
     color: colors.text,
     marginBottom: 28,

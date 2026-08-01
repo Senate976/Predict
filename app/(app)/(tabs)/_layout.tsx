@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { colors, fonts } from '../../../lib/theme';
+import { colors } from '../../../lib/theme';
 
 /** Petit point doré au-dessus du libellé actif — seul indicateur, pas d'icônes. */
 function TabDot({ focused }: { focused: boolean }) {
@@ -50,8 +50,8 @@ const styles = StyleSheet.create({
   },
   item: { paddingTop: 4 },
   label: {
-    fontFamily: fonts.serif,
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: '700',
     letterSpacing: 1.4,
     textTransform: 'uppercase',
   },

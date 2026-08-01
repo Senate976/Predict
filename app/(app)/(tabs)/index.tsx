@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   brand: {
-    fontFamily: fonts.serif,
+    fontFamily: fonts.serifItalic,
     fontSize: 15,
     letterSpacing: 3,
     color: colors.gold,

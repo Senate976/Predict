@@ -175,7 +175,7 @@ export default function NewPredictionScreen() {
             style={[styles.input, styles.teaserInput]}
           />
 
-          <Text style={[styles.label, styles.sectionLabel]}>Contenu secret</Text>
+          <Text style={[styles.label, styles.sectionLabel]}>Ma prédiction</Text>
           <TextInput
             value={content}
             onChangeText={setContent}
@@ -333,12 +333,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  headerTitle: { fontFamily: fonts.serif, fontSize: 18, color: colors.text },
+  headerTitle: { fontFamily: fonts.serifItalic, fontSize: 18, color: colors.text },
   headerSpacer: { width: 56 },
   cancel: { fontSize: 15, color: colors.gold, width: 56 },
   scroll: { padding: spacing.lg, paddingBottom: 40 },
   label: {
-    fontFamily: fonts.serif,
+    fontFamily: fonts.serifItalic,
     fontSize: 19,
     color: colors.text,
     marginBottom: 6,

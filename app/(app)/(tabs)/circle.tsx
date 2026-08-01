@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   eyebrow: { ...eyebrow, marginBottom: 4 },
-  headerTitle: { fontFamily: fonts.serif, fontSize: 26, color: colors.text },
+  headerTitle: { fontFamily: fonts.serifItalic, fontSize: 26, color: colors.text },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   sectionLabel: { marginTop: spacing.lg, marginBottom: 8 },
   input: {

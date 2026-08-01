@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  headerTitle: { fontFamily: fonts.serif, fontSize: 18, color: colors.text },
+  headerTitle: { fontFamily: fonts.serifItalic, fontSize: 18, color: colors.text },
   headerSpacer: { width: 56 },
   back: { fontSize: 15, color: colors.gold, width: 56 },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
   rowText: { flex: 1 },
   label: { fontSize: 14, fontWeight: '600', color: colors.text },
   teaser: {
-    fontFamily: fonts.serif,
+    fontFamily: fonts.serifItalic,
     fontSize: 16,
     color: colors.text,
     marginTop: 4,
