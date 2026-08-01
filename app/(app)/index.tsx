@@ -11,8 +11,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { SealBadge } from '../../components/SealBadge';
 import { useAuth } from '../../lib/auth';
 import { formatCountdown, formatRevealAt } from '../../lib/datetime';
+import { fetchNotifications } from '../../lib/notifications';
 import {
   feedErrorMessage,
   fetchPredictionsFeed,
@@ -36,20 +38,25 @@ function PredictionCard({
   item,
   now,
   authorLabel,
+  onPress,
 }: {
   item: PredictionFeedItem;
   now: Date;
   authorLabel?: string;
+  onPress?: () => void;
 }) {
   const revealAt = new Date(item.reveal_at);
   const revealed = isRevealed(item, now);
 
-  return (
+  const card = (
     <View style={styles.card}>
-      <View style={[styles.badge, revealed ? styles.badgeOpen : styles.badgeLocked]}>
-        <Text style={[styles.badgeText, revealed ? styles.badgeTextOpen : styles.badgeTextLocked]}>
-          {revealed ? 'Révélée' : formatCountdown(revealAt, now)}
-        </Text>
+      <View style={styles.cardTop}>
+        {!revealed && <SealBadge />}
+        <View style={[styles.badge, revealed ? styles.badgeOpen : styles.badgeLocked]}>
+          <Text style={[styles.badgeText, revealed ? styles.badgeTextOpen : styles.badgeTextLocked]}>
+            {revealed ? 'Révélée' : formatCountdown(revealAt, now)}
+          </Text>
+        </View>
       </View>
 
       {authorLabel && <Text style={styles.author}>{authorLabel}</Text>}
@@ -62,14 +69,23 @@ function PredictionCard({
         </View>
       ) : (
         <View style={styles.sealedBox}>
-          <Text style={styles.sealedText}>🔒 Contenu scellé jusqu’à la révélation</Text>
+          <Text style={styles.sealedText}>Contenu scellé jusqu’à la révélation</Text>
         </View>
       )}
 
       <Text style={styles.cardMeta}>
         {revealed ? 'Révélée' : 'Se révèle'} {formatRevealAt(revealAt)}
+        {onPress ? ' · Gérer les destinataires' : ''}
       </Text>
     </View>
+  );
+
+  if (!onPress) return card;
+
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => pressed && styles.cardPressed}>
+      {card}
+    </Pressable>
   );
 }
 
@@ -79,6 +95,7 @@ export default function HomeScreen() {
 
   const [feed, setFeed] = useState<PredictionFeedItem[] | null>(null);
   const [authorNames, setAuthorNames] = useState<AuthorNames>({});
+  const [unreadCount, setUnreadCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => new Date());
@@ -87,6 +104,11 @@ export default function HomeScreen() {
 
   const load = useCallback(async () => {
     if (!userId) return;
+
+    // Rattrape les notifications de révélation en retard avant de lire le
+    // fil et le compteur — sans ça, une prédiction tout juste révélée
+    // pourrait ne pas encore avoir sa notification au premier chargement.
+    await supabase.rpc('generate_reveal_notifications');
 
     const { data, error: fetchError } = await fetchPredictionsFeed();
 
@@ -113,11 +135,14 @@ export default function HomeScreen() {
       }
       setAuthorNames(names);
     }
+
+    const { data: notifications } = await fetchNotifications(userId);
+    setUnreadCount((notifications ?? []).filter((n) => !n.is_read).length);
   }, [userId]);
 
-  // Au focus et non au montage : l'écran de création revient ici par
-  // `router.back()`, qui ne remonte pas le composant. Sans ça, une prédiction
-  // tout juste créée n'apparaîtrait qu'après un pull-to-refresh.
+  // Au focus et non au montage : les écrans de création/gestion reviennent
+  // ici par `router.back()`, qui ne remonte pas le composant. Sans ça, une
+  // prédiction tout juste créée n'apparaîtrait qu'après un pull-to-refresh.
   useFocusEffect(
     useCallback(() => {
       setNow(new Date());
@@ -140,9 +165,6 @@ export default function HomeScreen() {
     }
   }
 
-  const mine = (feed ?? []).filter((item) => item.author_id === userId);
-  const fromCircle = (feed ?? []).filter((item) => item.author_id !== userId);
-
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
@@ -152,6 +174,14 @@ export default function HomeScreen() {
             {username ?? session?.user.email ?? ''}
           </Text>
         </View>
+        <Pressable onPress={() => router.push('/notifications')} hitSlop={8} style={styles.iconButton}>
+          <Text style={styles.iconButtonText}>Notifs</Text>
+          {unreadCount > 0 && (
+            <View style={styles.badgeDot}>
+              <Text style={styles.badgeDotText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+            </View>
+          )}
+        </Pressable>
         <Pressable onPress={() => router.push('/circle')} hitSlop={8} style={styles.circleLink}>
           <Text style={styles.circleLinkText}>Le Cercle</Text>
         </Pressable>
@@ -168,37 +198,26 @@ export default function HomeScreen() {
 
         {feed === null && !error ? (
           <ActivityIndicator style={styles.loader} color={colors.gold} />
+        ) : (feed ?? []).length === 0 ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyTitle}>Aucune prédiction pour l’instant.</Text>
+            <Text style={styles.emptyText}>
+              Écris ce que tu vois venir pour quelqu’un de ton cercle, et choisis
+              quand ça se dévoile.
+            </Text>
+          </View>
         ) : (
-          <>
-            <Text style={styles.sectionTitle}>Mes prédictions</Text>
-            {mine.length === 0 ? (
-              <View style={styles.empty}>
-                <Text style={styles.emptyTitle}>Aucune prédiction pour l’instant.</Text>
-                <Text style={styles.emptyText}>
-                  Écris ce que tu vois venir pour quelqu’un de ton cercle, et choisis
-                  quand ça se dévoile.
-                </Text>
-              </View>
-            ) : (
-              mine.map((item) => <PredictionCard key={item.id} item={item} now={now} />)
-            )}
-
-            <Text style={[styles.sectionTitle, styles.sectionSpacing]}>Le Cercle</Text>
-            {fromCircle.length === 0 ? (
-              <Text style={styles.emptyText}>
-                Rien de tes amis pour l’instant — leurs prédictions apparaîtront ici.
-              </Text>
-            ) : (
-              fromCircle.map((item) => (
-                <PredictionCard
-                  key={item.id}
-                  item={item}
-                  now={now}
-                  authorLabel={authorNames[item.author_id] ?? '…'}
-                />
-              ))
-            )}
-          </>
+          (feed ?? []).map((item) => (
+            <PredictionCard
+              key={item.id}
+              item={item}
+              now={now}
+              authorLabel={item.author_id !== userId ? authorNames[item.author_id] ?? '…' : undefined}
+              onPress={
+                item.author_id === userId ? () => router.push(`/prediction/${item.id}`) : undefined
+              }
+            />
+          ))
         )}
       </ScrollView>
 
@@ -234,6 +253,21 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   greeting: { fontSize: 17, fontWeight: '700', color: colors.text, marginTop: 2 },
+  iconButton: { position: 'relative', paddingHorizontal: 2 },
+  iconButtonText: { fontSize: 13, color: colors.textMuted, fontWeight: '600' },
+  badgeDot: {
+    position: 'absolute',
+    top: -8,
+    right: -10,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 3,
+    backgroundColor: colors.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeDotText: { fontSize: 10, fontWeight: '700', color: colors.background },
   circleLink: {
     borderWidth: 1,
     borderColor: colors.gold,
@@ -244,13 +278,6 @@ const styles = StyleSheet.create({
   circleLinkText: { fontSize: 13, fontWeight: '700', color: colors.gold },
   signOut: { fontSize: 13, color: colors.textFaint },
   scroll: { padding: spacing.lg, paddingBottom: 8, flexGrow: 1 },
-  sectionTitle: {
-    fontFamily: fonts.serif,
-    fontSize: 20,
-    color: colors.text,
-    marginBottom: 12,
-  },
-  sectionSpacing: { marginTop: spacing.lg },
   loader: { marginTop: 32 },
   empty: { paddingVertical: 24, alignItems: 'center' },
   emptyTitle: { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 6 },
@@ -276,12 +303,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     backgroundColor: colors.surface,
   },
+  cardPressed: { opacity: 0.85 },
+  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   badge: {
     alignSelf: 'flex-start',
     borderRadius: radius.pill,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    marginBottom: 10,
   },
   badgeLocked: { backgroundColor: colors.goldSoft },
   badgeOpen: { backgroundColor: colors.successSoft },

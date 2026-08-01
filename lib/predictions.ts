@@ -88,13 +88,25 @@ export function predictionErrorMessage(error: PostgrestError): string {
  * Le fil visible par l'utilisateur connecté : ses propres prédictions, et
  * celles où on lui a donné accès. La RLS de `predictions_feed` fait tout le
  * tri — cette fonction ne filtre rien de plus, elle se contente de trier.
+ *
+ * Tri par `created_at` et non `reveal_at` : c'est un fil d'actualité — l'ordre
+ * dans lequel les choses ont été publiées, pas celui de leur révélation.
  */
 export async function fetchPredictionsFeed() {
   return supabase
     .from('predictions_feed')
     .select('id, author_id, teaser, content, reveal_at, scope, created_at, is_revealed')
-    .order('reveal_at', { ascending: false })
+    .order('created_at', { ascending: false })
     .returns<PredictionFeedItem[]>();
+}
+
+export async function fetchPrediction(predictionId: string) {
+  return supabase
+    .from('predictions_feed')
+    .select('id, author_id, teaser, content, reveal_at, scope, created_at, is_revealed')
+    .eq('id', predictionId)
+    .maybeSingle()
+    .returns<PredictionFeedItem>();
 }
 
 export async function createPrediction(input: {
@@ -111,4 +123,44 @@ export async function createPrediction(input: {
     p_scope: input.scope,
     p_friend_ids: input.scope === 'selected' ? input.friendIds : [],
   });
+}
+
+/**
+ * Un destinataire d'une prédiction, tel que renvoyé par `prediction_access`
+ * avec son profil embarqué (la clé étrangère `user_id -> profiles(id)`
+ * permet l'embed en une requête).
+ */
+export type PredictionRecipient = {
+  user_id: string;
+  profile: { username: string };
+};
+
+/** Réservé à l'auteur : la RLS de `prediction_access` ne renvoie sinon que sa propre ligne. */
+export async function fetchPredictionRecipients(predictionId: string) {
+  return supabase
+    .from('prediction_access')
+    .select('user_id, profile:profiles(username)')
+    .eq('prediction_id', predictionId)
+    .returns<PredictionRecipient[]>();
+}
+
+/**
+ * Ajoute un destinataire à une prédiction existante. La RLS exige que ce soit
+ * l'auteur qui agisse et que la personne ajoutée soit un ami accepté — sinon
+ * l'insert est refusé (42501). Déclenche immédiatement la notification
+ * `new_teaser` côté base (trigger sur `prediction_access`).
+ */
+export async function addRecipient(predictionId: string, userId: string) {
+  return supabase
+    .from('prediction_access')
+    .insert({ prediction_id: predictionId, user_id: userId });
+}
+
+/** Retire un destinataire, à tout moment (avant ou après révélation). */
+export async function removeRecipient(predictionId: string, userId: string) {
+  return supabase
+    .from('prediction_access')
+    .delete()
+    .eq('prediction_id', predictionId)
+    .eq('user_id', userId);
 }

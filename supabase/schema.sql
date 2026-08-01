@@ -582,8 +582,10 @@ create policy "prediction_access_insert"
     )
   );
 
--- L'auteur peut retirer un destinataire tant que la prédiction n'est pas
--- révélée — après, l'audience est figée au même titre que le contenu.
+-- L'auteur gère ses destinataires à tout moment, y compris après révélation :
+-- contrairement au contenu (figé, c'est un engagement passé), l'audience
+-- reste à la main de l'auteur — il doit pouvoir retirer quelqu'un même après
+-- coup.
 drop policy if exists "prediction_access_delete" on public.prediction_access;
 create policy "prediction_access_delete"
   on public.prediction_access
@@ -594,7 +596,6 @@ create policy "prediction_access_delete"
       select 1 from public.predictions p
       where p.id = prediction_access.prediction_id
         and p.author_id = auth.uid()
-        and p.reveal_at > now()
     )
   );
 
@@ -761,3 +762,115 @@ from public.predictions p
 left join public.prediction_contents pc on pc.prediction_id = p.id;
 
 grant select on public.predictions_feed to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 14. Notifications
+-- ---------------------------------------------------------------------------
+--
+-- Deux types : 'new_teaser' (un accès vient d'être accordé — à la création
+-- d'une prédiction ou quand l'auteur ajoute un destinataire plus tard) et
+-- 'prediction_revealed' (le contenu vient de se débloquer). Jamais insérées
+-- directement par le client : uniquement par le trigger et la fonction
+-- `security definer` plus bas, pour qu'un utilisateur ne puisse pas se
+-- fabriquer de fausses notifications ni en écrire pour quelqu'un d'autre.
+create table if not exists public.notifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  prediction_id uuid not null references public.predictions (id) on delete cascade,
+  type text not null check (type in ('new_teaser', 'prediction_revealed')),
+  is_read boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+-- Empêche les doublons (même utilisateur, même prédiction, même type) — sert
+-- aussi de garde-fou pour `generate_reveal_notifications`, qui s'appuie
+-- dessus via `on conflict do nothing` plutôt qu'une sous-requête d'exclusion.
+create unique index if not exists notifications_unique_key
+  on public.notifications (user_id, prediction_id, type);
+
+-- Le fil de notifications d'un utilisateur : les plus récentes en tête.
+create index if not exists notifications_user_created_idx
+  on public.notifications (user_id, created_at desc);
+
+alter table public.notifications enable row level security;
+
+drop policy if exists "notifications_select_own" on public.notifications;
+create policy "notifications_select_own"
+  on public.notifications
+  for select
+  to authenticated
+  using (user_id = auth.uid());
+
+-- Seule modification légitime côté client : marquer une notification comme
+-- lue. Le `with check` empêche de faire glisser la ligne vers quelqu'un
+-- d'autre au passage.
+drop policy if exists "notifications_update_own" on public.notifications;
+create policy "notifications_update_own"
+  on public.notifications
+  for update
+  to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+-- Pas de policy insert ni delete pour `authenticated` : la création est
+-- réservée aux fonctions `security definer` ci-dessous.
+
+-- Un accès accordé (à la création d'une prédiction, ou plus tard quand
+-- l'auteur ajoute quelqu'un) déclenche immédiatement la notification. Couvre
+-- les trois cas d'un coup, puisqu'ils passent tous par un insert dans
+-- `prediction_access` : la portée « tout le Cercle » à la création, la
+-- sélection d'amis à la création, et un ajout ultérieur par l'auteur.
+--
+-- `security definer` : le trigger doit pouvoir écrire une notification pour
+-- le destinataire (`new.user_id`), qui n'est pas l'utilisateur en train
+-- d'agir (l'auteur) — une notification pour quelqu'un d'autre que soi est
+-- justement ce que la policy insert normale interdirait.
+create or replace function public.notify_new_teaser()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.notifications (user_id, prediction_id, type)
+  values (new.user_id, new.prediction_id, 'new_teaser')
+  on conflict (user_id, prediction_id, type) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists prediction_access_notify_new_teaser on public.prediction_access;
+create trigger prediction_access_notify_new_teaser
+  after insert on public.prediction_access
+  for each row execute function public.notify_new_teaser();
+
+-- Notifications de révélation : Postgres n'a pas de déclencheur qui se
+-- déclenche seul quand une horloge dépasse `reveal_at`, il faut qu'une requête
+-- vienne le constater. Cette fonction insère les notifications manquantes
+-- pour toutes les prédictions déjà révélées ; le client l'appelle à chaque
+-- chargement du fil (lib/notifications.ts), ce qui suffit à les faire
+-- apparaître dans la minute qui suit la révélation sans dépendre d'une tâche
+-- planifiée (pg_cron n'est pas garanti disponible selon le plan Supabase).
+--
+-- `security definer` : elle écrit pour tous les destinataires concernés,
+-- pas seulement l'appelant. Aucun paramètre fourni par le client — elle ne
+-- fait que rattraper un état entièrement déterminé par la base
+-- (`reveal_at <= now()`), donc rien à exploiter côté sécurité.
+create or replace function public.generate_reveal_notifications()
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.notifications (user_id, prediction_id, type)
+  select pa.user_id, p.id, 'prediction_revealed'
+  from public.predictions p
+  join public.prediction_access pa on pa.prediction_id = p.id
+  where p.reveal_at <= now()
+  on conflict (user_id, prediction_id, type) do nothing;
+end;
+$$;
+
+revoke all on function public.generate_reveal_notifications() from public;
+grant execute on function public.generate_reveal_notifications() to authenticated;
