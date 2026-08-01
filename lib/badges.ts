@@ -25,7 +25,7 @@ type Threshold = {
 const THRESHOLDS: Threshold[] = [
   {
     level: 'fer',
-    label: 'Fer',
+    label: 'Capteur de signal',
     min: 0,
     color: '#8A8D91',
     gradient: ['#C9CCCF', '#8A8D91', '#54575B'],
@@ -34,7 +34,7 @@ const THRESHOLDS: Threshold[] = [
   },
   {
     level: 'bronze',
-    label: 'Bronze',
+    label: 'Analyste de scénario',
     min: 10,
     color: '#B87A3D',
     gradient: ['#E3B27C', '#B87A3D', '#7A4C1E'],
@@ -43,7 +43,7 @@ const THRESHOLDS: Threshold[] = [
   },
   {
     level: 'argent',
-    label: 'Argent',
+    label: 'Expert en tendances',
     min: 20,
     color: '#B7B9BC',
     gradient: ['#F0F1F2', '#B7B9BC', '#84878B',],
@@ -52,7 +52,7 @@ const THRESHOLDS: Threshold[] = [
   },
   {
     level: 'or',
-    label: 'Or',
+    label: 'Maître de l\'anticipation',
     min: 35,
     color: '#CE9F2E',
     gradient: ['#F3D888', '#CE9F2E', '#8A6414'],

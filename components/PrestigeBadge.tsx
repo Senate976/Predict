@@ -47,10 +47,13 @@ export function PrestigeBadge({ count, size = 'small' }: Props) {
               pour suggérer le rebord gravé de la maquette de référence. */}
           <View style={styles.bevel}>
             <View style={styles.engraving}>
-              <Text style={[styles.label, styles.labelShadow, { color: badge.engraveShadow }]}>
+              <Text
+                style={[styles.label, styles.labelShadow, { color: badge.engraveShadow }]}
+                numberOfLines={2}
+              >
                 {badge.label.toUpperCase()}
               </Text>
-              <Text style={[styles.label, { color: badge.engraveLight }]}>
+              <Text style={[styles.label, { color: badge.engraveLight }]} numberOfLines={2}>
                 {badge.label.toUpperCase()}
               </Text>
               <View style={[styles.divider, { backgroundColor: badge.engraveShadow }]} />
@@ -134,8 +137,11 @@ const styles = StyleSheet.create({
   engraving: { alignItems: 'center' },
   label: {
     fontFamily: fonts.serif,
-    fontSize: 13,
-    letterSpacing: 1.5,
+    fontSize: 7.5,
+    lineHeight: 9,
+    letterSpacing: 0.3,
+    textAlign: 'center',
+    width: 74,
   },
   labelShadow: {
     position: 'absolute',
