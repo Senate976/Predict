@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -13,38 +13,73 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PredictionSeal } from '../../components/PredictionSeal';
 import { useAuth } from '../../lib/auth';
 import { formatCountdown, formatRevealAt, parseRevealAt } from '../../lib/datetime';
+import { fetchFriendships, otherProfile, type FriendProfile } from '../../lib/friends';
 import {
   MAX_CONTENT_LENGTH,
+  MAX_TEASER_LENGTH,
   MIN_REVEAL_DELAY_MS,
   createPrediction,
   predictionErrorMessage,
+  type PredictionScope,
 } from '../../lib/predictions';
+import { colors, fonts, radius, spacing } from '../../lib/theme';
 
 export default function NewPredictionScreen() {
   const { session } = useAuth();
   const router = useRouter();
+  const userId = session?.user.id;
 
+  const [teaser, setTeaser] = useState('');
   const [content, setContent] = useState('');
   // Champs vides au départ, et aucun raccourci de délai : le moment de la
   // révélation est un choix libre de l'auteur, pas quelque chose que l'écran
   // oriente. Une valeur pré-remplie suggérerait un horizon par défaut.
   const [dateInput, setDateInput] = useState('');
   const [timeInput, setTimeInput] = useState('');
+
+  const [scope, setScope] = useState<PredictionScope>('circle');
+  const [friends, setFriends] = useState<FriendProfile[] | null>(null);
+  const [selectedFriendIds, setSelectedFriendIds] = useState<Set<string>>(new Set());
+
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showSeal, setShowSeal] = useState(false);
 
+  useEffect(() => {
+    if (!userId) return;
+    fetchFriendships(userId).then(({ data }) => {
+      const accepted = (data ?? []).filter((f) => f.status === 'accepted');
+      setFriends(accepted.map((f) => otherProfile(f, userId)));
+    });
+  }, [userId]);
+
+  const trimmedTeaser = teaser.trim();
   const trimmedContent = content.trim();
   const revealAt = parseRevealAt(dateInput, timeInput);
   const remaining = MAX_CONTENT_LENGTH - trimmedContent.length;
   const revealTouched = dateInput.trim() !== '' || timeInput.trim() !== '';
 
+  function toggleFriend(id: string) {
+    setSelectedFriendIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   /** Vérifications locales, pour éviter un aller-retour réseau inutile. */
   function validate(): string | null {
-    if (!trimmedContent) return 'Écris ta prédiction.';
+    if (!trimmedTeaser) return 'Écris un teaser : l’accroche que verront tes destinataires.';
+    if (trimmedTeaser.length > MAX_TEASER_LENGTH) {
+      return `Le teaser ne peut pas dépasser ${MAX_TEASER_LENGTH} caractères.`;
+    }
+    if (!trimmedContent) return 'Écris le contenu secret de ta prédiction.';
     if (trimmedContent.length > MAX_CONTENT_LENGTH) {
-      return `La prédiction ne peut pas dépasser ${MAX_CONTENT_LENGTH} caractères.`;
+      return `Le contenu secret ne peut pas dépasser ${MAX_CONTENT_LENGTH} caractères.`;
     }
     if (!revealTouched) {
       return 'Choisis la date et l’heure de la révélation.';
@@ -54,6 +89,9 @@ export default function NewPredictionScreen() {
     }
     if (revealAt.getTime() - Date.now() < MIN_REVEAL_DELAY_MS) {
       return 'La révélation doit être au moins une minute après maintenant.';
+    }
+    if (scope === 'selected' && selectedFriendIds.size === 0) {
+      return 'Choisis au moins un ami, ou passe sur « Tout mon Cercle ».';
     }
     return null;
   }
@@ -75,9 +113,11 @@ export default function NewPredictionScreen() {
     setSubmitting(true);
     try {
       const { error: insertError } = await createPrediction({
-        authorId: session.user.id,
+        teaser: trimmedTeaser,
         content: trimmedContent,
         revealAt,
+        scope,
+        friendIds: Array.from(selectedFriendIds),
       });
 
       if (insertError) {
@@ -85,8 +125,7 @@ export default function NewPredictionScreen() {
         return;
       }
 
-      // L'accueil recharge la liste à chaque fois qu'il reprend le focus.
-      router.back();
+      setShowSeal(true);
     } catch (unexpected) {
       const message =
         unexpected instanceof Error ? unexpected.message : String(unexpected);
@@ -102,6 +141,8 @@ export default function NewPredictionScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <PredictionSeal visible={showSeal} onFinish={() => router.back()} />
+
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -119,7 +160,22 @@ export default function NewPredictionScreen() {
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.label}>Ta prédiction</Text>
+          <Text style={styles.label}>Teaser</Text>
+          <Text style={styles.sectionHint}>
+            Visible tout de suite par tes destinataires — le contenu secret, lui,
+            reste scellé.
+          </Text>
+          <TextInput
+            value={teaser}
+            onChangeText={setTeaser}
+            placeholder="Léa va me surprendre avant la fin de l’année…"
+            multiline
+            editable={!submitting}
+            maxLength={MAX_TEASER_LENGTH}
+            style={[styles.input, styles.teaserInput]}
+          />
+
+          <Text style={[styles.label, styles.sectionLabel]}>Ma prédiction</Text>
           <TextInput
             value={content}
             onChangeText={setContent}
@@ -132,9 +188,8 @@ export default function NewPredictionScreen() {
           <Text style={[styles.counter, remaining < 20 && styles.counterLow]}>
             {remaining} caractères restants
           </Text>
-
           <Text style={styles.hint}>
-            Personne ne la verra avant l’heure de révélation, pas même la personne
+            Personne ne le verra avant l’heure de révélation, pas même la personne
             concernée.
           </Text>
 
@@ -184,6 +239,65 @@ export default function NewPredictionScreen() {
             </Text>
           ) : null}
 
+          <Text style={[styles.label, styles.sectionLabel]}>Visible par</Text>
+          <View style={styles.scopeRow}>
+            <Pressable
+              onPress={() => setScope('circle')}
+              disabled={submitting}
+              style={[styles.scopeOption, scope === 'circle' && styles.scopeOptionActive]}
+            >
+              <Text
+                style={[styles.scopeText, scope === 'circle' && styles.scopeTextActive]}
+              >
+                Tout mon Cercle
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setScope('selected')}
+              disabled={submitting}
+              style={[styles.scopeOption, scope === 'selected' && styles.scopeOptionActive]}
+            >
+              <Text
+                style={[styles.scopeText, scope === 'selected' && styles.scopeTextActive]}
+              >
+                Amis spécifiques
+              </Text>
+            </Pressable>
+          </View>
+
+          {scope === 'selected' && (
+            <View style={styles.friendsBox}>
+              {friends === null ? (
+                <ActivityIndicator color={colors.gold} style={styles.searchLoader} />
+              ) : friends.length === 0 ? (
+                <Text style={styles.hint}>
+                  Tu n’as pas encore d’ami accepté dans ton Cercle.
+                </Text>
+              ) : (
+                friends.map((friend) => {
+                  const selected = selectedFriendIds.has(friend.id);
+                  return (
+                    <Pressable
+                      key={friend.id}
+                      onPress={() => toggleFriend(friend.id)}
+                      disabled={submitting}
+                      style={[styles.friendChip, selected && styles.friendChipActive]}
+                    >
+                      <Text
+                        style={[
+                          styles.friendChipText,
+                          selected && styles.friendChipTextActive,
+                        ]}
+                      >
+                        {friend.username}
+                      </Text>
+                    </Pressable>
+                  );
+                })
+              )}
+            </View>
+          )}
+
           {error && <Text style={styles.error}>{error}</Text>}
 
           <Pressable
@@ -196,9 +310,9 @@ export default function NewPredictionScreen() {
             ]}
           >
             {submitting ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.text} />
             ) : (
-              <Text style={styles.submitText}>Programmer la prédiction</Text>
+              <Text style={styles.submitText}>Sceller la prédiction</Text>
             )}
           </Pressable>
         </ScrollView>
@@ -208,61 +322,93 @@ export default function NewPredictionScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
+  safe: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.lg,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: colors.border,
   },
-  headerTitle: { fontSize: 16, fontWeight: '700', color: '#111' },
+  headerTitle: { fontFamily: fonts.serifItalic, fontSize: 18, color: colors.text },
   headerSpacer: { width: 56 },
-  cancel: { fontSize: 15, color: '#6b7280', width: 56 },
-  scroll: { padding: 20, paddingBottom: 40 },
-  label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6 },
-  sectionLabel: { marginTop: 24 },
-  subLabel: { fontSize: 12, color: '#6b7280', marginBottom: 6 },
+  cancel: { fontSize: 15, color: colors.gold, width: 56 },
+  scroll: { padding: spacing.lg, paddingBottom: 40 },
+  label: {
+    fontFamily: fonts.serifItalic,
+    fontSize: 19,
+    color: colors.text,
+    marginBottom: 6,
+  },
+  sectionLabel: { marginTop: spacing.lg },
+  subLabel: { fontSize: 12, color: colors.textFaint, marginBottom: 6 },
   input: {
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 10,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#111',
-    backgroundColor: '#fff',
+    color: colors.text,
+    backgroundColor: colors.surface,
   },
+  teaserInput: { minHeight: 60, textAlignVertical: 'top' },
   contentInput: { minHeight: 110, textAlignVertical: 'top' },
-  counter: { fontSize: 12, color: '#9ca3af', marginTop: 6, textAlign: 'right' },
-  counterLow: { color: '#b45309' },
-  hint: { fontSize: 13, color: '#6b7280', marginTop: 10, lineHeight: 18 },
-  sectionHint: { fontSize: 13, color: '#6b7280', marginBottom: 14, lineHeight: 18 },
+  counter: { fontSize: 12, color: colors.textFaint, marginTop: 6, textAlign: 'right' },
+  counterLow: { color: colors.gold },
+  hint: { fontSize: 13, color: colors.textMuted, marginTop: 10, lineHeight: 18 },
+  sectionHint: { fontSize: 13, color: colors.textMuted, marginBottom: 10, lineHeight: 18 },
   row: { flexDirection: 'row', gap: 12 },
   timeField: { width: 110 },
-  preview: { fontSize: 14, color: '#166534', marginTop: 14 },
-  previewInvalid: { fontSize: 14, color: '#b45309', marginTop: 14 },
+  preview: { fontSize: 14, color: colors.success, marginTop: 14 },
+  previewInvalid: { fontSize: 14, color: colors.gold, marginTop: 14 },
+  scopeRow: { flexDirection: 'row', gap: 10 },
+  scopeOption: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingVertical: 12,
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+  },
+  scopeOptionActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
+  scopeText: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
+  scopeTextActive: { color: colors.gold },
+  friendsBox: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: spacing.md },
+  searchLoader: { marginTop: spacing.sm },
+  friendChip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: colors.surface,
+  },
+  friendChipActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
+  friendChipText: { fontSize: 13, color: colors.textMuted, fontWeight: '600' },
+  friendChipTextActive: { color: colors.gold },
   error: {
-    color: '#b91c1c',
-    backgroundColor: '#fef2f2',
-    borderRadius: 8,
+    color: colors.danger,
+    backgroundColor: colors.dangerSoft,
+    borderRadius: radius.sm,
     padding: 12,
     fontSize: 14,
     marginTop: 14,
   },
   submit: {
-    backgroundColor: '#2563eb',
-    borderRadius: 10,
+    backgroundColor: colors.gold,
+    borderRadius: radius.sm,
     paddingVertical: 15,
     alignItems: 'center',
     marginTop: 24,
     minHeight: 52,
     justifyContent: 'center',
   },
-  submitPressed: { backgroundColor: '#1d4ed8' },
-  submitDisabled: { opacity: 0.7 },
-  submitText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  submitPressed: { backgroundColor: colors.goldBright },
+  submitDisabled: { opacity: 0.6 },
+  submitText: { color: colors.text, fontSize: 16, fontWeight: '700' },
 });

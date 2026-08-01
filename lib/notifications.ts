@@ -1,0 +1,57 @@
+import type { PostgrestError } from '@supabase/supabase-js';
+
+import { supabase } from './supabase';
+
+export type NotificationType = 'new_teaser' | 'prediction_revealed';
+
+/**
+ * Une notification telle que renvoyée par `public.notifications`, avec le
+ * teaser de la prédiction concernée embarqué pour l'affichage — jamais le
+ * contenu secret, qui reste soumis à sa propre RLS et n'a pas sa place ici.
+ */
+export type Notification = {
+  id: string;
+  user_id: string;
+  prediction_id: string;
+  type: NotificationType;
+  is_read: boolean;
+  created_at: string;
+  prediction: { teaser: string } | null;
+};
+
+export function isMissingTable(error: PostgrestError): boolean {
+  return error.code === 'PGRST205';
+}
+
+const MISSING_TABLE_MESSAGE =
+  'Table `notifications` introuvable. Exécute supabase/schema.sql dans le SQL Editor.';
+
+export function notificationErrorMessage(error: PostgrestError): string {
+  if (isMissingTable(error)) return MISSING_TABLE_MESSAGE;
+  return `Chargement impossible : ${error.message}`;
+}
+
+/** Les notifications de l'utilisateur, les plus récentes en tête. */
+export async function fetchNotifications(userId: string) {
+  return supabase
+    .from('notifications')
+    .select('id, user_id, prediction_id, type, is_read, created_at, prediction:predictions(teaser)')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .returns<Notification[]>();
+}
+
+export async function markNotificationRead(id: string) {
+  return supabase.from('notifications').update({ is_read: true }).eq('id', id);
+}
+
+/**
+ * Rattrape les notifications `prediction_revealed` en retard : Postgres n'a
+ * pas de déclencheur qui se déclenche seul quand `reveal_at` est dépassé, donc
+ * on appelle cette RPC à chaque chargement du fil pour matérialiser celles
+ * qui manquent. Idempotente (contrainte unique côté base), sans effet si rien
+ * n'a été révélé depuis le dernier appel.
+ */
+export async function triggerRevealNotifications() {
+  return supabase.rpc('generate_reveal_notifications');
+}

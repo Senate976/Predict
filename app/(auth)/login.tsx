@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { supabase } from '../../lib/supabase';
+import { colors, eyebrow, fonts, radius, spacing } from '../../lib/theme';
 
 type Mode = 'signIn' | 'signUp';
 
@@ -303,7 +304,7 @@ export default function LoginScreen() {
             ]}
           >
             {submitting ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.text} />
             ) : (
               <Text style={styles.submitText}>
                 {isSignUp ? 'Créer mon compte' : 'Se connecter'}
@@ -325,58 +326,63 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
+  safe: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
-  scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
+  scroll: { flexGrow: 1, justifyContent: 'center', padding: spacing.lg },
   brand: {
-    fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: 2,
-    color: '#2563eb',
+    fontFamily: fonts.serifItalic,
+    fontSize: 18,
+    letterSpacing: 4,
+    color: colors.gold,
     textTransform: 'uppercase',
     marginBottom: 8,
   },
-  title: { fontSize: 26, fontWeight: '700', color: '#111', marginBottom: 28 },
-  field: { marginBottom: 16 },
-  label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6 },
+  title: {
+    fontFamily: fonts.serifItalic,
+    fontSize: 34,
+    color: colors.text,
+    marginBottom: 28,
+  },
+  field: { marginBottom: spacing.md },
+  label: { ...eyebrow, marginBottom: 6 },
   input: {
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 10,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#111',
-    backgroundColor: '#fff',
+    color: colors.text,
+    backgroundColor: colors.surface,
   },
   error: {
-    color: '#b91c1c',
-    backgroundColor: '#fef2f2',
-    borderRadius: 8,
+    color: colors.danger,
+    backgroundColor: colors.dangerSoft,
+    borderRadius: radius.sm,
     padding: 12,
     fontSize: 14,
-    marginBottom: 12,
+    marginBottom: spacing.sm,
   },
   notice: {
-    color: '#166534',
-    backgroundColor: '#f0fdf4',
-    borderRadius: 8,
+    color: colors.goldBright,
+    backgroundColor: colors.goldSoft,
+    borderRadius: radius.sm,
     padding: 12,
     fontSize: 14,
-    marginBottom: 12,
+    marginBottom: spacing.sm,
   },
   submit: {
-    backgroundColor: '#2563eb',
-    borderRadius: 10,
+    backgroundColor: colors.gold,
+    borderRadius: radius.sm,
     paddingVertical: 15,
     alignItems: 'center',
     marginTop: 4,
     minHeight: 52,
     justifyContent: 'center',
   },
-  submitPressed: { backgroundColor: '#1d4ed8' },
-  submitDisabled: { opacity: 0.7 },
-  submitText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  submitPressed: { backgroundColor: colors.goldBright },
+  submitDisabled: { opacity: 0.6 },
+  submitText: { color: colors.text, fontSize: 16, fontWeight: '700' },
   switch: { marginTop: 18, alignItems: 'center' },
-  switchText: { color: '#2563eb', fontSize: 14, fontWeight: '600' },
+  switchText: { color: colors.gold, fontSize: 14, fontWeight: '600' },
 });
