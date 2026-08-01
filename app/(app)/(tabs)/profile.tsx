@@ -3,10 +3,14 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Avatar } from '../../../components/Avatar';
 import { PrestigeBadge } from '../../../components/PrestigeBadge';
+import { QuickCreateButton } from '../../../components/QuickCreateButton';
+import { pickAvatarImage, uploadAvatar } from '../../../lib/avatar';
 import { allBadgeLevels, badgeForCount, fetchRealizedCount30d } from '../../../lib/badges';
 import { useAuth } from '../../../lib/auth';
 import { formatRevealAt } from '../../../lib/datetime';
+import { fetchProfileById } from '../../../lib/friends';
 import {
   fetchPredictionOutcomes,
   type PredictionOutcome,
@@ -37,6 +41,9 @@ export default function ProfileScreen() {
 
   const [outcomes, setOutcomes] = useState<PredictionOutcome[] | null>(null);
   const [badgeCount, setBadgeCount] = useState<number | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('total');
   const [scaleOpen, setScaleOpen] = useState(false);
@@ -44,8 +51,8 @@ export default function ProfileScreen() {
   const load = useCallback(async () => {
     if (!userId) return;
 
-    // Les deux chargements sont indépendants : un échec de l'un ne doit pas
-    // laisser l'autre bloqué indéfiniment (le badge restait en chargement
+    // Les trois chargements sont indépendants : l'échec de l'un ne doit pas
+    // laisser les autres bloqués indéfiniment (le badge restait en chargement
     // perpétuel si les scellés échouaient, faute d'être jamais appelé).
     const { data, error: fetchError } = await fetchPredictionOutcomes(userId);
     if (fetchError) {
@@ -57,7 +64,33 @@ export default function ProfileScreen() {
 
     const { data: count, error: badgeError } = await fetchRealizedCount30d(userId);
     setBadgeCount(!badgeError && typeof count === 'number' ? count : 0);
+
+    const { data: profile } = await fetchProfileById(userId);
+    setAvatarUrl(profile?.avatar_url ?? null);
   }, [userId]);
+
+  async function handlePickAvatar() {
+    if (!userId) return;
+    setAvatarError(null);
+    const { uri, error: pickError } = await pickAvatarImage();
+    if (pickError) {
+      setAvatarError(pickError.message);
+      return;
+    }
+    if (!uri) return;
+
+    setUploadingAvatar(true);
+    try {
+      const { url, error: uploadError } = await uploadAvatar(userId, uri);
+      if (uploadError) {
+        setAvatarError(`Envoi impossible : ${uploadError.message}`);
+        return;
+      }
+      setAvatarUrl(url);
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }
 
   useFocusEffect(
     useCallback(() => {
@@ -75,12 +108,26 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.eyebrow}>Bienvenue</Text>
+      <View style={styles.header}>
         <Text style={styles.brand}>Predict</Text>
+        <QuickCreateButton />
+      </View>
 
+      <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.identityCard}>
-          <Text style={styles.eyebrow}>Nom d’utilisateur</Text>
+          <Pressable onPress={handlePickAvatar} disabled={uploadingAvatar} style={styles.avatarWrap}>
+            <Avatar url={avatarUrl} username={username} size={84} />
+            <View style={styles.avatarEditBadge}>
+              {uploadingAvatar ? (
+                <ActivityIndicator size="small" color={colors.background} />
+              ) : (
+                <Text style={styles.avatarEditText}>Modifier</Text>
+              )}
+            </View>
+          </Pressable>
+          {avatarError && <Text style={styles.error}>{avatarError}</Text>}
+
+          <Text style={[styles.eyebrow, styles.sectionSpacing]}>Nom d’utilisateur</Text>
           <Text style={styles.username}>@{username ?? '…'}</Text>
           <Text style={styles.email}>{session?.user.email ?? ''}</Text>
         </View>
@@ -212,10 +259,20 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingTop: 14,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
   scroll: { padding: spacing.lg, paddingBottom: 40 },
   eyebrow: { ...eyebrow },
   sectionSpacing: { marginTop: spacing.xl },
-  brand: { fontFamily: fonts.serifItalic, fontSize: 40, color: colors.text, marginTop: 2 },
+  brand: { fontFamily: fonts.serifItalic, fontSize: 28, color: colors.text },
   identityCard: {
     marginTop: spacing.lg,
     padding: 18,
@@ -223,7 +280,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
+    alignItems: 'center',
   },
+  avatarWrap: { position: 'relative' },
+  avatarEditBadge: {
+    position: 'absolute',
+    bottom: -4,
+    alignSelf: 'center',
+    backgroundColor: colors.gold,
+    borderRadius: radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  avatarEditText: { color: colors.background, fontSize: 10, fontWeight: '700' },
   username: { fontFamily: fonts.serifItalic, fontSize: 22, color: colors.text, marginTop: 6 },
   email: { fontSize: 13, color: colors.textFaint, marginTop: 4 },
   loader: { marginTop: 24 },

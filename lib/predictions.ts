@@ -214,3 +214,32 @@ export async function fetchPredictionOutcomes(authorId: string) {
     .order('created_at', { ascending: false })
     .returns<PredictionOutcome[]>();
 }
+
+export type PredictionStats = { total: number; realized: number; missed: number; pending: number };
+
+/**
+ * Compteurs agrégés des scellés d'un utilisateur (Total/Réalisées/Manquées/
+ * En cours), pour la vue "Profil d'un ami" — jamais le détail des prédictions,
+ * juste des totaux. `get_prediction_stats` (security definer) réserve l'accès
+ * à soi-même ou à un ami accepté, et renvoie des zéros sinon.
+ */
+export async function fetchPredictionStats(targetUserId: string) {
+  const { data, error } = await supabase
+    .rpc('get_prediction_stats', { target_user: targetUserId })
+    .maybeSingle()
+    .returns<PredictionStats>();
+
+  if (error || !data) {
+    return { data: { total: 0, realized: 0, missed: 0, pending: 0 }, error };
+  }
+
+  return {
+    data: {
+      total: Number(data.total),
+      realized: Number(data.realized),
+      missed: Number(data.missed),
+      pending: Number(data.pending),
+    } satisfies PredictionStats,
+    error: null,
+  };
+}

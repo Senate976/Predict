@@ -1,38 +1,61 @@
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { formatCountdown, formatRevealAt } from '../lib/datetime';
 import { isRevealed, type PredictionFeedItem } from '../lib/predictions';
 import { colors, fonts, radius } from '../lib/theme';
 import { AudioPlayerButton } from './AudioPlayerButton';
+import { Avatar } from './Avatar';
 import { InlineComments } from './InlineComments';
 import { SealBadge } from './SealBadge';
 
 /**
- * Carte d'une prédiction, partagée entre le Fil et les Archives. `onPress` est
- * toujours fourni par l'appelant (navigue vers le détail) — depuis là,
- * l'auteur gère les destinataires et chacun peut se prononcer une fois
- * révélée. Les commentaires, eux, sont directement sur la carte
- * (`InlineComments`), avant comme après révélation.
+ * Carte d'une prédiction, partagée entre le Fil et les Archives.
+ *
+ * `mode: 'link'` (Fil, par défaut) : la carte est toujours dépliée, un tap
+ * navigue vers l'écran détail (`onPress`) où l'auteur gère les destinataires
+ * et chacun se prononce une fois révélée.
+ *
+ * `mode: 'accordion'` (Archives) : repliée par défaut (teaser seul), un tap
+ * déplie/replie le contenu et les commentaires sur place — pas de navigation.
  */
 export function PredictionCard({
   item,
   now,
   authorLabel,
+  authorId,
+  authorAvatarUrl,
   userId,
   onPress,
+  mode = 'link',
 }: {
   item: PredictionFeedItem;
   now: Date;
   authorLabel?: string;
+  authorId?: string;
+  authorAvatarUrl?: string | null;
   userId: string;
-  onPress: () => void;
+  onPress?: () => void;
+  mode?: 'link' | 'accordion';
 }) {
+  const router = useRouter();
+  const [expanded, setExpanded] = useState(mode !== 'accordion');
   const revealAt = new Date(item.reveal_at);
   const revealed = isRevealed(item, now);
+  const showBody = mode === 'link' || expanded;
+
+  function handlePress() {
+    if (mode === 'accordion') {
+      setExpanded((e) => !e);
+    } else {
+      onPress?.();
+    }
+  }
 
   return (
     <View style={styles.card}>
-      <Pressable onPress={onPress} style={({ pressed }) => pressed && styles.cardPressed}>
+      <Pressable onPress={handlePress} style={({ pressed }) => pressed && styles.cardPressed}>
         <View style={styles.cardTop}>
           {!revealed && <SealBadge />}
           <View style={[styles.badge, revealed ? styles.badgeOpen : styles.badgeLocked]}>
@@ -40,33 +63,44 @@ export function PredictionCard({
               {revealed ? 'Révélée' : formatCountdown(revealAt, now)}
             </Text>
           </View>
+          {mode === 'accordion' && <Text style={styles.chevron}>{expanded ? '▲' : '▼'}</Text>}
         </View>
 
-        {authorLabel && <Text style={styles.author}>{authorLabel}</Text>}
+        {authorLabel && (
+          <Pressable
+            onPress={() => authorId && router.push(`/profile/${authorId}`)}
+            style={styles.authorRow}
+            hitSlop={4}
+          >
+            <Avatar url={authorAvatarUrl} username={authorLabel} size={18} />
+            <Text style={styles.author}>{authorLabel}</Text>
+          </Pressable>
+        )}
         <Text style={styles.cardTeaser}>{item.teaser}</Text>
 
-        {revealed && item.content ? (
-          <View style={styles.contentBox}>
-            <Text style={styles.contentLabel}>Contenu</Text>
-            <Text style={styles.cardContent}>{item.content}</Text>
-            {item.audio_path && (
-              <View style={styles.audioRow}>
-                <AudioPlayerButton path={item.audio_path} />
-              </View>
-            )}
-          </View>
-        ) : (
-          <View style={styles.sealedBox}>
-            <Text style={styles.sealedText}>Contenu scellé jusqu’à la révélation</Text>
-          </View>
-        )}
+        {showBody &&
+          (revealed && item.content ? (
+            <View style={styles.contentBox}>
+              <Text style={styles.contentLabel}>Contenu</Text>
+              <Text style={styles.cardContent}>{item.content}</Text>
+              {item.audio_path && (
+                <View style={styles.audioRow}>
+                  <AudioPlayerButton path={item.audio_path} />
+                </View>
+              )}
+            </View>
+          ) : (
+            <View style={styles.sealedBox}>
+              <Text style={styles.sealedText}>Contenu scellé jusqu’à la révélation</Text>
+            </View>
+          ))}
 
         <Text style={styles.cardMeta}>
           {revealed ? 'Révélée' : 'Se révèle'} {formatRevealAt(revealAt)}
         </Text>
       </Pressable>
 
-      <InlineComments predictionId={item.id} userId={userId} />
+      {showBody && <InlineComments predictionId={item.id} userId={userId} truncate />}
     </View>
   );
 }
@@ -75,11 +109,16 @@ const styles = StyleSheet.create({
   cardPressed: { opacity: 0.85 },
   card: {
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'rgba(173, 138, 62, 0.28)',
     borderRadius: radius.xl,
-    padding: 16,
-    marginBottom: 12,
+    padding: 18,
+    marginBottom: 22,
     backgroundColor: colors.surface,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 1,
   },
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   badge: {
@@ -93,7 +132,9 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 12, fontWeight: '700' },
   badgeTextLocked: { color: colors.gold },
   badgeTextOpen: { color: colors.success },
-  author: { fontSize: 12, color: colors.textFaint, marginBottom: 4 },
+  chevron: { marginLeft: 'auto', fontSize: 11, color: colors.textFaint },
+  authorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginBottom: 4 },
+  author: { fontSize: 12, color: colors.textFaint },
   cardTeaser: {
     fontFamily: fonts.serifItalic,
     fontSize: 20,

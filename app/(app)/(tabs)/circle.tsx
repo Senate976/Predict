@@ -1,5 +1,5 @@
 import type { PostgrestError } from '@supabase/supabase-js';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -12,7 +12,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Avatar } from '../../../components/Avatar';
 import { PrestigeBadge } from '../../../components/PrestigeBadge';
+import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { useAuth } from '../../../lib/auth';
 import { fetchRealizedCount30d } from '../../../lib/badges';
 import {
@@ -49,6 +51,7 @@ type Relation =
 
 export default function CircleScreen() {
   const { session } = useAuth();
+  const router = useRouter();
   const userId = session?.user.id;
 
   const [friendships, setFriendships] = useState<Friendship[] | null>(null);
@@ -244,8 +247,8 @@ export default function CircleScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Text style={styles.eyebrow}>Cercle</Text>
         <Text style={styles.headerTitle}>Le Cercle</Text>
+        <QuickCreateButton />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
@@ -360,10 +363,14 @@ export default function CircleScreen() {
             const profile = otherProfile(f, userId!);
             return (
               <View key={f.id} style={styles.row}>
-                <View style={styles.usernameRow}>
+                <Pressable
+                  onPress={() => router.push(`/profile/${profile.id}`)}
+                  style={styles.usernameRow}
+                >
+                  <Avatar url={profile.avatar_url} username={profile.username} size={28} />
                   <PrestigeBadge count={friendBadges[profile.id] ?? 0} size="small" />
                   <Text style={styles.username}>{profile.username}</Text>
-                </View>
+                </Pressable>
                 <Pressable
                   onPress={() => handleRemove(f.id)}
                   disabled={pendingActionId === f.id}
@@ -470,6 +477,9 @@ export default function CircleScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingTop: 14,
     paddingBottom: 16,
