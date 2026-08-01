@@ -1171,8 +1171,10 @@ on conflict (id) do nothing;
 -- que le contenu texte.
 alter table public.prediction_contents add column if not exists audio_path text;
 
-alter table storage.objects enable row level security;
-
+-- La RLS de `storage.objects` est déjà activée par Supabase (table gérée par
+-- `supabase_storage_admin` — notre rôle n'en est pas propriétaire et ne peut
+-- pas exécuter `alter table ... enable row level security` dessus). On ajoute
+-- seulement nos policies.
 drop policy if exists "prediction_audio_select" on storage.objects;
 create policy "prediction_audio_select"
   on storage.objects
