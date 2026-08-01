@@ -3,6 +3,8 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PrestigeBadge } from '../../../components/PrestigeBadge';
+import { fetchRealizedCount30d } from '../../../lib/badges';
 import { useAuth } from '../../../lib/auth';
 import { formatRevealAt } from '../../../lib/datetime';
 import {
@@ -34,6 +36,7 @@ export default function ProfileScreen() {
   const userId = session?.user.id;
 
   const [outcomes, setOutcomes] = useState<PredictionOutcome[] | null>(null);
+  const [badgeCount, setBadgeCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('total');
 
@@ -46,6 +49,9 @@ export default function ProfileScreen() {
     }
     setError(null);
     setOutcomes(data ?? []);
+
+    const { data: count } = await fetchRealizedCount30d(userId);
+    setBadgeCount(typeof count === 'number' ? count : 0);
   }, [userId]);
 
   useFocusEffect(
@@ -72,6 +78,20 @@ export default function ProfileScreen() {
           <Text style={styles.eyebrow}>Nom d’utilisateur</Text>
           <Text style={styles.username}>@{username ?? '…'}</Text>
           <Text style={styles.email}>{session?.user.email ?? ''}</Text>
+        </View>
+
+        <Text style={[styles.eyebrow, styles.sectionSpacing]}>Prestige</Text>
+        <View style={styles.prestigeCard}>
+          {badgeCount === null ? (
+            <ActivityIndicator color={colors.gold} style={styles.loader} />
+          ) : (
+            <>
+              <PrestigeBadge count={badgeCount} size="large" />
+              <Text style={styles.prestigeHint}>
+                Prédictions approuvées par le Cercle, 30 derniers jours
+              </Text>
+            </>
+          )}
         </View>
 
         <Text style={[styles.eyebrow, styles.sectionSpacing]}>Vos scellés</Text>
@@ -161,6 +181,22 @@ const styles = StyleSheet.create({
   username: { fontFamily: fonts.serifItalic, fontSize: 22, color: colors.text, marginTop: 6 },
   email: { fontSize: 13, color: colors.textFaint, marginTop: 4 },
   loader: { marginTop: 24 },
+  prestigeCard: {
+    marginTop: 12,
+    paddingVertical: 24,
+    borderRadius: radius.xl,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  prestigeHint: {
+    fontSize: 12,
+    color: colors.textFaint,
+    marginTop: 10,
+    textAlign: 'center',
+    paddingHorizontal: 24,
+  },
   statsRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
   statCard: {
     flex: 1,

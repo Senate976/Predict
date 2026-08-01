@@ -1055,3 +1055,102 @@ left join public.prediction_votes v on v.prediction_id = p.id
 group by p.id, p.author_id, p.teaser, p.reveal_at, p.created_at;
 
 grant select on public.prediction_outcomes to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 17. Gamification — célébration et badges de prestige
+-- ---------------------------------------------------------------------------
+
+-- Nouveau type de notification, réservé à l'auteur (les précédents sont tous
+-- pour un destinataire) : le moment où sa prédiction bascule sur « Réalisée ».
+alter table public.notifications drop constraint if exists notifications_type_check;
+alter table public.notifications add constraint notifications_type_check
+  check (type in ('new_teaser', 'prediction_revealed', 'prediction_approved'));
+
+-- Se déclenche à chaque vote (pose ou changement), recalcule la majorité, et
+-- notifie l'auteur la première fois qu'elle penche pour 'realized'. La
+-- contrainte unique de la table absorbe les appels suivants (`on conflict do
+-- nothing`) : un vote qui repasse ensuite côté 'missed' puis revient sur
+-- 'realized' ne redéclenche pas une deuxième célébration.
+--
+-- `security definer` : la notification est pour l'auteur, pas pour qui vote —
+-- exactement ce que la policy insert normale de `notifications` interdit.
+create or replace function public.notify_prediction_approved()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_realized int;
+  v_missed int;
+  v_author uuid;
+begin
+  select
+    coalesce(sum((vote_value = 'realized')::int), 0),
+    coalesce(sum((vote_value = 'missed')::int), 0)
+  into v_realized, v_missed
+  from public.prediction_votes
+  where prediction_id = new.prediction_id;
+
+  if v_realized > v_missed then
+    select author_id into v_author from public.predictions where id = new.prediction_id;
+
+    insert into public.notifications (user_id, prediction_id, type)
+    values (v_author, new.prediction_id, 'prediction_approved')
+    on conflict (user_id, prediction_id, type) do nothing;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists prediction_votes_notify_approved on public.prediction_votes;
+create trigger prediction_votes_notify_approved
+  after insert or update on public.prediction_votes
+  for each row execute function public.notify_prediction_approved();
+
+-- Nombre de prédictions d'un utilisateur passées 'realized' (majorité des
+-- votes) et révélées dans les 30 derniers jours — la mesure qui détermine son
+-- badge de prestige. `security definer` pour pouvoir compter les prédictions
+-- de quelqu'un d'autre (un ami) sans que l'appelant ait besoin d'être
+-- destinataire de chacune ; la garde se fait explicitement dans le `where`
+-- (soi-même, ou un ami accepté) plutôt qu'en s'appuyant sur la RLS des tables
+-- sous-jacentes — sans elle, n'importe qui pourrait sonder le score de
+-- n'importe qui.
+--
+-- Renvoie un compte agrégé, jamais le contenu ni l'identité des prédictions
+-- comptées : rien de sensible n'est exposé au-delà de ce nombre.
+create or replace function public.get_realized_count_30d(target_user uuid)
+returns integer
+language sql
+security definer
+stable
+set search_path = ''
+as $$
+  select count(*)::int
+  from public.predictions p
+  where p.author_id = target_user
+    and p.reveal_at >= now() - interval '30 days'
+    and (
+      target_user = auth.uid()
+      or exists (
+        select 1 from public.friendships f
+        where f.status = 'accepted'
+          and (
+            (f.requester_id = auth.uid() and f.addressee_id = target_user)
+            or (f.addressee_id = auth.uid() and f.requester_id = target_user)
+          )
+      )
+    )
+    and exists (
+      select 1
+      from public.prediction_votes v
+      where v.prediction_id = p.id
+      group by v.prediction_id
+      having coalesce(sum((v.vote_value = 'realized')::int), 0)
+           > coalesce(sum((v.vote_value = 'missed')::int), 0)
+    );
+$$;
+
+revoke all on function public.get_realized_count_30d(uuid) from public;
+grant execute on function public.get_realized_count_30d(uuid) to authenticated;

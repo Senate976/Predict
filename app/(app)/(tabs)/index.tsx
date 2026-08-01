@@ -11,9 +11,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CelebrationBurst } from '../../../components/CelebrationBurst';
 import { PredictionCard } from '../../../components/PredictionCard';
 import { useAuth } from '../../../lib/auth';
-import { fetchNotifications } from '../../../lib/notifications';
+import { fetchNotifications, markNotificationRead } from '../../../lib/notifications';
 import {
   feedErrorMessage,
   fetchPredictionsFeed,
@@ -39,6 +40,10 @@ export default function HomeScreen() {
   const [feed, setFeed] = useState<PredictionFeedItem[] | null>(null);
   const [authorNames, setAuthorNames] = useState<AuthorNames>({});
   const [unreadCount, setUnreadCount] = useState(0);
+  const [celebration, setCelebration] = useState<{ visible: boolean; message: string }>({
+    visible: false,
+    message: '',
+  });
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => new Date());
@@ -80,7 +85,22 @@ export default function HomeScreen() {
     }
 
     const { data: notifications } = await fetchNotifications(userId);
-    setUnreadCount((notifications ?? []).filter((n) => !n.is_read).length);
+    const notifList = notifications ?? [];
+    setUnreadCount(notifList.filter((n) => !n.is_read).length);
+
+    // La première approbation non vue déclenche la célébration, une seule
+    // fois — marquée lue tout de suite pour qu'un focus ultérieur de cet
+    // écran ne la rejoue pas.
+    const approval = notifList.find((n) => n.type === 'prediction_approved' && !n.is_read);
+    if (approval) {
+      markNotificationRead(approval.id);
+      setCelebration({
+        visible: true,
+        message: approval.prediction
+          ? `« ${approval.prediction.teaser} » approuvée par vos pairs !`
+          : 'Prédiction approuvée par vos pairs !',
+      });
+    }
   }, [userId]);
 
   // Au focus et non au montage : les écrans de création/gestion reviennent
@@ -110,6 +130,12 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <CelebrationBurst
+        visible={celebration.visible}
+        message={celebration.message}
+        onFinish={() => setCelebration((c) => ({ ...c, visible: false }))}
+      />
+
       <View style={styles.header}>
         <View style={styles.flex}>
           <Text style={styles.brand}>Predict</Text>
