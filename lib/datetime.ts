@@ -7,7 +7,7 @@
 // Ce module ne dépend que de `Date` — ce qui le rend aussi exécutable tel quel
 // sous Node pour vérifier les cas limites (31/02, minuit, passage de mois).
 
-const MONTHS = [
+export const MONTHS = [
   'janvier',
   'février',
   'mars',

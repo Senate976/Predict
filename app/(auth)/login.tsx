@@ -257,6 +257,9 @@ export default function LoginScreen() {
                 editable={!submitting}
                 style={styles.input}
               />
+              <Text style={styles.fieldHint}>
+                {MIN_USERNAME_LENGTH} à {MAX_USERNAME_LENGTH} caractères — lettres, chiffres, « _ » et « . » uniquement.
+              </Text>
             </View>
           )}
 
@@ -345,6 +348,7 @@ const styles = StyleSheet.create({
   },
   field: { marginBottom: spacing.md },
   label: { ...eyebrow, marginBottom: 6 },
+  fieldHint: { fontSize: 12, color: colors.textFaint, marginTop: 6 },
   input: {
     borderWidth: 1,
     borderColor: colors.border,

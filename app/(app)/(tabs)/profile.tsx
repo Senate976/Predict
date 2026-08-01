@@ -42,16 +42,20 @@ export default function ProfileScreen() {
 
   const load = useCallback(async () => {
     if (!userId) return;
+
+    // Les deux chargements sont indépendants : un échec de l'un ne doit pas
+    // laisser l'autre bloqué indéfiniment (le badge restait en chargement
+    // perpétuel si les scellés échouaient, faute d'être jamais appelé).
     const { data, error: fetchError } = await fetchPredictionOutcomes(userId);
     if (fetchError) {
       setError(`Chargement impossible : ${fetchError.message}`);
-      return;
+    } else {
+      setError(null);
+      setOutcomes(data ?? []);
     }
-    setError(null);
-    setOutcomes(data ?? []);
 
-    const { data: count } = await fetchRealizedCount30d(userId);
-    setBadgeCount(typeof count === 'number' ? count : 0);
+    const { data: count, error: badgeError } = await fetchRealizedCount30d(userId);
+    setBadgeCount(!badgeError && typeof count === 'number' ? count : 0);
   }, [userId]);
 
   useFocusEffect(
