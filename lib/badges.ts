@@ -1,26 +1,64 @@
 import { supabase } from './supabase';
 
-export type BadgeLevel = 'bois' | 'fer' | 'bronze' | 'argent' | 'or' | 'titane';
+export type BadgeLevel = 'fer' | 'bronze' | 'argent' | 'or';
 
 type Gradient = readonly [string, string, string];
 
-type Threshold = { level: BadgeLevel; label: string; min: number; color: string; gradient: Gradient };
+type Threshold = {
+  level: BadgeLevel;
+  label: string;
+  min: number;
+  color: string;
+  gradient: Gradient;
+  engraveShadow: string;
+  engraveLight: string;
+};
 
 /**
- * Seuils de prestige, sur le nombre de prédictions passées « Réalisée » (à la
- * majorité des votes) au cours des 30 derniers jours. Doivent rester alignés
- * sur `get_realized_count_30d` côté SQL, qui calcule le nombre lui-même — ce
- * fichier ne fait que le traduire en niveau visuel. Les dégradés (clair →
- * teinte → sombre) donnent le reflet métallique de la médaille ; définis à la
- * main plutôt que calculés, pour un rendu fiable par matériau.
+ * Quatre niveaux de prestige, sur le nombre de prédictions passées
+ * « Réalisée » (à la majorité des votes) au cours des 30 derniers jours.
+ * Doivent rester alignés sur `get_realized_count_30d` côté SQL. Chaque métal
+ * a son propre dégradé (reflet métallique) et ses teintes de gravure
+ * (ombre/relief du libellé), pour un rendu fidèle par matériau plutôt qu'une
+ * simple couleur plate.
  */
 const THRESHOLDS: Threshold[] = [
-  { level: 'bois', label: 'Bois', min: 0, color: '#8B6B4A', gradient: ['#B08D63', '#8B6B4A', '#5B4128'] },
-  { level: 'fer', label: 'Fer', min: 5, color: '#8A8D91', gradient: ['#B4B7BA', '#8A8D91', '#5C5F63'] },
-  { level: 'bronze', label: 'Bronze', min: 10, color: '#B87333', gradient: ['#D99A5B', '#B87333', '#7D4B1E'] },
-  { level: 'argent', label: 'Argent', min: 20, color: '#ADADAD', gradient: ['#E2E2E2', '#ADADAD', '#787878'] },
-  { level: 'or', label: 'Or', min: 35, color: '#D4AF37', gradient: ['#F0D77B', '#D4AF37', '#9C7A1F'] },
-  { level: 'titane', label: 'Titane', min: 50, color: '#5E7C8A', gradient: ['#93B4C2', '#5E7C8A', '#37505C'] },
+  {
+    level: 'fer',
+    label: 'Fer',
+    min: 0,
+    color: '#8A8D91',
+    gradient: ['#C9CCCF', '#8A8D91', '#54575B'],
+    engraveShadow: '#3A3C3F',
+    engraveLight: '#EDEEEF',
+  },
+  {
+    level: 'bronze',
+    label: 'Bronze',
+    min: 10,
+    color: '#B87A3D',
+    gradient: ['#E3B27C', '#B87A3D', '#7A4C1E'],
+    engraveShadow: '#4A2C10',
+    engraveLight: '#F6DFB8',
+  },
+  {
+    level: 'argent',
+    label: 'Argent',
+    min: 20,
+    color: '#B7B9BC',
+    gradient: ['#F0F1F2', '#B7B9BC', '#84878B',],
+    engraveShadow: '#5C5E61',
+    engraveLight: '#FFFFFF',
+  },
+  {
+    level: 'or',
+    label: 'Or',
+    min: 35,
+    color: '#CE9F2E',
+    gradient: ['#F3D888', '#CE9F2E', '#8A6414'],
+    engraveShadow: '#5C4310',
+    engraveLight: '#FCEDBB',
+  },
 ];
 
 export type BadgeInfo = {
@@ -28,6 +66,8 @@ export type BadgeInfo = {
   label: string;
   color: string;
   gradient: Gradient;
+  engraveShadow: string;
+  engraveLight: string;
   min: number;
   next: { label: string; min: number } | null;
 };
@@ -44,12 +84,14 @@ export function badgeForCount(count: number): BadgeInfo {
     label: current.label,
     color: current.color,
     gradient: current.gradient,
+    engraveShadow: current.engraveShadow,
+    engraveLight: current.engraveLight,
     min: current.min,
     next: next ? { label: next.label, min: next.min } : null,
   };
 }
 
-/** Progression vers le niveau suivant, entre 0 et 1. `null` : déjà au sommet (Titane). */
+/** Progression vers le niveau suivant, entre 0 et 1. `null` : déjà au sommet (Or). */
 export function badgeProgress(count: number, badge: BadgeInfo): number | null {
   if (!badge.next) return null;
   const span = badge.next.min - badge.min;
