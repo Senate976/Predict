@@ -15,9 +15,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PredictionRecorder } from '../../components/PredictionRecorder';
 import { PredictionSeal } from '../../components/PredictionSeal';
+import { SelectField, type SelectOption } from '../../components/SelectField';
 import { setPredictionAudioPath, uploadPredictionAudio } from '../../lib/audio';
 import { useAuth } from '../../lib/auth';
-import { formatCountdown, formatRevealAt, parseRevealAt } from '../../lib/datetime';
+import { MONTHS, formatCountdown, formatRevealAt } from '../../lib/datetime';
 import { fetchFriendships, otherProfile, type FriendProfile } from '../../lib/friends';
 import {
   MAX_CONTENT_LENGTH,
@@ -34,6 +35,40 @@ type ContentMode = 'text' | 'audio';
 /** Contenu écrit à la place du texte quand la prédiction est uniquement vocale. */
 const AUDIO_PLACEHOLDER = '🎙️ Message vocal';
 
+function pad2(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+/** Nombre de jours du mois `month` (1-12) de l'année `year`. */
+function daysInMonth(month: number, year: number): number {
+  return new Date(year, month, 0).getDate();
+}
+
+const HOUR_OPTIONS: SelectOption<number>[] = Array.from({ length: 24 }, (_, i) => ({
+  value: i,
+  label: pad2(i),
+}));
+
+const MINUTE_OPTIONS: SelectOption<number>[] = Array.from({ length: 60 }, (_, i) => ({
+  value: i,
+  label: pad2(i),
+}));
+
+const MONTH_OPTIONS: SelectOption<number>[] = MONTHS.map((label, i) => ({
+  value: i + 1,
+  label: label.charAt(0).toUpperCase() + label.slice(1),
+}));
+
+function yearOptions(): SelectOption<number>[] {
+  const current = new Date().getFullYear();
+  return Array.from({ length: 5 }, (_, i) => ({ value: current + i, label: String(current + i) }));
+}
+
+function dayOptions(month: number | null, year: number | null): SelectOption<number>[] {
+  const max = month !== null && year !== null ? daysInMonth(month, year) : 31;
+  return Array.from({ length: max }, (_, i) => ({ value: i + 1, label: String(i + 1) }));
+}
+
 export default function NewPredictionScreen() {
   const { session } = useAuth();
   const router = useRouter();
@@ -46,8 +81,11 @@ export default function NewPredictionScreen() {
   // Champs vides au départ, et aucun raccourci de délai : le moment de la
   // révélation est un choix libre de l'auteur, pas quelque chose que l'écran
   // oriente. Une valeur pré-remplie suggérerait un horizon par défaut.
-  const [dateInput, setDateInput] = useState('');
-  const [timeInput, setTimeInput] = useState('');
+  const [day, setDay] = useState<number | null>(null);
+  const [month, setMonth] = useState<number | null>(null);
+  const [year, setYear] = useState<number | null>(null);
+  const [hour, setHour] = useState<number | null>(null);
+  const [minute, setMinute] = useState<number | null>(null);
 
   const [scope, setScope] = useState<PredictionScope>('circle');
   const [friends, setFriends] = useState<FriendProfile[] | null>(null);
@@ -65,11 +103,22 @@ export default function NewPredictionScreen() {
     });
   }, [userId]);
 
+  // Recale le jour si le mois/année choisi en compte moins (ex. 31 puis
+  // bascule sur février) : un menu déroulant ne doit jamais pouvoir aboutir à
+  // une date qui n'existe pas.
+  useEffect(() => {
+    if (day === null || month === null || year === null) return;
+    const max = daysInMonth(month, year);
+    if (day > max) setDay(max);
+  }, [month, year, day]);
+
   const trimmedTeaser = teaser.trim();
   const trimmedContent = content.trim();
-  const revealAt = parseRevealAt(dateInput, timeInput);
   const remaining = MAX_CONTENT_LENGTH - trimmedContent.length;
-  const revealTouched = dateInput.trim() !== '' || timeInput.trim() !== '';
+  const revealAt =
+    day !== null && month !== null && year !== null && hour !== null && minute !== null
+      ? new Date(year, month - 1, day, hour, minute, 0, 0)
+      : null;
 
   function toggleFriend(id: string) {
     setSelectedFriendIds((prev) => {
@@ -94,11 +143,8 @@ export default function NewPredictionScreen() {
     } else if (!audioUri) {
       return 'Enregistre ta prédiction avant de la sceller.';
     }
-    if (!revealTouched) {
-      return 'Choisis la date et l’heure de la révélation.';
-    }
     if (!revealAt) {
-      return 'Date ou heure invalide. Format attendu : JJ/MM/AAAA et HH:MM.';
+      return 'Choisis la date et l’heure de la révélation.';
     }
     if (revealAt.getTime() - Date.now() < MIN_REVEAL_DELAY_MS) {
       return 'La révélation doit être au moins une minute après maintenant.';
@@ -258,45 +304,70 @@ export default function NewPredictionScreen() {
           </Text>
 
           <View style={styles.row}>
-            <View style={styles.flex}>
-              <Text style={styles.subLabel}>Date</Text>
-              <TextInput
-                value={dateInput}
-                onChangeText={setDateInput}
-                placeholder="JJ/MM/AAAA"
-                keyboardType="numbers-and-punctuation"
-                autoCorrect={false}
-                editable={!submitting}
-                style={styles.input}
+            <View style={styles.dayField}>
+              <SelectField
+                label="Jour"
+                value={day}
+                options={dayOptions(month, year)}
+                placeholder="JJ"
+                onChange={setDay}
+                disabled={submitting}
               />
             </View>
-            <View style={styles.timeField}>
-              <Text style={styles.subLabel}>Heure</Text>
-              <TextInput
-                value={timeInput}
-                onChangeText={setTimeInput}
-                placeholder="HH:MM"
-                keyboardType="numbers-and-punctuation"
-                autoCorrect={false}
-                editable={!submitting}
-                style={styles.input}
+            <View style={styles.monthField}>
+              <SelectField
+                label="Mois"
+                value={month}
+                options={MONTH_OPTIONS}
+                placeholder="Mois"
+                onChange={setMonth}
+                disabled={submitting}
+              />
+            </View>
+            <View style={styles.yearField}>
+              <SelectField
+                label="Année"
+                value={year}
+                options={yearOptions()}
+                placeholder="Année"
+                onChange={setYear}
+                disabled={submitting}
               />
             </View>
           </View>
 
-          {/* Rien tant que les deux champs sont vides : à l'ouverture, un
-              « date incomplète » se lirait comme une erreur alors que
-              l'utilisateur n'a encore rien saisi. */}
-          {revealAt ? (
+          <View style={[styles.row, styles.fieldSpacing]}>
+            <View style={styles.timeField}>
+              <SelectField
+                label="Heure"
+                value={hour}
+                options={HOUR_OPTIONS}
+                placeholder="HH"
+                onChange={setHour}
+                disabled={submitting}
+              />
+            </View>
+            <View style={styles.timeField}>
+              <SelectField
+                label="Minute"
+                value={minute}
+                options={MINUTE_OPTIONS}
+                placeholder="MM"
+                onChange={setMinute}
+                disabled={submitting}
+              />
+            </View>
+          </View>
+
+          {/* Rien tant qu'aucun des champs n'est renseigné : à l'ouverture,
+              un rappel se lirait comme une erreur alors que l'utilisateur
+              n'a encore rien choisi. */}
+          {revealAt && (
             <Text style={styles.preview}>
               Se révélera {formatRevealAt(revealAt)} —{' '}
               {formatCountdown(revealAt, new Date())}.
             </Text>
-          ) : revealTouched ? (
-            <Text style={styles.previewInvalid}>
-              Date incomplète — format attendu : JJ/MM/AAAA et HH:MM.
-            </Text>
-          ) : null}
+          )}
 
           <Text style={[styles.label, styles.sectionLabel]}>Visible par</Text>
           <View style={styles.scopeRow}>
@@ -422,9 +493,11 @@ const styles = StyleSheet.create({
   hint: { fontSize: 13, color: colors.textMuted, marginTop: 10, lineHeight: 18 },
   sectionHint: { fontSize: 13, color: colors.textMuted, marginBottom: 10, lineHeight: 18 },
   row: { flexDirection: 'row', gap: 12 },
-  timeField: { width: 110 },
+  dayField: { flex: 0.8 },
+  monthField: { flex: 1.4 },
+  yearField: { flex: 1 },
+  timeField: { flex: 1 },
   preview: { fontSize: 14, color: colors.success, marginTop: 14 },
-  previewInvalid: { fontSize: 14, color: colors.gold, marginTop: 14 },
   scopeRow: { flexDirection: 'row', gap: 10 },
   scopeOption: {
     flex: 1,

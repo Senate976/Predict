@@ -6,8 +6,64 @@ import {
   useState,
   type PropsWithChildren,
 } from 'react';
+import { Platform } from 'react-native';
 
 import { supabase } from './supabase';
+
+const VALID_OTP_TYPES = new Set([
+  'signup',
+  'invite',
+  'magiclink',
+  'recovery',
+  'email_change',
+  'email',
+]);
+type OtpType = 'signup' | 'invite' | 'magiclink' | 'recovery' | 'email_change' | 'email';
+
+/**
+ * Finalise le retour du lien de confirmation d'email, sur le web uniquement.
+ *
+ * Deux formats possibles selon le modèle d'email configuré côté Supabase :
+ * - historique — le lien passe par le serveur d'auth Supabase, qui valide et
+ *   redirige vers le site avec les jetons dans le fragment d'URL
+ *   (`#access_token=...`). `detectSessionInUrl` (lib/supabase.ts) les récupère
+ *   normalement tout seul ; on s'assure ici que rien ne l'en empêche (ex. un
+ *   redéploiement du site pas encore propagé au moment du clic).
+ * - récent — le lien pointe directement sur le site avec `token_hash`/`type`
+ *   en paramètres de requête, et c'est au client de finaliser la vérification
+ *   via `verifyOtp`. Sans ce traitement, cliquer le lien atterrit sur le site
+ *   sans qu'aucune session ne s'ouvre.
+ *
+ * Dans les deux cas, l'URL est nettoyée ensuite (`replaceState`) pour ne pas
+ * laisser de jeton trainer dans l'historique du navigateur.
+ */
+async function consumeEmailConfirmationFromUrl() {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+
+  const { hash, search, pathname } = window.location;
+
+  if (hash.includes('access_token')) {
+    const params = new URLSearchParams(hash.slice(1));
+    const access_token = params.get('access_token');
+    const refresh_token = params.get('refresh_token');
+    if (access_token && refresh_token) {
+      await supabase.auth.setSession({ access_token, refresh_token });
+    }
+    window.history.replaceState(null, '', pathname);
+    return;
+  }
+
+  const params = new URLSearchParams(search);
+  const tokenHash = params.get('token_hash');
+  const type = params.get('type');
+  if (tokenHash && type && VALID_OTP_TYPES.has(type)) {
+    await supabase.auth.verifyOtp({ token_hash: tokenHash, type: type as OtpType });
+    params.delete('token_hash');
+    params.delete('type');
+    const rest = params.toString();
+    window.history.replaceState(null, '', pathname + (rest ? `?${rest}` : ''));
+  }
+}
 
 type AuthContextValue = {
   session: Session | null;
@@ -34,11 +90,17 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Session restaurée depuis AsyncStorage au démarrage.
-    supabase.auth.getSession().then(({ data }) => {
+    let cancelled = false;
+
+    (async () => {
+      // Doit passer avant `getSession()` : c'est ce qui établit la session à
+      // partir du lien de confirmation d'email, le cas échéant.
+      await consumeEmailConfirmationFromUrl();
+      const { data } = await supabase.auth.getSession();
+      if (cancelled) return;
       setSession(data.session);
       setLoading(false);
-    });
+    })();
 
     // Couvre login, logout, refresh de token et mise à jour utilisateur.
     const {
@@ -47,7 +109,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
       setSession(nextSession);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const userId = session?.user.id;

@@ -357,6 +357,62 @@ alter table public.friendships add column if not exists status text not null def
 alter table public.friendships add column if not exists created_at timestamptz not null default now();
 alter table public.friendships add column if not exists updated_at timestamptz not null default now();
 
+-- Renomme les contraintes de clé étrangère héritées de l'ancien schéma
+-- (`user_id`/`friend_id`) vers les noms attendus par lib/friends.ts
+-- (`profiles!friendships_requester_id_fkey` / `..._addressee_id_fkey`).
+-- Renommer une COLONNE (juste au-dessus) ne renomme pas la CONTRAINTE qui
+-- porte dessus : elle garde son nom d'origine (ex. `friendships_user_id_fkey`).
+-- PostgREST a besoin du nom exact pour résoudre l'embed demandé par le
+-- client, d'où l'erreur « could not find a relationship between friendships
+-- and profiles » tant que ce renommage n'a pas eu lieu.
+do $$
+declare
+  old_name text;
+begin
+  select conname into old_name
+  from pg_constraint
+  where conrelid = 'public.friendships'::regclass
+    and contype = 'f'
+    and pg_get_constraintdef(oid) like 'FOREIGN KEY (requester_id)%';
+
+  if old_name is not null and old_name <> 'friendships_requester_id_fkey' then
+    execute format('alter table public.friendships rename constraint %I to friendships_requester_id_fkey', old_name);
+  end if;
+
+  select conname into old_name
+  from pg_constraint
+  where conrelid = 'public.friendships'::regclass
+    and contype = 'f'
+    and pg_get_constraintdef(oid) like 'FOREIGN KEY (addressee_id)%';
+
+  if old_name is not null and old_name <> 'friendships_addressee_id_fkey' then
+    execute format('alter table public.friendships rename constraint %I to friendships_addressee_id_fkey', old_name);
+  end if;
+end;
+$$;
+
+-- Filet de sécurité si l'une des deux contraintes n'existe pas du tout
+-- (table créée sans clé étrangère inline, ou contrainte supprimée entre-temps).
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.friendships'::regclass and conname = 'friendships_requester_id_fkey'
+  ) then
+    alter table public.friendships add constraint friendships_requester_id_fkey
+      foreign key (requester_id) references public.profiles (id) on delete cascade;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.friendships'::regclass and conname = 'friendships_addressee_id_fkey'
+  ) then
+    alter table public.friendships add constraint friendships_addressee_id_fkey
+      foreign key (addressee_id) references public.profiles (id) on delete cascade;
+  end if;
+end;
+$$;
+
 alter table public.friendships drop constraint if exists friendships_no_self;
 alter table public.friendships add constraint friendships_no_self
   check (requester_id <> addressee_id);
@@ -524,11 +580,42 @@ create index if not exists prediction_access_user_idx
 -- 11. RLS de l'audience et du contenu scellé
 -- ---------------------------------------------------------------------------
 
+-- `security definer` : tourne avec les droits de son propriétaire et non de
+-- l'appelant, donc son `select` sur `prediction_access` ne redéclenche pas la
+-- RLS de cette table. Utilisée uniquement par `predictions_select_visible`
+-- ci-dessous, pour casser le cycle expliqué dans son commentaire.
+create or replace function public.has_prediction_access(p_prediction_id uuid, p_user_id uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.prediction_access
+    where prediction_id = p_prediction_id and user_id = p_user_id
+  );
+$$;
+
+revoke all on function public.has_prediction_access(uuid, uuid) from public;
+grant execute on function public.has_prediction_access(uuid, uuid) to authenticated;
+
 -- Un destinataire doit pouvoir voir la ligne `predictions` (titre, teaser,
 -- date) dès la création, sans attendre reveal_at : c'est le Teaser, censé être
 -- lisible immédiatement. Remplace l'ancienne policy qui rendait toute
 -- prédiction révélée visible à n'importe quel utilisateur connecté — avec Le
 -- Cercle, la visibilité est restreinte à l'audience choisie par l'auteur.
+--
+-- Passe par `has_prediction_access` (fonction `security definer` définie
+-- juste en dessous) plutôt que par un `exists (select ... from
+-- prediction_access ...)` direct : `prediction_access_select` (section
+-- suivante) interroge elle-même `predictions` pour savoir si l'appelant en
+-- est l'auteur. Les deux policies s'appelant l'une l'autre en direct forment
+-- un cycle — Postgres l'a signalé par « infinite recursion detected in
+-- policy for relation "predictions" ». `has_prediction_access` tourne avec
+-- les droits de son propriétaire (le rôle qui a exécuté ce script), qui n'a
+-- pas la RLS forcée sur ses propres tables : elle lit `prediction_access`
+-- sans redéclencher sa policy, ce qui casse le cycle.
 drop policy if exists "predictions_select_visible" on public.predictions;
 create policy "predictions_select_visible"
   on public.predictions
@@ -536,10 +623,7 @@ create policy "predictions_select_visible"
   to authenticated
   using (
     author_id = auth.uid()
-    or exists (
-      select 1 from public.prediction_access pa
-      where pa.prediction_id = predictions.id and pa.user_id = auth.uid()
-    )
+    or public.has_prediction_access(id, auth.uid())
   );
 
 alter table public.prediction_access enable row level security;
