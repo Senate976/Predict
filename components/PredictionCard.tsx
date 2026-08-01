@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { formatCountdown, formatRevealAt } from '../lib/datetime';
 import { isRevealed, type PredictionFeedItem } from '../lib/predictions';
 import { colors, fonts, radius } from '../lib/theme';
+import { AudioPlayerButton } from './AudioPlayerButton';
 import { SealBadge } from './SealBadge';
 
 /**
@@ -44,6 +45,11 @@ export function PredictionCard({
           <View style={styles.contentBox}>
             <Text style={styles.contentLabel}>Contenu</Text>
             <Text style={styles.cardContent}>{item.content}</Text>
+            {item.audio_path && (
+              <View style={styles.audioRow}>
+                <AudioPlayerButton path={item.audio_path} />
+              </View>
+            )}
           </View>
         ) : (
           <View style={styles.sealedBox}>
@@ -115,5 +121,6 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   sealedText: { fontSize: 13, color: colors.textFaint, fontStyle: 'italic' },
+  audioRow: { marginTop: 10 },
   cardMeta: { fontSize: 12, color: colors.textFaint, marginTop: 10 },
 });

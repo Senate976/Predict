@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AudioPlayerButton } from '../../../components/AudioPlayerButton';
 import { addComment, commentErrorMessage, fetchComments, MAX_COMMENT_LENGTH, type Comment } from '../../../lib/comments';
 import { useAuth } from '../../../lib/auth';
 import { formatRevealAt } from '../../../lib/datetime';
@@ -197,7 +198,14 @@ export default function PredictionDetailScreen() {
           <>
             <Text style={styles.teaser}>{prediction.teaser}</Text>
             {revealed && prediction.content ? (
-              <Text style={styles.content}>{prediction.content}</Text>
+              <>
+                <Text style={styles.content}>{prediction.content}</Text>
+                {prediction.audio_path && (
+                  <View style={styles.audioRow}>
+                    <AudioPlayerButton path={prediction.audio_path} />
+                  </View>
+                )}
+              </>
             ) : (
               <Text style={styles.sealedHint}>Contenu scellé jusqu’à la révélation.</Text>
             )}
@@ -379,6 +387,7 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginTop: 14,
   },
+  audioRow: { marginTop: 12 },
   sealedHint: {
     fontSize: 13,
     color: colors.textFaint,

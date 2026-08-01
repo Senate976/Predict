@@ -1154,3 +1154,96 @@ $$;
 
 revoke all on function public.get_realized_count_30d(uuid) from public;
 grant execute on function public.get_realized_count_30d(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 18. Prédictions vocales — bucket de stockage et politiques
+-- ---------------------------------------------------------------------------
+--
+-- Un bucket privé (`public: false`) : les fichiers ne sont accessibles que via
+-- les policies ci-dessous, jamais par une URL publique devinable.
+insert into storage.buckets (id, name, public)
+values ('prediction-audio', 'prediction-audio', false)
+on conflict (id) do nothing;
+
+-- Chemin de stockage attendu : `<prediction_id>/<fichier>`. C'est ce premier
+-- segment (`storage.foldername(name)`) que les policies comparent à
+-- `predictions.id` pour appliquer exactement les mêmes règles de visibilité
+-- que le contenu texte.
+alter table public.prediction_contents add column if not exists audio_path text;
+
+alter table storage.objects enable row level security;
+
+drop policy if exists "prediction_audio_select" on storage.objects;
+create policy "prediction_audio_select"
+  on storage.objects
+  for select
+  to authenticated
+  using (
+    bucket_id = 'prediction-audio'
+    and exists (
+      select 1 from public.predictions p
+      where p.id::text = (storage.foldername(name))[1]
+        and (
+          p.author_id = auth.uid()
+          or exists (
+            select 1 from public.prediction_access pa
+            where pa.prediction_id = p.id
+              and pa.user_id = auth.uid()
+              and p.reveal_at <= now()
+          )
+        )
+    )
+  );
+
+-- Écriture réservée à l'auteur, et seulement avant la révélation — même
+-- fenêtre que la modification du contenu texte
+-- (`prediction_contents_update_before_reveal`).
+drop policy if exists "prediction_audio_insert" on storage.objects;
+create policy "prediction_audio_insert"
+  on storage.objects
+  for insert
+  to authenticated
+  with check (
+    bucket_id = 'prediction-audio'
+    and exists (
+      select 1 from public.predictions p
+      where p.id::text = (storage.foldername(name))[1]
+        and p.author_id = auth.uid()
+        and p.reveal_at > now()
+    )
+  );
+
+drop policy if exists "prediction_audio_delete" on storage.objects;
+create policy "prediction_audio_delete"
+  on storage.objects
+  for delete
+  to authenticated
+  using (
+    bucket_id = 'prediction-audio'
+    and exists (
+      select 1 from public.predictions p
+      where p.id::text = (storage.foldername(name))[1]
+        and p.author_id = auth.uid()
+    )
+  );
+
+-- La vue expose le chemin du fichier (pas son contenu) : c'est au client de
+-- demander une URL signée, qui elle-même repasse par les policies ci-dessus.
+drop view if exists public.predictions_feed;
+
+create view public.predictions_feed
+with (security_invoker = true) as
+select
+  p.id,
+  p.author_id,
+  p.teaser,
+  pc.content,
+  pc.audio_path,
+  p.reveal_at,
+  p.scope,
+  p.created_at,
+  (p.reveal_at <= now()) as is_revealed
+from public.predictions p
+left join public.prediction_contents pc on pc.prediction_id = p.id;
+
+grant select on public.predictions_feed to authenticated;
