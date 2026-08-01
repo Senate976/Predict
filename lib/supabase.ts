@@ -20,8 +20,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storage: AsyncStorage,
     autoRefreshToken: true,
     persistSession: true,
-    // Pas de redirection par URL en natif : ce flag ne concerne que le web.
-    detectSessionInUrl: false,
+    // Récupère la session dans l'URL au retour du lien de confirmation
+    // d'email — uniquement pertinent sur le web (déploiement Vercel), un lien
+    // ouvert depuis le natif n'a pas de session à extraire d'une URL.
+    detectSessionInUrl: Platform.OS === 'web',
   },
 });
 
