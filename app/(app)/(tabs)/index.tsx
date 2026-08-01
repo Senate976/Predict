@@ -131,7 +131,6 @@ export default function HomeScreen() {
 
   async function handleStartFirstPrediction() {
     await markOnboarded();
-    router.push('/new-prediction');
   }
 
   return (
@@ -184,6 +183,7 @@ export default function HomeScreen() {
               item={item}
               now={now}
               authorLabel={item.author_id !== userId ? authorNames[item.author_id] ?? '…' : undefined}
+              userId={userId!}
               onPress={() => router.push(`/prediction/${item.id}`)}
             />
           ))

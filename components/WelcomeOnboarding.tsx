@@ -5,7 +5,7 @@ import { colors, fonts, radius, spacing } from '../lib/theme';
 const STEPS = [
   'Scellez votre prédiction et définissez sa date de révélation et à qui vous souhaitez la révéler.',
   'Partagez le teaser exclusif à votre Cercle.',
-  'Révélez la vérité le jour J et laissez vos proches voter pour valider votre intuition.',
+  'Révélez la vérité le jour J et laissez vos proches confirmer si votre intuition était la bonne.',
 ];
 
 /**

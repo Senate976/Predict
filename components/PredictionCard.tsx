@@ -4,31 +4,35 @@ import { formatCountdown, formatRevealAt } from '../lib/datetime';
 import { isRevealed, type PredictionFeedItem } from '../lib/predictions';
 import { colors, fonts, radius } from '../lib/theme';
 import { AudioPlayerButton } from './AudioPlayerButton';
+import { InlineComments } from './InlineComments';
 import { SealBadge } from './SealBadge';
 
 /**
  * Carte d'une prédiction, partagée entre le Fil et les Archives. `onPress` est
- * toujours fourni par l'appelant (navigue vers le détail) — auteur et
- * destinataires y ont accès, pour voter/commenter une fois révélée ou, pour
- * l'auteur, gérer les destinataires.
+ * toujours fourni par l'appelant (navigue vers le détail) — depuis là,
+ * l'auteur gère les destinataires et chacun peut se prononcer une fois
+ * révélée. Les commentaires, eux, sont directement sur la carte
+ * (`InlineComments`), avant comme après révélation.
  */
 export function PredictionCard({
   item,
   now,
   authorLabel,
+  userId,
   onPress,
 }: {
   item: PredictionFeedItem;
   now: Date;
   authorLabel?: string;
+  userId: string;
   onPress: () => void;
 }) {
   const revealAt = new Date(item.reveal_at);
   const revealed = isRevealed(item, now);
 
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => pressed && styles.cardPressed}>
-      <View style={styles.card}>
+    <View style={styles.card}>
+      <Pressable onPress={onPress} style={({ pressed }) => pressed && styles.cardPressed}>
         <View style={styles.cardTop}>
           {!revealed && <SealBadge />}
           <View style={[styles.badge, revealed ? styles.badgeOpen : styles.badgeLocked]}>
@@ -60,8 +64,10 @@ export function PredictionCard({
         <Text style={styles.cardMeta}>
           {revealed ? 'Révélée' : 'Se révèle'} {formatRevealAt(revealAt)}
         </Text>
-      </View>
-    </Pressable>
+      </Pressable>
+
+      <InlineComments predictionId={item.id} userId={userId} />
+    </View>
   );
 }
 

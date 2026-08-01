@@ -6,13 +6,12 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AudioPlayerButton } from '../../../components/AudioPlayerButton';
-import { addComment, commentErrorMessage, fetchComments, MAX_COMMENT_LENGTH, type Comment } from '../../../lib/comments';
+import { InlineComments } from '../../../components/InlineComments';
 import { useAuth } from '../../../lib/auth';
 import { formatRevealAt } from '../../../lib/datetime';
 import { fetchFriendships, otherProfile, type FriendProfile } from '../../../lib/friends';
@@ -47,16 +46,12 @@ export default function PredictionDetailScreen() {
   const [friends, setFriends] = useState<FriendProfile[] | null>(null);
   const [outcome, setOutcome] = useState<PredictionOutcome | null>(null);
   const [myVote, setMyVote] = useState<Vote | null>(null);
-  const [comments, setComments] = useState<Comment[] | null>(null);
-  const [commentInput, setCommentInput] = useState('');
 
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [voteError, setVoteError] = useState<string | null>(null);
-  const [commentError, setCommentError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [voting, setVoting] = useState(false);
-  const [submittingComment, setSubmittingComment] = useState(false);
 
   const load = useCallback(async () => {
     if (!id || !userId) return;
@@ -86,12 +81,8 @@ export default function PredictionDetailScreen() {
     }
 
     if (isRevealed(item, new Date())) {
-      const [{ data: outcomeData }, { data: commentsData }] = await Promise.all([
-        fetchPredictionOutcome(id),
-        fetchComments(id),
-      ]);
+      const { data: outcomeData } = await fetchPredictionOutcome(id);
       setOutcome(outcomeData ?? null);
-      setComments(commentsData ?? []);
 
       if (!isAuthorNow) {
         const { data: voteData } = await fetchMyVote(id, userId);
@@ -154,25 +145,6 @@ export default function PredictionDetailScreen() {
       await load();
     } finally {
       setVoting(false);
-    }
-  }
-
-  async function handleComment() {
-    const trimmed = commentInput.trim();
-    if (!id || !userId || !trimmed) return;
-    setCommentError(null);
-    setSubmittingComment(true);
-    try {
-      const { error: addError } = await addComment(id, userId, trimmed);
-      if (addError) {
-        setCommentError(commentErrorMessage(addError));
-        return;
-      }
-      setCommentInput('');
-      const { data } = await fetchComments(id);
-      setComments(data ?? []);
-    } finally {
-      setSubmittingComment(false);
     }
   }
 
@@ -240,7 +212,7 @@ export default function PredictionDetailScreen() {
                             myVote?.vote_value === 'realized' && styles.voteButtonTextActive,
                           ]}
                         >
-                          Réalisée
+                          Prédiction réalisée
                         </Text>
                       </Pressable>
                       <Pressable
@@ -257,7 +229,7 @@ export default function PredictionDetailScreen() {
                             myVote?.vote_value === 'missed' && styles.voteButtonTextActive,
                           ]}
                         >
-                          Manquée
+                          Prédiction manquée
                         </Text>
                       </Pressable>
                     </View>
@@ -318,43 +290,8 @@ export default function PredictionDetailScreen() {
               </>
             )}
 
-            {revealed && (
-              <>
-                <Text style={[styles.eyebrow, styles.sectionSpacing]}>Discussion</Text>
-                {comments === null ? (
-                  <ActivityIndicator color={colors.gold} style={styles.loader} />
-                ) : comments.length === 0 ? (
-                  <Text style={styles.hint}>Aucun commentaire pour l’instant.</Text>
-                ) : (
-                  comments.map((comment) => (
-                    <View key={comment.id} style={styles.comment}>
-                      <Text style={styles.commentAuthor}>{comment.author.username}</Text>
-                      <Text style={styles.commentContent}>{comment.content}</Text>
-                    </View>
-                  ))
-                )}
-
-                {commentError && <Text style={styles.error}>{commentError}</Text>}
-                <View style={styles.commentInputRow}>
-                  <TextInput
-                    value={commentInput}
-                    onChangeText={setCommentInput}
-                    placeholder="Ajouter un commentaire…"
-                    multiline
-                    maxLength={MAX_COMMENT_LENGTH}
-                    editable={!submittingComment}
-                    style={styles.commentInput}
-                  />
-                  <Pressable
-                    onPress={handleComment}
-                    disabled={submittingComment || !commentInput.trim()}
-                    style={styles.pillGold}
-                  >
-                    <Text style={styles.pillGoldText}>Envoyer</Text>
-                  </Pressable>
-                </View>
-              </>
-            )}
+            <Text style={[styles.eyebrow, styles.sectionSpacing]}>Discussion</Text>
+            <InlineComments predictionId={id} userId={userId!} />
           </>
         ) : null}
       </ScrollView>
@@ -446,26 +383,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   pillOutlineText: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
-  comment: {
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  commentAuthor: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
-  commentContent: { fontSize: 14, color: colors.text, marginTop: 2, lineHeight: 20 },
-  commentInputRow: { flexDirection: 'row', gap: 8, marginTop: 12, alignItems: 'flex-end' },
-  commentInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: colors.text,
-    backgroundColor: colors.surface,
-    maxHeight: 90,
-  },
   error: {
     color: colors.danger,
     backgroundColor: colors.dangerSoft,

@@ -1070,8 +1070,10 @@ create policy "prediction_comments_select"
     )
   );
 
--- Commenter : auteur ou destinataire, seulement après révélation — avant, il
--- n'y a que le teaser, rien à débattre.
+-- Commenter : auteur ou destinataire, à tout moment — y compris avant
+-- révélation, pour réagir au teaser (façon fil d'actualité). Seul le contenu
+-- scellé reste caché avant `reveal_at` ; la discussion, elle, est ouverte dès
+-- la création.
 drop policy if exists "prediction_comments_insert" on public.prediction_comments;
 create policy "prediction_comments_insert"
   on public.prediction_comments
@@ -1079,10 +1081,6 @@ create policy "prediction_comments_insert"
   to authenticated
   with check (
     author_id = auth.uid()
-    and exists (
-      select 1 from public.predictions p
-      where p.id = prediction_comments.prediction_id and p.reveal_at <= now()
-    )
     and (
       exists (
         select 1 from public.prediction_access pa
@@ -1336,3 +1334,200 @@ from public.predictions p
 left join public.prediction_contents pc on pc.prediction_id = p.id;
 
 grant select on public.predictions_feed to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 19. Groupes d'amis privés
+-- ---------------------------------------------------------------------------
+--
+-- Un regroupement nommé d'amis ("Les Intimes", "Potes de Promo"), propre à
+-- son créateur, pour cibler une prédiction sans repasser par « tout le
+-- Cercle » ni une sélection individuelle à chaque fois.
+create table if not exists public.groups (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references public.profiles (id) on delete cascade,
+  name text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.groups drop constraint if exists groups_name_length;
+alter table public.groups add constraint groups_name_length
+  check (char_length(btrim(name)) between 1 and 40);
+
+create index if not exists groups_owner_idx on public.groups (owner_id);
+
+drop trigger if exists groups_set_updated_at on public.groups;
+create trigger groups_set_updated_at
+  before update on public.groups
+  for each row execute function public.set_updated_at();
+
+alter table public.groups enable row level security;
+
+-- Un groupe est privé à son créateur : contrairement aux amitiés (mutuelles
+-- par nature), ni les membres ni personne d'autre ne le voient.
+drop policy if exists "groups_select_own" on public.groups;
+create policy "groups_select_own"
+  on public.groups
+  for select
+  to authenticated
+  using (owner_id = auth.uid());
+
+drop policy if exists "groups_insert_own" on public.groups;
+create policy "groups_insert_own"
+  on public.groups
+  for insert
+  to authenticated
+  with check (owner_id = auth.uid());
+
+drop policy if exists "groups_update_own" on public.groups;
+create policy "groups_update_own"
+  on public.groups
+  for update
+  to authenticated
+  using (owner_id = auth.uid())
+  with check (owner_id = auth.uid());
+
+drop policy if exists "groups_delete_own" on public.groups;
+create policy "groups_delete_own"
+  on public.groups
+  for delete
+  to authenticated
+  using (owner_id = auth.uid());
+
+-- Membres d'un groupe : uniquement des amis acceptés du propriétaire, vérifié
+-- à l'insertion — même garde-fou que `prediction_access_insert` pour la
+-- portée « Amis spécifiques ».
+create table if not exists public.group_members (
+  group_id uuid not null references public.groups (id) on delete cascade,
+  friend_id uuid not null references public.profiles (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (group_id, friend_id)
+);
+
+create index if not exists group_members_friend_idx on public.group_members (friend_id);
+
+alter table public.group_members enable row level security;
+
+drop policy if exists "group_members_select_own" on public.group_members;
+create policy "group_members_select_own"
+  on public.group_members
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1 from public.groups g
+      where g.id = group_members.group_id and g.owner_id = auth.uid()
+    )
+  );
+
+drop policy if exists "group_members_insert_own" on public.group_members;
+create policy "group_members_insert_own"
+  on public.group_members
+  for insert
+  to authenticated
+  with check (
+    exists (
+      select 1 from public.groups g
+      where g.id = group_members.group_id and g.owner_id = auth.uid()
+    )
+    and exists (
+      select 1 from public.friendships f
+      where f.status = 'accepted'
+        and (
+          (f.requester_id = auth.uid() and f.addressee_id = group_members.friend_id)
+          or (f.addressee_id = auth.uid() and f.requester_id = group_members.friend_id)
+        )
+    )
+  );
+
+drop policy if exists "group_members_delete_own" on public.group_members;
+create policy "group_members_delete_own"
+  on public.group_members
+  for delete
+  to authenticated
+  using (
+    exists (
+      select 1 from public.groups g
+      where g.id = group_members.group_id and g.owner_id = auth.uid()
+    )
+  );
+
+-- Élargit la portée d'une prédiction à un groupe nommé, en plus de « tout le
+-- Cercle » et « sélection individuelle ».
+alter table public.predictions drop constraint if exists predictions_scope_valid;
+alter table public.predictions add constraint predictions_scope_valid
+  check (scope in ('circle', 'selected', 'group'));
+
+-- `create_prediction` gagne un paramètre optionnel `p_group_id`, ajouté en
+-- fin de liste (après `p_friend_ids`, qui a déjà un défaut) pour ne pas casser
+-- les appels existants. Signature différente de celle créée section 12 ->
+-- `drop function` d'abord.
+drop function if exists public.create_prediction(text, text, timestamptz, text, uuid[]);
+
+create or replace function public.create_prediction(
+  p_teaser text,
+  p_content text,
+  p_reveal_at timestamptz,
+  p_scope text,
+  p_friend_ids uuid[] default array[]::uuid[],
+  p_group_id uuid default null
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+  v_recipient uuid;
+begin
+  insert into public.predictions (author_id, teaser, reveal_at, scope)
+  values (auth.uid(), p_teaser, p_reveal_at, p_scope)
+  returning id into v_id;
+
+  insert into public.prediction_contents (prediction_id, content)
+  values (v_id, p_content);
+
+  if p_scope = 'circle' then
+    -- Tout le cercle actuel : tous les amis acceptés au moment de la création.
+    insert into public.prediction_access (prediction_id, user_id)
+    select
+      v_id,
+      case when f.requester_id = auth.uid() then f.addressee_id else f.requester_id end
+    from public.friendships f
+    where f.status = 'accepted'
+      and (f.requester_id = auth.uid() or f.addressee_id = auth.uid());
+  elsif p_scope = 'group' then
+    -- Le groupe doit appartenir à l'appelant : la RLS de `groups`/`group_members`
+    -- ne renverrait de toute façon rien d'autre, mais le check explicite évite
+    -- qu'un `p_group_id` invalide passe silencieusement inaperçu (0
+    -- destinataire, prédiction créée sans personne pour la voir).
+    insert into public.prediction_access (prediction_id, user_id)
+    select v_id, gm.friend_id
+    from public.group_members gm
+    join public.groups g on g.id = gm.group_id
+    where gm.group_id = p_group_id and g.owner_id = auth.uid();
+  else
+    foreach v_recipient in array coalesce(p_friend_ids, array[]::uuid[]) loop
+      insert into public.prediction_access (prediction_id, user_id)
+      values (v_id, v_recipient)
+      on conflict (prediction_id, user_id) do nothing;
+    end loop;
+  end if;
+
+  return v_id;
+end;
+$$;
+
+revoke all on function public.create_prediction(text, text, timestamptz, text, uuid[], uuid) from public;
+grant execute on function public.create_prediction(text, text, timestamptz, text, uuid[], uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 20. Filet de sécurité — forcer PostgREST à relire le schéma
+-- ---------------------------------------------------------------------------
+--
+-- PostgREST met normalement à jour son cache de schéma tout seul après une
+-- modification DDL, mais ce n'est pas garanti instantané. Ce `notify` force un
+-- rechargement immédiat en fin de script, pour ne jamais avoir à cliquer sur
+-- « Reload schema » dans le dashboard après avoir lancé ce fichier.
+notify pgrst, 'reload schema';

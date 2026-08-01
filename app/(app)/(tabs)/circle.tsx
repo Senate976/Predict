@@ -13,8 +13,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PrestigeBadge } from '../../../components/PrestigeBadge';
-import { fetchRealizedCount30d } from '../../../lib/badges';
 import { useAuth } from '../../../lib/auth';
+import { fetchRealizedCount30d } from '../../../lib/badges';
 import {
   acceptFriendRequest,
   fetchFriendships,
@@ -27,6 +27,18 @@ import {
   type Friendship,
   type FriendProfile,
 } from '../../../lib/friends';
+import {
+  addGroupMember,
+  createGroup,
+  deleteGroup,
+  fetchGroupMembers,
+  fetchGroups,
+  groupErrorMessage,
+  removeGroupMember,
+  MAX_GROUP_NAME_LENGTH,
+  type FriendGroup,
+  type GroupMember,
+} from '../../../lib/groups';
 import { colors, eyebrow, fonts, radius, spacing } from '../../../lib/theme';
 
 type Relation =
@@ -49,6 +61,85 @@ export default function CircleScreen() {
 
   const [pendingActionId, setPendingActionId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  const [groups, setGroups] = useState<FriendGroup[] | null>(null);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [groupError, setGroupError] = useState<string | null>(null);
+  const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
+  const [groupMembers, setGroupMembers] = useState<Record<string, GroupMember[]>>({});
+  const [pendingGroupActionId, setPendingGroupActionId] = useState<string | null>(null);
+
+  const loadGroups = useCallback(async () => {
+    if (!userId) return;
+    const { data } = await fetchGroups(userId);
+    setGroups(data ?? []);
+  }, [userId]);
+
+  async function loadGroupMembers(groupId: string) {
+    const { data } = await fetchGroupMembers(groupId);
+    setGroupMembers((prev) => ({ ...prev, [groupId]: data ?? [] }));
+  }
+
+  async function handleToggleExpand(groupId: string) {
+    const next = expandedGroupId === groupId ? null : groupId;
+    setExpandedGroupId(next);
+    if (next && !groupMembers[next]) {
+      await loadGroupMembers(next);
+    }
+  }
+
+  async function handleCreateGroup() {
+    if (!userId) return;
+    const trimmed = newGroupName.trim();
+    if (!trimmed) return;
+    setGroupError(null);
+    setCreatingGroup(true);
+    try {
+      const { data, error } = await createGroup(userId, trimmed);
+      if (error) {
+        setGroupError(groupErrorMessage(error));
+        return;
+      }
+      if (data) setGroups((prev) => [...(prev ?? []), data]);
+      setNewGroupName('');
+    } finally {
+      setCreatingGroup(false);
+    }
+  }
+
+  async function handleDeleteGroup(groupId: string) {
+    setGroupError(null);
+    setPendingGroupActionId(groupId);
+    try {
+      const { error } = await deleteGroup(groupId);
+      if (error) {
+        setGroupError(groupErrorMessage(error));
+        return;
+      }
+      setGroups((prev) => (prev ?? []).filter((g) => g.id !== groupId));
+      if (expandedGroupId === groupId) setExpandedGroupId(null);
+    } finally {
+      setPendingGroupActionId(null);
+    }
+  }
+
+  async function handleToggleMember(groupId: string, friendId: string, isMember: boolean) {
+    setGroupError(null);
+    setPendingGroupActionId(`${groupId}:${friendId}`);
+    try {
+      const { error } = isMember
+        ? await removeGroupMember(groupId, friendId)
+        : await addGroupMember(groupId, friendId);
+      if (error) {
+        setGroupError(groupErrorMessage(error));
+        return;
+      }
+      await loadGroupMembers(groupId);
+    } finally {
+      setPendingGroupActionId(null);
+    }
+  }
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -80,7 +171,8 @@ export default function CircleScreen() {
   useFocusEffect(
     useCallback(() => {
       load();
-    }, [load])
+      loadGroups();
+    }, [load, loadGroups])
   );
 
   // Recherche différée : on évite un aller-retour réseau à chaque frappe.
@@ -283,6 +375,93 @@ export default function CircleScreen() {
             );
           })
         )}
+
+        <Text style={[styles.eyebrow, styles.sectionLabel]}>
+          Mes groupes {groups && groups.length > 0 ? `(${groups.length})` : ''}
+        </Text>
+        <Text style={styles.muted}>
+          Regroupe certains amis sous un nom (« Les Intimes »…) pour les cibler
+          d’un coup à la création d’une prédiction.
+        </Text>
+
+        <View style={styles.newGroupRow}>
+          <TextInput
+            value={newGroupName}
+            onChangeText={setNewGroupName}
+            placeholder="Nom du groupe"
+            maxLength={MAX_GROUP_NAME_LENGTH}
+            editable={!creatingGroup}
+            style={[styles.input, styles.newGroupInput]}
+          />
+          <Pressable
+            onPress={handleCreateGroup}
+            disabled={creatingGroup || !newGroupName.trim()}
+            style={styles.pillGold}
+          >
+            <Text style={styles.pillGoldText}>{creatingGroup ? '…' : 'Créer'}</Text>
+          </Pressable>
+        </View>
+
+        {groupError && <Text style={styles.error}>{groupError}</Text>}
+
+        {groups === null ? (
+          <ActivityIndicator style={styles.searchLoader} color={colors.gold} />
+        ) : groups.length === 0 ? (
+          <Text style={styles.muted}>Aucun groupe pour l’instant.</Text>
+        ) : (
+          groups.map((group) => {
+            const expanded = expandedGroupId === group.id;
+            const members = groupMembers[group.id];
+            const memberIds = new Set((members ?? []).map((m) => m.friend_id));
+            return (
+              <View key={group.id} style={styles.groupBox}>
+                <Pressable onPress={() => handleToggleExpand(group.id)} style={styles.groupHeader}>
+                  <Text style={styles.username}>
+                    {group.name} {members ? `(${members.length})` : ''}
+                  </Text>
+                  <Text style={styles.groupChevron}>{expanded ? '▲' : '▼'}</Text>
+                </Pressable>
+
+                {expanded && (
+                  <View style={styles.groupBody}>
+                    {accepted.length === 0 ? (
+                      <Text style={styles.muted}>
+                        Pas encore d’ami accepté à ajouter à ce groupe.
+                      </Text>
+                    ) : (
+                      accepted.map((f) => {
+                        const profile = otherProfile(f, userId!);
+                        const isMember = memberIds.has(profile.id);
+                        const pending = pendingGroupActionId === `${group.id}:${profile.id}`;
+                        return (
+                          <View key={profile.id} style={styles.row}>
+                            <Text style={styles.username}>{profile.username}</Text>
+                            <Pressable
+                              onPress={() => handleToggleMember(group.id, profile.id, isMember)}
+                              disabled={pending}
+                              style={isMember ? styles.pillGold : styles.pillOutline}
+                            >
+                              <Text style={isMember ? styles.pillGoldText : styles.pillOutlineText}>
+                                {pending ? '…' : isMember ? 'Dans le groupe' : 'Ajouter'}
+                              </Text>
+                            </Pressable>
+                          </View>
+                        );
+                      })
+                    )}
+                    <Pressable
+                      onPress={() => handleDeleteGroup(group.id)}
+                      disabled={pendingGroupActionId === group.id}
+                      style={styles.deleteGroup}
+                    >
+                      <Text style={styles.deleteGroupText}>Supprimer ce groupe</Text>
+                    </Pressable>
+                  </View>
+                )}
+              </View>
+            );
+          })
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -348,4 +527,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: spacing.md,
   },
+  newGroupRow: { flexDirection: 'row', gap: 8, marginTop: spacing.md },
+  newGroupInput: { flex: 1 },
+  groupBox: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    marginTop: spacing.sm,
+    overflow: 'hidden',
+  },
+  groupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  groupChevron: { fontSize: 11, color: colors.textFaint },
+  groupBody: {
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  deleteGroup: { marginTop: 10, alignSelf: 'flex-start' },
+  deleteGroupText: { fontSize: 12, color: colors.danger, fontWeight: '600' },
 });

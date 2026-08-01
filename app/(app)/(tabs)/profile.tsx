@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PrestigeBadge } from '../../../components/PrestigeBadge';
-import { fetchRealizedCount30d } from '../../../lib/badges';
+import { allBadgeLevels, badgeForCount, fetchRealizedCount30d } from '../../../lib/badges';
 import { useAuth } from '../../../lib/auth';
 import { formatRevealAt } from '../../../lib/datetime';
 import {
@@ -39,6 +39,7 @@ export default function ProfileScreen() {
   const [badgeCount, setBadgeCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('total');
+  const [scaleOpen, setScaleOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -94,6 +95,47 @@ export default function ProfileScreen() {
               <Text style={styles.prestigeHint}>
                 Prédictions approuvées par le Cercle, 30 derniers jours
               </Text>
+
+              <Pressable onPress={() => setScaleOpen((o) => !o)} style={styles.scaleToggle}>
+                <Text style={styles.scaleToggleText}>
+                  {scaleOpen ? 'Masquer l’échelle complète' : 'Voir l’échelle complète'}
+                </Text>
+                <Text style={styles.scaleToggleChevron}>{scaleOpen ? '▲' : '▼'}</Text>
+              </Pressable>
+
+              {scaleOpen && (
+                <View style={styles.scaleList}>
+                  {allBadgeLevels().map((level) => {
+                    const reached = badgeCount >= level.min;
+                    const isCurrent = badgeForCount(badgeCount).level === level.level;
+                    const remaining =
+                      isCurrent && level.max !== null ? level.max + 1 - badgeCount : null;
+                    return (
+                      <View
+                        key={level.level}
+                        style={[styles.scaleRow, isCurrent && styles.scaleRowActive]}
+                      >
+                        <View style={[styles.scaleDot, { backgroundColor: level.color }]} />
+                        <View style={styles.flex}>
+                          <Text style={styles.scaleLabel}>{level.label}</Text>
+                          <Text style={styles.scaleThreshold}>
+                            {level.max !== null
+                              ? `${level.min} à ${level.max} prédictions`
+                              : `${level.min} prédictions et plus`}
+                          </Text>
+                          {remaining !== null && remaining > 0 && (
+                            <Text style={styles.scaleRemaining}>
+                              Encore {remaining} prédiction{remaining > 1 ? 's' : ''} validée
+                              {remaining > 1 ? 's' : ''} pour passer au niveau suivant.
+                            </Text>
+                          )}
+                        </View>
+                        {reached && <Text style={styles.scaleCheck}>✓</Text>}
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
             </>
           )}
         </View>
@@ -201,6 +243,31 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 24,
   },
+  flex: { flex: 1 },
+  scaleToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 16,
+  },
+  scaleToggleText: { fontSize: 12, fontWeight: '700', color: colors.gold },
+  scaleToggleChevron: { fontSize: 10, color: colors.gold },
+  scaleList: { width: '100%', marginTop: 14, paddingHorizontal: 20, gap: 8 },
+  scaleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 10,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  scaleRowActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
+  scaleDot: { width: 12, height: 12, borderRadius: 6 },
+  scaleLabel: { fontSize: 14, fontWeight: '700', color: colors.text },
+  scaleThreshold: { fontSize: 12, color: colors.textFaint, marginTop: 2 },
+  scaleRemaining: { fontSize: 12, color: colors.gold, marginTop: 4 },
+  scaleCheck: { fontSize: 15, color: colors.success, fontWeight: '700' },
   statsRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
   statCard: {
     flex: 1,

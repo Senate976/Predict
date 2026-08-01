@@ -18,7 +18,7 @@ export function commentErrorMessage(error: PostgrestError): string {
     case '23514':
       return `Le commentaire doit faire entre 1 et ${MAX_COMMENT_LENGTH} caractères.`;
     case '42501':
-      return 'Commentaire refusé : réservé à l’auteur et aux destinataires, une fois la prédiction révélée.';
+      return 'Commentaire refusé : réservé à l’auteur et aux destinataires de la prédiction.';
     default:
       return `Commentaire impossible : ${error.message}`;
   }

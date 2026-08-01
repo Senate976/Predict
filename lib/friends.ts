@@ -6,13 +6,6 @@ export type FriendProfile = { id: string; username: string };
 
 export type FriendshipStatus = 'pending' | 'accepted';
 
-/**
- * Une relation telle que renvoyée par `public.friendships`, avec les deux
- * profils embarqués. Les deux alias de clé étrangère (`friendships_requester_id_fkey`
- * et `friendships_addressee_id_fkey`) sont obligatoires côté requête : sans eux,
- * PostgREST ne sait pas laquelle des deux relations vers `profiles` utiliser
- * pour chaque colonne, il y en a deux.
- */
 export type Friendship = {
   id: string;
   requester_id: string;
@@ -52,18 +45,58 @@ export function otherProfile(friendship: Friendship, userId: string): FriendProf
   return friendship.requester_id === userId ? friendship.addressee : friendship.requester;
 }
 
-/** Toutes les relations où l'utilisateur apparaît, les plus récentes en tête. */
+/**
+ * Toutes les relations où l'utilisateur apparaît, les plus récentes en tête.
+ *
+ * Volontairement en deux requêtes plutôt qu'un embed PostgREST
+ * (`profiles!friendships_requester_id_fkey(...)`) : cet embed dépend du nom
+ * exact d'une contrainte de clé étrangère côté base, qui s'est révélé
+ * intermittent sur ce projet (renommages de colonnes hérités, cache de schéma
+ * PostgREST pas toujours à jour) — d'où l'erreur récurrente « could not find a
+ * relationship between friendships and profiles ». Deux requêtes simples
+ * (aucune ne dépend d'un nom de contrainte) puis un assemblage côté client
+ * élimine cette classe de panne.
+ */
 export async function fetchFriendships(userId: string) {
-  return supabase
+  const { data, error } = await supabase
     .from('friendships')
-    .select(
-      'id, requester_id, addressee_id, status, created_at, ' +
-        'requester:profiles!friendships_requester_id_fkey(id, username), ' +
-        'addressee:profiles!friendships_addressee_id_fkey(id, username)'
-    )
+    .select('id, requester_id, addressee_id, status, created_at')
     .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`)
-    .order('created_at', { ascending: false })
-    .returns<Friendship[]>();
+    .order('created_at', { ascending: false });
+
+  if (error || !data) {
+    return { data: null, error };
+  }
+
+  const otherIds = Array.from(
+    new Set(
+      data.map((f) => (f.requester_id === userId ? f.addressee_id : f.requester_id))
+    )
+  );
+
+  if (otherIds.length === 0) {
+    return { data: [] as Friendship[], error: null };
+  }
+
+  const { data: profiles, error: profilesError } = await supabase
+    .from('profiles')
+    .select('id, username')
+    .in('id', otherIds);
+
+  if (profilesError) {
+    return { data: null, error: profilesError };
+  }
+
+  const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
+  const profileOrFallback = (id: string): FriendProfile => byId.get(id) ?? { id, username: '…' };
+
+  const friendships: Friendship[] = data.map((f) => ({
+    ...f,
+    requester: profileOrFallback(f.requester_id),
+    addressee: profileOrFallback(f.addressee_id),
+  }));
+
+  return { data: friendships, error: null };
 }
 
 /**

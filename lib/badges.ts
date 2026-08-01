@@ -98,6 +98,28 @@ export function badgeProgress(count: number, badge: BadgeInfo): number | null {
   return Math.min(1, Math.max(0, (count - badge.min) / span));
 }
 
+export type BadgeLevelInfo = {
+  level: BadgeLevel;
+  label: string;
+  color: string;
+  min: number;
+  /** `null` pour le dernier niveau (Or) — pas de plafond. */
+  max: number | null;
+};
+
+/** L'échelle complète des 4 niveaux, du plus bas au plus haut — pour le
+ * panneau récapitulatif du Profil (components/PrestigeBadge.tsx ne montre
+ * que le niveau courant). */
+export function allBadgeLevels(): BadgeLevelInfo[] {
+  return THRESHOLDS.map((t, i) => ({
+    level: t.level,
+    label: t.label,
+    color: t.color,
+    min: t.min,
+    max: THRESHOLDS[i + 1] ? THRESHOLDS[i + 1].min - 1 : null,
+  }));
+}
+
 /**
  * Réservé à soi-même ou à un ami accepté (`get_realized_count_30d` le vérifie
  * côté base) ; renvoie `0` sinon, silencieusement.

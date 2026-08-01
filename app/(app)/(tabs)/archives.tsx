@@ -92,6 +92,7 @@ export default function ArchivesScreen() {
               item={item}
               now={new Date()}
               authorLabel={item.author_id !== userId ? authorNames[item.author_id] ?? '…' : undefined}
+              userId={userId!}
               onPress={() => router.push(`/prediction/${item.id}`)}
             />
           ))
