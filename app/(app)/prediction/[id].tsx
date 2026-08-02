@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AudioPlayerButton } from '../../../components/AudioPlayerButton';
 import { InlineComments } from '../../../components/InlineComments';
 import { QuickCreateButton } from '../../../components/QuickCreateButton';
+import { RoyalSeal } from '../../../components/RoyalSeal';
 import { useAuth } from '../../../lib/auth';
 import { formatRevealAt } from '../../../lib/datetime';
 import { fetchFriendships, otherProfile, type FriendProfile } from '../../../lib/friends';
@@ -188,7 +189,7 @@ export default function PredictionDetailScreen() {
           <>
             {/* Date de scellé bien en évidence, juste au-dessus du Teaser. */}
             <View style={styles.sealedDateRow}>
-              <Ionicons name="lock-closed" size={13} color={colors.textMuted} />
+              <RoyalSeal size={16} />
               <Text style={styles.sealedDate}>{formatRevealAt(new Date(prediction.created_at))}</Text>
             </View>
 
