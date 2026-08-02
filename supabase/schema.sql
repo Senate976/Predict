@@ -1411,12 +1411,64 @@ alter table public.group_members add constraint group_members_status_valid
 
 create index if not exists group_members_friend_idx on public.group_members (friend_id);
 
+-- `security definer` : tourne avec les droits de son propriétaire, donc son
+-- `select` sur `group_members` ne redéclenche pas la RLS de cette table.
+-- Utilisée uniquement par `groups_select_own` ci-dessous, pour casser le
+-- cycle expliqué dans son commentaire (même principe que
+-- `has_prediction_access`, section 11).
+create or replace function public.is_group_member(p_group_id uuid, p_user_id uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.group_members
+    where group_id = p_group_id and friend_id = p_user_id
+  );
+$$;
+
+revoke all on function public.is_group_member(uuid, uuid) from public;
+grant execute on function public.is_group_member(uuid, uuid) to authenticated;
+
+-- Miroir de `is_group_member` : tourne avec les droits de son propriétaire,
+-- donc son `select` sur `groups` ne redéclenche pas la RLS de cette table.
+-- Utilisée par les policies de `group_members` ci-dessous, qui doivent
+-- vérifier si l'appelant possède le groupe sans interroger `groups`
+-- directement (voir le commentaire de `groups_select_own`).
+create or replace function public.is_group_owner(p_group_id uuid, p_user_id uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.groups
+    where id = p_group_id and owner_id = p_user_id
+  );
+$$;
+
+revoke all on function public.is_group_owner(uuid, uuid) from public;
+grant execute on function public.is_group_owner(uuid, uuid) to authenticated;
+
 alter table public.groups enable row level security;
 
 -- Visible par : le propriétaire, tout membre (même invité en attente — il
 -- doit pouvoir lire le nom du groupe pour décider d'accepter ou non, y
 -- compris si le groupe est privé), et, si le groupe est public, n'importe
 -- quel ami accepté du propriétaire.
+--
+-- Passe par `is_group_member` (fonction `security definer` définie
+-- juste au-dessus) plutôt que par un `exists (select ... from
+-- group_members ...)` direct : `group_members_select_own` interroge
+-- elle-même `groups` pour savoir si l'appelant en est le propriétaire. Les
+-- deux policies s'appelant l'une l'autre en direct forment un cycle —
+-- Postgres l'a signalé par « infinite recursion detected in policy for
+-- relation "groups" ». `is_group_member` tourne avec les droits de son
+-- propriétaire, qui n'a pas la RLS forcée sur ses propres tables : elle lit
+-- `group_members` sans redéclencher sa policy, ce qui casse le cycle.
 drop policy if exists "groups_select_own" on public.groups;
 create policy "groups_select_own"
   on public.groups
@@ -1424,10 +1476,7 @@ create policy "groups_select_own"
   to authenticated
   using (
     owner_id = auth.uid()
-    or exists (
-      select 1 from public.group_members gm
-      where gm.group_id = groups.id and gm.friend_id = auth.uid()
-    )
+    or public.is_group_member(id, auth.uid())
     or (
       visibility = 'public'
       and exists (
@@ -1467,7 +1516,8 @@ alter table public.group_members enable row level security;
 
 -- Le propriétaire voit tous les membres/invités de ses groupes ; un invité
 -- voit sa propre ligne (pending ou accepted), pour savoir à quoi il a été
--- convié et y répondre.
+-- convié et y répondre. Passe par `is_group_owner` plutôt qu'un `exists`
+-- direct sur `groups` — même raison que `groups_select_own` ci-dessus.
 drop policy if exists "group_members_select_own" on public.group_members;
 create policy "group_members_select_own"
   on public.group_members
@@ -1475,10 +1525,7 @@ create policy "group_members_select_own"
   to authenticated
   using (
     friend_id = auth.uid()
-    or exists (
-      select 1 from public.groups g
-      where g.id = group_members.group_id and g.owner_id = auth.uid()
-    )
+    or public.is_group_owner(group_id, auth.uid())
   );
 
 -- Seul le propriétaire invite, et seulement un ami accepté — jamais
@@ -1491,10 +1538,7 @@ create policy "group_members_insert_own"
   to authenticated
   with check (
     status = 'pending'
-    and exists (
-      select 1 from public.groups g
-      where g.id = group_members.group_id and g.owner_id = auth.uid()
-    )
+    and public.is_group_owner(group_id, auth.uid())
     and exists (
       select 1 from public.friendships f
       where f.status = 'accepted'
@@ -1524,10 +1568,7 @@ create policy "group_members_delete_own"
   to authenticated
   using (
     friend_id = auth.uid()
-    or exists (
-      select 1 from public.groups g
-      where g.id = group_members.group_id and g.owner_id = auth.uid()
-    )
+    or public.is_group_owner(group_id, auth.uid())
   );
 
 -- Notification d'invitation à un groupe. `groups` existe maintenant, donc

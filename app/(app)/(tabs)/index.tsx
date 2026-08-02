@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Avatar } from '../../../components/Avatar';
 import { CelebrationBurst } from '../../../components/CelebrationBurst';
 import { PredictionCard } from '../../../components/PredictionCard';
 import { WelcomeOnboarding } from '../../../components/WelcomeOnboarding';
@@ -73,18 +74,18 @@ export default function HomeScreen() {
     const items = data ?? [];
     setFeed(items);
 
-    const authorIds = Array.from(new Set(items.map((item) => item.author_id)));
-    if (authorIds.length > 0) {
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, username, avatar_url')
-        .in('id', authorIds);
-      const map: AuthorMap = {};
-      for (const profile of profiles ?? []) {
-        map[profile.id] = { username: profile.username, avatar_url: profile.avatar_url };
-      }
-      setAuthors(map);
+    // Inclut toujours son propre id, même fil vide : c'est aussi la source
+    // de l'avatar affiché dans l'en-tête, à côté de « Predict ».
+    const authorIds = Array.from(new Set([...items.map((item) => item.author_id), userId]));
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url')
+      .in('id', authorIds);
+    const map: AuthorMap = {};
+    for (const profile of profiles ?? []) {
+      map[profile.id] = { username: profile.username, avatar_url: profile.avatar_url };
     }
+    setAuthors(map);
 
     // La première approbation non vue déclenche la célébration, une seule
     // fois — marquée lue tout de suite pour qu'un focus ultérieur de cet
@@ -154,6 +155,7 @@ export default function HomeScreen() {
             {username ?? session?.user.email ?? ''}
           </Text>
         </View>
+        <Avatar url={userId ? authors[userId]?.avatar_url ?? null : null} username={username ?? ''} size={40} />
       </View>
 
       <View style={styles.tabs}>

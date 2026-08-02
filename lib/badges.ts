@@ -64,16 +64,19 @@ export type BadgeInfo = {
   gradient: Gradient;
   monogramColor: string;
   min: number;
-  next: { label: string; min: number } | null;
 };
 
+/**
+ * Ne renvoie que le niveau courant, jamais le suivant ni ses seuils : le
+ * Profil (components/PrestigeBadge.tsx) n'affiche que le badge débloqué,
+ * volontairement sans indice sur la progression à venir.
+ */
 export function badgeForCount(count: number): BadgeInfo {
   let index = 0;
   for (let i = 0; i < THRESHOLDS.length; i++) {
     if (count >= THRESHOLDS[i].min) index = i;
   }
   const current = THRESHOLDS[index];
-  const next = THRESHOLDS[index + 1] ?? null;
   return {
     level: current.level,
     label: current.label,
@@ -81,37 +84,7 @@ export function badgeForCount(count: number): BadgeInfo {
     gradient: current.gradient,
     monogramColor: current.monogramColor,
     min: current.min,
-    next: next ? { label: next.label, min: next.min } : null,
   };
-}
-
-/** Progression vers le niveau suivant, entre 0 et 1. `null` : déjà au sommet (Or). */
-export function badgeProgress(count: number, badge: BadgeInfo): number | null {
-  if (!badge.next) return null;
-  const span = badge.next.min - badge.min;
-  return Math.min(1, Math.max(0, (count - badge.min) / span));
-}
-
-export type BadgeLevelInfo = {
-  level: BadgeLevel;
-  label: string;
-  color: string;
-  min: number;
-  /** `null` pour le dernier niveau (Or) — pas de plafond. */
-  max: number | null;
-};
-
-/** L'échelle complète des 4 niveaux, du plus bas au plus haut — pour le
- * panneau récapitulatif du Profil (components/PrestigeBadge.tsx ne montre
- * que le niveau courant). */
-export function allBadgeLevels(): BadgeLevelInfo[] {
-  return THRESHOLDS.map((t, i) => ({
-    level: t.level,
-    label: t.label,
-    color: t.color,
-    min: t.min,
-    max: THRESHOLDS[i + 1] ? THRESHOLDS[i + 1].min - 1 : null,
-  }));
 }
 
 /**
