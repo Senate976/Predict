@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
@@ -14,7 +13,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AudioPlayerButton } from '../../../components/AudioPlayerButton';
 import { InlineComments } from '../../../components/InlineComments';
 import { QuickCreateButton } from '../../../components/QuickCreateButton';
-import { RoyalSeal } from '../../../components/RoyalSeal';
 import { useAuth } from '../../../lib/auth';
 import { formatRevealAt } from '../../../lib/datetime';
 import { fetchFriendships, otherProfile, type FriendProfile } from '../../../lib/friends';
@@ -187,20 +185,28 @@ export default function PredictionDetailScreen() {
           <ActivityIndicator color={colors.gold} style={styles.loader} />
         ) : prediction ? (
           <>
-            {/* Date de scellé bien en évidence, juste au-dessus du Teaser. */}
-            <View style={styles.sealedDateRow}>
-              <RoyalSeal size={16} />
-              <Text style={styles.sealedDate}>{formatRevealAt(new Date(prediction.created_at))}</Text>
-            </View>
-
             <Text style={styles.teaser}>{prediction.teaser}</Text>
+
+            {/* Depuis que le Fil n'affiche plus ni la date de scellé ni celle
+                de révélation, cet écran détail est la seule à les montrer —
+                toujours visible, avant comme après la révélation. */}
+            <View style={styles.datesRow}>
+              <Text style={styles.dateColText}>
+                Scellé le {formatRevealAt(new Date(prediction.created_at))}
+              </Text>
+              <Text style={[styles.dateColText, styles.dateColRight]}>
+                Révélé le {formatRevealAt(new Date(prediction.reveal_at))}
+              </Text>
+            </View>
 
             {/* Le cœur de l'écran : le contenu de la prédiction prime sur tout
                 le reste, y compris le verdict — repoussé tout en bas. Même
                 taille de police que le Teaser, volontairement : les deux sont
-                la promesse de l'auteur, avant et après révélation. */}
+                la promesse de l'auteur, avant et après révélation.
+                L'auteur voit toujours son propre contenu, même avant
+                révélation — seul un destinataire attend l'heure dite. */}
             <View style={styles.contentHero}>
-              {revealed && prediction.content ? (
+              {(revealed || isAuthor) && prediction.content ? (
                 <>
                   <Text style={styles.contentHeroText}>{prediction.content}</Text>
                   {prediction.audio_path && (
@@ -212,16 +218,6 @@ export default function PredictionDetailScreen() {
               ) : (
                 <Text style={styles.sealedHint}>Contenu scellé jusqu’à la révélation.</Text>
               )}
-            </View>
-
-            {/* Depuis que le Fil n'affiche plus ni la date de scellé ni celle
-                de révélation, cet écran détail est la seule à les montrer —
-                toujours visible, avant comme après la révélation. */}
-            <View style={styles.datesBlock}>
-              <View style={styles.dateLineRow}>
-                <Ionicons name="lock-open" size={13} color={colors.textFaint} />
-                <Text style={styles.dateLine}>{formatRevealAt(new Date(prediction.reveal_at))}</Text>
-              </View>
             </View>
 
             <Text style={[styles.eyebrow, styles.sectionSpacing]}>Destinataires</Text>
@@ -341,13 +337,10 @@ const styles = StyleSheet.create({
   loader: { marginTop: 24 },
   eyebrow: { ...eyebrow },
   eyebrowSmall: { ...eyebrow, fontSize: 10 },
-  sealedDateRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-  sealedDate: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.textMuted,
-  },
   teaser: { fontFamily: fonts.serifItalic, fontSize: 28, color: colors.text, lineHeight: 36 },
+  datesRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
+  dateColText: { fontSize: 12, color: colors.textFaint, flexShrink: 1 },
+  dateColRight: { textAlign: 'right' },
   contentHero: {
     marginTop: spacing.xl,
     marginBottom: spacing.lg,
@@ -367,9 +360,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     textAlign: 'center',
   },
-  datesBlock: { alignItems: 'center', marginBottom: spacing.md },
-  dateLineRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
-  dateLine: { fontSize: 12, color: colors.textFaint },
   verdictBox: {
     marginTop: spacing.xl,
     paddingVertical: 12,
