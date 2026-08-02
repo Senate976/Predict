@@ -136,12 +136,7 @@ export default function ProfileScreen() {
           {badgeCount === null ? (
             <ActivityIndicator color={colors.gold} style={styles.loader} />
           ) : (
-            <>
-              <PrestigeBadge count={badgeCount} size="large" />
-              <Text style={styles.prestigeHint}>
-                Prédictions approuvées par le Cercle, 30 derniers jours
-              </Text>
-            </>
+            <PrestigeBadge count={badgeCount} size="large" />
           )}
         </View>
 
@@ -262,13 +257,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: 'center',
-  },
-  prestigeHint: {
-    fontSize: 12,
-    color: colors.textFaint,
-    marginTop: 10,
-    textAlign: 'center',
-    paddingHorizontal: 24,
   },
   statsRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
   statCard: {

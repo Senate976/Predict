@@ -1,12 +1,12 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { badgeForCount, badgeProgress } from '../lib/badges';
+import { badgeForCount } from '../lib/badges';
 import { colors, eyebrow, fonts } from '../lib/theme';
 
 type Props = {
   count: number;
-  /** `small` : simple puce, à côté d'un pseudo. `large` : médaillon + libellé + jauge (Profil). */
+  /** `small` : simple puce, à côté d'un pseudo. `large` : médaillon + libellé, sans indice sur le niveau suivant (Profil). */
   size?: 'small' | 'large';
 };
 
@@ -22,7 +22,6 @@ const LARGE_SIZE = 72;
  */
 export function PrestigeBadge({ count, size = 'small' }: Props) {
   const badge = badgeForCount(count);
-  const progress = badgeProgress(count, badge);
 
   if (size === 'small') {
     return (
@@ -54,24 +53,6 @@ export function PrestigeBadge({ count, size = 'small' }: Props) {
       </View>
 
       <Text style={[styles.label, { color: badge.color }]}>{badge.label}</Text>
-
-      {badge.next ? (
-        <>
-          <View style={styles.track}>
-            <View
-              style={[
-                styles.fill,
-                { width: `${Math.round((progress ?? 0) * 100)}%`, backgroundColor: badge.color },
-              ]}
-            />
-          </View>
-          <Text style={styles.nextLabel}>
-            {count} / {badge.next.min} vers {badge.next.label}
-          </Text>
-        </>
-      ) : (
-        <Text style={styles.nextLabel}>Niveau maximum</Text>
-      )}
     </View>
   );
 }
@@ -141,14 +122,4 @@ const styles = StyleSheet.create({
     textTransform: 'none',
     fontWeight: '600',
   },
-  track: {
-    width: 150,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: colors.border,
-    marginTop: 12,
-    overflow: 'hidden',
-  },
-  fill: { height: '100%', borderRadius: 2 },
-  nextLabel: { fontSize: 11, color: colors.textFaint, marginTop: 6 },
 });
