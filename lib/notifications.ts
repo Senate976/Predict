@@ -38,13 +38,20 @@ export function notificationErrorMessage(error: PostgrestError): string {
   return `Chargement impossible : ${error.message}`;
 }
 
-/** Les notifications de l'utilisateur, les plus récentes en tête. */
+/**
+ * Les notifications de l'utilisateur, les plus récentes en tête.
+ *
+ * `owner:profiles!groups_owner_id_fkey(username)` — hint explicite requis :
+ * `group_members` relie déjà `groups` et `profiles` (via `friend_id`), donc
+ * sans préciser la contrainte, PostgREST trouve deux chemins possibles entre
+ * les deux tables et refuse de deviner lequel embarquer.
+ */
 export async function fetchNotifications(userId: string) {
   return supabase
     .from('notifications')
     .select(
       'id, user_id, prediction_id, group_id, type, is_read, created_at, ' +
-        'prediction:predictions(teaser), group:groups(name, owner:profiles(username))'
+        'prediction:predictions(teaser), group:groups(name, owner:profiles!groups_owner_id_fkey(username))'
     )
     .eq('user_id', userId)
     .order('created_at', { ascending: false })

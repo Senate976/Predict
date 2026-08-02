@@ -8,12 +8,19 @@ function TabDot({ focused }: { focused: boolean }) {
   return <View style={[styles.dot, focused && styles.dotActive]} />;
 }
 
-/** Le logo de l'app (le "P" vitrail), en médaillon — tient lieu d'icône ET de libellé pour l'onglet Profil. */
-function BrandMark({ focused }: { focused: boolean }) {
+/**
+ * Le logo de l'app (le "P" vitrail), utilisé comme libellé de l'onglet
+ * Profil plutôt que comme icône : posé dans le même emplacement (`tabBarLabel`)
+ * que le texte des autres onglets, il hérite exactement de leur mise en page
+ * verticale — une icône dans `tabBarIcon` (comme les autres) le décalerait,
+ * react-navigation ne réservant pas le même espace à un `Image` qu'à un texte.
+ */
+function BrandLabel({ focused }: { focused: boolean }) {
   return (
-    <View style={[styles.brandRing, focused && styles.brandRingActive]}>
-      <Image source={require('../../../assets/predict-mark.png')} style={styles.brandImage} />
-    </View>
+    <Image
+      source={require('../../../assets/predict-mark.png')}
+      style={[styles.brandLabelImage, focused && styles.brandLabelImageActive]}
+    />
   );
 }
 
@@ -45,8 +52,8 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          tabBarLabel: () => null,
-          tabBarIcon: ({ focused }) => <BrandMark focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabDot focused={focused} />,
+          tabBarLabel: ({ focused }) => <BrandLabel focused={focused} />,
         }}
       />
     </Tabs>
@@ -69,18 +76,11 @@ const styles = StyleSheet.create({
   },
   dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: 'transparent' },
   dotActive: { backgroundColor: colors.gold },
-  brandRing: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
+  brandLabelImage: {
+    width: 16,
+    height: 16,
+    borderRadius: 4,
     opacity: 0.55,
   },
-  brandRingActive: { opacity: 1 },
-  brandImage: {
-    width: 28,
-    height: 28,
-  },
+  brandLabelImageActive: { opacity: 1 },
 });

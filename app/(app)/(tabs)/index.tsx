@@ -73,14 +73,12 @@ export default function HomeScreen() {
     const items = data ?? [];
     setFeed(items);
 
-    const otherAuthorIds = Array.from(
-      new Set(items.filter((item) => item.author_id !== userId).map((item) => item.author_id))
-    );
-    if (otherAuthorIds.length > 0) {
+    const authorIds = Array.from(new Set(items.map((item) => item.author_id)));
+    if (authorIds.length > 0) {
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, username, avatar_url')
-        .in('id', otherAuthorIds);
+        .in('id', authorIds);
       const map: AuthorMap = {};
       for (const profile of profiles ?? []) {
         map[profile.id] = { username: profile.username, avatar_url: profile.avatar_url };
@@ -196,9 +194,9 @@ export default function HomeScreen() {
               key={item.id}
               item={item}
               now={now}
-              authorLabel={item.author_id !== userId ? authors[item.author_id]?.username ?? '…' : undefined}
-              authorId={item.author_id !== userId ? item.author_id : undefined}
-              authorAvatarUrl={item.author_id !== userId ? authors[item.author_id]?.avatar_url : undefined}
+              authorLabel={authors[item.author_id]?.username ?? '…'}
+              authorId={item.author_id}
+              authorAvatarUrl={authors[item.author_id]?.avatar_url}
               userId={userId!}
               mode={tab === 'past' ? 'accordion' : 'link'}
               onPress={() => router.push(`/prediction/${item.id}`)}
@@ -231,13 +229,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     gap: spacing.md,
   },
-  brand: {
-    fontFamily: fonts.serifItalic,
-    fontSize: 15,
-    letterSpacing: 3,
-    color: colors.gold,
-    textTransform: 'uppercase',
-  },
+  brand: { fontFamily: fonts.serifItalic, fontSize: 26, color: colors.text },
   greeting: { fontSize: 17, fontWeight: '700', color: colors.text, marginTop: 2 },
   tabs: {
     flexDirection: 'row',
