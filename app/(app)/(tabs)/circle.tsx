@@ -254,7 +254,7 @@ export default function CircleScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Mon Cercle</Text>
+        <Text style={styles.headerTitle}>Cercle</Text>
         <QuickCreateButton />
       </View>
 
