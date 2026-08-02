@@ -65,17 +65,6 @@ export function PredictionCard({
     >
       <Pressable onPress={handlePress} style={({ pressed }) => pressed && styles.cardPressed}>
         <View style={styles.cardTop}>
-          <View style={styles.cardTopLeft}>
-            {!verdict && (
-              <View style={[styles.badge, !revealed ? styles.badgeLocked : styles.badgeNeutral]}>
-                <Text style={[styles.badgeText, !revealed ? styles.badgeTextLocked : styles.badgeTextNeutral]}>
-                  {!revealed ? formatCountdown(revealAt, now) : 'Révélée'}
-                </Text>
-              </View>
-            )}
-            {mode === 'accordion' && <Text style={styles.chevron}>{expanded ? '▲' : '▼'}</Text>}
-          </View>
-
           {authorLabel && (
             <Pressable
               onPress={() => authorId && router.push(`/profile/${authorId}`)}
@@ -88,6 +77,17 @@ export function PredictionCard({
               </Text>
             </Pressable>
           )}
+
+          <View style={styles.cardTopRight}>
+            {mode === 'accordion' && <Text style={styles.chevron}>{expanded ? '▲' : '▼'}</Text>}
+            {!verdict && (
+              <View style={[styles.badge, !revealed ? styles.badgeLocked : styles.badgeNeutral]}>
+                <Text style={[styles.badgeText, !revealed ? styles.badgeTextLocked : styles.badgeTextNeutral]}>
+                  {!revealed ? formatCountdown(revealAt, now) : 'Révélée'}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
 
         <Text style={styles.cardTeaser}>{item.teaser}</Text>
@@ -147,11 +147,11 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   cardTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 10 },
-  cardTopLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardTopRight: { alignItems: 'flex-end', gap: 6 },
   authorBlock: { alignItems: 'center', maxWidth: 88 },
   authorName: { fontSize: 13, fontWeight: '600', color: colors.textMuted, marginTop: 4, textAlign: 'center' },
   badge: {
-    alignSelf: 'flex-start',
+    alignSelf: 'flex-end',
     borderRadius: radius.pill,
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 12, fontWeight: '700' },
   badgeTextLocked: { color: colors.gold },
   badgeTextNeutral: { color: colors.textMuted },
-  chevron: { fontSize: 11, color: colors.textFaint, marginTop: 6 },
+  chevron: { fontSize: 11, color: colors.textFaint },
   cardRealized: { borderLeftWidth: 4, borderLeftColor: colors.success },
   cardMissed: { borderLeftWidth: 4, borderLeftColor: colors.danger },
   cardTeaser: {
@@ -186,9 +186,9 @@ const styles = StyleSheet.create({
   },
   cardContent: {
     fontFamily: fonts.serifItalic,
-    fontSize: 17,
+    fontSize: 20,
     color: colors.text,
-    lineHeight: 23,
+    lineHeight: 26,
   },
   sealedBox: {
     marginTop: 12,
