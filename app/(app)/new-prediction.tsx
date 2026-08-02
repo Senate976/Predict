@@ -229,7 +229,7 @@ export default function NewPredictionScreen() {
           <TextInput
             value={teaser}
             onChangeText={setTeaser}
-            placeholder="Léa va me surprendre avant la fin de l’année…"
+            placeholder=""
             multiline
             editable={!submitting}
             maxLength={MAX_TEASER_LENGTH}
@@ -263,7 +263,7 @@ export default function NewPredictionScreen() {
               <TextInput
                 value={content}
                 onChangeText={setContent}
-                placeholder="Dans un mois, Léa aura adopté un chat."
+                placeholder="Écrivez votre predict ici et prouvez à votre cercle, qu’une fois encore, vous aurez raison"
                 multiline
                 editable={!submitting}
                 maxLength={MAX_CONTENT_LENGTH}
