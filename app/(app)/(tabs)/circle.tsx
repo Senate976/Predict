@@ -32,6 +32,7 @@ import {
 import {
   addGroupMember,
   createGroup,
+  declineGroupInvite,
   deleteGroup,
   fetchGroupMembers,
   fetchGroups,
@@ -122,6 +123,24 @@ export default function CircleScreen() {
     setPendingGroupActionId(groupId);
     try {
       const { error } = await deleteGroup(groupId);
+      if (error) {
+        setGroupError(groupErrorMessage(error));
+        return;
+      }
+      setGroups((prev) => (prev ?? []).filter((g) => g.id !== groupId));
+      if (expandedGroupId === groupId) setExpandedGroupId(null);
+    } finally {
+      setPendingGroupActionId(null);
+    }
+  }
+
+  /** Quitter un groupe rejoint (pas le sien) — supprime sa propre ligne `group_members`. */
+  async function handleLeaveGroup(groupId: string) {
+    if (!userId) return;
+    setGroupError(null);
+    setPendingGroupActionId(groupId);
+    try {
+      const { error } = await declineGroupInvite(groupId, userId);
       if (error) {
         setGroupError(groupErrorMessage(error));
         return;
@@ -468,6 +487,7 @@ export default function CircleScreen() {
             ) : (
               groups.map((group) => {
                 const expanded = expandedGroupId === group.id;
+                const isOwner = group.owner_id === userId;
                 const members = groupMembers[group.id];
                 const memberById = new Map((members ?? []).map((m) => [m.friend_id, m]));
                 const acceptedCount = (members ?? []).filter((m) => m.status === 'accepted').length;
@@ -479,11 +499,13 @@ export default function CircleScreen() {
                         <Text style={styles.username}>{group.name}</Text>
                         <Text style={styles.groupMeta}>
                           {group.visibility === 'public' ? 'Public' : 'Privé'}
-                          {members
+                          {isOwner && members
                             ? ` · ${acceptedCount} membre${acceptedCount > 1 ? 's' : ''}${
                                 pendingCount > 0 ? ` · ${pendingCount} en attente` : ''
                               }`
-                            : ''}
+                            : !isOwner
+                              ? ' · Tu es membre'
+                              : ''}
                         </Text>
                       </View>
                       <Text style={styles.groupChevron}>{expanded ? '▲' : '▼'}</Text>
@@ -491,43 +513,58 @@ export default function CircleScreen() {
 
                     {expanded && (
                       <View style={styles.groupBody}>
-                        {accepted.length === 0 ? (
-                          <Text style={styles.muted}>
-                            Pas encore d’ami accepté à inviter dans ce groupe.
-                          </Text>
+                        {isOwner ? (
+                          <>
+                            {accepted.length === 0 ? (
+                              <Text style={styles.muted}>
+                                Pas encore d’ami accepté à inviter dans ce groupe.
+                              </Text>
+                            ) : (
+                              accepted.map((f) => {
+                                const profile = otherProfile(f, userId!);
+                                const member = memberById.get(profile.id);
+                                const pending = pendingGroupActionId === `${group.id}:${profile.id}`;
+                                const label = pending
+                                  ? '…'
+                                  : member?.status === 'accepted'
+                                    ? 'Membre'
+                                    : member?.status === 'pending'
+                                      ? 'Invitation envoyée'
+                                      : 'Inviter';
+                                return (
+                                  <View key={profile.id} style={styles.row}>
+                                    <Text style={styles.username}>{profile.username}</Text>
+                                    <Pressable
+                                      onPress={() => handleToggleMember(group.id, profile.id, !!member)}
+                                      disabled={pending}
+                                      style={member ? styles.pillOutline : styles.pillGold}
+                                    >
+                                      <Text style={member ? styles.pillOutlineText : styles.pillGoldText}>{label}</Text>
+                                    </Pressable>
+                                  </View>
+                                );
+                              })
+                            )}
+                            <Pressable
+                              onPress={() => handleDeleteGroup(group.id)}
+                              disabled={pendingGroupActionId === group.id}
+                              style={styles.deleteGroup}
+                            >
+                              <Text style={styles.deleteGroupText}>Supprimer ce groupe</Text>
+                            </Pressable>
+                          </>
                         ) : (
-                          accepted.map((f) => {
-                            const profile = otherProfile(f, userId!);
-                            const member = memberById.get(profile.id);
-                            const pending = pendingGroupActionId === `${group.id}:${profile.id}`;
-                            const label = pending
-                              ? '…'
-                              : member?.status === 'accepted'
-                                ? 'Membre'
-                                : member?.status === 'pending'
-                                  ? 'Invitation envoyée'
-                                  : 'Inviter';
-                            return (
-                              <View key={profile.id} style={styles.row}>
-                                <Text style={styles.username}>{profile.username}</Text>
-                                <Pressable
-                                  onPress={() => handleToggleMember(group.id, profile.id, !!member)}
-                                  disabled={pending}
-                                  style={member ? styles.pillOutline : styles.pillGold}
-                                >
-                                  <Text style={member ? styles.pillOutlineText : styles.pillGoldText}>{label}</Text>
-                                </Pressable>
-                              </View>
-                            );
-                          })
+                          <>
+                            <Text style={styles.muted}>Tu fais partie de ce groupe.</Text>
+                            <Pressable
+                              onPress={() => handleLeaveGroup(group.id)}
+                              disabled={pendingGroupActionId === group.id}
+                              style={styles.deleteGroup}
+                            >
+                              <Text style={styles.deleteGroupText}>Quitter ce groupe</Text>
+                            </Pressable>
+                          </>
                         )}
-                        <Pressable
-                          onPress={() => handleDeleteGroup(group.id)}
-                          disabled={pendingGroupActionId === group.id}
-                          style={styles.deleteGroup}
-                        >
-                          <Text style={styles.deleteGroupText}>Supprimer ce groupe</Text>
-                        </Pressable>
                       </View>
                     )}
                   </View>

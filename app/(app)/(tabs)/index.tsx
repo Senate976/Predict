@@ -135,7 +135,11 @@ export default function HomeScreen() {
   }
 
   const upcoming = (feed ?? []).filter((item) => !item.is_revealed);
-  const past = (feed ?? []).filter((item) => item.is_revealed);
+  // Passées : la plus récemment révélée en tête, indépendamment de l'ordre de
+  // publication (`created_at`) utilisé pour le reste du fil.
+  const past = (feed ?? [])
+    .filter((item) => item.is_revealed)
+    .sort((a, b) => new Date(b.reveal_at).getTime() - new Date(a.reveal_at).getTime());
   const shown = tab === 'upcoming' ? upcoming : past;
 
   return (

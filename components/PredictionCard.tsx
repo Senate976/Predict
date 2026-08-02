@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -109,11 +110,21 @@ export function PredictionCard({
             </View>
           ))}
 
-        <Text style={styles.cardMeta}>
-          Scellée {formatRevealAt(new Date(item.created_at))}
-        </Text>
+        {item.recipient_usernames.length > 0 && (
+          <Text style={styles.recipientsLine} numberOfLines={2}>
+            Destiné à : {item.recipient_usernames.join(', ')}
+          </Text>
+        )}
+
+        <View style={styles.dateRow}>
+          <Ionicons name="lock-closed" size={12} color={colors.textFaint} />
+          <Text style={styles.cardMeta}>{formatRevealAt(new Date(item.created_at))}</Text>
+        </View>
         {!revealed && (
-          <Text style={styles.cardMetaSecondary}>Se révèle {formatRevealAt(revealAt)}</Text>
+          <View style={styles.dateRow}>
+            <Ionicons name="lock-open" size={12} color={colors.textFaint} />
+            <Text style={styles.cardMetaSecondary}>{formatRevealAt(revealAt)}</Text>
+          </View>
         )}
       </Pressable>
 
@@ -200,8 +211,10 @@ const styles = StyleSheet.create({
   },
   sealedText: { fontSize: 13, color: colors.textFaint, fontStyle: 'italic' },
   audioRow: { marginTop: 10 },
-  cardMeta: { fontSize: 12, color: colors.textFaint, marginTop: 10 },
-  cardMetaSecondary: { fontSize: 12, color: colors.textFaint, marginTop: 2 },
+  recipientsLine: { fontSize: 12, color: colors.textMuted, fontWeight: '600', marginTop: 10 },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
+  cardMeta: { fontSize: 12, color: colors.textFaint },
+  cardMetaSecondary: { fontSize: 12, color: colors.textFaint },
   voteLink: { marginTop: 10 },
   voteLinkText: { fontSize: 13, fontWeight: '600', color: colors.gold },
 });

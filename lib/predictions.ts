@@ -28,6 +28,8 @@ export type PredictionFeedItem = {
   realized_votes: number;
   missed_votes: number;
   final_status: PredictionOutcomeStatus;
+  /** Pseudos de l'audience autorisée, triés alphabétiquement — jamais vide pour une prédiction qui a un destinataire. */
+  recipient_usernames: string[];
 };
 
 /** Doivent rester alignés sur les contraintes `predictions_*_length` du SQL. */
@@ -99,7 +101,7 @@ export function predictionErrorMessage(error: PostgrestError): string {
  * dans lequel les choses ont été publiées, pas celui de leur révélation.
  */
 const FEED_COLUMNS =
-  'id, author_id, teaser, content, audio_path, reveal_at, scope, created_at, is_revealed, realized_votes, missed_votes, final_status';
+  'id, author_id, teaser, content, audio_path, reveal_at, scope, created_at, is_revealed, realized_votes, missed_votes, final_status, recipient_usernames';
 
 export async function fetchPredictionsFeed() {
   return supabase
