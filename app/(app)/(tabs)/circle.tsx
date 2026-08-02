@@ -604,6 +604,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     paddingHorizontal: 14,
     paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   pillGoldText: { color: colors.text, fontSize: 13, fontWeight: '700' },
   pillOutline: {
@@ -612,6 +614,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     paddingHorizontal: 14,
     paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   pillOutlineText: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
   error: {
