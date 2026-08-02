@@ -1,3 +1,4 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { badgeForCount, badgeProgress } from '../lib/badges';
@@ -13,10 +14,11 @@ const SMALL_SIZE = 16;
 const LARGE_SIZE = 72;
 
 /**
- * Un anneau doré fin plutôt qu'une pièce gravée en relief : le nom du niveau
- * se lit en typographie (style `eyebrow`, cohérent avec le reste de
- * l'application) sous le médaillon, jamais à l'intérieur — ce qui évite tout
- * problème de contraste texte-sur-métal, quel que soit le niveau.
+ * Un anneau doré fin plutôt qu'une pièce gravée en relief, avec un médaillon
+ * central qui reprend le monogramme "P" du logo — un dégradé subtil par
+ * métal (fer, bronze, argent, or) plutôt qu'une couleur plate, façon reflet
+ * de bijouterie. Le nom du niveau se lit en typographie sous le médaillon,
+ * jamais dessus, pour rester lisible quel que soit le métal.
  */
 export function PrestigeBadge({ count, size = 'small' }: Props) {
   const badge = badgeForCount(count);
@@ -25,7 +27,12 @@ export function PrestigeBadge({ count, size = 'small' }: Props) {
   if (size === 'small') {
     return (
       <View style={[styles.smallRing, { borderColor: badge.color }]}>
-        <View style={[styles.smallCore, { backgroundColor: badge.color }]} />
+        <LinearGradient
+          colors={badge.gradient}
+          start={{ x: 0.15, y: 0 }}
+          end={{ x: 0.9, y: 1 }}
+          style={styles.smallCore}
+        />
       </View>
     );
   }
@@ -36,7 +43,14 @@ export function PrestigeBadge({ count, size = 'small' }: Props) {
         <View style={[styles.innerRing, { borderColor: badge.color }]} />
         {/* Reflet subtil, façon verre — un simple arc clair en haut à gauche. */}
         <View style={styles.gloss} />
-        <View style={[styles.core, { backgroundColor: badge.color }]} />
+        <LinearGradient
+          colors={badge.gradient}
+          start={{ x: 0.15, y: 0 }}
+          end={{ x: 0.9, y: 1 }}
+          style={styles.core}
+        >
+          <Text style={[styles.monogram, { color: badge.monogramColor }]}>P</Text>
+        </LinearGradient>
       </View>
 
       <Text style={[styles.label, { color: badge.color }]}>{badge.label}</Text>
@@ -73,10 +87,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   smallCore: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    opacity: 0.85,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
   largeWrap: { alignItems: 'center' },
   medallion: {
@@ -108,10 +121,16 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   core: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    opacity: 0.9,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  monogram: {
+    fontFamily: fonts.serifItalic,
+    fontSize: 18,
+    lineHeight: 21,
   },
   label: {
     ...eyebrow,

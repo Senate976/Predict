@@ -45,6 +45,8 @@ export function PredictionCard({
   const revealed = isRevealed(item, now);
   const showBody = mode === 'link' || expanded;
 
+  const verdict = revealed && item.final_status !== 'pending' ? item.final_status : null;
+
   function handlePress() {
     if (mode === 'accordion') {
       setExpanded((e) => !e);
@@ -57,31 +59,58 @@ export function PredictionCard({
     <View style={styles.card}>
       <Pressable onPress={handlePress} style={({ pressed }) => pressed && styles.cardPressed}>
         <View style={styles.cardTop}>
-          {!revealed && <SealBadge />}
-          <View style={[styles.badge, revealed ? styles.badgeOpen : styles.badgeLocked]}>
-            <Text style={[styles.badgeText, revealed ? styles.badgeTextOpen : styles.badgeTextLocked]}>
-              {revealed ? 'Révélée' : formatCountdown(revealAt, now)}
+          <View style={styles.cardTopLeft}>
+            {!revealed && <SealBadge />}
+            {authorLabel && (
+              <Pressable
+                onPress={() => authorId && router.push(`/profile/${authorId}`)}
+                style={styles.authorBlock}
+                hitSlop={4}
+              >
+                <Avatar url={authorAvatarUrl} username={authorLabel} size={24} />
+                <Text style={styles.authorName} numberOfLines={1}>
+                  {authorLabel}
+                </Text>
+              </Pressable>
+            )}
+          </View>
+
+          <View
+            style={[
+              styles.badge,
+              !revealed ? styles.badgeLocked : verdict === 'realized' ? styles.badgeRealized : verdict === 'missed' ? styles.badgeMissed : styles.badgeNeutral,
+            ]}
+          >
+            <Text
+              style={[
+                styles.badgeText,
+                !revealed
+                  ? styles.badgeTextLocked
+                  : verdict === 'realized'
+                    ? styles.badgeTextRealized
+                    : verdict === 'missed'
+                      ? styles.badgeTextMissed
+                      : styles.badgeTextNeutral,
+              ]}
+            >
+              {!revealed
+                ? formatCountdown(revealAt, now)
+                : verdict === 'realized'
+                  ? 'Réalisée'
+                  : verdict === 'missed'
+                    ? 'Manquée'
+                    : 'Révélée'}
             </Text>
           </View>
           {mode === 'accordion' && <Text style={styles.chevron}>{expanded ? '▲' : '▼'}</Text>}
         </View>
 
-        {authorLabel && (
-          <Pressable
-            onPress={() => authorId && router.push(`/profile/${authorId}`)}
-            style={styles.authorRow}
-            hitSlop={4}
-          >
-            <Avatar url={authorAvatarUrl} username={authorLabel} size={18} />
-            <Text style={styles.author}>{authorLabel}</Text>
-          </Pressable>
-        )}
         <Text style={styles.cardTeaser}>{item.teaser}</Text>
 
         {showBody &&
           (revealed && item.content ? (
             <View style={styles.contentBox}>
-              <Text style={styles.contentLabel}>Contenu</Text>
+              <Text style={styles.contentLabel}>Prédiction</Text>
               <Text style={styles.cardContent}>{item.content}</Text>
               {item.audio_path && (
                 <View style={styles.audioRow}>
@@ -120,7 +149,10 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 1,
   },
-  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  cardTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 10 },
+  cardTopLeft: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, flexShrink: 1 },
+  authorBlock: { alignItems: 'center', maxWidth: 64 },
+  authorName: { fontSize: 10, color: colors.textFaint, marginTop: 3, textAlign: 'center' },
   badge: {
     alignSelf: 'flex-start',
     borderRadius: radius.pill,
@@ -128,13 +160,15 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   badgeLocked: { backgroundColor: colors.goldSoft },
-  badgeOpen: { backgroundColor: colors.successSoft },
+  badgeNeutral: { backgroundColor: colors.border },
+  badgeRealized: { backgroundColor: colors.successSoft },
+  badgeMissed: { backgroundColor: colors.dangerSoft },
   badgeText: { fontSize: 12, fontWeight: '700' },
   badgeTextLocked: { color: colors.gold },
-  badgeTextOpen: { color: colors.success },
-  chevron: { marginLeft: 'auto', fontSize: 11, color: colors.textFaint },
-  authorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginBottom: 4 },
-  author: { fontSize: 12, color: colors.textFaint },
+  badgeTextNeutral: { color: colors.textMuted },
+  badgeTextRealized: { color: colors.success },
+  badgeTextMissed: { color: colors.danger },
+  chevron: { fontSize: 11, color: colors.textFaint, marginTop: 6 },
   cardTeaser: {
     fontFamily: fonts.serifItalic,
     fontSize: 20,

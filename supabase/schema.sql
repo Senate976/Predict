@@ -869,6 +869,12 @@ create table if not exists public.notifications (
   created_at timestamptz not null default now()
 );
 
+-- Une invitation de groupe (section 19, plus bas) ne concerne pas une
+-- prédiction : la colonne devient optionnelle. `group_id` (ajoutée section 19,
+-- une fois la table `groups` créée) la complète, avec une contrainte imposant
+-- que l'une exactement des deux soit renseignée selon le type.
+alter table public.notifications alter column prediction_id drop not null;
+
 -- Empêche les doublons (même utilisateur, même prédiction, même type) — sert
 -- aussi de garde-fou pour `generate_reveal_notifications`, qui s'appuie
 -- dessus via `on conflict do nothing` plutôt qu'une sous-requête d'exclusion.
@@ -1316,6 +1322,12 @@ create policy "prediction_audio_delete"
 
 -- La vue expose le chemin du fichier (pas son contenu) : c'est au client de
 -- demander une URL signée, qui elle-même repasse par les policies ci-dessus.
+--
+-- `realized_votes`/`missed_votes`/`final_status` : même calcul que la vue
+-- `prediction_outcomes` (majorité des votants effectifs), dupliqué ici plutôt
+-- que réutilisé pour éviter une seconde requête par carte du Fil — le badge
+-- de verdict (Réalisée/Manquée) a besoin de cette info dès le premier
+-- chargement du fil.
 drop view if exists public.predictions_feed;
 
 create view public.predictions_feed
@@ -1329,9 +1341,21 @@ select
   p.reveal_at,
   p.scope,
   p.created_at,
-  (p.reveal_at <= now()) as is_revealed
+  (p.reveal_at <= now()) as is_revealed,
+  coalesce(sum((v.vote_value = 'realized')::int), 0) as realized_votes,
+  coalesce(sum((v.vote_value = 'missed')::int), 0) as missed_votes,
+  case
+    when p.reveal_at > now() then 'pending'
+    when coalesce(sum((v.vote_value = 'realized')::int), 0)
+       > coalesce(sum((v.vote_value = 'missed')::int), 0) then 'realized'
+    when coalesce(sum((v.vote_value = 'missed')::int), 0)
+       > coalesce(sum((v.vote_value = 'realized')::int), 0) then 'missed'
+    else 'pending'
+  end as final_status
 from public.predictions p
-left join public.prediction_contents pc on pc.prediction_id = p.id;
+left join public.prediction_contents pc on pc.prediction_id = p.id
+left join public.prediction_votes v on v.prediction_id = p.id
+group by p.id, p.author_id, p.teaser, pc.content, pc.audio_path, p.reveal_at, p.scope, p.created_at;
 
 grant select on public.predictions_feed to authenticated;
 
@@ -1354,6 +1378,15 @@ alter table public.groups drop constraint if exists groups_name_length;
 alter table public.groups add constraint groups_name_length
   check (char_length(btrim(name)) between 1 and 40);
 
+-- 'private' (par défaut) : seuls les membres le voient. 'public' : visible
+-- par tout le Cercle du créateur — les membres en font de toute façon partie
+-- (l'insertion dans group_members exige un ami accepté du propriétaire), donc
+-- « Cercle du créateur et des membres » se résume à « Cercle du créateur ».
+alter table public.groups add column if not exists visibility text not null default 'private';
+alter table public.groups drop constraint if exists groups_visibility_valid;
+alter table public.groups add constraint groups_visibility_valid
+  check (visibility in ('private', 'public'));
+
 create index if not exists groups_owner_idx on public.groups (owner_id);
 
 drop trigger if exists groups_set_updated_at on public.groups;
@@ -1361,16 +1394,57 @@ create trigger groups_set_updated_at
   before update on public.groups
   for each row execute function public.set_updated_at();
 
+-- Membres d'un groupe : uniquement des amis acceptés du propriétaire, vérifié
+-- à l'insertion — même garde-fou que `prediction_access_insert` pour la
+-- portée « Amis spécifiques ». Créée ici (structure minimale), avant les
+-- policies de `groups` qui la référencent, pour que ces `create policy`
+-- trouvent bien la table au moment de leur exécution.
+create table if not exists public.group_members (
+  group_id uuid not null references public.groups (id) on delete cascade,
+  friend_id uuid not null references public.profiles (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (group_id, friend_id)
+);
+
+-- 'pending' par défaut : ajouter un membre crée une invitation, pas une
+-- adhésion immédiate — l'invité doit l'accepter (depuis ses notifications)
+-- avant de compter comme un vrai membre (ciblage d'une prédiction, etc.).
+alter table public.group_members add column if not exists status text not null default 'pending';
+alter table public.group_members drop constraint if exists group_members_status_valid;
+alter table public.group_members add constraint group_members_status_valid
+  check (status in ('pending', 'accepted'));
+
+create index if not exists group_members_friend_idx on public.group_members (friend_id);
+
 alter table public.groups enable row level security;
 
--- Un groupe est privé à son créateur : contrairement aux amitiés (mutuelles
--- par nature), ni les membres ni personne d'autre ne le voient.
+-- Visible par : le propriétaire, tout membre (même invité en attente — il
+-- doit pouvoir lire le nom du groupe pour décider d'accepter ou non, y
+-- compris si le groupe est privé), et, si le groupe est public, n'importe
+-- quel ami accepté du propriétaire.
 drop policy if exists "groups_select_own" on public.groups;
 create policy "groups_select_own"
   on public.groups
   for select
   to authenticated
-  using (owner_id = auth.uid());
+  using (
+    owner_id = auth.uid()
+    or exists (
+      select 1 from public.group_members gm
+      where gm.group_id = groups.id and gm.friend_id = auth.uid()
+    )
+    or (
+      visibility = 'public'
+      and exists (
+        select 1 from public.friendships f
+        where f.status = 'accepted'
+          and (
+            (f.requester_id = auth.uid() and f.addressee_id = groups.owner_id)
+            or (f.addressee_id = auth.uid() and f.requester_id = groups.owner_id)
+          )
+      )
+    )
+  );
 
 drop policy if exists "groups_insert_own" on public.groups;
 create policy "groups_insert_own"
@@ -1394,39 +1468,35 @@ create policy "groups_delete_own"
   to authenticated
   using (owner_id = auth.uid());
 
--- Membres d'un groupe : uniquement des amis acceptés du propriétaire, vérifié
--- à l'insertion — même garde-fou que `prediction_access_insert` pour la
--- portée « Amis spécifiques ».
-create table if not exists public.group_members (
-  group_id uuid not null references public.groups (id) on delete cascade,
-  friend_id uuid not null references public.profiles (id) on delete cascade,
-  created_at timestamptz not null default now(),
-  primary key (group_id, friend_id)
-);
-
-create index if not exists group_members_friend_idx on public.group_members (friend_id);
-
 alter table public.group_members enable row level security;
 
+-- Le propriétaire voit tous les membres/invités de ses groupes ; un invité
+-- voit sa propre ligne (pending ou accepted), pour savoir à quoi il a été
+-- convié et y répondre.
 drop policy if exists "group_members_select_own" on public.group_members;
 create policy "group_members_select_own"
   on public.group_members
   for select
   to authenticated
   using (
-    exists (
+    friend_id = auth.uid()
+    or exists (
       select 1 from public.groups g
       where g.id = group_members.group_id and g.owner_id = auth.uid()
     )
   );
 
+-- Seul le propriétaire invite, et seulement un ami accepté — jamais
+-- directement à l'état 'accepted' : la ligne commence en 'pending', c'est
+-- l'invité qui la fait basculer (policy suivante).
 drop policy if exists "group_members_insert_own" on public.group_members;
 create policy "group_members_insert_own"
   on public.group_members
   for insert
   to authenticated
   with check (
-    exists (
+    status = 'pending'
+    and exists (
       select 1 from public.groups g
       where g.id = group_members.group_id and g.owner_id = auth.uid()
     )
@@ -1440,17 +1510,78 @@ create policy "group_members_insert_own"
     )
   );
 
+-- Accepter une invitation : seul l'invité, et seulement 'pending' -> 'accepted'.
+drop policy if exists "group_members_respond_own" on public.group_members;
+create policy "group_members_respond_own"
+  on public.group_members
+  for update
+  to authenticated
+  using (friend_id = auth.uid() and status = 'pending')
+  with check (friend_id = auth.uid() and status = 'accepted');
+
+-- Le propriétaire retire qui il veut ; l'invité refuse une invitation ou
+-- quitte un groupe qu'il a déjà rejoint — dans les deux cas, une suppression
+-- de sa propre ligne.
 drop policy if exists "group_members_delete_own" on public.group_members;
 create policy "group_members_delete_own"
   on public.group_members
   for delete
   to authenticated
   using (
-    exists (
+    friend_id = auth.uid()
+    or exists (
       select 1 from public.groups g
       where g.id = group_members.group_id and g.owner_id = auth.uid()
     )
   );
+
+-- Notification d'invitation à un groupe. `groups` existe maintenant, donc
+-- `group_id` (annoncée section 14) peut être ajoutée ici.
+alter table public.notifications add column if not exists group_id uuid references public.groups (id) on delete cascade;
+
+-- Même rôle que `notifications_unique_key`, mais pour les invitations de
+-- groupe : index partiel, puisque `prediction_id` est toujours nul pour
+-- elles (un index unique classique n'aurait pas détecté les doublons, deux
+-- `null` n'étant jamais égaux entre eux).
+create unique index if not exists notifications_group_invite_unique_key
+  on public.notifications (user_id, group_id, type)
+  where type = 'group_invite';
+
+alter table public.notifications drop constraint if exists notifications_type_check;
+alter table public.notifications add constraint notifications_type_check
+  check (type in ('new_teaser', 'prediction_revealed', 'prediction_approved', 'group_invite'));
+
+-- Exactement l'un des deux selon le type : jamais les deux, jamais aucun.
+alter table public.notifications drop constraint if exists notifications_target_consistency;
+alter table public.notifications add constraint notifications_target_consistency
+  check (
+    (type = 'group_invite' and group_id is not null and prediction_id is null)
+    or (type <> 'group_invite' and prediction_id is not null and group_id is null)
+  );
+
+-- `security definer` : la notification est pour l'invité, pas pour qui
+-- invite — exactement ce que la policy insert normale de `notifications`
+-- interdit (même raison que `notify_new_teaser`).
+create or replace function public.notify_group_invite()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.status = 'pending' then
+    insert into public.notifications (user_id, group_id, type)
+    values (new.friend_id, new.group_id, 'group_invite')
+    on conflict (user_id, group_id, type) where (type = 'group_invite') do nothing;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists group_members_notify_invite on public.group_members;
+create trigger group_members_notify_invite
+  after insert on public.group_members
+  for each row execute function public.notify_group_invite();
 
 -- Élargit la portée d'une prédiction à un groupe nommé, en plus de « tout le
 -- Cercle » et « sélection individuelle ».
@@ -1501,12 +1632,14 @@ begin
     -- Le groupe doit appartenir à l'appelant : la RLS de `groups`/`group_members`
     -- ne renverrait de toute façon rien d'autre, mais le check explicite évite
     -- qu'un `p_group_id` invalide passe silencieusement inaperçu (0
-    -- destinataire, prédiction créée sans personne pour la voir).
+    -- destinataire, prédiction créée sans personne pour la voir). Seuls les
+    -- membres ayant accepté l'invitation comptent — un invité encore
+    -- 'pending' ne doit rien voir tant qu'il n'a pas répondu.
     insert into public.prediction_access (prediction_id, user_id)
     select v_id, gm.friend_id
     from public.group_members gm
     join public.groups g on g.id = gm.group_id
-    where gm.group_id = p_group_id and g.owner_id = auth.uid();
+    where gm.group_id = p_group_id and g.owner_id = auth.uid() and gm.status = 'accepted';
   else
     foreach v_recipient in array coalesce(p_friend_ids, array[]::uuid[]) loop
       insert into public.prediction_access (prediction_id, user_id)

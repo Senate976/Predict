@@ -2,21 +2,28 @@ import type { PostgrestError } from '@supabase/supabase-js';
 
 import { supabase } from './supabase';
 
-export type NotificationType = 'new_teaser' | 'prediction_revealed' | 'prediction_approved';
+export type NotificationType =
+  | 'new_teaser'
+  | 'prediction_revealed'
+  | 'prediction_approved'
+  | 'group_invite';
 
 /**
- * Une notification telle que renvoyée par `public.notifications`, avec le
- * teaser de la prédiction concernée embarqué pour l'affichage — jamais le
- * contenu secret, qui reste soumis à sa propre RLS et n'a pas sa place ici.
+ * Une notification telle que renvoyée par `public.notifications`. Selon le
+ * type, exactement l'un de `prediction`/`group` est renseigné (contrainte
+ * `notifications_target_consistency` côté base) — jamais le contenu secret
+ * d'une prédiction, qui reste soumis à sa propre RLS et n'a pas sa place ici.
  */
 export type Notification = {
   id: string;
   user_id: string;
-  prediction_id: string;
+  prediction_id: string | null;
+  group_id: string | null;
   type: NotificationType;
   is_read: boolean;
   created_at: string;
   prediction: { teaser: string } | null;
+  group: { name: string; owner: { username: string } | null } | null;
 };
 
 export function isMissingTable(error: PostgrestError): boolean {
@@ -35,7 +42,10 @@ export function notificationErrorMessage(error: PostgrestError): string {
 export async function fetchNotifications(userId: string) {
   return supabase
     .from('notifications')
-    .select('id, user_id, prediction_id, type, is_read, created_at, prediction:predictions(teaser)')
+    .select(
+      'id, user_id, prediction_id, group_id, type, is_read, created_at, ' +
+        'prediction:predictions(teaser), group:groups(name, owner:profiles(username))'
+    )
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .returns<Notification[]>();

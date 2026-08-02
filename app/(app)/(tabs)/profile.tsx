@@ -21,7 +21,7 @@ import { colors, eyebrow, fonts, radius, spacing } from '../../../lib/theme';
 type Filter = 'total' | 'realized' | 'missed' | 'pending';
 
 const FILTER_LABEL: Record<Filter, string> = {
-  total: 'Total',
+  total: 'Journal',
   realized: 'Réalisés',
   missed: 'Manqués',
   pending: 'En cours',
@@ -109,7 +109,7 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Text style={styles.brand}>Predict</Text>
+        <Text style={styles.brand}>Profil</Text>
         <QuickCreateButton />
       </View>
 
@@ -187,7 +187,7 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        <Text style={[styles.eyebrow, styles.sectionSpacing]}>Vos scellés</Text>
+        <Text style={[styles.eyebrow, styles.sectionSpacing]}>Prédictions</Text>
 
         {error && <Text style={styles.error}>{error}</Text>}
 
@@ -201,7 +201,7 @@ export default function ProfileScreen() {
                 style={[styles.statCard, filter === 'total' && styles.statCardActive]}
               >
                 <Text style={styles.statValue}>{total.length}</Text>
-                <Text style={styles.statLabel}>Total</Text>
+                <Text style={styles.statLabel}>Journal</Text>
               </Pressable>
               <Pressable
                 onPress={() => setFilter('realized')}

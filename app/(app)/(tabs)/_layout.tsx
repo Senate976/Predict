@@ -1,11 +1,20 @@
 import { Tabs } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 
 import { colors } from '../../../lib/theme';
 
 /** Petit point doré au-dessus du libellé actif — seul indicateur, pas d'icônes. */
 function TabDot({ focused }: { focused: boolean }) {
   return <View style={[styles.dot, focused && styles.dotActive]} />;
+}
+
+/** Le logo de l'app (le "P" vitrail), en médaillon — tient lieu d'icône ET de libellé pour l'onglet Profil. */
+function BrandMark({ focused }: { focused: boolean }) {
+  return (
+    <View style={[styles.brandRing, focused && styles.brandRingActive]}>
+      <Image source={require('../../../assets/predict-mark.png')} style={styles.brandImage} />
+    </View>
+  );
 }
 
 export default function TabsLayout() {
@@ -26,8 +35,8 @@ export default function TabsLayout() {
         options={{ title: 'Fil', tabBarIcon: ({ focused }) => <TabDot focused={focused} /> }}
       />
       <Tabs.Screen
-        name="archives"
-        options={{ title: 'Archives', tabBarIcon: ({ focused }) => <TabDot focused={focused} /> }}
+        name="notifications"
+        options={{ title: 'Notif', tabBarIcon: ({ focused }) => <TabDot focused={focused} /> }}
       />
       <Tabs.Screen
         name="circle"
@@ -35,7 +44,10 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="profile"
-        options={{ title: 'Profil', tabBarIcon: ({ focused }) => <TabDot focused={focused} /> }}
+        options={{
+          tabBarLabel: () => null,
+          tabBarIcon: ({ focused }) => <BrandMark focused={focused} />,
+        }}
       />
     </Tabs>
   );
@@ -57,4 +69,18 @@ const styles = StyleSheet.create({
   },
   dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: 'transparent' },
   dotActive: { backgroundColor: colors.gold },
+  brandRing: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    opacity: 0.55,
+  },
+  brandRingActive: { opacity: 1 },
+  brandImage: {
+    width: 28,
+    height: 28,
+  },
 });

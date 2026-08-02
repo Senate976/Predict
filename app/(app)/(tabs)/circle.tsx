@@ -40,6 +40,7 @@ import {
   MAX_GROUP_NAME_LENGTH,
   type FriendGroup,
   type GroupMember,
+  type GroupVisibility,
 } from '../../../lib/groups';
 import { colors, eyebrow, fonts, radius, spacing } from '../../../lib/theme';
 
@@ -67,6 +68,7 @@ export default function CircleScreen() {
 
   const [groups, setGroups] = useState<FriendGroup[] | null>(null);
   const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupVisibility, setNewGroupVisibility] = useState<GroupVisibility>('private');
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [groupError, setGroupError] = useState<string | null>(null);
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
@@ -99,13 +101,14 @@ export default function CircleScreen() {
     setGroupError(null);
     setCreatingGroup(true);
     try {
-      const { data, error } = await createGroup(userId, trimmed);
+      const { data, error } = await createGroup(userId, trimmed, newGroupVisibility);
       if (error) {
         setGroupError(groupErrorMessage(error));
         return;
       }
       if (data) setGroups((prev) => [...(prev ?? []), data]);
       setNewGroupName('');
+      setNewGroupVisibility('private');
     } finally {
       setCreatingGroup(false);
     }
@@ -127,6 +130,7 @@ export default function CircleScreen() {
     }
   }
 
+/** `undefined` : pas encore invité — le clic invite. Sinon, le clic retire l'invité ou le membre. */
   async function handleToggleMember(groupId: string, friendId: string, isMember: boolean) {
     setGroupError(null);
     setPendingGroupActionId(`${groupId}:${friendId}`);
@@ -247,7 +251,7 @@ export default function CircleScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Le Cercle</Text>
+        <Text style={styles.headerTitle}>Mon Cercle</Text>
         <QuickCreateButton />
       </View>
 
@@ -409,6 +413,30 @@ export default function CircleScreen() {
           </Pressable>
         </View>
 
+        <View style={styles.visibilityRow}>
+          <Pressable
+            onPress={() => setNewGroupVisibility('private')}
+            style={[styles.visibilityOption, newGroupVisibility === 'private' && styles.visibilityOptionActive]}
+          >
+            <Text style={[styles.visibilityText, newGroupVisibility === 'private' && styles.visibilityTextActive]}>
+              Privé
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setNewGroupVisibility('public')}
+            style={[styles.visibilityOption, newGroupVisibility === 'public' && styles.visibilityOptionActive]}
+          >
+            <Text style={[styles.visibilityText, newGroupVisibility === 'public' && styles.visibilityTextActive]}>
+              Public
+            </Text>
+          </Pressable>
+        </View>
+        <Text style={styles.visibilityHint}>
+          {newGroupVisibility === 'private'
+            ? 'Seuls les membres verront ce groupe.'
+            : 'Visible par tout ton Cercle.'}
+        </Text>
+
         {groupError && <Text style={styles.error}>{groupError}</Text>}
 
         {groups === null ? (
@@ -419,13 +447,23 @@ export default function CircleScreen() {
           groups.map((group) => {
             const expanded = expandedGroupId === group.id;
             const members = groupMembers[group.id];
-            const memberIds = new Set((members ?? []).map((m) => m.friend_id));
+            const memberById = new Map((members ?? []).map((m) => [m.friend_id, m]));
+            const acceptedCount = (members ?? []).filter((m) => m.status === 'accepted').length;
+            const pendingCount = (members ?? []).filter((m) => m.status === 'pending').length;
             return (
               <View key={group.id} style={styles.groupBox}>
                 <Pressable onPress={() => handleToggleExpand(group.id)} style={styles.groupHeader}>
-                  <Text style={styles.username}>
-                    {group.name} {members ? `(${members.length})` : ''}
-                  </Text>
+                  <View style={styles.flex}>
+                    <Text style={styles.username}>{group.name}</Text>
+                    <Text style={styles.groupMeta}>
+                      {group.visibility === 'public' ? 'Public' : 'Privé'}
+                      {members
+                        ? ` · ${acceptedCount} membre${acceptedCount > 1 ? 's' : ''}${
+                            pendingCount > 0 ? ` · ${pendingCount} en attente` : ''
+                          }`
+                        : ''}
+                    </Text>
+                  </View>
                   <Text style={styles.groupChevron}>{expanded ? '▲' : '▼'}</Text>
                 </Pressable>
 
@@ -433,24 +471,29 @@ export default function CircleScreen() {
                   <View style={styles.groupBody}>
                     {accepted.length === 0 ? (
                       <Text style={styles.muted}>
-                        Pas encore d’ami accepté à ajouter à ce groupe.
+                        Pas encore d’ami accepté à inviter dans ce groupe.
                       </Text>
                     ) : (
                       accepted.map((f) => {
                         const profile = otherProfile(f, userId!);
-                        const isMember = memberIds.has(profile.id);
+                        const member = memberById.get(profile.id);
                         const pending = pendingGroupActionId === `${group.id}:${profile.id}`;
+                        const label = pending
+                          ? '…'
+                          : member?.status === 'accepted'
+                            ? 'Membre'
+                            : member?.status === 'pending'
+                              ? 'Invitation envoyée'
+                              : 'Inviter';
                         return (
                           <View key={profile.id} style={styles.row}>
                             <Text style={styles.username}>{profile.username}</Text>
                             <Pressable
-                              onPress={() => handleToggleMember(group.id, profile.id, isMember)}
+                              onPress={() => handleToggleMember(group.id, profile.id, !!member)}
                               disabled={pending}
-                              style={isMember ? styles.pillGold : styles.pillOutline}
+                              style={member ? styles.pillOutline : styles.pillGold}
                             >
-                              <Text style={isMember ? styles.pillGoldText : styles.pillOutlineText}>
-                                {pending ? '…' : isMember ? 'Dans le groupe' : 'Ajouter'}
-                              </Text>
+                              <Text style={member ? styles.pillOutlineText : styles.pillGoldText}>{label}</Text>
                             </Pressable>
                           </View>
                         );
@@ -539,6 +582,22 @@ const styles = StyleSheet.create({
   },
   newGroupRow: { flexDirection: 'row', gap: 8, marginTop: spacing.md },
   newGroupInput: { flex: 1 },
+  flex: { flex: 1 },
+  visibilityRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  visibilityOption: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  visibilityOptionActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
+  visibilityText: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
+  visibilityTextActive: { color: colors.gold },
+  visibilityHint: { fontSize: 12, color: colors.textFaint, marginTop: 6 },
+  groupMeta: { fontSize: 11, color: colors.textFaint, marginTop: 2 },
   groupBox: {
     borderWidth: 1,
     borderColor: colors.border,

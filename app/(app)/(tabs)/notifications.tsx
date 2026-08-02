@@ -1,0 +1,243 @@
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { QuickCreateButton } from '../../../components/QuickCreateButton';
+import { useAuth } from '../../../lib/auth';
+import { acceptGroupInvite, declineGroupInvite, groupErrorMessage } from '../../../lib/groups';
+import {
+  fetchNotifications,
+  markNotificationRead,
+  notificationErrorMessage,
+  type Notification,
+} from '../../../lib/notifications';
+import { colors, fonts, radius, spacing } from '../../../lib/theme';
+
+/** « à l’instant », « il y a 12 min », « il y a 3 h », « il y a 2 jours ». */
+function timeAgo(iso: string, now: Date): string {
+  const minutes = Math.floor((now.getTime() - new Date(iso).getTime()) / 60_000);
+  if (minutes < 1) return 'à l’instant';
+  if (minutes < 60) return `il y a ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `il y a ${hours} h`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? 'il y a 1 jour' : `il y a ${days} jours`;
+}
+
+function notificationLabel(notification: Notification): string {
+  switch (notification.type) {
+    case 'prediction_revealed':
+      return 'Une prédiction vient d’être révélée';
+    case 'prediction_approved':
+      return 'Une de tes prédictions a été approuvée par le Cercle';
+    case 'group_invite':
+      return notification.group?.owner
+        ? `${notification.group.owner.username} t’invite dans un groupe`
+        : 'Invitation à rejoindre un groupe';
+    default:
+      return 'Nouvelle prédiction dans ton Cercle';
+  }
+}
+
+/** Toutes les notifications, dans l'ordre chronologique strict (la plus récente en tête). */
+export default function NotificationsScreen() {
+  const { session } = useAuth();
+  const router = useRouter();
+  const userId = session?.user.id;
+
+  const [notifications, setNotifications] = useState<Notification[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [respondedIds, setRespondedIds] = useState<Set<string>>(new Set());
+
+  const load = useCallback(async () => {
+    if (!userId) return;
+    const { data, error: fetchError } = await fetchNotifications(userId);
+    if (fetchError) {
+      setError(notificationErrorMessage(fetchError));
+      return;
+    }
+    setError(null);
+    setNotifications(data ?? []);
+  }, [userId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
+
+  async function handlePress(notification: Notification) {
+    if (notification.type === 'group_invite') return;
+    if (!notification.is_read) {
+      setNotifications((prev) =>
+        (prev ?? []).map((n) => (n.id === notification.id ? { ...n, is_read: true } : n))
+      );
+      markNotificationRead(notification.id);
+    }
+    router.push(`/prediction/${notification.prediction_id}`);
+  }
+
+  async function handleGroupInviteResponse(notification: Notification, accept: boolean) {
+    if (!userId || !notification.group_id) return;
+    setActionError(null);
+    setPendingId(notification.id);
+    try {
+      const { error: respondError } = accept
+        ? await acceptGroupInvite(notification.group_id, userId)
+        : await declineGroupInvite(notification.group_id, userId);
+      if (respondError) {
+        setActionError(groupErrorMessage(respondError));
+        return;
+      }
+      markNotificationRead(notification.id);
+      setRespondedIds((prev) => new Set(prev).add(notification.id));
+    } finally {
+      setPendingId(null);
+    }
+  }
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Notifications</Text>
+        <QuickCreateButton />
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scroll}>
+        {error && <Text style={styles.error}>{error}</Text>}
+        {actionError && <Text style={styles.error}>{actionError}</Text>}
+
+        {notifications === null && !error ? (
+          <ActivityIndicator color={colors.gold} style={styles.loader} />
+        ) : notifications && notifications.length === 0 ? (
+          <Text style={styles.empty}>Rien pour l’instant.</Text>
+        ) : (
+          (notifications ?? []).map((notification) => {
+            const isGroupInvite = notification.type === 'group_invite';
+            const responded = respondedIds.has(notification.id);
+            return (
+              <Pressable
+                key={notification.id}
+                onPress={() => handlePress(notification)}
+                disabled={isGroupInvite}
+                style={({ pressed }) => [
+                  styles.row,
+                  !notification.is_read && styles.rowUnread,
+                  pressed && !isGroupInvite && styles.rowPressed,
+                ]}
+              >
+                {!notification.is_read && <View style={styles.dot} />}
+                <View style={styles.rowText}>
+                  <Text style={styles.label}>{notificationLabel(notification)}</Text>
+                  {notification.prediction && (
+                    <Text style={styles.teaser} numberOfLines={2}>
+                      {notification.prediction.teaser}
+                    </Text>
+                  )}
+                  {isGroupInvite && notification.group && (
+                    <Text style={styles.teaser} numberOfLines={1}>
+                      {notification.group.name}
+                    </Text>
+                  )}
+                  <Text style={styles.time}>{timeAgo(notification.created_at, new Date())}</Text>
+
+                  {isGroupInvite && !responded && (
+                    <View style={styles.inviteActions}>
+                      <Pressable
+                        onPress={() => handleGroupInviteResponse(notification, true)}
+                        disabled={pendingId === notification.id}
+                        style={styles.pillGold}
+                      >
+                        <Text style={styles.pillGoldText}>Accepter</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleGroupInviteResponse(notification, false)}
+                        disabled={pendingId === notification.id}
+                        style={styles.pillOutline}
+                      >
+                        <Text style={styles.pillOutlineText}>Refuser</Text>
+                      </Pressable>
+                    </View>
+                  )}
+                  {isGroupInvite && responded && <Text style={styles.respondedText}>Réponse envoyée.</Text>}
+                </View>
+              </Pressable>
+            );
+          })
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.background },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingTop: 14,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  headerTitle: { fontFamily: fonts.serifItalic, fontSize: 26, color: colors.text },
+  scroll: { padding: spacing.lg, paddingBottom: 48 },
+  loader: { marginTop: 32 },
+  empty: { fontSize: 14, color: colors.textFaint, textAlign: 'center', marginTop: 32 },
+  error: {
+    color: colors.danger,
+    backgroundColor: colors.dangerSoft,
+    borderRadius: radius.sm,
+    padding: 12,
+    fontSize: 14,
+    marginBottom: spacing.md,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  rowUnread: { backgroundColor: colors.goldSoft },
+  rowPressed: { opacity: 0.7 },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.gold,
+    marginTop: 6,
+  },
+  rowText: { flex: 1 },
+  label: { fontSize: 14, fontWeight: '600', color: colors.text },
+  teaser: {
+    fontFamily: fonts.serifItalic,
+    fontSize: 16,
+    color: colors.text,
+    marginTop: 4,
+  },
+  time: { fontSize: 12, color: colors.textFaint, marginTop: 6 },
+  inviteActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  pillGold: {
+    backgroundColor: colors.gold,
+    borderRadius: radius.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  pillGoldText: { color: colors.text, fontSize: 13, fontWeight: '700' },
+  pillOutline: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  pillOutlineText: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
+  respondedText: { fontSize: 12, color: colors.textFaint, marginTop: 8, fontStyle: 'italic' },
+});

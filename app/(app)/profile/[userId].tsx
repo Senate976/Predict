@@ -83,14 +83,14 @@ export default function FriendProfileScreen() {
               )}
             </View>
 
-            <Text style={[styles.eyebrow, styles.sectionSpacing]}>Scellés</Text>
+            <Text style={[styles.eyebrow, styles.sectionSpacing]}>Prédictions</Text>
             {stats === null ? (
               <ActivityIndicator color={colors.gold} style={styles.loader} />
             ) : (
               <View style={styles.statsRow}>
                 <View style={styles.statCard}>
                   <Text style={styles.statValue}>{stats.total}</Text>
-                  <Text style={styles.statLabel}>Total</Text>
+                  <Text style={styles.statLabel}>Journal</Text>
                 </View>
                 <View style={styles.statCard}>
                   <Text style={[styles.statValue, styles.statValueRealized]}>{stats.realized}</Text>
