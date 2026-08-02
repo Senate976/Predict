@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
@@ -186,9 +187,10 @@ export default function PredictionDetailScreen() {
         ) : prediction ? (
           <>
             {/* Date de scellé bien en évidence, juste au-dessus du Teaser. */}
-            <Text style={styles.sealedDate}>
-              Scellée {formatRevealAt(new Date(prediction.created_at))}
-            </Text>
+            <View style={styles.sealedDateRow}>
+              <Ionicons name="lock-closed" size={13} color={colors.textMuted} />
+              <Text style={styles.sealedDate}>{formatRevealAt(new Date(prediction.created_at))}</Text>
+            </View>
 
             <Text style={styles.teaser}>{prediction.teaser}</Text>
 
@@ -216,9 +218,10 @@ export default function PredictionDetailScreen() {
                 contenu (la date de scellé, elle, reste au-dessus du Teaser). */}
             {!revealed && (
               <View style={styles.datesBlock}>
-                <Text style={styles.dateLine}>
-                  Se révèle {formatRevealAt(new Date(prediction.reveal_at))}
-                </Text>
+                <View style={styles.dateLineRow}>
+                  <Ionicons name="lock-open" size={13} color={colors.textFaint} />
+                  <Text style={styles.dateLine}>{formatRevealAt(new Date(prediction.reveal_at))}</Text>
+                </View>
               </View>
             )}
 
@@ -287,42 +290,30 @@ export default function PredictionDetailScreen() {
                 {!isAuthor && (
                   <>
                     {voteError && <Text style={styles.error}>{voteError}</Text>}
-                    <View style={styles.voteRow}>
-                      <Pressable
-                        onPress={() => handleVote('realized')}
-                        disabled={voting}
-                        style={[
-                          styles.voteButton,
-                          myVote?.vote_value === 'realized' && styles.voteButtonRealizedActive,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.voteButtonText,
-                            myVote?.vote_value === 'realized' && styles.voteButtonTextActive,
-                          ]}
+                    {myVote ? (
+                      // Choix définitif une fois posé : jamais de bouton pour en
+                      // reprendre un autre, seulement un rappel de ce qui a été dit.
+                      <Text style={styles.voteLockedText}>
+                        Tu as indiqué : {myVote.vote_value === 'realized' ? 'Réalisée' : 'Manquée'}
+                      </Text>
+                    ) : (
+                      <View style={styles.voteRow}>
+                        <Pressable
+                          onPress={() => handleVote('realized')}
+                          disabled={voting}
+                          style={styles.voteButton}
                         >
-                          Réalisée
-                        </Text>
-                      </Pressable>
-                      <Pressable
-                        onPress={() => handleVote('missed')}
-                        disabled={voting}
-                        style={[
-                          styles.voteButton,
-                          myVote?.vote_value === 'missed' && styles.voteButtonMissedActive,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.voteButtonText,
-                            myVote?.vote_value === 'missed' && styles.voteButtonTextActive,
-                          ]}
+                          <Text style={styles.voteButtonText}>Réalisée</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => handleVote('missed')}
+                          disabled={voting}
+                          style={styles.voteButton}
                         >
-                          Manquée
-                        </Text>
-                      </Pressable>
-                    </View>
+                          <Text style={styles.voteButtonText}>Manquée</Text>
+                        </Pressable>
+                      </View>
+                    )}
                   </>
                 )}
               </View>
@@ -351,11 +342,11 @@ const styles = StyleSheet.create({
   loader: { marginTop: 24 },
   eyebrow: { ...eyebrow },
   eyebrowSmall: { ...eyebrow, fontSize: 10 },
+  sealedDateRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   sealedDate: {
     fontSize: 14,
     fontWeight: '700',
     color: colors.textMuted,
-    marginBottom: 10,
   },
   teaser: { fontFamily: fonts.serifItalic, fontSize: 28, color: colors.text, lineHeight: 36 },
   contentHero: {
@@ -378,7 +369,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   datesBlock: { alignItems: 'center', marginBottom: spacing.md },
-  dateLine: { fontSize: 12, color: colors.textFaint, marginTop: 2 },
+  dateLineRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
+  dateLine: { fontSize: 12, color: colors.textFaint },
   verdictBox: {
     marginTop: spacing.xl,
     paddingVertical: 12,
@@ -400,10 +392,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.background,
   },
-  voteButtonRealizedActive: { borderColor: colors.success, backgroundColor: colors.successSoft },
-  voteButtonMissedActive: { borderColor: colors.danger, backgroundColor: colors.dangerSoft },
   voteButtonText: { fontSize: 12, fontWeight: '600', color: colors.textMuted },
-  voteButtonTextActive: { color: colors.text },
+  voteLockedText: { fontSize: 14, fontWeight: '700', color: colors.text, marginTop: 10 },
   sectionSpacing: { marginTop: spacing.lg, marginBottom: 8 },
   hint: { fontSize: 14, color: colors.textFaint, lineHeight: 20 },
   row: {

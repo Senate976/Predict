@@ -5,13 +5,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { useAuth } from '../../../lib/auth';
-import { acceptGroupInvite, declineGroupInvite, groupErrorMessage } from '../../../lib/groups';
+import {
+  acceptGroupInvite,
+  declineGroupInvite,
+  groupErrorMessage,
+  type GroupMemberStatus,
+} from '../../../lib/groups';
 import {
   fetchNotifications,
   markNotificationRead,
   notificationErrorMessage,
   type Notification,
 } from '../../../lib/notifications';
+import { supabase } from '../../../lib/supabase';
 import { colors, fonts, radius, spacing } from '../../../lib/theme';
 
 /** « à l’instant », « il y a 12 min », « il y a 3 h », « il y a 2 jours ». */
@@ -50,7 +56,10 @@ export default function NotificationsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
-  const [respondedIds, setRespondedIds] = useState<Set<string>>(new Set());
+  // Statut persisté de ses propres invitations de groupe (group_id -> status),
+  // pour distinguer « acceptée » de « refusée » après un rechargement —
+  // `is_read` seul suffit à savoir qu'on a répondu, mais pas quoi.
+  const [membershipStatus, setMembershipStatus] = useState<Record<string, GroupMemberStatus>>({});
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -61,6 +70,16 @@ export default function NotificationsScreen() {
     }
     setError(null);
     setNotifications(data ?? []);
+
+    const { data: memberships } = await supabase
+      .from('group_members')
+      .select('group_id, status')
+      .eq('friend_id', userId);
+    const map: Record<string, GroupMemberStatus> = {};
+    for (const row of memberships ?? []) {
+      map[row.group_id] = row.status as GroupMemberStatus;
+    }
+    setMembershipStatus(map);
   }, [userId]);
 
   useFocusEffect(
@@ -82,18 +101,30 @@ export default function NotificationsScreen() {
 
   async function handleGroupInviteResponse(notification: Notification, accept: boolean) {
     if (!userId || !notification.group_id) return;
+    const groupId = notification.group_id;
     setActionError(null);
     setPendingId(notification.id);
     try {
       const { error: respondError } = accept
-        ? await acceptGroupInvite(notification.group_id, userId)
-        : await declineGroupInvite(notification.group_id, userId);
+        ? await acceptGroupInvite(groupId, userId)
+        : await declineGroupInvite(groupId, userId);
       if (respondError) {
         setActionError(groupErrorMessage(respondError));
         return;
       }
       markNotificationRead(notification.id);
-      setRespondedIds((prev) => new Set(prev).add(notification.id));
+      setNotifications((prev) =>
+        (prev ?? []).map((n) => (n.id === notification.id ? { ...n, is_read: true } : n))
+      );
+      setMembershipStatus((prev) => {
+        const next = { ...prev };
+        if (accept) {
+          next[groupId] = 'accepted';
+        } else {
+          delete next[groupId];
+        }
+        return next;
+      });
     } finally {
       setPendingId(null);
     }
@@ -117,7 +148,13 @@ export default function NotificationsScreen() {
         ) : (
           (notifications ?? []).map((notification) => {
             const isGroupInvite = notification.type === 'group_invite';
-            const responded = respondedIds.has(notification.id);
+            // `is_read` n'est mis à jour, pour une invitation de groupe, que par
+            // `handleGroupInviteResponse` : sa valeur en base fait donc foi même
+            // après un rechargement, contrairement à un état local éphémère.
+            const responded = isGroupInvite && notification.is_read;
+            const accepted = isGroupInvite && notification.group_id
+              ? membershipStatus[notification.group_id] === 'accepted'
+              : false;
             return (
               <Pressable
                 key={notification.id}
@@ -162,7 +199,11 @@ export default function NotificationsScreen() {
                       </Pressable>
                     </View>
                   )}
-                  {isGroupInvite && responded && <Text style={styles.respondedText}>Réponse envoyée.</Text>}
+                  {isGroupInvite && responded && (
+                    <Text style={styles.respondedText}>
+                      {accepted ? 'Invitation acceptée.' : 'Invitation refusée.'}
+                    </Text>
+                  )}
                 </View>
               </Pressable>
             );

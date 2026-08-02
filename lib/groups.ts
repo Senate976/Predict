@@ -8,10 +8,13 @@ export type GroupVisibility = 'private' | 'public';
 
 export type FriendGroup = {
   id: string;
+  owner_id: string;
   name: string;
   visibility: GroupVisibility;
   created_at: string;
 };
+
+const GROUP_COLUMNS = 'id, owner_id, name, visibility, created_at';
 
 export type GroupMemberStatus = 'pending' | 'accepted';
 
@@ -39,21 +42,69 @@ export function groupErrorMessage(error: PostgrestError): string {
   }
 }
 
-/** Les groupes de l'utilisateur connecté, du plus ancien au plus récent. */
-export async function fetchGroups(ownerId: string) {
-  return supabase
+/**
+ * Les groupes de l'utilisateur connecté, du plus ancien au plus récent — les
+ * siens (owner_id) ET ceux qu'il a rejoints (ligne `group_members` acceptée).
+ *
+ * Deux requêtes plutôt qu'un `.or()` sur des tables différentes (impossible
+ * en un seul appel PostgREST) : on récupère d'abord les groupes possédés, puis
+ * les ids des groupes rejoints via `group_members`, avant de charger ces
+ * derniers et de tout fusionner côté client. Sans ce second aller-retour, un
+ * utilisateur qui accepte une invitation ne voyait jamais le groupe apparaître
+ * dans son propre onglet Groupes — seul le propriétaire le voyait.
+ */
+export async function fetchGroups(userId: string) {
+  const { data: owned, error: ownedError } = await supabase
     .from('groups')
-    .select('id, name, visibility, created_at')
-    .eq('owner_id', ownerId)
-    .order('created_at', { ascending: true })
+    .select(GROUP_COLUMNS)
+    .eq('owner_id', userId)
     .returns<FriendGroup[]>();
+
+  if (ownedError) {
+    return { data: null, error: ownedError };
+  }
+
+  const { data: memberRows, error: memberError } = await supabase
+    .from('group_members')
+    .select('group_id')
+    .eq('friend_id', userId)
+    .eq('status', 'accepted');
+
+  if (memberError) {
+    return { data: null, error: memberError };
+  }
+
+  const ownedIds = new Set((owned ?? []).map((g) => g.id));
+  const joinedIds = Array.from(new Set((memberRows ?? []).map((r) => r.group_id))).filter(
+    (id) => !ownedIds.has(id)
+  );
+
+  let joined: FriendGroup[] = [];
+  if (joinedIds.length > 0) {
+    const { data: joinedGroups, error: joinedError } = await supabase
+      .from('groups')
+      .select(GROUP_COLUMNS)
+      .in('id', joinedIds)
+      .returns<FriendGroup[]>();
+
+    if (joinedError) {
+      return { data: null, error: joinedError };
+    }
+    joined = joinedGroups ?? [];
+  }
+
+  const all = [...(owned ?? []), ...joined].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+
+  return { data: all, error: null as PostgrestError | null };
 }
 
 export async function createGroup(ownerId: string, name: string, visibility: GroupVisibility) {
   return supabase
     .from('groups')
     .insert({ owner_id: ownerId, name: name.trim(), visibility })
-    .select('id, name, visibility, created_at')
+    .select(GROUP_COLUMNS)
     .single();
 }
 
