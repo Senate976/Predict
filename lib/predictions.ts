@@ -161,11 +161,21 @@ export async function fetchPredictionRecipients(predictionId: string) {
  * l'auteur qui agisse et que la personne ajoutée soit un ami accepté — sinon
  * l'insert est refusé (42501). Déclenche immédiatement la notification
  * `new_teaser` côté base (trigger sur `prediction_access`).
+ *
+ * `upsert` + `ignoreDuplicates` plutôt qu'un `insert` : si la personne a déjà
+ * accès (scope « Tout mon Cercle »/« Groupe » à la création, ou un ajout
+ * précédent), un simple insert violerait la clé primaire
+ * `(prediction_id, user_id)` — l'intention de l'auteur (« cette personne doit
+ * avoir accès ») est de toute façon déjà satisfaite, donc on ne fait rien
+ * plutôt que de faire échouer l'action sur une contrainte unique.
  */
 export async function addRecipient(predictionId: string, userId: string) {
   return supabase
     .from('prediction_access')
-    .insert({ prediction_id: predictionId, user_id: userId });
+    .upsert(
+      { prediction_id: predictionId, user_id: userId },
+      { onConflict: 'prediction_id,user_id', ignoreDuplicates: true }
+    );
 }
 
 /** Retire un destinataire, à tout moment (avant ou après révélation). */
