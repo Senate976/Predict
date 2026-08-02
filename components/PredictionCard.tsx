@@ -1,9 +1,10 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { formatCountdown, formatRevealAt } from '../lib/datetime';
+import { fetchCommentCount } from '../lib/comments';
+import { formatCountdown } from '../lib/datetime';
 import { isRevealed, type PredictionFeedItem } from '../lib/predictions';
 import { colors, fonts, radius } from '../lib/theme';
 import { AudioPlayerButton } from './AudioPlayerButton';
@@ -29,6 +30,7 @@ export function PredictionCard({
   userId,
   onPress,
   mode = 'link',
+  hasVoted = false,
 }: {
   item: PredictionFeedItem;
   now: Date;
@@ -38,15 +40,30 @@ export function PredictionCard({
   userId: string;
   onPress?: () => void;
   mode?: 'link' | 'accordion';
+  /** Le destinataire s'est déjà prononcé sur cette prédiction — masque le lien
+   * « Donner mon avis », qui n'a plus lieu d'être une fois le vote posé. */
+  hasVoted?: boolean;
 }) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(mode !== 'accordion');
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentCount, setCommentCount] = useState<number | null>(null);
   const revealAt = new Date(item.reveal_at);
   const revealed = isRevealed(item, now);
   const showBody = mode === 'link' || expanded;
   const isAuthor = item.author_id === userId;
 
   const verdict = revealed && item.final_status !== 'pending' ? item.final_status : null;
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchCommentCount(item.id).then(({ count }) => {
+      if (!cancelled) setCommentCount(count);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [item.id]);
 
   function handlePress() {
     if (mode === 'accordion') {
@@ -104,32 +121,32 @@ export function PredictionCard({
             )}
           </View>
         )}
-
-        {item.recipient_usernames.length > 0 && (
-          <Text style={styles.recipientsLine} numberOfLines={2}>
-            Destiné à : {item.recipient_usernames.join(', ')}
-          </Text>
-        )}
-
-        {/* Date de révélation volontairement absente du Fil — seul l'écran
-            détail la précise ; ici, l'encart « dans X » en haut de carte
-            suffit à savoir que ça arrive bientôt. */}
-        <View style={styles.dateRow}>
-          <MaterialCommunityIcons name="seal" size={14} color={colors.textMuted} />
-          <Text style={styles.cardMeta}>{formatRevealAt(new Date(item.created_at))}</Text>
-        </View>
       </Pressable>
 
       {showBody && (
         <>
-          {mode === 'accordion' && revealed && (
+          {mode === 'accordion' && revealed && (isAuthor || !hasVoted) && (
             <Pressable onPress={() => onPress?.()} style={styles.voteLink} hitSlop={4}>
               <Text style={styles.voteLinkText}>
                 {isAuthor ? 'Voir les destinataires →' : 'Donner mon avis sur cette prédiction →'}
               </Text>
             </Pressable>
           )}
-          <InlineComments predictionId={item.id} userId={userId} truncate />
+
+          <Pressable
+            onPress={() => setCommentsOpen((o) => !o)}
+            style={styles.commentsToggle}
+            hitSlop={4}
+          >
+            <Ionicons
+              name={commentsOpen ? 'chatbubble' : 'chatbubble-outline'}
+              size={16}
+              color={colors.textMuted}
+            />
+            <Text style={styles.commentsToggleText}>{commentCount ?? 0}</Text>
+          </Pressable>
+
+          {commentsOpen && <InlineComments predictionId={item.id} userId={userId} truncate />}
         </>
       )}
     </View>
@@ -196,9 +213,14 @@ const styles = StyleSheet.create({
     lineHeight: 26,
   },
   audioRow: { marginTop: 10 },
-  recipientsLine: { fontSize: 12, color: colors.textMuted, fontWeight: '600', marginTop: 10 },
-  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
-  cardMeta: { fontSize: 12, color: colors.textFaint },
   voteLink: { marginTop: 10 },
   voteLinkText: { fontSize: 13, fontWeight: '600', color: colors.gold },
+  commentsToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    marginTop: 10,
+  },
+  commentsToggleText: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
 });

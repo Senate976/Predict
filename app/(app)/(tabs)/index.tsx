@@ -44,6 +44,7 @@ export default function HomeScreen() {
 
   const [feed, setFeed] = useState<PredictionFeedItem[] | null>(null);
   const [authors, setAuthors] = useState<AuthorMap>({});
+  const [votedIds, setVotedIds] = useState<Set<string>>(new Set());
   const [celebration, setCelebration] = useState<{ visible: boolean; message: string }>({
     visible: false,
     message: '',
@@ -86,6 +87,15 @@ export default function HomeScreen() {
       map[profile.id] = { username: profile.username, avatar_url: profile.avatar_url };
     }
     setAuthors(map);
+
+    // Sert uniquement à masquer « Donner mon avis » une fois le vote posé —
+    // la RLS de `prediction_votes` ne renvoie de toute façon que ses propres
+    // votes, pas besoin de filtrer sur les ids de ce chargement.
+    const { data: myVotes } = await supabase
+      .from('prediction_votes')
+      .select('prediction_id')
+      .eq('voter_id', userId);
+    setVotedIds(new Set((myVotes ?? []).map((v) => v.prediction_id)));
 
     // La première approbation non vue déclenche la célébration, une seule
     // fois — marquée lue tout de suite pour qu'un focus ultérieur de cet
@@ -205,6 +215,7 @@ export default function HomeScreen() {
               authorAvatarUrl={authors[item.author_id]?.avatar_url}
               userId={userId!}
               mode={tab === 'past' ? 'accordion' : 'link'}
+              hasVoted={votedIds.has(item.id)}
               onPress={() => router.push(`/prediction/${item.id}`)}
             />
           ))

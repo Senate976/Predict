@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AudioPlayerButton } from '../../../components/AudioPlayerButton';
 import { InlineComments } from '../../../components/InlineComments';
 import { QuickCreateButton } from '../../../components/QuickCreateButton';
+import { RoyalSeal } from '../../../components/RoyalSeal';
 import { useAuth } from '../../../lib/auth';
 import { formatRevealAt } from '../../../lib/datetime';
 import { fetchFriendships, otherProfile, type FriendProfile } from '../../../lib/friends';
@@ -188,7 +189,7 @@ export default function PredictionDetailScreen() {
           <>
             {/* Date de scellé bien en évidence, juste au-dessus du Teaser. */}
             <View style={styles.sealedDateRow}>
-              <Ionicons name="lock-closed" size={13} color={colors.textMuted} />
+              <RoyalSeal size={16} />
               <Text style={styles.sealedDate}>{formatRevealAt(new Date(prediction.created_at))}</Text>
             </View>
 
@@ -213,17 +214,15 @@ export default function PredictionDetailScreen() {
               )}
             </View>
 
-            {/* Date de révélation seulement tant qu'elle n'a pas eu lieu — une
-                fois révélée, elle n'apporte plus rien et distrairait du
-                contenu (la date de scellé, elle, reste au-dessus du Teaser). */}
-            {!revealed && (
-              <View style={styles.datesBlock}>
-                <View style={styles.dateLineRow}>
-                  <Ionicons name="lock-open" size={13} color={colors.textFaint} />
-                  <Text style={styles.dateLine}>{formatRevealAt(new Date(prediction.reveal_at))}</Text>
-                </View>
+            {/* Depuis que le Fil n'affiche plus ni la date de scellé ni celle
+                de révélation, cet écran détail est la seule à les montrer —
+                toujours visible, avant comme après la révélation. */}
+            <View style={styles.datesBlock}>
+              <View style={styles.dateLineRow}>
+                <Ionicons name="lock-open" size={13} color={colors.textFaint} />
+                <Text style={styles.dateLine}>{formatRevealAt(new Date(prediction.reveal_at))}</Text>
               </View>
-            )}
+            </View>
 
             <Text style={[styles.eyebrow, styles.sectionSpacing]}>Destinataires</Text>
             {recipientsError && <Text style={styles.error}>{recipientsError}</Text>}

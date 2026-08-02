@@ -34,6 +34,21 @@ export async function fetchComments(predictionId: string) {
     .returns<Comment[]>();
 }
 
+/**
+ * Nombre de commentaires, sans charger leur contenu — pour l'icône du Fil,
+ * qui affiche juste un compteur tant que le fil de discussion n'est pas
+ * ouvert. `head: true` : la requête ne renvoie aucune ligne, seulement l'en-
+ * tête avec le total, ce qui évite de rapatrier des commentaires qu'on
+ * n'affiche pas encore.
+ */
+export async function fetchCommentCount(predictionId: string) {
+  const { count, error } = await supabase
+    .from('prediction_comments')
+    .select('id', { count: 'exact', head: true })
+    .eq('prediction_id', predictionId);
+  return { count: count ?? 0, error };
+}
+
 export async function addComment(predictionId: string, authorId: string, content: string) {
   return supabase
     .from('prediction_comments')
