@@ -34,14 +34,15 @@ const TICK_MS = 30_000;
 
 type AuthorInfo = { username: string; avatar_url: string | null };
 type AuthorMap = Record<string, AuthorInfo>;
+type Tab = 'upcoming' | 'past';
 
+/** Fil d'actualité — Archives a été fusionné ici, sous forme de deux onglets. */
 export default function HomeScreen() {
   const { username, session, onboarded, markOnboarded } = useAuth();
   const router = useRouter();
 
   const [feed, setFeed] = useState<PredictionFeedItem[] | null>(null);
   const [authors, setAuthors] = useState<AuthorMap>({});
-  const [unreadCount, setUnreadCount] = useState(0);
   const [celebration, setCelebration] = useState<{ visible: boolean; message: string }>({
     visible: false,
     message: '',
@@ -49,6 +50,7 @@ export default function HomeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => new Date());
+  const [tab, setTab] = useState<Tab>('upcoming');
 
   const userId = session?.user.id;
 
@@ -56,8 +58,8 @@ export default function HomeScreen() {
     if (!userId) return;
 
     // Rattrape les notifications de révélation en retard avant de lire le
-    // fil et le compteur — sans ça, une prédiction tout juste révélée
-    // pourrait ne pas encore avoir sa notification au premier chargement.
+    // fil — sans ça, une prédiction tout juste révélée pourrait ne pas
+    // encore avoir sa notification au premier chargement.
     await supabase.rpc('generate_reveal_notifications');
 
     const { data, error: fetchError } = await fetchPredictionsFeed();
@@ -86,14 +88,13 @@ export default function HomeScreen() {
       setAuthors(map);
     }
 
-    const { data: notifications } = await fetchNotifications(userId);
-    const notifList = notifications ?? [];
-    setUnreadCount(notifList.filter((n) => !n.is_read).length);
-
     // La première approbation non vue déclenche la célébration, une seule
     // fois — marquée lue tout de suite pour qu'un focus ultérieur de cet
     // écran ne la rejoue pas.
-    const approval = notifList.find((n) => n.type === 'prediction_approved' && !n.is_read);
+    const { data: notifications } = await fetchNotifications(userId);
+    const approval = (notifications ?? []).find(
+      (n) => n.type === 'prediction_approved' && !n.is_read
+    );
     if (approval) {
       markNotificationRead(approval.id);
       setCelebration({
@@ -134,6 +135,10 @@ export default function HomeScreen() {
     await markOnboarded();
   }
 
+  const upcoming = (feed ?? []).filter((item) => !item.is_revealed);
+  const past = (feed ?? []).filter((item) => item.is_revealed);
+  const shown = tab === 'upcoming' ? upcoming : past;
+
   return (
     <SafeAreaView style={styles.safe}>
       <WelcomeOnboarding visible={onboarded === false} onStart={handleStartFirstPrediction} />
@@ -151,13 +156,17 @@ export default function HomeScreen() {
             {username ?? session?.user.email ?? ''}
           </Text>
         </View>
-        <Pressable onPress={() => router.push('/notifications')} hitSlop={8} style={styles.iconButton}>
-          <Text style={styles.iconButtonText}>Notifs</Text>
-          {unreadCount > 0 && (
-            <View style={styles.badgeDot}>
-              <Text style={styles.badgeDotText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-            </View>
-          )}
+      </View>
+
+      <View style={styles.tabs}>
+        <Pressable
+          onPress={() => setTab('upcoming')}
+          style={[styles.tab, tab === 'upcoming' && styles.tabActive]}
+        >
+          <Text style={[styles.tabText, tab === 'upcoming' && styles.tabTextActive]}>À venir</Text>
+        </Pressable>
+        <Pressable onPress={() => setTab('past')} style={[styles.tab, tab === 'past' && styles.tabActive]}>
+          <Text style={[styles.tabText, tab === 'past' && styles.tabTextActive]}>Passées</Text>
         </Pressable>
       </View>
 
@@ -169,16 +178,20 @@ export default function HomeScreen() {
 
         {feed === null && !error ? (
           <ActivityIndicator style={styles.loader} color={colors.gold} />
-        ) : (feed ?? []).length === 0 ? (
+        ) : shown.length === 0 ? (
           <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>Aucune prédiction pour l’instant.</Text>
-            <Text style={styles.emptyText}>
-              Écris ce que tu vois venir pour quelqu’un de ton cercle, et choisis
-              quand ça se dévoile.
+            <Text style={styles.emptyTitle}>
+              {tab === 'upcoming' ? 'Aucune prédiction en cours.' : 'Rien de révélé pour l’instant.'}
             </Text>
+            {tab === 'upcoming' && (
+              <Text style={styles.emptyText}>
+                Écris ce que tu vois venir pour quelqu’un de ton cercle, et choisis
+                quand ça se dévoile.
+              </Text>
+            )}
           </View>
         ) : (
-          (feed ?? []).map((item) => (
+          shown.map((item) => (
             <PredictionCard
               key={item.id}
               item={item}
@@ -187,6 +200,7 @@ export default function HomeScreen() {
               authorId={item.author_id !== userId ? item.author_id : undefined}
               authorAvatarUrl={item.author_id !== userId ? authors[item.author_id]?.avatar_url : undefined}
               userId={userId!}
+              mode={tab === 'past' ? 'accordion' : 'link'}
               onPress={() => router.push(`/prediction/${item.id}`)}
             />
           ))
@@ -225,21 +239,24 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   greeting: { fontSize: 17, fontWeight: '700', color: colors.text, marginTop: 2 },
-  iconButton: { position: 'relative', paddingHorizontal: 2 },
-  iconButtonText: { fontSize: 13, color: colors.textMuted, fontWeight: '600' },
-  badgeDot: {
-    position: 'absolute',
-    top: -8,
-    right: -10,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    paddingHorizontal: 3,
-    backgroundColor: colors.gold,
-    alignItems: 'center',
-    justifyContent: 'center',
+  tabs: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
   },
-  badgeDotText: { fontSize: 10, fontWeight: '700', color: colors.background },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 999,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  tabActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
+  tabText: { fontSize: 12, fontWeight: '700', letterSpacing: 1, color: colors.textMuted, textTransform: 'uppercase' },
+  tabTextActive: { color: colors.gold },
   scroll: { padding: spacing.lg, paddingBottom: 8, flexGrow: 1 },
   loader: { marginTop: 32 },
   empty: { paddingVertical: 24, alignItems: 'center' },

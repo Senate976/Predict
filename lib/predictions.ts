@@ -24,6 +24,10 @@ export type PredictionFeedItem = {
   scope: PredictionScope;
   created_at: string;
   is_revealed: boolean;
+  /** Nombre de votes, et verdict à la majorité des votants effectifs — voir prediction_outcomes. */
+  realized_votes: number;
+  missed_votes: number;
+  final_status: PredictionOutcomeStatus;
 };
 
 /** Doivent rester alignés sur les contraintes `predictions_*_length` du SQL. */
@@ -94,7 +98,8 @@ export function predictionErrorMessage(error: PostgrestError): string {
  * Tri par `created_at` et non `reveal_at` : c'est un fil d'actualité — l'ordre
  * dans lequel les choses ont été publiées, pas celui de leur révélation.
  */
-const FEED_COLUMNS = 'id, author_id, teaser, content, audio_path, reveal_at, scope, created_at, is_revealed';
+const FEED_COLUMNS =
+  'id, author_id, teaser, content, audio_path, reveal_at, scope, created_at, is_revealed, realized_votes, missed_votes, final_status';
 
 export async function fetchPredictionsFeed() {
   return supabase

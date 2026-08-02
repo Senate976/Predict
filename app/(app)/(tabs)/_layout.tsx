@@ -26,8 +26,8 @@ export default function TabsLayout() {
         options={{ title: 'Fil', tabBarIcon: ({ focused }) => <TabDot focused={focused} /> }}
       />
       <Tabs.Screen
-        name="archives"
-        options={{ title: 'Archives', tabBarIcon: ({ focused }) => <TabDot focused={focused} /> }}
+        name="notifications"
+        options={{ title: 'Notifs', tabBarIcon: ({ focused }) => <TabDot focused={focused} /> }}
       />
       <Tabs.Screen
         name="circle"
