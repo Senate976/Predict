@@ -559,10 +559,6 @@ alter table public.predictions drop constraint if exists predictions_teaser_leng
 alter table public.predictions add constraint predictions_teaser_length
   check (char_length(btrim(teaser)) between 1 and 160);
 
-alter table public.predictions drop constraint if exists predictions_scope_valid;
-alter table public.predictions add constraint predictions_scope_valid
-  check (scope in ('circle', 'selected'));
-
 alter table public.prediction_contents drop constraint if exists prediction_contents_length;
 alter table public.prediction_contents add constraint prediction_contents_length
   check (char_length(btrim(content)) between 1 and 280);
@@ -1153,9 +1149,8 @@ grant select on public.prediction_outcomes to authenticated;
 
 -- Nouveau type de notification, réservé à l'auteur (les précédents sont tous
 -- pour un destinataire) : le moment où sa prédiction bascule sur « Réalisée ».
-alter table public.notifications drop constraint if exists notifications_type_check;
-alter table public.notifications add constraint notifications_type_check
-  check (type in ('new_teaser', 'prediction_revealed', 'prediction_approved'));
+-- (La contrainte `notifications_type_check` elle-même n'est (re)posée qu'une
+-- fois, plus bas, une fois tous les types connus.)
 
 -- Se déclenche à chaque vote (pose ou changement), recalcule la majorité, et
 -- notifie l'auteur la première fois qu'elle penche pour 'realized'. La
