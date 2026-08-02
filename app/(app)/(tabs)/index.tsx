@@ -214,7 +214,6 @@ export default function HomeScreen() {
               authorId={item.author_id}
               authorAvatarUrl={authors[item.author_id]?.avatar_url}
               userId={userId!}
-              mode={tab === 'past' ? 'accordion' : 'link'}
               hasVoted={votedIds.has(item.id)}
               onPress={() => router.push(`/prediction/${item.id}`)}
             />

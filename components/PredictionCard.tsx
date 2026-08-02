@@ -12,14 +12,12 @@ import { Avatar } from './Avatar';
 import { InlineComments } from './InlineComments';
 
 /**
- * Carte d'une prédiction, partagée entre le Fil et les Archives.
- *
- * `mode: 'link'` (Fil, par défaut) : la carte est toujours dépliée, un tap
- * navigue vers l'écran détail (`onPress`) où l'auteur gère les destinataires
- * et chacun se prononce une fois révélée.
- *
- * `mode: 'accordion'` (Archives) : repliée par défaut (teaser seul), un tap
- * déplie/replie le contenu et les commentaires sur place — pas de navigation.
+ * Carte d'une prédiction, partagée entre les onglets À venir et Passées du
+ * Fil. Toujours dépliée (teaser, puis contenu une fois révélé) ; un tap sur
+ * la carte navigue vers l'écran détail (`onPress`), où l'auteur gère les
+ * destinataires et chacun se prononce une fois révélée. Les commentaires,
+ * eux, restent repliés derrière une icône dédiée — pas besoin de quitter le
+ * Fil pour les consulter.
  */
 export function PredictionCard({
   item,
@@ -29,7 +27,6 @@ export function PredictionCard({
   authorAvatarUrl,
   userId,
   onPress,
-  mode = 'link',
   hasVoted = false,
 }: {
   item: PredictionFeedItem;
@@ -39,18 +36,15 @@ export function PredictionCard({
   authorAvatarUrl?: string | null;
   userId: string;
   onPress?: () => void;
-  mode?: 'link' | 'accordion';
   /** Le destinataire s'est déjà prononcé sur cette prédiction — masque le lien
    * « Donner mon avis », qui n'a plus lieu d'être une fois le vote posé. */
   hasVoted?: boolean;
 }) {
   const router = useRouter();
-  const [expanded, setExpanded] = useState(mode !== 'accordion');
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentCount, setCommentCount] = useState<number | null>(null);
   const revealAt = new Date(item.reveal_at);
   const revealed = isRevealed(item, now);
-  const showBody = mode === 'link' || expanded;
   const isAuthor = item.author_id === userId;
 
   const verdict = revealed && item.final_status !== 'pending' ? item.final_status : null;
@@ -65,14 +59,6 @@ export function PredictionCard({
     };
   }, [item.id]);
 
-  function handlePress() {
-    if (mode === 'accordion') {
-      setExpanded((e) => !e);
-    } else {
-      onPress?.();
-    }
-  }
-
   return (
     <View
       style={[
@@ -81,7 +67,7 @@ export function PredictionCard({
         verdict === 'missed' && styles.cardMissed,
       ]}
     >
-      <Pressable onPress={handlePress} style={({ pressed }) => pressed && styles.cardPressed}>
+      <Pressable onPress={() => onPress?.()} style={({ pressed }) => pressed && styles.cardPressed}>
         <View style={styles.cardTop}>
           {authorLabel && (
             <Pressable
@@ -89,28 +75,25 @@ export function PredictionCard({
               style={styles.authorBlock}
               hitSlop={4}
             >
-              <Avatar url={authorAvatarUrl} username={authorLabel} size={36} />
+              <Avatar url={authorAvatarUrl} username={authorLabel} size={30} />
               <Text style={styles.authorName} numberOfLines={1}>
                 {authorLabel}
               </Text>
             </Pressable>
           )}
 
-          <View style={styles.cardTopRight}>
-            {mode === 'accordion' && <Text style={styles.chevron}>{expanded ? '▲' : '▼'}</Text>}
-            {!verdict && (
-              <View style={[styles.badge, !revealed ? styles.badgeLocked : styles.badgeNeutral]}>
-                <Text style={[styles.badgeText, !revealed ? styles.badgeTextLocked : styles.badgeTextNeutral]}>
-                  {!revealed ? formatCountdown(revealAt, now) : 'Révélée'}
-                </Text>
-              </View>
-            )}
-          </View>
+          {!verdict && (
+            <View style={[styles.badge, !revealed ? styles.badgeLocked : styles.badgeNeutral]}>
+              <Text style={[styles.badgeText, !revealed ? styles.badgeTextLocked : styles.badgeTextNeutral]}>
+                {!revealed ? formatCountdown(revealAt, now) : 'Révélée'}
+              </Text>
+            </View>
+          )}
         </View>
 
         <Text style={styles.cardTeaser}>{item.teaser}</Text>
 
-        {showBody && revealed && item.content && (
+        {revealed && item.content && (
           <View style={styles.contentBox}>
             <Text style={styles.contentLabel}>Prédiction</Text>
             <Text style={styles.cardContent}>{item.content}</Text>
@@ -123,32 +106,24 @@ export function PredictionCard({
         )}
       </Pressable>
 
-      {showBody && (
-        <>
-          {mode === 'accordion' && revealed && (isAuthor || !hasVoted) && (
-            <Pressable onPress={() => onPress?.()} style={styles.voteLink} hitSlop={4}>
-              <Text style={styles.voteLinkText}>
-                {isAuthor ? 'Voir les destinataires →' : 'Donner mon avis sur cette prédiction →'}
-              </Text>
-            </Pressable>
-          )}
-
-          <Pressable
-            onPress={() => setCommentsOpen((o) => !o)}
-            style={styles.commentsToggle}
-            hitSlop={4}
-          >
-            <Ionicons
-              name={commentsOpen ? 'chatbubble' : 'chatbubble-outline'}
-              size={16}
-              color={colors.textMuted}
-            />
-            <Text style={styles.commentsToggleText}>{commentCount ?? 0}</Text>
-          </Pressable>
-
-          {commentsOpen && <InlineComments predictionId={item.id} userId={userId} truncate />}
-        </>
+      {revealed && (isAuthor || !hasVoted) && (
+        <Pressable onPress={() => onPress?.()} style={styles.voteLink} hitSlop={4}>
+          <Text style={styles.voteLinkText}>
+            {isAuthor ? 'Voir les destinataires →' : 'Donner mon avis sur cette prédiction →'}
+          </Text>
+        </Pressable>
       )}
+
+      <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
+        <Ionicons
+          name={commentsOpen ? 'chatbubble' : 'chatbubble-outline'}
+          size={16}
+          color={colors.textMuted}
+        />
+        <Text style={styles.commentsToggleText}>{commentCount ?? 0}</Text>
+      </Pressable>
+
+      {commentsOpen && <InlineComments predictionId={item.id} userId={userId} truncate />}
     </View>
   );
 }
@@ -168,12 +143,10 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 1,
   },
-  cardTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 10 },
-  cardTopRight: { alignItems: 'flex-end', gap: 6 },
-  authorBlock: { alignItems: 'center', maxWidth: 88 },
-  authorName: { fontSize: 13, fontWeight: '600', color: colors.textMuted, marginTop: 4, textAlign: 'center' },
+  cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 },
+  authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, maxWidth: '65%' },
+  authorName: { fontSize: 13, fontWeight: '600', color: colors.textMuted, flexShrink: 1 },
   badge: {
-    alignSelf: 'flex-end',
     borderRadius: radius.pill,
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -183,7 +156,6 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 12, fontWeight: '700' },
   badgeTextLocked: { color: colors.gold },
   badgeTextNeutral: { color: colors.textMuted },
-  chevron: { fontSize: 11, color: colors.textFaint },
   cardRealized: { borderLeftWidth: 4, borderLeftColor: colors.success },
   cardMissed: { borderLeftWidth: 4, borderLeftColor: colors.danger },
   cardTeaser: {
