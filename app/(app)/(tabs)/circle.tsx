@@ -436,7 +436,8 @@ export default function CircleScreen() {
               <TextInput
                 value={newGroupName}
                 onChangeText={setNewGroupName}
-                placeholder="Nom du groupe"
+                placeholder="Nouveau groupe"
+                placeholderTextColor={colors.textFaint}
                 maxLength={MAX_GROUP_NAME_LENGTH}
                 editable={!creatingGroup}
                 style={[styles.input, styles.newGroupInput]}
