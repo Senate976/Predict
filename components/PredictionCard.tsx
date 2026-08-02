@@ -44,6 +44,7 @@ export function PredictionCard({
   const revealAt = new Date(item.reveal_at);
   const revealed = isRevealed(item, now);
   const showBody = mode === 'link' || expanded;
+  const isAuthor = item.author_id === userId;
 
   const verdict = revealed && item.final_status !== 'pending' ? item.final_status : null;
 
@@ -113,11 +114,23 @@ export function PredictionCard({
           ))}
 
         <Text style={styles.cardMeta}>
-          {revealed ? 'Révélée' : 'Se révèle'} {formatRevealAt(revealAt)}
+          Scellée {formatRevealAt(new Date(item.created_at))}
         </Text>
+        {!revealed && (
+          <Text style={styles.cardMetaSecondary}>Se révèle {formatRevealAt(revealAt)}</Text>
+        )}
       </Pressable>
 
-      {showBody && <InlineComments predictionId={item.id} userId={userId} truncate />}
+      {showBody && (
+        <>
+          {mode === 'accordion' && revealed && !isAuthor && (
+            <Pressable onPress={() => onPress?.()} style={styles.voteLink} hitSlop={4}>
+              <Text style={styles.voteLinkText}>Donner mon avis sur cette prédiction →</Text>
+            </Pressable>
+          )}
+          <InlineComments predictionId={item.id} userId={userId} truncate />
+        </>
+      )}
     </View>
   );
 }
@@ -191,4 +204,7 @@ const styles = StyleSheet.create({
   sealedText: { fontSize: 13, color: colors.textFaint, fontStyle: 'italic' },
   audioRow: { marginTop: 10 },
   cardMeta: { fontSize: 12, color: colors.textFaint, marginTop: 10 },
+  cardMetaSecondary: { fontSize: 12, color: colors.textFaint, marginTop: 2 },
+  voteLink: { marginTop: 10 },
+  voteLinkText: { fontSize: 13, fontWeight: '600', color: colors.gold },
 });

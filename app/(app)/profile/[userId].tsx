@@ -1,6 +1,15 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
@@ -26,6 +35,7 @@ export default function FriendProfileScreen() {
   const [stats, setStats] = useState<PredictionStats | null>(null);
   const [badgeCount, setBadgeCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [avatarOpen, setAvatarOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -70,7 +80,13 @@ export default function FriendProfileScreen() {
         ) : profile ? (
           <>
             <View style={styles.identityCard}>
-              <Avatar url={profile.avatar_url} username={profile.username} size={72} />
+              <Pressable
+                onPress={() => profile.avatar_url && setAvatarOpen(true)}
+                disabled={!profile.avatar_url}
+                hitSlop={4}
+              >
+                <Avatar url={profile.avatar_url} username={profile.username} size={72} />
+              </Pressable>
               <Text style={styles.username}>@{profile.username}</Text>
             </View>
 
@@ -109,6 +125,23 @@ export default function FriendProfileScreen() {
           </>
         ) : null}
       </ScrollView>
+
+      <Modal
+        visible={avatarOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAvatarOpen(false)}
+      >
+        <Pressable style={styles.lightboxBackdrop} onPress={() => setAvatarOpen(false)}>
+          {profile?.avatar_url && (
+            <Image
+              source={{ uri: profile.avatar_url }}
+              style={styles.lightboxImage}
+              resizeMode="contain"
+            />
+          )}
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -171,4 +204,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 12,
   },
+  lightboxBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(23, 21, 18, 0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lightboxImage: { width: '88%', height: '70%' },
 });

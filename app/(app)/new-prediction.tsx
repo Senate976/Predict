@@ -61,12 +61,11 @@ export default function NewPredictionScreen() {
   const [contentMode, setContentMode] = useState<ContentMode>('text');
   const [content, setContent] = useState('');
   const [audioUri, setAudioUri] = useState<string | null>(null);
-  // Rien de pré-rempli au départ, et aucun raccourci de délai : le moment de
-  // la révélation est un choix libre de l'auteur, pas quelque chose que
-  // l'écran oriente.
+  // La date reste un choix explicite, mais l'heure est facultative : pré-remplie
+  // à midi, l'auteur n'a besoin de la toucher que s'il veut une autre heure.
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [hour, setHour] = useState<number | null>(null);
-  const [minute, setMinute] = useState<number | null>(null);
+  const [hour, setHour] = useState<number | null>(12);
+  const [minute, setMinute] = useState<number | null>(0);
 
   const [scope, setScope] = useState<PredictionScope>('circle');
   const [friends, setFriends] = useState<FriendProfile[] | null>(null);
@@ -127,7 +126,7 @@ export default function NewPredictionScreen() {
       return 'Enregistre ta prédiction avant de la sceller.';
     }
     if (!revealAt) {
-      return 'Choisis la date et l’heure de la révélation.';
+      return 'Choisis la date de la révélation.';
     }
     if (revealAt.getTime() - Date.now() < MIN_REVEAL_DELAY_MS) {
       return 'La révélation doit être au moins une minute après maintenant.';
@@ -287,7 +286,8 @@ export default function NewPredictionScreen() {
 
           <Text style={[styles.label, styles.sectionLabel]}>Révélation</Text>
           <Text style={styles.sectionHint}>
-            Le moment que tu veux, à la minute près.
+            Le moment que tu veux, à la minute près. L’heure est facultative —
+            par défaut, midi.
           </Text>
 
           <CalendarPicker value={selectedDate} onChange={setSelectedDate} disabled={submitting} />

@@ -49,6 +49,7 @@ export default function PredictionDetailScreen() {
   const [myVote, setMyVote] = useState<Vote | null>(null);
 
   const [error, setError] = useState<string | null>(null);
+  const [recipientsError, setRecipientsError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [voteError, setVoteError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -72,11 +73,20 @@ export default function PredictionDetailScreen() {
     const isAuthorNow = item.author_id === userId;
 
     if (isAuthorNow) {
-      const [{ data: recipientsData }, { data: friendships }] = await Promise.all([
-        fetchPredictionRecipients(id),
-        fetchFriendships(userId),
-      ]);
-      setRecipients(recipientsData ?? []);
+      const [{ data: recipientsData, error: recipientsFetchError }, { data: friendships }] =
+        await Promise.all([fetchPredictionRecipients(id), fetchFriendships(userId)]);
+      if (recipientsFetchError) {
+        // Ne jamais confondre une vraie erreur avec « personne pour l'instant » :
+        // sans ça, un souci de chargement se lisait comme une prédiction sans
+        // aucun destinataire, ce qui n'est jamais vrai (l'auteur a toujours au
+        // moins lui-même, et le scope choisi à la création peuple toujours
+        // `prediction_access`).
+        setRecipientsError(`Chargement des destinataires impossible : ${recipientsFetchError.message}`);
+        setRecipients([]);
+      } else {
+        setRecipientsError(null);
+        setRecipients(recipientsData ?? []);
+      }
       const accepted = (friendships ?? []).filter((f) => f.status === 'accepted');
       setFriends(accepted.map((f) => otherProfile(f, userId)));
     }
@@ -170,74 +180,37 @@ export default function PredictionDetailScreen() {
         ) : prediction ? (
           <>
             <Text style={styles.teaser}>{prediction.teaser}</Text>
-            {revealed && prediction.content ? (
-              <>
-                <Text style={styles.content}>{prediction.content}</Text>
-                {prediction.audio_path && (
-                  <View style={styles.audioRow}>
-                    <AudioPlayerButton path={prediction.audio_path} />
-                  </View>
-                )}
-              </>
-            ) : (
-              <Text style={styles.sealedHint}>Contenu scellé jusqu’à la révélation.</Text>
-            )}
-            <Text style={styles.meta}>
-              {revealed ? 'Révélée' : 'Se révèle'} {formatRevealAt(new Date(prediction.reveal_at))}
-            </Text>
 
-            {revealed && outcome && (
-              <View style={styles.verdictBox}>
-                <Text style={styles.eyebrow}>Verdict du Cercle</Text>
-                <Text style={styles.verdict}>{STATUS_LABEL[outcome.final_status]}</Text>
-                <Text style={styles.tally}>
-                  {outcome.realized_votes} réalisée{outcome.realized_votes > 1 ? 's' : ''} ·{' '}
-                  {outcome.missed_votes} manquée{outcome.missed_votes > 1 ? 's' : ''}
-                </Text>
-
-                {!isAuthor && (
-                  <>
-                    {voteError && <Text style={styles.error}>{voteError}</Text>}
-                    <View style={styles.voteRow}>
-                      <Pressable
-                        onPress={() => handleVote('realized')}
-                        disabled={voting}
-                        style={[
-                          styles.voteButton,
-                          myVote?.vote_value === 'realized' && styles.voteButtonRealizedActive,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.voteButtonText,
-                            myVote?.vote_value === 'realized' && styles.voteButtonTextActive,
-                          ]}
-                        >
-                          Prédiction réalisée
-                        </Text>
-                      </Pressable>
-                      <Pressable
-                        onPress={() => handleVote('missed')}
-                        disabled={voting}
-                        style={[
-                          styles.voteButton,
-                          myVote?.vote_value === 'missed' && styles.voteButtonMissedActive,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.voteButtonText,
-                            myVote?.vote_value === 'missed' && styles.voteButtonTextActive,
-                          ]}
-                        >
-                          Prédiction manquée
-                        </Text>
-                      </Pressable>
+            {/* Le cœur de l'écran : le contenu de la prédiction prime sur tout
+                le reste, y compris le verdict — repoussé tout en bas. */}
+            <View style={styles.contentHero}>
+              {revealed && prediction.content ? (
+                <>
+                  <Text style={styles.contentHeroText}>{prediction.content}</Text>
+                  {prediction.audio_path && (
+                    <View style={styles.audioRow}>
+                      <AudioPlayerButton path={prediction.audio_path} />
                     </View>
-                  </>
-                )}
-              </View>
-            )}
+                  )}
+                </>
+              ) : (
+                <Text style={styles.sealedHint}>Contenu scellé jusqu’à la révélation.</Text>
+              )}
+            </View>
+
+            {/* Date de scellé toujours visible ; date de révélation seulement
+                tant qu'elle n'a pas eu lieu — une fois révélée, elle n'apporte
+                plus rien et distrairait du contenu. */}
+            <View style={styles.datesBlock}>
+              <Text style={styles.dateLine}>
+                Scellée {formatRevealAt(new Date(prediction.created_at))}
+              </Text>
+              {!revealed && (
+                <Text style={styles.dateLine}>
+                  Se révèle {formatRevealAt(new Date(prediction.reveal_at))}
+                </Text>
+              )}
+            </View>
 
             {!isAuthor ? (
               <Text style={styles.notAuthor}>
@@ -248,6 +221,7 @@ export default function PredictionDetailScreen() {
                 {actionError && <Text style={styles.error}>{actionError}</Text>}
 
                 <Text style={[styles.eyebrow, styles.sectionSpacing]}>Destinataires</Text>
+                {recipientsError && <Text style={styles.error}>{recipientsError}</Text>}
                 {recipients === null ? (
                   <ActivityIndicator color={colors.gold} style={styles.loader} />
                 ) : recipients.length === 0 ? (
@@ -293,6 +267,59 @@ export default function PredictionDetailScreen() {
 
             <Text style={[styles.eyebrow, styles.sectionSpacing]}>Discussion</Text>
             <InlineComments predictionId={id} userId={userId!} />
+
+            {revealed && outcome && (
+              <View style={styles.verdictBox}>
+                <Text style={styles.eyebrowSmall}>Verdict du Cercle</Text>
+                <Text style={styles.verdict}>{STATUS_LABEL[outcome.final_status]}</Text>
+                <Text style={styles.tally}>
+                  {outcome.realized_votes} réalisée{outcome.realized_votes > 1 ? 's' : ''} ·{' '}
+                  {outcome.missed_votes} manquée{outcome.missed_votes > 1 ? 's' : ''}
+                </Text>
+
+                {!isAuthor && (
+                  <>
+                    {voteError && <Text style={styles.error}>{voteError}</Text>}
+                    <View style={styles.voteRow}>
+                      <Pressable
+                        onPress={() => handleVote('realized')}
+                        disabled={voting}
+                        style={[
+                          styles.voteButton,
+                          myVote?.vote_value === 'realized' && styles.voteButtonRealizedActive,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.voteButtonText,
+                            myVote?.vote_value === 'realized' && styles.voteButtonTextActive,
+                          ]}
+                        >
+                          Réalisée
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleVote('missed')}
+                        disabled={voting}
+                        style={[
+                          styles.voteButton,
+                          myVote?.vote_value === 'missed' && styles.voteButtonMissedActive,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.voteButtonText,
+                            myVote?.vote_value === 'missed' && styles.voteButtonTextActive,
+                          ]}
+                        >
+                          Manquée
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </>
+                )}
+              </View>
+            )}
           </>
         ) : null}
       </ScrollView>
@@ -316,45 +343,53 @@ const styles = StyleSheet.create({
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   loader: { marginTop: 24 },
   eyebrow: { ...eyebrow },
-  teaser: { fontFamily: fonts.serifItalic, fontSize: 24, color: colors.text, lineHeight: 30 },
-  content: {
-    fontFamily: fonts.serifItalic,
-    fontSize: 18,
-    color: colors.text,
-    lineHeight: 24,
-    marginTop: 14,
+  eyebrowSmall: { ...eyebrow, fontSize: 10 },
+  teaser: { fontFamily: fonts.serifItalic, fontSize: 20, color: colors.text, lineHeight: 26 },
+  contentHero: {
+    marginTop: spacing.xl,
+    marginBottom: spacing.lg,
+    alignItems: 'center',
   },
-  audioRow: { marginTop: 12 },
+  contentHeroText: {
+    fontFamily: fonts.serifItalic,
+    fontSize: 28,
+    color: colors.text,
+    lineHeight: 36,
+    textAlign: 'center',
+  },
+  audioRow: { marginTop: 16 },
   sealedHint: {
-    fontSize: 13,
+    fontSize: 14,
     color: colors.textFaint,
     fontStyle: 'italic',
-    marginTop: 14,
+    textAlign: 'center',
   },
-  meta: { fontSize: 12, color: colors.textFaint, marginTop: 10 },
+  datesBlock: { alignItems: 'center', marginBottom: spacing.md },
+  dateLine: { fontSize: 12, color: colors.textFaint, marginTop: 2 },
   verdictBox: {
-    marginTop: spacing.lg,
-    padding: 16,
-    borderRadius: radius.xl,
+    marginTop: spacing.xl,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: radius.md,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  verdict: { fontFamily: fonts.serifItalic, fontSize: 19, color: colors.text, marginTop: 6 },
-  tally: { fontSize: 13, color: colors.textFaint, marginTop: 6 },
-  voteRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  verdict: { fontFamily: fonts.serifItalic, fontSize: 15, color: colors.text, marginTop: 4 },
+  tally: { fontSize: 12, color: colors.textFaint, marginTop: 4 },
+  voteRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
   voteButton: {
     flex: 1,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.pill,
-    paddingVertical: 12,
+    paddingVertical: 8,
     alignItems: 'center',
     backgroundColor: colors.background,
   },
   voteButtonRealizedActive: { borderColor: colors.success, backgroundColor: colors.successSoft },
   voteButtonMissedActive: { borderColor: colors.danger, backgroundColor: colors.dangerSoft },
-  voteButtonText: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
+  voteButtonText: { fontSize: 12, fontWeight: '600', color: colors.textMuted },
   voteButtonTextActive: { color: colors.text },
   notAuthor: { fontSize: 13, color: colors.textMuted, marginTop: spacing.lg, lineHeight: 19 },
   sectionSpacing: { marginTop: spacing.lg, marginBottom: 8 },
