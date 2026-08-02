@@ -2,7 +2,6 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -24,7 +23,7 @@ import {
   type PredictionFeedItem,
 } from '../../../lib/predictions';
 import { supabase } from '../../../lib/supabase';
-import { colors, spacing } from '../../../lib/theme';
+import { colors, fonts, spacing } from '../../../lib/theme';
 
 /**
  * Période de rafraîchissement des comptes à rebours.
@@ -150,13 +149,13 @@ export default function HomeScreen() {
       />
 
       <View style={styles.header}>
-        <Image source={require('../../../assets/predict-mark.png')} style={styles.logo} />
-        <View style={styles.userChip}>
+        <Text style={styles.brand}>Actu</Text>
+        <Pressable style={styles.userChip} onPress={() => router.push('/profile')} hitSlop={4}>
           <Avatar url={userId ? authors[userId]?.avatar_url ?? null : null} username={username ?? ''} size={32} />
           <Text style={styles.userChipName} numberOfLines={1}>
             {username ?? session?.user.email ?? ''}
           </Text>
-        </View>
+        </Pressable>
       </View>
 
       <View style={styles.tabs}>
@@ -231,7 +230,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  logo: { width: 40, height: 40, borderRadius: 9 },
+  brand: { fontFamily: fonts.serifItalic, fontSize: 26, color: colors.text },
   userChip: { flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: '55%' },
   userChipName: { fontSize: 14, fontWeight: '700', color: colors.text, flexShrink: 1 },
   tabs: {

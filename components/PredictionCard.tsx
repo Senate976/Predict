@@ -119,9 +119,11 @@ export function PredictionCard({
 
       {showBody && (
         <>
-          {mode === 'accordion' && revealed && !isAuthor && (
+          {mode === 'accordion' && revealed && (
             <Pressable onPress={() => onPress?.()} style={styles.voteLink} hitSlop={4}>
-              <Text style={styles.voteLinkText}>Donner mon avis sur cette prédiction →</Text>
+              <Text style={styles.voteLinkText}>
+                {isAuthor ? 'Voir les destinataires →' : 'Donner mon avis sur cette prédiction →'}
+              </Text>
             </Pressable>
           )}
           <InlineComments predictionId={item.id} userId={userId} truncate />

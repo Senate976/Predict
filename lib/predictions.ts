@@ -137,23 +137,55 @@ export async function createPrediction(input: {
   return result as { data: string | null; error: PostgrestError | null };
 }
 
-/**
- * Un destinataire d'une prédiction, tel que renvoyé par `prediction_access`
- * avec son profil embarqué (la clé étrangère `user_id -> profiles(id)`
- * permet l'embed en une requête).
- */
+/** Un destinataire d'une prédiction, avec son profil assemblé côté client. */
 export type PredictionRecipient = {
   user_id: string;
   profile: { username: string };
 };
 
-/** Réservé à l'auteur : la RLS de `prediction_access` ne renvoie sinon que sa propre ligne. */
+/**
+ * Visible par l'auteur et par tout autre destinataire (RLS de
+ * `prediction_access`, section 11 du schéma).
+ *
+ * Volontairement en deux requêtes plutôt qu'un embed PostgREST
+ * (`profile:profiles(username)`) : cet embed dépend du cache de schéma de
+ * PostgREST, qui s'est révélé intermittent sur ce projet (même classe
+ * d'erreur que pour `friendships`/`profiles`, déjà contournée dans
+ * lib/friends.ts) — d'où « could not find a relationship between
+ * prediction_access and profiles ». Deux requêtes simples puis un
+ * assemblage côté client élimine cette classe de panne.
+ */
 export async function fetchPredictionRecipients(predictionId: string) {
-  return supabase
+  const { data, error } = await supabase
     .from('prediction_access')
-    .select('user_id, profile:profiles(username)')
-    .eq('prediction_id', predictionId)
-    .returns<PredictionRecipient[]>();
+    .select('user_id')
+    .eq('prediction_id', predictionId);
+
+  if (error || !data) {
+    return { data: null, error };
+  }
+
+  if (data.length === 0) {
+    return { data: [] as PredictionRecipient[], error: null };
+  }
+
+  const userIds = data.map((r) => r.user_id);
+  const { data: profiles, error: profilesError } = await supabase
+    .from('profiles')
+    .select('id, username')
+    .in('id', userIds);
+
+  if (profilesError) {
+    return { data: null, error: profilesError };
+  }
+
+  const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
+  const recipients: PredictionRecipient[] = data.map((r) => ({
+    user_id: r.user_id,
+    profile: { username: byId.get(r.user_id)?.username ?? '…' },
+  }));
+
+  return { data: recipients, error: null };
 }
 
 /**
