@@ -431,10 +431,6 @@ export default function CircleScreen() {
             <Text style={[styles.eyebrow, styles.sectionLabel]}>
               Mes groupes {groups && groups.length > 0 ? `(${groups.length})` : ''}
             </Text>
-            <Text style={styles.muted}>
-              Regroupe certains amis sous un nom (« Les Intimes »…) pour les cibler
-              d’un coup à la création d’une prédiction.
-            </Text>
 
             <View style={styles.newGroupRow}>
               <TextInput

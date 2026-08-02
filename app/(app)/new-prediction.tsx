@@ -222,10 +222,6 @@ export default function NewPredictionScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <Text style={styles.label}>Teaser</Text>
-          <Text style={styles.sectionHint}>
-            Visible tout de suite par tes destinataires — le contenu secret, lui,
-            reste scellé.
-          </Text>
           <TextInput
             value={teaser}
             onChangeText={setTeaser}
@@ -264,6 +260,7 @@ export default function NewPredictionScreen() {
                 value={content}
                 onChangeText={setContent}
                 placeholder="Écrivez votre predict ici et prouvez à votre cercle, qu’une fois encore, vous aurez raison"
+                placeholderTextColor={colors.textFaint}
                 multiline
                 editable={!submitting}
                 maxLength={MAX_CONTENT_LENGTH}
