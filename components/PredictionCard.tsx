@@ -56,12 +56,13 @@ export function PredictionCard({
   }
 
   return (
-    <View style={styles.card}>
-      {verdict && (
-        <Text style={[styles.verdictIcon, verdict === 'realized' ? styles.verdictIconSuccess : styles.verdictIconDanger]}>
-          {verdict === 'realized' ? '✓' : '✕'}
-        </Text>
-      )}
+    <View
+      style={[
+        styles.card,
+        verdict === 'realized' && styles.cardRealized,
+        verdict === 'missed' && styles.cardMissed,
+      ]}
+    >
       <Pressable onPress={handlePress} style={({ pressed }) => pressed && styles.cardPressed}>
         <View style={styles.cardTop}>
           <View style={styles.cardTopLeft}>
@@ -130,7 +131,6 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 22,
     backgroundColor: colors.surface,
-    position: 'relative',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.05,
@@ -154,16 +154,8 @@ const styles = StyleSheet.create({
   badgeTextLocked: { color: colors.gold },
   badgeTextNeutral: { color: colors.textMuted },
   chevron: { fontSize: 11, color: colors.textFaint, marginTop: 6 },
-  verdictIcon: {
-    position: 'absolute',
-    top: 14,
-    right: 16,
-    fontSize: 20,
-    fontWeight: '800',
-    zIndex: 2,
-  },
-  verdictIconSuccess: { color: colors.success },
-  verdictIconDanger: { color: colors.danger },
+  cardRealized: { borderLeftWidth: 4, borderLeftColor: colors.success },
+  cardMissed: { borderLeftWidth: 4, borderLeftColor: colors.danger },
   cardTeaser: {
     fontFamily: fonts.serifItalic,
     fontSize: 20,

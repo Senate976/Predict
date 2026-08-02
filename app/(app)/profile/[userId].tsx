@@ -90,7 +90,7 @@ export default function FriendProfileScreen() {
               <View style={styles.statsRow}>
                 <View style={styles.statCard}>
                   <Text style={styles.statValue}>{stats.total}</Text>
-                  <Text style={styles.statLabel}>Journal</Text>
+                  <Text style={styles.statLabel}>Predict</Text>
                 </View>
                 <View style={styles.statCard}>
                   <Text style={[styles.statValue, styles.statValueRealized]}>{stats.realized}</Text>
