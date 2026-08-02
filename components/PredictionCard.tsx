@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -93,22 +93,17 @@ export function PredictionCard({
 
         <Text style={styles.cardTeaser}>{item.teaser}</Text>
 
-        {showBody &&
-          (revealed && item.content ? (
-            <View style={styles.contentBox}>
-              <Text style={styles.contentLabel}>Prédiction</Text>
-              <Text style={styles.cardContent}>{item.content}</Text>
-              {item.audio_path && (
-                <View style={styles.audioRow}>
-                  <AudioPlayerButton path={item.audio_path} />
-                </View>
-              )}
-            </View>
-          ) : (
-            <View style={styles.sealedBox}>
-              <Text style={styles.sealedText}>Contenu scellé jusqu’à la révélation</Text>
-            </View>
-          ))}
+        {showBody && revealed && item.content && (
+          <View style={styles.contentBox}>
+            <Text style={styles.contentLabel}>Prédiction</Text>
+            <Text style={styles.cardContent}>{item.content}</Text>
+            {item.audio_path && (
+              <View style={styles.audioRow}>
+                <AudioPlayerButton path={item.audio_path} />
+              </View>
+            )}
+          </View>
+        )}
 
         {item.recipient_usernames.length > 0 && (
           <Text style={styles.recipientsLine} numberOfLines={2}>
@@ -116,16 +111,13 @@ export function PredictionCard({
           </Text>
         )}
 
+        {/* Date de révélation volontairement absente du Fil — seul l'écran
+            détail la précise ; ici, l'encart « dans X » en haut de carte
+            suffit à savoir que ça arrive bientôt. */}
         <View style={styles.dateRow}>
-          <Ionicons name="lock-closed" size={12} color={colors.textFaint} />
+          <MaterialCommunityIcons name="seal" size={14} color={colors.textMuted} />
           <Text style={styles.cardMeta}>{formatRevealAt(new Date(item.created_at))}</Text>
         </View>
-        {!revealed && (
-          <View style={styles.dateRow}>
-            <Ionicons name="lock-open" size={12} color={colors.textFaint} />
-            <Text style={styles.cardMetaSecondary}>{formatRevealAt(revealAt)}</Text>
-          </View>
-        )}
       </Pressable>
 
       {showBody && (
@@ -203,18 +195,10 @@ const styles = StyleSheet.create({
     color: colors.text,
     lineHeight: 26,
   },
-  sealedBox: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  sealedText: { fontSize: 13, color: colors.textFaint, fontStyle: 'italic' },
   audioRow: { marginTop: 10 },
   recipientsLine: { fontSize: 12, color: colors.textMuted, fontWeight: '600', marginTop: 10 },
   dateRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
   cardMeta: { fontSize: 12, color: colors.textFaint },
-  cardMetaSecondary: { fontSize: 12, color: colors.textFaint },
   voteLink: { marginTop: 10 },
   voteLinkText: { fontSize: 13, fontWeight: '600', color: colors.gold },
 });
