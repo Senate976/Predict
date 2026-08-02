@@ -179,10 +179,17 @@ export default function PredictionDetailScreen() {
           <ActivityIndicator color={colors.gold} style={styles.loader} />
         ) : prediction ? (
           <>
+            {/* Date de scellé bien en évidence, juste au-dessus du Teaser. */}
+            <Text style={styles.sealedDate}>
+              Scellée {formatRevealAt(new Date(prediction.created_at))}
+            </Text>
+
             <Text style={styles.teaser}>{prediction.teaser}</Text>
 
             {/* Le cœur de l'écran : le contenu de la prédiction prime sur tout
-                le reste, y compris le verdict — repoussé tout en bas. */}
+                le reste, y compris le verdict — repoussé tout en bas. Même
+                taille de police que le Teaser, volontairement : les deux sont
+                la promesse de l'auteur, avant et après révélation. */}
             <View style={styles.contentHero}>
               {revealed && prediction.content ? (
                 <>
@@ -198,19 +205,16 @@ export default function PredictionDetailScreen() {
               )}
             </View>
 
-            {/* Date de scellé toujours visible ; date de révélation seulement
-                tant qu'elle n'a pas eu lieu — une fois révélée, elle n'apporte
-                plus rien et distrairait du contenu. */}
-            <View style={styles.datesBlock}>
-              <Text style={styles.dateLine}>
-                Scellée {formatRevealAt(new Date(prediction.created_at))}
-              </Text>
-              {!revealed && (
+            {/* Date de révélation seulement tant qu'elle n'a pas eu lieu — une
+                fois révélée, elle n'apporte plus rien et distrairait du
+                contenu (la date de scellé, elle, reste au-dessus du Teaser). */}
+            {!revealed && (
+              <View style={styles.datesBlock}>
                 <Text style={styles.dateLine}>
                   Se révèle {formatRevealAt(new Date(prediction.reveal_at))}
                 </Text>
-              )}
-            </View>
+              </View>
+            )}
 
             {!isAuthor ? (
               <Text style={styles.notAuthor}>
@@ -344,7 +348,13 @@ const styles = StyleSheet.create({
   loader: { marginTop: 24 },
   eyebrow: { ...eyebrow },
   eyebrowSmall: { ...eyebrow, fontSize: 10 },
-  teaser: { fontFamily: fonts.serifItalic, fontSize: 20, color: colors.text, lineHeight: 26 },
+  sealedDate: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textMuted,
+    marginBottom: 10,
+  },
+  teaser: { fontFamily: fonts.serifItalic, fontSize: 28, color: colors.text, lineHeight: 36 },
   contentHero: {
     marginTop: spacing.xl,
     marginBottom: spacing.lg,

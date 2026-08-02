@@ -8,7 +8,6 @@ import { colors, fonts, radius } from '../lib/theme';
 import { AudioPlayerButton } from './AudioPlayerButton';
 import { Avatar } from './Avatar';
 import { InlineComments } from './InlineComments';
-import { SealBadge } from './SealBadge';
 
 /**
  * Carte d'une prédiction, partagée entre le Fil et les Archives.
@@ -67,22 +66,6 @@ export function PredictionCard({
       <Pressable onPress={handlePress} style={({ pressed }) => pressed && styles.cardPressed}>
         <View style={styles.cardTop}>
           <View style={styles.cardTopLeft}>
-            {!revealed && <SealBadge />}
-            {authorLabel && (
-              <Pressable
-                onPress={() => authorId && router.push(`/profile/${authorId}`)}
-                style={styles.authorBlock}
-                hitSlop={4}
-              >
-                <Avatar url={authorAvatarUrl} username={authorLabel} size={20} />
-                <Text style={styles.authorName} numberOfLines={1}>
-                  {authorLabel}
-                </Text>
-              </Pressable>
-            )}
-          </View>
-
-          <View style={styles.cardTopRight}>
             {!verdict && (
               <View style={[styles.badge, !revealed ? styles.badgeLocked : styles.badgeNeutral]}>
                 <Text style={[styles.badgeText, !revealed ? styles.badgeTextLocked : styles.badgeTextNeutral]}>
@@ -92,6 +75,19 @@ export function PredictionCard({
             )}
             {mode === 'accordion' && <Text style={styles.chevron}>{expanded ? '▲' : '▼'}</Text>}
           </View>
+
+          {authorLabel && (
+            <Pressable
+              onPress={() => authorId && router.push(`/profile/${authorId}`)}
+              style={styles.authorBlock}
+              hitSlop={4}
+            >
+              <Avatar url={authorAvatarUrl} username={authorLabel} size={36} />
+              <Text style={styles.authorName} numberOfLines={1}>
+                {authorLabel}
+              </Text>
+            </Pressable>
+          )}
         </View>
 
         <Text style={styles.cardTeaser}>{item.teaser}</Text>
@@ -151,10 +147,9 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   cardTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 10 },
-  cardTopLeft: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, flexShrink: 1 },
-  cardTopRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  authorBlock: { alignItems: 'center', maxWidth: 56 },
-  authorName: { fontSize: 9, color: colors.textFaint, marginTop: 3, textAlign: 'center' },
+  cardTopLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  authorBlock: { alignItems: 'center', maxWidth: 88 },
+  authorName: { fontSize: 13, fontWeight: '600', color: colors.textMuted, marginTop: 4, textAlign: 'center' },
   badge: {
     alignSelf: 'flex-start',
     borderRadius: radius.pill,
