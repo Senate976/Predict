@@ -21,7 +21,7 @@ import { colors, eyebrow, fonts, radius, spacing } from '../../../lib/theme';
 type Filter = 'total' | 'realized' | 'missed' | 'pending';
 
 const FILTER_LABEL: Record<Filter, string> = {
-  total: 'Journal',
+  total: 'Predict',
   realized: 'Réalisés',
   missed: 'Manqués',
   pending: 'En cours',
@@ -154,7 +154,7 @@ export default function ProfileScreen() {
                 style={[styles.statCard, filter === 'total' && styles.statCardActive]}
               >
                 <Text style={styles.statValue}>{total.length}</Text>
-                <Text style={styles.statLabel}>Journal</Text>
+                <Text style={styles.statLabel}>Predict</Text>
               </Pressable>
               <Pressable
                 onPress={() => setFilter('realized')}

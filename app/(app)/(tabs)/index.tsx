@@ -2,6 +2,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -23,7 +24,7 @@ import {
   type PredictionFeedItem,
 } from '../../../lib/predictions';
 import { supabase } from '../../../lib/supabase';
-import { colors, fonts, spacing } from '../../../lib/theme';
+import { colors, spacing } from '../../../lib/theme';
 
 /**
  * Période de rafraîchissement des comptes à rebours.
@@ -149,13 +150,13 @@ export default function HomeScreen() {
       />
 
       <View style={styles.header}>
-        <View style={styles.flex}>
-          <Text style={styles.brand}>Predict</Text>
-          <Text style={styles.greeting} numberOfLines={1}>
+        <Image source={require('../../../assets/predict-mark.png')} style={styles.logo} />
+        <View style={styles.userChip}>
+          <Avatar url={userId ? authors[userId]?.avatar_url ?? null : null} username={username ?? ''} size={32} />
+          <Text style={styles.userChipName} numberOfLines={1}>
             {username ?? session?.user.email ?? ''}
           </Text>
         </View>
-        <Avatar url={userId ? authors[userId]?.avatar_url ?? null : null} username={username ?? ''} size={40} />
       </View>
 
       <View style={styles.tabs}>
@@ -221,18 +222,18 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
-  flex: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    gap: spacing.md,
   },
-  brand: { fontFamily: fonts.serifItalic, fontSize: 26, color: colors.text },
-  greeting: { fontSize: 17, fontWeight: '700', color: colors.text, marginTop: 2 },
+  logo: { width: 40, height: 40, borderRadius: 9 },
+  userChip: { flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: '55%' },
+  userChipName: { fontSize: 14, fontWeight: '700', color: colors.text, flexShrink: 1 },
   tabs: {
     flexDirection: 'row',
     gap: 8,

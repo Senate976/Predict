@@ -50,11 +50,14 @@ type Relation =
   | { kind: 'incoming'; friendshipId: string }
   | { kind: 'outgoing'; friendshipId: string };
 
+type Tab = 'friends' | 'groups';
+
 export default function CircleScreen() {
   const { session } = useAuth();
   const router = useRouter();
   const userId = session?.user.id;
 
+  const [tab, setTab] = useState<Tab>('friends');
   const [friendships, setFriendships] = useState<Friendship[] | null>(null);
   const [friendBadges, setFriendBadges] = useState<Record<string, number>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -255,262 +258,283 @@ export default function CircleScreen() {
         <QuickCreateButton />
       </View>
 
+      <View style={styles.tabs}>
+        <Pressable
+          onPress={() => setTab('friends')}
+          style={[styles.tab, tab === 'friends' && styles.tabActive]}
+        >
+          <Text style={[styles.tabText, tab === 'friends' && styles.tabTextActive]}>Amis</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setTab('groups')}
+          style={[styles.tab, tab === 'groups' && styles.tabActive]}
+        >
+          <Text style={[styles.tabText, tab === 'groups' && styles.tabTextActive]}>Groupes</Text>
+        </Pressable>
+      </View>
+
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <Text style={styles.eyebrow}>Ajouter quelqu’un</Text>
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Chercher un pseudo"
-          autoCapitalize="none"
-          autoCorrect={false}
-          style={styles.input}
-        />
-
-        {searching && <ActivityIndicator style={styles.searchLoader} color={colors.gold} />}
-
-        {results && results.length === 0 && !searching && (
-          <Text style={styles.muted}>Aucun pseudo ne correspond.</Text>
-        )}
-
-        {results && results.length > 0 && (
-          <View style={styles.resultsBox}>
-            {results.map((profile) => {
-              const relation = relationFor(profile.id);
-              return (
-                <View key={profile.id} style={styles.row}>
-                  <Text style={styles.username}>{profile.username}</Text>
-                  {relation.kind === 'none' && (
-                    <Pressable
-                      onPress={() => handleAdd(profile.id)}
-                      disabled={pendingActionId === profile.id}
-                      style={styles.pillGold}
-                    >
-                      <Text style={styles.pillGoldText}>
-                        {pendingActionId === profile.id ? '…' : 'Ajouter'}
-                      </Text>
-                    </Pressable>
-                  )}
-                  {relation.kind === 'accepted' && <Text style={styles.muted}>Déjà ami</Text>}
-                  {relation.kind === 'outgoing' && <Text style={styles.muted}>Demande envoyée</Text>}
-                  {relation.kind === 'incoming' && <Text style={styles.muted}>T’a demandé</Text>}
-                </View>
-              );
-            })}
-          </View>
-        )}
-
         {actionError && <Text style={styles.error}>{actionError}</Text>}
         {loadError && <Text style={styles.error}>{loadError}</Text>}
 
-        {incoming.length > 0 && (
+        {tab === 'friends' ? (
           <>
-            <Text style={[styles.eyebrow, styles.sectionLabel]}>Demandes reçues</Text>
-            {incoming.map((f) => {
-              const profile = otherProfile(f, userId!);
-              return (
-                <View key={f.id} style={styles.row}>
-                  <Text style={styles.username}>{profile.username}</Text>
-                  <View style={styles.actions}>
+            <Text style={styles.eyebrow}>Ajouter quelqu’un</Text>
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Chercher un pseudo"
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={styles.input}
+            />
+
+            {searching && <ActivityIndicator style={styles.searchLoader} color={colors.gold} />}
+
+            {results && results.length === 0 && !searching && (
+              <Text style={styles.muted}>Aucun pseudo ne correspond.</Text>
+            )}
+
+            {results && results.length > 0 && (
+              <View style={styles.resultsBox}>
+                {results.map((profile) => {
+                  const relation = relationFor(profile.id);
+                  return (
+                    <View key={profile.id} style={styles.row}>
+                      <Text style={styles.username}>{profile.username}</Text>
+                      {relation.kind === 'none' && (
+                        <Pressable
+                          onPress={() => handleAdd(profile.id)}
+                          disabled={pendingActionId === profile.id}
+                          style={styles.pillGold}
+                        >
+                          <Text style={styles.pillGoldText}>
+                            {pendingActionId === profile.id ? '…' : 'Ajouter'}
+                          </Text>
+                        </Pressable>
+                      )}
+                      {relation.kind === 'accepted' && <Text style={styles.muted}>Déjà ami</Text>}
+                      {relation.kind === 'outgoing' && <Text style={styles.muted}>Demande envoyée</Text>}
+                      {relation.kind === 'incoming' && <Text style={styles.muted}>T’a demandé</Text>}
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
+            {incoming.length > 0 && (
+              <>
+                <Text style={[styles.eyebrow, styles.sectionLabel]}>Demandes reçues</Text>
+                {incoming.map((f) => {
+                  const profile = otherProfile(f, userId!);
+                  return (
+                    <View key={f.id} style={styles.row}>
+                      <Text style={styles.username}>{profile.username}</Text>
+                      <View style={styles.actions}>
+                        <Pressable
+                          onPress={() => handleAccept(f.id)}
+                          disabled={pendingActionId === f.id}
+                          style={styles.pillGold}
+                        >
+                          <Text style={styles.pillGoldText}>Accepter</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => handleRemove(f.id)}
+                          disabled={pendingActionId === f.id}
+                          style={styles.pillOutline}
+                        >
+                          <Text style={styles.pillOutlineText}>Refuser</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  );
+                })}
+              </>
+            )}
+
+            {outgoing.length > 0 && (
+              <>
+                <Text style={[styles.eyebrow, styles.sectionLabel]}>Demandes envoyées</Text>
+                {outgoing.map((f) => {
+                  const profile = otherProfile(f, userId!);
+                  return (
+                    <View key={f.id} style={styles.row}>
+                      <Text style={styles.username}>{profile.username}</Text>
+                      <Pressable
+                        onPress={() => handleRemove(f.id)}
+                        disabled={pendingActionId === f.id}
+                        style={styles.pillOutline}
+                      >
+                        <Text style={styles.pillOutlineText}>Annuler</Text>
+                      </Pressable>
+                    </View>
+                  );
+                })}
+              </>
+            )}
+
+            <Text style={[styles.eyebrow, styles.sectionLabel]}>
+              Mes amis {accepted.length > 0 ? `(${accepted.length})` : ''}
+            </Text>
+            {friendships === null && !loadError ? (
+              <ActivityIndicator style={styles.searchLoader} color={colors.gold} />
+            ) : accepted.length === 0 ? (
+              <Text style={styles.muted}>
+                Pas encore d’ami. Cherche un pseudo ci-dessus pour envoyer une demande.
+              </Text>
+            ) : (
+              accepted.map((f) => {
+                const profile = otherProfile(f, userId!);
+                return (
+                  <View key={f.id} style={styles.row}>
                     <Pressable
-                      onPress={() => handleAccept(f.id)}
-                      disabled={pendingActionId === f.id}
-                      style={styles.pillGold}
+                      onPress={() => router.push(`/profile/${profile.id}`)}
+                      style={styles.usernameRow}
                     >
-                      <Text style={styles.pillGoldText}>Accepter</Text>
+                      <Avatar url={profile.avatar_url} username={profile.username} size={28} />
+                      <PrestigeBadge count={friendBadges[profile.id] ?? 0} size="small" />
+                      <Text style={styles.username}>{profile.username}</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => handleRemove(f.id)}
                       disabled={pendingActionId === f.id}
                       style={styles.pillOutline}
                     >
-                      <Text style={styles.pillOutlineText}>Refuser</Text>
+                      <Text style={styles.pillOutlineText}>Retirer</Text>
                     </Pressable>
                   </View>
-                </View>
-              );
-            })}
+                );
+              })
+            )}
           </>
-        )}
-
-        {outgoing.length > 0 && (
+        ) : (
           <>
-            <Text style={[styles.eyebrow, styles.sectionLabel]}>Demandes envoyées</Text>
-            {outgoing.map((f) => {
-              const profile = otherProfile(f, userId!);
-              return (
-                <View key={f.id} style={styles.row}>
-                  <Text style={styles.username}>{profile.username}</Text>
-                  <Pressable
-                    onPress={() => handleRemove(f.id)}
-                    disabled={pendingActionId === f.id}
-                    style={styles.pillOutline}
-                  >
-                    <Text style={styles.pillOutlineText}>Annuler</Text>
-                  </Pressable>
-                </View>
-              );
-            })}
-          </>
-        )}
-
-        <Text style={[styles.eyebrow, styles.sectionLabel]}>
-          Mes amis {accepted.length > 0 ? `(${accepted.length})` : ''}
-        </Text>
-        {friendships === null && !loadError ? (
-          <ActivityIndicator style={styles.searchLoader} color={colors.gold} />
-        ) : accepted.length === 0 ? (
-          <Text style={styles.muted}>
-            Pas encore d’ami. Cherche un pseudo ci-dessus pour envoyer une demande.
-          </Text>
-        ) : (
-          accepted.map((f) => {
-            const profile = otherProfile(f, userId!);
-            return (
-              <View key={f.id} style={styles.row}>
-                <Pressable
-                  onPress={() => router.push(`/profile/${profile.id}`)}
-                  style={styles.usernameRow}
-                >
-                  <Avatar url={profile.avatar_url} username={profile.username} size={28} />
-                  <PrestigeBadge count={friendBadges[profile.id] ?? 0} size="small" />
-                  <Text style={styles.username}>{profile.username}</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => handleRemove(f.id)}
-                  disabled={pendingActionId === f.id}
-                  style={styles.pillOutline}
-                >
-                  <Text style={styles.pillOutlineText}>Retirer</Text>
-                </Pressable>
-              </View>
-            );
-          })
-        )}
-
-        <Text style={[styles.eyebrow, styles.sectionLabel]}>
-          Mes groupes {groups && groups.length > 0 ? `(${groups.length})` : ''}
-        </Text>
-        <Text style={styles.muted}>
-          Regroupe certains amis sous un nom (« Les Intimes »…) pour les cibler
-          d’un coup à la création d’une prédiction.
-        </Text>
-
-        <View style={styles.newGroupRow}>
-          <TextInput
-            value={newGroupName}
-            onChangeText={setNewGroupName}
-            placeholder="Nom du groupe"
-            maxLength={MAX_GROUP_NAME_LENGTH}
-            editable={!creatingGroup}
-            style={[styles.input, styles.newGroupInput]}
-          />
-          <Pressable
-            onPress={handleCreateGroup}
-            disabled={creatingGroup || !newGroupName.trim()}
-            style={styles.pillGold}
-          >
-            <Text style={styles.pillGoldText}>{creatingGroup ? '…' : 'Créer'}</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.visibilityRow}>
-          <Pressable
-            onPress={() => setNewGroupVisibility('private')}
-            style={[styles.visibilityOption, newGroupVisibility === 'private' && styles.visibilityOptionActive]}
-          >
-            <Text style={[styles.visibilityText, newGroupVisibility === 'private' && styles.visibilityTextActive]}>
-              Privé
+            <Text style={[styles.eyebrow, styles.sectionLabel]}>
+              Mes groupes {groups && groups.length > 0 ? `(${groups.length})` : ''}
             </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setNewGroupVisibility('public')}
-            style={[styles.visibilityOption, newGroupVisibility === 'public' && styles.visibilityOptionActive]}
-          >
-            <Text style={[styles.visibilityText, newGroupVisibility === 'public' && styles.visibilityTextActive]}>
-              Public
+            <Text style={styles.muted}>
+              Regroupe certains amis sous un nom (« Les Intimes »…) pour les cibler
+              d’un coup à la création d’une prédiction.
             </Text>
-          </Pressable>
-        </View>
-        <Text style={styles.visibilityHint}>
-          {newGroupVisibility === 'private'
-            ? 'Seuls les membres verront ce groupe.'
-            : 'Visible par tout ton Cercle.'}
-        </Text>
 
-        {groupError && <Text style={styles.error}>{groupError}</Text>}
+            <View style={styles.newGroupRow}>
+              <TextInput
+                value={newGroupName}
+                onChangeText={setNewGroupName}
+                placeholder="Nom du groupe"
+                maxLength={MAX_GROUP_NAME_LENGTH}
+                editable={!creatingGroup}
+                style={[styles.input, styles.newGroupInput]}
+              />
+              <Pressable
+                onPress={handleCreateGroup}
+                disabled={creatingGroup || !newGroupName.trim()}
+                style={styles.pillGold}
+              >
+                <Text style={styles.pillGoldText}>{creatingGroup ? '…' : 'Créer'}</Text>
+              </Pressable>
+            </View>
 
-        {groups === null ? (
-          <ActivityIndicator style={styles.searchLoader} color={colors.gold} />
-        ) : groups.length === 0 ? (
-          <Text style={styles.muted}>Aucun groupe pour l’instant.</Text>
-        ) : (
-          groups.map((group) => {
-            const expanded = expandedGroupId === group.id;
-            const members = groupMembers[group.id];
-            const memberById = new Map((members ?? []).map((m) => [m.friend_id, m]));
-            const acceptedCount = (members ?? []).filter((m) => m.status === 'accepted').length;
-            const pendingCount = (members ?? []).filter((m) => m.status === 'pending').length;
-            return (
-              <View key={group.id} style={styles.groupBox}>
-                <Pressable onPress={() => handleToggleExpand(group.id)} style={styles.groupHeader}>
-                  <View style={styles.flex}>
-                    <Text style={styles.username}>{group.name}</Text>
-                    <Text style={styles.groupMeta}>
-                      {group.visibility === 'public' ? 'Public' : 'Privé'}
-                      {members
-                        ? ` · ${acceptedCount} membre${acceptedCount > 1 ? 's' : ''}${
-                            pendingCount > 0 ? ` · ${pendingCount} en attente` : ''
-                          }`
-                        : ''}
-                    </Text>
-                  </View>
-                  <Text style={styles.groupChevron}>{expanded ? '▲' : '▼'}</Text>
-                </Pressable>
+            <View style={styles.visibilityRow}>
+              <Pressable
+                onPress={() => setNewGroupVisibility('private')}
+                style={[styles.visibilityOption, newGroupVisibility === 'private' && styles.visibilityOptionActive]}
+              >
+                <Text style={[styles.visibilityText, newGroupVisibility === 'private' && styles.visibilityTextActive]}>
+                  Privé
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setNewGroupVisibility('public')}
+                style={[styles.visibilityOption, newGroupVisibility === 'public' && styles.visibilityOptionActive]}
+              >
+                <Text style={[styles.visibilityText, newGroupVisibility === 'public' && styles.visibilityTextActive]}>
+                  Public
+                </Text>
+              </Pressable>
+            </View>
+            <Text style={styles.visibilityHint}>
+              {newGroupVisibility === 'private'
+                ? 'Seuls les membres verront ce groupe.'
+                : 'Visible par tout ton Cercle.'}
+            </Text>
 
-                {expanded && (
-                  <View style={styles.groupBody}>
-                    {accepted.length === 0 ? (
-                      <Text style={styles.muted}>
-                        Pas encore d’ami accepté à inviter dans ce groupe.
-                      </Text>
-                    ) : (
-                      accepted.map((f) => {
-                        const profile = otherProfile(f, userId!);
-                        const member = memberById.get(profile.id);
-                        const pending = pendingGroupActionId === `${group.id}:${profile.id}`;
-                        const label = pending
-                          ? '…'
-                          : member?.status === 'accepted'
-                            ? 'Membre'
-                            : member?.status === 'pending'
-                              ? 'Invitation envoyée'
-                              : 'Inviter';
-                        return (
-                          <View key={profile.id} style={styles.row}>
-                            <Text style={styles.username}>{profile.username}</Text>
-                            <Pressable
-                              onPress={() => handleToggleMember(group.id, profile.id, !!member)}
-                              disabled={pending}
-                              style={member ? styles.pillOutline : styles.pillGold}
-                            >
-                              <Text style={member ? styles.pillOutlineText : styles.pillGoldText}>{label}</Text>
-                            </Pressable>
-                          </View>
-                        );
-                      })
-                    )}
-                    <Pressable
-                      onPress={() => handleDeleteGroup(group.id)}
-                      disabled={pendingGroupActionId === group.id}
-                      style={styles.deleteGroup}
-                    >
-                      <Text style={styles.deleteGroupText}>Supprimer ce groupe</Text>
+            {groupError && <Text style={styles.error}>{groupError}</Text>}
+
+            {groups === null ? (
+              <ActivityIndicator style={styles.searchLoader} color={colors.gold} />
+            ) : groups.length === 0 ? (
+              <Text style={styles.muted}>Aucun groupe pour l’instant.</Text>
+            ) : (
+              groups.map((group) => {
+                const expanded = expandedGroupId === group.id;
+                const members = groupMembers[group.id];
+                const memberById = new Map((members ?? []).map((m) => [m.friend_id, m]));
+                const acceptedCount = (members ?? []).filter((m) => m.status === 'accepted').length;
+                const pendingCount = (members ?? []).filter((m) => m.status === 'pending').length;
+                return (
+                  <View key={group.id} style={styles.groupBox}>
+                    <Pressable onPress={() => handleToggleExpand(group.id)} style={styles.groupHeader}>
+                      <View style={styles.flex}>
+                        <Text style={styles.username}>{group.name}</Text>
+                        <Text style={styles.groupMeta}>
+                          {group.visibility === 'public' ? 'Public' : 'Privé'}
+                          {members
+                            ? ` · ${acceptedCount} membre${acceptedCount > 1 ? 's' : ''}${
+                                pendingCount > 0 ? ` · ${pendingCount} en attente` : ''
+                              }`
+                            : ''}
+                        </Text>
+                      </View>
+                      <Text style={styles.groupChevron}>{expanded ? '▲' : '▼'}</Text>
                     </Pressable>
+
+                    {expanded && (
+                      <View style={styles.groupBody}>
+                        {accepted.length === 0 ? (
+                          <Text style={styles.muted}>
+                            Pas encore d’ami accepté à inviter dans ce groupe.
+                          </Text>
+                        ) : (
+                          accepted.map((f) => {
+                            const profile = otherProfile(f, userId!);
+                            const member = memberById.get(profile.id);
+                            const pending = pendingGroupActionId === `${group.id}:${profile.id}`;
+                            const label = pending
+                              ? '…'
+                              : member?.status === 'accepted'
+                                ? 'Membre'
+                                : member?.status === 'pending'
+                                  ? 'Invitation envoyée'
+                                  : 'Inviter';
+                            return (
+                              <View key={profile.id} style={styles.row}>
+                                <Text style={styles.username}>{profile.username}</Text>
+                                <Pressable
+                                  onPress={() => handleToggleMember(group.id, profile.id, !!member)}
+                                  disabled={pending}
+                                  style={member ? styles.pillOutline : styles.pillGold}
+                                >
+                                  <Text style={member ? styles.pillOutlineText : styles.pillGoldText}>{label}</Text>
+                                </Pressable>
+                              </View>
+                            );
+                          })
+                        )}
+                        <Pressable
+                          onPress={() => handleDeleteGroup(group.id)}
+                          disabled={pendingGroupActionId === group.id}
+                          style={styles.deleteGroup}
+                        >
+                          <Text style={styles.deleteGroupText}>Supprimer ce groupe</Text>
+                        </Pressable>
+                      </View>
+                    )}
                   </View>
-                )}
-              </View>
-            );
-          })
+                );
+              })
+            )}
+          </>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -531,6 +555,24 @@ const styles = StyleSheet.create({
   },
   eyebrow: { ...eyebrow, marginBottom: 4 },
   headerTitle: { fontFamily: fonts.serifItalic, fontSize: 26, color: colors.text },
+  tabs: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 999,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  tabActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
+  tabText: { fontSize: 12, fontWeight: '700', letterSpacing: 1, color: colors.textMuted, textTransform: 'uppercase' },
+  tabTextActive: { color: colors.gold },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   sectionLabel: { marginTop: spacing.lg, marginBottom: 8 },
   input: {
