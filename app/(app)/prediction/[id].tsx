@@ -213,17 +213,15 @@ export default function PredictionDetailScreen() {
               )}
             </View>
 
-            {/* Date de révélation seulement tant qu'elle n'a pas eu lieu — une
-                fois révélée, elle n'apporte plus rien et distrairait du
-                contenu (la date de scellé, elle, reste au-dessus du Teaser). */}
-            {!revealed && (
-              <View style={styles.datesBlock}>
-                <View style={styles.dateLineRow}>
-                  <Ionicons name="lock-open" size={13} color={colors.textFaint} />
-                  <Text style={styles.dateLine}>{formatRevealAt(new Date(prediction.reveal_at))}</Text>
-                </View>
+            {/* Depuis que le Fil n'affiche plus ni la date de scellé ni celle
+                de révélation, cet écran détail est la seule à les montrer —
+                toujours visible, avant comme après la révélation. */}
+            <View style={styles.datesBlock}>
+              <View style={styles.dateLineRow}>
+                <Ionicons name="lock-open" size={13} color={colors.textFaint} />
+                <Text style={styles.dateLine}>{formatRevealAt(new Date(prediction.reveal_at))}</Text>
               </View>
-            )}
+            </View>
 
             <Text style={[styles.eyebrow, styles.sectionSpacing]}>Destinataires</Text>
             {recipientsError && <Text style={styles.error}>{recipientsError}</Text>}

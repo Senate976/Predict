@@ -1,9 +1,8 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { formatCountdown, formatRevealAt } from '../lib/datetime';
+import { formatCountdown } from '../lib/datetime';
 import { isRevealed, type PredictionFeedItem } from '../lib/predictions';
 import { colors, fonts, radius } from '../lib/theme';
 import { AudioPlayerButton } from './AudioPlayerButton';
@@ -104,20 +103,6 @@ export function PredictionCard({
             )}
           </View>
         )}
-
-        {item.recipient_usernames.length > 0 && (
-          <Text style={styles.recipientsLine} numberOfLines={2}>
-            Destiné à : {item.recipient_usernames.join(', ')}
-          </Text>
-        )}
-
-        {/* Date de révélation volontairement absente du Fil — seul l'écran
-            détail la précise ; ici, l'encart « dans X » en haut de carte
-            suffit à savoir que ça arrive bientôt. */}
-        <View style={styles.dateRow}>
-          <MaterialCommunityIcons name="seal" size={14} color={colors.textMuted} />
-          <Text style={styles.cardMeta}>{formatRevealAt(new Date(item.created_at))}</Text>
-        </View>
       </Pressable>
 
       {showBody && (
@@ -196,9 +181,6 @@ const styles = StyleSheet.create({
     lineHeight: 26,
   },
   audioRow: { marginTop: 10 },
-  recipientsLine: { fontSize: 12, color: colors.textMuted, fontWeight: '600', marginTop: 10 },
-  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
-  cardMeta: { fontSize: 12, color: colors.textFaint },
   voteLink: { marginTop: 10 },
   voteLinkText: { fontSize: 13, fontWeight: '600', color: colors.gold },
 });
