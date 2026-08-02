@@ -72,22 +72,28 @@ export default function PredictionDetailScreen() {
 
     const isAuthorNow = item.author_id === userId;
 
+    // Les destinataires se chargent pour tout le monde — ouvrir une prédiction
+    // doit montrer toute l'audience, pas seulement à l'auteur. Seuls l'ajout
+    // et le retrait restent réservés à l'auteur (chargement des amis inclus).
+    const [{ data: recipientsData, error: recipientsFetchError }, friendshipsResult] =
+      await Promise.all([
+        fetchPredictionRecipients(id),
+        isAuthorNow ? fetchFriendships(userId) : Promise.resolve({ data: null }),
+      ]);
+    if (recipientsFetchError) {
+      // Ne jamais confondre une vraie erreur avec « personne pour l'instant » :
+      // sans ça, un souci de chargement se lisait comme une prédiction sans
+      // aucun destinataire, ce qui n'est jamais vrai (l'auteur a toujours au
+      // moins lui-même, et le scope choisi à la création peuple toujours
+      // `prediction_access`).
+      setRecipientsError(`Chargement des destinataires impossible : ${recipientsFetchError.message}`);
+      setRecipients([]);
+    } else {
+      setRecipientsError(null);
+      setRecipients(recipientsData ?? []);
+    }
     if (isAuthorNow) {
-      const [{ data: recipientsData, error: recipientsFetchError }, { data: friendships }] =
-        await Promise.all([fetchPredictionRecipients(id), fetchFriendships(userId)]);
-      if (recipientsFetchError) {
-        // Ne jamais confondre une vraie erreur avec « personne pour l'instant » :
-        // sans ça, un souci de chargement se lisait comme une prédiction sans
-        // aucun destinataire, ce qui n'est jamais vrai (l'auteur a toujours au
-        // moins lui-même, et le scope choisi à la création peuple toujours
-        // `prediction_access`).
-        setRecipientsError(`Chargement des destinataires impossible : ${recipientsFetchError.message}`);
-        setRecipients([]);
-      } else {
-        setRecipientsError(null);
-        setRecipients(recipientsData ?? []);
-      }
-      const accepted = (friendships ?? []).filter((f) => f.status === 'accepted');
+      const accepted = (friendshipsResult.data ?? []).filter((f) => f.status === 'accepted');
       setFriends(accepted.map((f) => otherProfile(f, userId)));
     }
 
@@ -216,35 +222,32 @@ export default function PredictionDetailScreen() {
               </View>
             )}
 
-            {!isAuthor ? (
-              <Text style={styles.notAuthor}>
-                Seul l’auteur peut gérer les destinataires de cette prédiction.
-              </Text>
+            <Text style={[styles.eyebrow, styles.sectionSpacing]}>Destinataires</Text>
+            {recipientsError && <Text style={styles.error}>{recipientsError}</Text>}
+            {actionError && <Text style={styles.error}>{actionError}</Text>}
+            {recipients === null ? (
+              <ActivityIndicator color={colors.gold} style={styles.loader} />
+            ) : recipients.length === 0 ? (
+              <Text style={styles.hint}>Personne pour l’instant.</Text>
             ) : (
+              recipients.map((r) => (
+                <View key={r.user_id} style={styles.row}>
+                  <Text style={styles.username}>{r.profile.username}</Text>
+                  {isAuthor && (
+                    <Pressable
+                      onPress={() => handleRemove(r.user_id)}
+                      disabled={pendingId === r.user_id}
+                      style={styles.pillOutline}
+                    >
+                      <Text style={styles.pillOutlineText}>Retirer</Text>
+                    </Pressable>
+                  )}
+                </View>
+              ))
+            )}
+
+            {isAuthor && (
               <>
-                {actionError && <Text style={styles.error}>{actionError}</Text>}
-
-                <Text style={[styles.eyebrow, styles.sectionSpacing]}>Destinataires</Text>
-                {recipientsError && <Text style={styles.error}>{recipientsError}</Text>}
-                {recipients === null ? (
-                  <ActivityIndicator color={colors.gold} style={styles.loader} />
-                ) : recipients.length === 0 ? (
-                  <Text style={styles.hint}>Personne pour l’instant.</Text>
-                ) : (
-                  recipients.map((r) => (
-                    <View key={r.user_id} style={styles.row}>
-                      <Text style={styles.username}>{r.profile.username}</Text>
-                      <Pressable
-                        onPress={() => handleRemove(r.user_id)}
-                        disabled={pendingId === r.user_id}
-                        style={styles.pillOutline}
-                      >
-                        <Text style={styles.pillOutlineText}>Retirer</Text>
-                      </Pressable>
-                    </View>
-                  ))
-                )}
-
                 <Text style={[styles.eyebrow, styles.sectionSpacing]}>Ajouter depuis le Cercle</Text>
                 {friends === null ? (
                   <ActivityIndicator color={colors.gold} style={styles.loader} />
@@ -401,7 +404,6 @@ const styles = StyleSheet.create({
   voteButtonMissedActive: { borderColor: colors.danger, backgroundColor: colors.dangerSoft },
   voteButtonText: { fontSize: 12, fontWeight: '600', color: colors.textMuted },
   voteButtonTextActive: { color: colors.text },
-  notAuthor: { fontSize: 13, color: colors.textMuted, marginTop: spacing.lg, lineHeight: 19 },
   sectionSpacing: { marginTop: spacing.lg, marginBottom: 8 },
   hint: { fontSize: 14, color: colors.textFaint, lineHeight: 20 },
   row: {

@@ -627,19 +627,24 @@ create policy "predictions_select_visible"
 
 alter table public.prediction_access enable row level security;
 
--- Un utilisateur voit ses propres accès (pour savoir ce qu'on lui a partagé),
--- et l'auteur voit qui a accès à ses prédictions.
+-- L'auteur voit qui a accès à ses prédictions, et n'importe quel destinataire
+-- voit le reste de l'audience de la même prédiction (pas seulement sa propre
+-- ligne) — ouvrir une prédiction doit montrer qui d'autre la reçoit, pas
+-- seulement à l'auteur. Passe par `has_prediction_access` plutôt qu'un
+-- second `exists (select ... from prediction_access ...)` direct sur la
+-- table elle-même : cette fonction tourne `security definer`, donc son
+-- propre `select` ne redéclenche pas cette policy.
 drop policy if exists "prediction_access_select" on public.prediction_access;
 create policy "prediction_access_select"
   on public.prediction_access
   for select
   to authenticated
   using (
-    user_id = auth.uid()
-    or exists (
+    exists (
       select 1 from public.predictions p
       where p.id = prediction_access.prediction_id and p.author_id = auth.uid()
     )
+    or public.has_prediction_access(prediction_access.prediction_id, auth.uid())
   );
 
 -- Seul l'auteur de la prédiction peut accorder un accès, et seulement à un ami
