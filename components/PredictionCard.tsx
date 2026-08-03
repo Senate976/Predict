@@ -5,7 +5,16 @@ import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native
 
 import { fetchCommentCount } from '../lib/comments';
 import { formatCountdown } from '../lib/datetime';
-import { isRevealed, type PredictionFeedItem } from '../lib/predictions';
+import {
+  CATEGORY_LABEL,
+  castEmojiReaction,
+  EMOJI_REACTIONS,
+  isRevealed,
+  removeEmojiReaction,
+  setPredictionUserState,
+  type EmojiReaction,
+  type PredictionFeedItem,
+} from '../lib/predictions';
 import { colors, fonts, radius } from '../lib/theme';
 import { AudioPlayerButton } from './AudioPlayerButton';
 import { Avatar } from './Avatar';
@@ -29,6 +38,8 @@ export function PredictionCard({
   onPress,
   hasVoted = false,
   onDelete,
+  onFavoriteChange,
+  onHiddenChange,
 }: {
   item: PredictionFeedItem;
   now: Date;
@@ -43,10 +54,19 @@ export function PredictionCard({
   /** Réservé à l'auteur d'une prédiction révélée — affiche l'icône de
    * suppression, avec confirmation, en bas à droite de la carte. */
   onDelete?: () => void;
+  /** Préviennent l'écran parent (Fil) du nouvel état, pour que ses propres
+   * listes filtrées (favoris, masquées) restent à jour sans recharger tout
+   * le fil à chaque bascule. */
+  onFavoriteChange?: (isFavorite: boolean) => void;
+  onHiddenChange?: (isHidden: boolean) => void;
 }) {
   const router = useRouter();
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentCount, setCommentCount] = useState<number | null>(null);
+  const [isFavorite, setIsFavorite] = useState(item.is_favorite);
+  const [isHidden, setIsHidden] = useState(item.is_hidden);
+  const [myEmoji, setMyEmoji] = useState<EmojiReaction | null>(item.my_emoji_reaction);
+  const [emojiCounts, setEmojiCounts] = useState(item.emoji_counts);
   const revealAt = new Date(item.reveal_at);
   const revealed = isRevealed(item, now);
   const isAuthor = item.author_id === userId;
@@ -82,6 +102,62 @@ export function PredictionCard({
     ]);
   }
 
+  async function handleToggleFavorite() {
+    const next = !isFavorite;
+    setIsFavorite(next);
+    onFavoriteChange?.(next);
+    const { error } = await setPredictionUserState(item.id, userId, { favorite: next });
+    if (error) {
+      setIsFavorite(!next);
+      onFavoriteChange?.(!next);
+    }
+  }
+
+  async function handleToggleHidden() {
+    const next = !isHidden;
+    setIsHidden(next);
+    onHiddenChange?.(next);
+    const { error } = await setPredictionUserState(item.id, userId, { hidden: next });
+    if (error) {
+      setIsHidden(!next);
+      onHiddenChange?.(!next);
+    }
+  }
+
+  function adjustCounts(
+    counts: Partial<Record<EmojiReaction, number>>,
+    remove: EmojiReaction | null,
+    add: EmojiReaction | null
+  ): Partial<Record<EmojiReaction, number>> {
+    const next = { ...counts };
+    if (remove) next[remove] = Math.max(0, (next[remove] ?? 0) - 1);
+    if (add) next[add] = (next[add] ?? 0) + 1;
+    return next;
+  }
+
+  async function handleEmojiPress(emoji: EmojiReaction) {
+    const previous = myEmoji;
+    if (previous === emoji) {
+      // Retape le même emoji : retire la réaction.
+      setMyEmoji(null);
+      setEmojiCounts((prev) => adjustCounts(prev, emoji, null));
+      const { error } = await removeEmojiReaction(item.id, userId);
+      if (error) {
+        setMyEmoji(previous);
+        setEmojiCounts((prev) => adjustCounts(prev, null, previous));
+      }
+      return;
+    }
+
+    setMyEmoji(emoji);
+    setEmojiCounts((prev) => adjustCounts(prev, previous, emoji));
+    const { error } = await castEmojiReaction(item.id, userId, emoji);
+    if (error) {
+      setMyEmoji(previous);
+      setEmojiCounts((prev) => adjustCounts(prev, emoji, previous));
+    }
+  }
+
   return (
     <View
       style={[
@@ -114,6 +190,7 @@ export function PredictionCard({
           )}
         </View>
 
+        <Text style={styles.categoryTag}>{CATEGORY_LABEL[item.category]}</Text>
         <Text style={styles.cardTeaser}>{item.teaser}</Text>
 
         {revealed && item.content && (
@@ -135,15 +212,53 @@ export function PredictionCard({
         </Pressable>
       )}
 
+      <View style={styles.emojiRow}>
+        {EMOJI_REACTIONS.map((emoji) => {
+          const count = emojiCounts[emoji] ?? 0;
+          const selected = myEmoji === emoji;
+          return (
+            <Pressable
+              key={emoji}
+              onPress={() => handleEmojiPress(emoji)}
+              style={[styles.emojiButton, selected && styles.emojiButtonActive]}
+              hitSlop={4}
+            >
+              <Text style={styles.emojiButtonText}>
+                {emoji}
+                {count > 0 ? ` ${count}` : ''}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
       <View style={styles.footerRow}>
-        <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
-          <Ionicons
-            name={commentsOpen ? 'chatbubble' : 'chatbubble-outline'}
-            size={16}
-            color={colors.textMuted}
-          />
-          <Text style={styles.commentsToggleText}>{commentCount ?? 0}</Text>
-        </Pressable>
+        <View style={styles.footerLeft}>
+          <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
+            <Ionicons
+              name={commentsOpen ? 'chatbubble' : 'chatbubble-outline'}
+              size={16}
+              color={colors.textMuted}
+            />
+            <Text style={styles.commentsToggleText}>{commentCount ?? 0}</Text>
+          </Pressable>
+
+          <Pressable onPress={handleToggleFavorite} hitSlop={8}>
+            <Ionicons
+              name={isFavorite ? 'star' : 'star-outline'}
+              size={17}
+              color={isFavorite ? colors.gold : colors.textMuted}
+            />
+          </Pressable>
+
+          <Pressable onPress={handleToggleHidden} hitSlop={8}>
+            <Ionicons
+              name={isHidden ? 'eye-off' : 'eye-off-outline'}
+              size={17}
+              color={isHidden ? colors.gold : colors.textMuted}
+            />
+          </Pressable>
+        </View>
 
         {revealed && isAuthor && onDelete && (
           <Pressable onPress={handleDeletePress} hitSlop={4}>
@@ -183,6 +298,14 @@ const styles = StyleSheet.create({
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 },
   authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, maxWidth: '65%' },
   authorName: { fontSize: 13, fontWeight: '600', color: colors.textMuted, flexShrink: 1 },
+  categoryTag: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: colors.textFaint,
+    marginBottom: 4,
+  },
   badge: {
     borderRadius: radius.pill,
     paddingHorizontal: 10,
@@ -222,12 +345,23 @@ const styles = StyleSheet.create({
   audioRow: { marginTop: 10 },
   voteLink: { marginTop: 10 },
   voteLinkText: { fontSize: 13, fontWeight: '600', color: colors.gold },
+  emojiRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },
+  emojiButton: {
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  emojiButtonActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
+  emojiButtonText: { fontSize: 14, color: colors.textMuted },
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 10,
   },
+  footerLeft: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   commentsToggle: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   commentsToggleText: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
 });
