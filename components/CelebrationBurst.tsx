@@ -4,8 +4,8 @@ import { Animated, Dimensions, Modal, StyleSheet, Text, View } from 'react-nativ
 import { colors, fonts, radius } from '../lib/theme';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const PARTICLE_COUNT = 24;
-const HOLD_MS = 2600;
+const PARTICLE_COUNT = 160;
+const HOLD_MS = 3000;
 const GOLD_TONES = ['#D4AF37', '#E4C978', '#C9A24B', '#F0D77B'];
 
 type Particle = {
@@ -20,10 +20,10 @@ type Particle = {
 function makeParticles(): Particle[] {
   return Array.from({ length: PARTICLE_COUNT }, () => ({
     left: Math.random() * 100,
-    size: 3 + Math.random() * 5,
-    delayMs: Math.random() * 500,
-    durationMs: 1400 + Math.random() * 900,
-    drift: (Math.random() - 0.5) * 80,
+    size: 3 + Math.random() * 6,
+    delayMs: Math.random() * 900,
+    durationMs: 1500 + Math.random() * 1100,
+    drift: (Math.random() - 0.5) * 100,
     color: GOLD_TONES[Math.floor(Math.random() * GOLD_TONES.length)],
   }));
 }

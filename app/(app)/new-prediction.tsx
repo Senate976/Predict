@@ -259,7 +259,7 @@ export default function NewPredictionScreen() {
               <TextInput
                 value={content}
                 onChangeText={setContent}
-                placeholder="Écrivez votre predict ici et prouvez à votre cercle, qu’une fois encore, vous aurez raison"
+                placeholder="Écrivez votre predict ici et prouvez à votre cercle, qu’une fois encore, vous aviez raison"
                 placeholderTextColor={colors.textFaint}
                 multiline
                 editable={!submitting}
@@ -276,15 +276,9 @@ export default function NewPredictionScreen() {
             </View>
           )}
 
-          <Text style={styles.hint}>
-            Personne ne le verra (ni ne l’écoutera) avant l’heure de révélation, pas
-            même la personne concernée.
-          </Text>
-
           <Text style={[styles.label, styles.sectionLabel]}>Révélation</Text>
           <Text style={styles.sectionHint}>
-            Le moment que tu veux, à la minute près. L’heure est facultative —
-            par défaut, midi.
+            Le moment que tu veux, à la minute près. L’heure est facultative.
           </Text>
 
           <CalendarPicker value={selectedDate} onChange={setSelectedDate} disabled={submitting} />

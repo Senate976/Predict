@@ -85,6 +85,12 @@ export function formatRevealAt(date: Date): string {
   return `${weekday} ${dayLabel} ${month} à ${toTimeInput(date)}`;
 }
 
+/** « 04/08/26 - 20:00 » — sans le jour de la semaine, année sur deux chiffres. */
+export function formatShortDateTime(date: Date): string {
+  const year2 = pad(date.getFullYear() % 100);
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${year2} - ${toTimeInput(date)}`;
+}
+
 /** « dans 12 min », « dans 3 h 05 », « dans 4 jours ». */
 export function formatCountdown(target: Date, from: Date): string {
   const ms = target.getTime() - from.getTime();

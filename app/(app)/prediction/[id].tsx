@@ -14,7 +14,7 @@ import { AudioPlayerButton } from '../../../components/AudioPlayerButton';
 import { InlineComments } from '../../../components/InlineComments';
 import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { useAuth } from '../../../lib/auth';
-import { formatRevealAt } from '../../../lib/datetime';
+import { formatShortDateTime } from '../../../lib/datetime';
 import { fetchFriendships, otherProfile, type FriendProfile } from '../../../lib/friends';
 import {
   addRecipient,
@@ -54,6 +54,7 @@ export default function PredictionDetailScreen() {
   const [voteError, setVoteError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [voting, setVoting] = useState(false);
+  const [recipientsOpen, setRecipientsOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!id || !userId) return;
@@ -187,17 +188,11 @@ export default function PredictionDetailScreen() {
           <>
             <Text style={styles.teaser}>{prediction.teaser}</Text>
 
-            {/* Depuis que le Fil n'affiche plus ni la date de scellé ni celle
-                de révélation, cet écran détail est la seule à les montrer —
-                toujours visible, avant comme après la révélation. */}
-            <View style={styles.datesRow}>
-              <Text style={styles.dateColText}>
-                Scellé le {formatRevealAt(new Date(prediction.created_at))}
-              </Text>
-              <Text style={[styles.dateColText, styles.dateColRight]}>
-                Révélé le {formatRevealAt(new Date(prediction.reveal_at))}
-              </Text>
-            </View>
+            {/* Depuis que le Fil n'affiche plus la date de scellé, cet écran
+                détail est le seul à la montrer — toujours visible. */}
+            <Text style={styles.sealedDate}>
+              Scellé le {formatShortDateTime(new Date(prediction.created_at))}
+            </Text>
 
             {/* Le cœur de l'écran : le contenu de la prédiction prime sur tout
                 le reste, y compris le verdict — repoussé tout en bas. Même
@@ -216,62 +211,75 @@ export default function PredictionDetailScreen() {
                   )}
                 </>
               ) : (
-                <Text style={styles.sealedHint}>Contenu scellé jusqu’à la révélation.</Text>
+                <Text style={styles.sealedHint}>
+                  Cette prédiction sera révélée le {formatShortDateTime(new Date(prediction.reveal_at))}.
+                </Text>
               )}
             </View>
 
-            <Text style={[styles.eyebrow, styles.sectionSpacing]}>Destinataires</Text>
-            {recipientsError && <Text style={styles.error}>{recipientsError}</Text>}
-            {actionError && <Text style={styles.error}>{actionError}</Text>}
-            {recipients === null ? (
-              <ActivityIndicator color={colors.gold} style={styles.loader} />
-            ) : recipients.length === 0 ? (
-              <Text style={styles.hint}>Personne pour l’instant.</Text>
-            ) : (
-              recipients.map((r) => (
-                <View key={r.user_id} style={styles.row}>
-                  <Text style={styles.username}>{r.profile.username}</Text>
-                  {isAuthor && (
-                    <Pressable
-                      onPress={() => handleRemove(r.user_id)}
-                      disabled={pendingId === r.user_id}
-                      style={styles.pillOutline}
-                    >
-                      <Text style={styles.pillOutlineText}>Retirer</Text>
-                    </Pressable>
-                  )}
-                </View>
-              ))
-            )}
+            <Pressable
+              onPress={() => setRecipientsOpen((o) => !o)}
+              style={[styles.sectionToggle, styles.sectionSpacing]}
+              hitSlop={4}
+            >
+              <Text style={styles.eyebrow}>Destinataires</Text>
+              <Text style={styles.chevron}>{recipientsOpen ? '▲' : '▼'}</Text>
+            </Pressable>
 
-            {isAuthor && (
+            {recipientsOpen && (
               <>
-                <Text style={[styles.eyebrow, styles.sectionSpacing]}>Ajouter depuis le Cercle</Text>
-                {friends === null ? (
+                {recipientsError && <Text style={styles.error}>{recipientsError}</Text>}
+                {actionError && <Text style={styles.error}>{actionError}</Text>}
+                {recipients === null ? (
                   <ActivityIndicator color={colors.gold} style={styles.loader} />
-                ) : addableFriends.length === 0 ? (
-                  <Text style={styles.hint}>
-                    Tout ton Cercle a déjà accès, ou tu n’as pas encore d’ami.
-                  </Text>
+                ) : recipients.length === 0 ? (
+                  <Text style={styles.hint}>Personne pour l’instant.</Text>
                 ) : (
-                  addableFriends.map((friend) => (
-                    <View key={friend.id} style={styles.row}>
-                      <Text style={styles.username}>{friend.username}</Text>
-                      <Pressable
-                        onPress={() => handleAdd(friend.id)}
-                        disabled={pendingId === friend.id}
-                        style={styles.pillGold}
-                      >
-                        <Text style={styles.pillGoldText}>Ajouter</Text>
-                      </Pressable>
+                  recipients.map((r) => (
+                    <View key={r.user_id} style={styles.row}>
+                      <Text style={styles.username}>{r.profile.username}</Text>
+                      {isAuthor && (
+                        <Pressable
+                          onPress={() => handleRemove(r.user_id)}
+                          disabled={pendingId === r.user_id}
+                          style={styles.pillOutline}
+                        >
+                          <Text style={styles.pillOutlineText}>Retirer</Text>
+                        </Pressable>
+                      )}
                     </View>
                   ))
                 )}
+
+                {/* Ajouter un destinataire n'a plus de sens une fois la
+                    prédiction révélée — réservé à l'auteur, avant révélation. */}
+                {isAuthor && !revealed && (
+                  <>
+                    <Text style={[styles.eyebrow, styles.sectionSpacing]}>Ajouter depuis le Cercle</Text>
+                    {friends === null ? (
+                      <ActivityIndicator color={colors.gold} style={styles.loader} />
+                    ) : addableFriends.length === 0 ? (
+                      <Text style={styles.hint}>
+                        Tout ton Cercle a déjà accès, ou tu n’as pas encore d’ami.
+                      </Text>
+                    ) : (
+                      addableFriends.map((friend) => (
+                        <View key={friend.id} style={styles.row}>
+                          <Text style={styles.username}>{friend.username}</Text>
+                          <Pressable
+                            onPress={() => handleAdd(friend.id)}
+                            disabled={pendingId === friend.id}
+                            style={styles.pillGold}
+                          >
+                            <Text style={styles.pillGoldText}>Ajouter</Text>
+                          </Pressable>
+                        </View>
+                      ))
+                    )}
+                  </>
+                )}
               </>
             )}
-
-            <Text style={[styles.eyebrow, styles.sectionSpacing]}>Discussion</Text>
-            <InlineComments predictionId={id} userId={userId!} />
 
             {revealed && outcome && (
               <View style={styles.verdictBox}>
@@ -313,6 +321,9 @@ export default function PredictionDetailScreen() {
                 )}
               </View>
             )}
+
+            <Text style={[styles.eyebrow, styles.sectionSpacing]}>Discussion</Text>
+            <InlineComments predictionId={id} userId={userId!} />
           </>
         ) : null}
       </ScrollView>
@@ -338,9 +349,7 @@ const styles = StyleSheet.create({
   eyebrow: { ...eyebrow },
   eyebrowSmall: { ...eyebrow, fontSize: 10 },
   teaser: { fontFamily: fonts.serifItalic, fontSize: 28, color: colors.text, lineHeight: 36 },
-  datesRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
-  dateColText: { fontSize: 12, color: colors.textFaint, flexShrink: 1 },
-  dateColRight: { textAlign: 'right' },
+  sealedDate: { fontSize: 12, color: colors.textFaint, marginTop: 10 },
   contentHero: {
     marginTop: spacing.xl,
     marginBottom: spacing.lg,
@@ -384,6 +393,8 @@ const styles = StyleSheet.create({
   voteButtonText: { fontSize: 12, fontWeight: '600', color: colors.textMuted },
   voteLockedText: { fontSize: 14, fontWeight: '700', color: colors.text, marginTop: 10 },
   sectionSpacing: { marginTop: spacing.lg, marginBottom: 8 },
+  sectionToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  chevron: { fontSize: 11, color: colors.textFaint },
   hint: { fontSize: 14, color: colors.textFaint, lineHeight: 20 },
   row: {
     flexDirection: 'row',
