@@ -219,6 +219,16 @@ export async function removeRecipient(predictionId: string, userId: string) {
     .eq('user_id', userId);
 }
 
+/**
+ * Supprime la prédiction elle-même — réservé à l'auteur (RLS
+ * `predictions_delete_own`), à tout moment. Entraîne en cascade la
+ * suppression de son contenu, de son audience, des votes et des
+ * commentaires (contraintes `on delete cascade`).
+ */
+export async function deletePrediction(predictionId: string) {
+  return supabase.from('predictions').delete().eq('id', predictionId);
+}
+
 export type PredictionOutcomeStatus = 'pending' | 'realized' | 'missed';
 
 /**

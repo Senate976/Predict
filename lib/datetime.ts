@@ -91,6 +91,24 @@ export function formatShortDateTime(date: Date): string {
   return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${year2} - ${toTimeInput(date)}`;
 }
 
+/**
+ * « Prédit 4 jours à l’avance » ou, en-deçà de 24 h, « Prédit 3 heures à
+ * l’avance » — l'écart entre le scellé et la révélation compterait comme
+ * « 0 jour » sinon, peu lisible pour une prédiction posée le matin pour le
+ * soir même.
+ */
+export function formatAdvance(createdAt: Date, revealAt: Date): string {
+  const totalHours = (revealAt.getTime() - createdAt.getTime()) / 3_600_000;
+
+  if (totalHours < 24) {
+    const hours = Math.max(0, Math.round(totalHours));
+    return `Prédit ${hours} heure${hours > 1 ? 's' : ''} à l’avance`;
+  }
+
+  const days = Math.max(0, Math.round(totalHours / 24));
+  return `Prédit ${days} jour${days > 1 ? 's' : ''} à l’avance`;
+}
+
 /** « dans 12 min », « dans 3 h 05 », « dans 4 jours ». */
 export function formatCountdown(target: Date, from: Date): string {
   const ms = target.getTime() - from.getTime();

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { fetchCommentCount } from '../lib/comments';
 import { formatCountdown } from '../lib/datetime';
@@ -28,6 +28,7 @@ export function PredictionCard({
   userId,
   onPress,
   hasVoted = false,
+  onDelete,
 }: {
   item: PredictionFeedItem;
   now: Date;
@@ -39,6 +40,9 @@ export function PredictionCard({
   /** Le destinataire s'est déjà prononcé sur cette prédiction — masque le lien
    * « Donner mon avis », qui n'a plus lieu d'être une fois le vote posé. */
   hasVoted?: boolean;
+  /** Réservé à l'auteur d'une prédiction révélée — affiche l'icône de
+   * suppression, avec confirmation, en bas à droite de la carte. */
+  onDelete?: () => void;
 }) {
   const router = useRouter();
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -58,6 +62,17 @@ export function PredictionCard({
       cancelled = true;
     };
   }, [item.id]);
+
+  function handleDeletePress() {
+    Alert.alert(
+      'Supprimer cette prédiction ?',
+      'Cette action est définitive : le contenu, les votes et les commentaires seront perdus pour tout le Cercle.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Supprimer', style: 'destructive', onPress: () => onDelete?.() },
+      ]
+    );
+  }
 
   return (
     <View
@@ -112,14 +127,22 @@ export function PredictionCard({
         </Pressable>
       )}
 
-      <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
-        <Ionicons
-          name={commentsOpen ? 'chatbubble' : 'chatbubble-outline'}
-          size={16}
-          color={colors.textMuted}
-        />
-        <Text style={styles.commentsToggleText}>{commentCount ?? 0}</Text>
-      </Pressable>
+      <View style={styles.footerRow}>
+        <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
+          <Ionicons
+            name={commentsOpen ? 'chatbubble' : 'chatbubble-outline'}
+            size={16}
+            color={colors.textMuted}
+          />
+          <Text style={styles.commentsToggleText}>{commentCount ?? 0}</Text>
+        </Pressable>
+
+        {revealed && isAuthor && onDelete && (
+          <Pressable onPress={handleDeletePress} hitSlop={4}>
+            <Ionicons name="trash-outline" size={17} color={colors.danger} />
+          </Pressable>
+        )}
+      </View>
 
       {commentsOpen && <InlineComments predictionId={item.id} userId={userId} truncate />}
     </View>
@@ -183,12 +206,12 @@ const styles = StyleSheet.create({
   audioRow: { marginTop: 10 },
   voteLink: { marginTop: 10 },
   voteLinkText: { fontSize: 13, fontWeight: '600', color: colors.gold },
-  commentsToggle: {
+  footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 6,
+    justifyContent: 'space-between',
     marginTop: 10,
   },
+  commentsToggle: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   commentsToggleText: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
 });
