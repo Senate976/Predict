@@ -82,10 +82,10 @@ export function PredictionCard({
             </Pressable>
           )}
 
-          {!verdict && (
-            <View style={[styles.badge, !revealed ? styles.badgeLocked : styles.badgeNeutral]}>
-              <Text style={[styles.badgeText, !revealed ? styles.badgeTextLocked : styles.badgeTextNeutral]}>
-                {!revealed ? formatCountdown(revealAt, now) : 'Révélée'}
+          {!verdict && !revealed && (
+            <View style={[styles.badge, styles.badgeLocked]}>
+              <Text style={[styles.badgeText, styles.badgeTextLocked]}>
+                {formatCountdown(revealAt, now)}
               </Text>
             </View>
           )}
@@ -152,10 +152,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   badgeLocked: { backgroundColor: colors.goldSoft },
-  badgeNeutral: { backgroundColor: colors.border },
   badgeText: { fontSize: 12, fontWeight: '700' },
   badgeTextLocked: { color: colors.gold },
-  badgeTextNeutral: { color: colors.textMuted },
   cardRealized: { borderLeftWidth: 4, borderLeftColor: colors.success },
   cardMissed: { borderLeftWidth: 4, borderLeftColor: colors.danger },
   cardTeaser: {
