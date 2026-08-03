@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -174,12 +175,26 @@ export default function HomeScreen() {
 
       <View style={styles.header}>
         <Text style={styles.brand}>Actu</Text>
-        <Pressable style={styles.userChip} onPress={() => router.push('/profile')} hitSlop={4}>
-          <Avatar url={userId ? authors[userId]?.avatar_url ?? null : null} username={username ?? ''} size={32} />
-          <Text style={styles.userChipName} numberOfLines={1}>
-            {username ?? session?.user.email ?? ''}
-          </Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            onPress={handleRefresh}
+            disabled={refreshing}
+            style={styles.refreshButton}
+            hitSlop={8}
+          >
+            {refreshing ? (
+              <ActivityIndicator size="small" color={colors.gold} />
+            ) : (
+              <Ionicons name="refresh-outline" size={20} color={colors.gold} />
+            )}
+          </Pressable>
+          <Pressable style={styles.userChip} onPress={() => router.push('/profile')} hitSlop={4}>
+            <Avatar url={userId ? authors[userId]?.avatar_url ?? null : null} username={username ?? ''} size={32} />
+            <Text style={styles.userChipName} numberOfLines={1}>
+              {username ?? session?.user.email ?? ''}
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.tabs}>
@@ -256,6 +271,8 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   brand: { fontFamily: fonts.serifItalic, fontSize: 26, color: colors.text },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  refreshButton: { padding: 2 },
   userChip: { flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: '55%' },
   userChipName: { fontSize: 14, fontWeight: '700', color: colors.text, flexShrink: 1 },
   tabs: {

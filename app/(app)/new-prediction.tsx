@@ -1,7 +1,8 @@
-import { useRouter } from 'expo-router';
+import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -13,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Avatar } from '../../components/Avatar';
 import { CalendarPicker } from '../../components/CalendarPicker';
 import { PredictionRecorder } from '../../components/PredictionRecorder';
 import { PredictionSeal } from '../../components/PredictionSeal';
@@ -55,6 +57,7 @@ const MINUTE_OPTIONS: SelectOption<number>[] = [0, 15, 30, 45].map((m) => ({
 export default function NewPredictionScreen() {
   const { session } = useAuth();
   const router = useRouter();
+  const navigation = useNavigation();
   const userId = session?.user.id;
 
   const [teaser, setTeaser] = useState('');
@@ -89,6 +92,33 @@ export default function NewPredictionScreen() {
   const trimmedTeaser = teaser.trim();
   const trimmedContent = content.trim();
   const remaining = MAX_CONTENT_LENGTH - trimmedContent.length;
+  const hasUnsavedContent =
+    trimmedTeaser.length > 0 || trimmedContent.length > 0 || !!audioUri || !!selectedDate;
+
+  // Avertit avant d'abandonner une prédiction en cours de rédaction — sans ça,
+  // un retour accidentel (bouton « Annuler », geste retour) perdait tout sans
+  // prévenir. Ignoré une fois scellée (`showSeal`) : `router.back()` déclenché
+  // par le sceau ne doit pas redéclencher cette même confirmation.
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (showSeal || !hasUnsavedContent) return;
+      e.preventDefault();
+
+      const message = 'Cette prédiction n’est pas scellée : elle sera perdue si tu quittes maintenant.';
+      const discard = () => navigation.dispatch(e.data.action);
+
+      if (Platform.OS === 'web') {
+        if (window.confirm(`Abandonner cette prédiction ?\n\n${message}`)) discard();
+        return;
+      }
+      Alert.alert('Abandonner cette prédiction ?', message, [
+        { text: 'Continuer la rédaction', style: 'cancel' },
+        { text: 'Abandonner', style: 'destructive', onPress: discard },
+      ]);
+    });
+    return unsubscribe;
+  }, [navigation, hasUnsavedContent, showSeal]);
+
   const revealAt =
     selectedDate && hour !== null && minute !== null
       ? new Date(
@@ -225,7 +255,8 @@ export default function NewPredictionScreen() {
           <TextInput
             value={teaser}
             onChangeText={setTeaser}
-            placeholder=""
+            placeholder="Donnez un indice sur la nature de votre prédiction"
+            placeholderTextColor={colors.textFaint}
             multiline
             editable={!submitting}
             maxLength={MAX_TEASER_LENGTH}
@@ -399,6 +430,7 @@ export default function NewPredictionScreen() {
                       disabled={submitting}
                       style={[styles.friendChip, selected && styles.friendChipActive]}
                     >
+                      <Avatar url={friend.avatar_url} username={friend.username} size={20} />
                       <Text
                         style={[
                           styles.friendChipText,
@@ -497,6 +529,9 @@ const styles = StyleSheet.create({
   friendsBox: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: spacing.md },
   searchLoader: { marginTop: spacing.sm },
   friendChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.pill,

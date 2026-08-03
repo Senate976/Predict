@@ -3,6 +3,8 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -42,6 +44,22 @@ import {
   type GroupVisibility,
 } from '../../../lib/groups';
 import { colors, eyebrow, fonts, radius, spacing } from '../../../lib/theme';
+
+/**
+ * `Alert.alert` de React Native Web ne fait rien (implémentation vide) — sans
+ * ce repli, le bouton semble ne pas répondre du tout sur le web (déjà
+ * rencontré pour la suppression d'une prédiction, cf. PredictionCard.tsx).
+ */
+function confirmAndRun(title: string, message: string, run: () => void) {
+  if (Platform.OS === 'web') {
+    if (window.confirm(`${title}\n\n${message}`)) run();
+    return;
+  }
+  Alert.alert(title, message, [
+    { text: 'Annuler', style: 'cancel' },
+    { text: 'Confirmer', style: 'destructive', onPress: run },
+  ]);
+}
 
 type Relation =
   | { kind: 'none' }
@@ -399,7 +417,13 @@ export default function CircleScreen() {
                       <Text style={styles.username}>{profile.username}</Text>
                     </Pressable>
                     <Pressable
-                      onPress={() => handleRemove(f.id)}
+                      onPress={() =>
+                        confirmAndRun(
+                          'Retirer cet ami ?',
+                          `Vous ne serez plus liés : ${profile.username} devra renvoyer une demande pour redevenir ami.`,
+                          () => handleRemove(f.id)
+                        )
+                      }
                       disabled={pendingActionId === f.id}
                       style={styles.pillOutline}
                     >
@@ -527,7 +551,13 @@ export default function CircleScreen() {
                               })
                             )}
                             <Pressable
-                              onPress={() => handleDeleteGroup(group.id)}
+                              onPress={() =>
+                                confirmAndRun(
+                                  'Supprimer ce groupe ?',
+                                  `« ${group.name} » sera définitivement supprimé pour tous ses membres.`,
+                                  () => handleDeleteGroup(group.id)
+                                )
+                              }
                               disabled={pendingGroupActionId === group.id}
                               style={styles.deleteGroup}
                             >

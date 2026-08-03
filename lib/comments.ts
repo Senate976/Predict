@@ -54,3 +54,11 @@ export async function addComment(predictionId: string, authorId: string, content
     .from('prediction_comments')
     .insert({ prediction_id: predictionId, author_id: authorId, content: content.trim() });
 }
+
+/**
+ * Réservé à son propre commentaire, ou à l'auteur de la prédiction (RLS
+ * `prediction_comments_delete_own`) — modération de ses propres scellés.
+ */
+export async function deleteComment(commentId: string) {
+  return supabase.from('prediction_comments').delete().eq('id', commentId);
+}

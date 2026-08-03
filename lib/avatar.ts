@@ -56,3 +56,13 @@ export async function uploadAvatar(userId: string, uri: string) {
 
   return { url: data.publicUrl, error: null };
 }
+
+/**
+ * Retire la photo de profil sans avoir besoin d'en choisir une nouvelle —
+ * repasse simplement `avatar_url` à `null`. Le fichier reste dans le bucket
+ * (pas de suppression de l'objet de stockage) : un chemin fixe par upload
+ * suffit à ne plus jamais l'exposer, sans complexité de parsing d'URL ici.
+ */
+export async function removeAvatar(userId: string) {
+  return supabase.from('profiles').update({ avatar_url: null }).eq('id', userId);
+}

@@ -6,13 +6,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar } from '../../../components/Avatar';
 import { PrediscoreGauge } from '../../../components/PrediscoreGauge';
 import { QuickCreateButton } from '../../../components/QuickCreateButton';
-import { pickAvatarImage, uploadAvatar } from '../../../lib/avatar';
+import { pickAvatarImage, removeAvatar, uploadAvatar } from '../../../lib/avatar';
 import { useAuth } from '../../../lib/auth';
 import { formatRevealAt } from '../../../lib/datetime';
 import { fetchProfileById } from '../../../lib/friends';
 import {
   fetchPredictionOutcomes,
   fetchPrediscore,
+  isMissingSchema,
   type PredictionOutcome,
   type PredictionOutcomeStatus,
 } from '../../../lib/predictions';
@@ -42,6 +43,7 @@ export default function ProfileScreen() {
   const [outcomes, setOutcomes] = useState<PredictionOutcome[] | null>(null);
   const [prediscore, setPrediscore] = useState<number | null>(null);
   const [prediscoreLoaded, setPrediscoreLoaded] = useState(false);
+  const [prediscoreError, setPrediscoreError] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
@@ -61,8 +63,15 @@ export default function ProfileScreen() {
       setOutcomes(data ?? []);
     }
 
-    const { data: prediscoreData } = await fetchPrediscore(userId);
+    const { data: prediscoreData, error: prediscoreFetchError } = await fetchPrediscore(userId);
     setPrediscore(prediscoreData.score);
+    setPrediscoreError(
+      prediscoreFetchError
+        ? isMissingSchema(prediscoreFetchError)
+          ? 'Prediscore indisponible : exécute le dernier supabase/schema.sql dans le SQL Editor.'
+          : `Prediscore indisponible : ${prediscoreFetchError.message}`
+        : null
+    );
     setPrediscoreLoaded(true);
 
     const { data: profile } = await fetchProfileById(userId);
@@ -87,6 +96,22 @@ export default function ProfileScreen() {
         return;
       }
       setAvatarUrl(url);
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }
+
+  async function handleRemoveAvatar() {
+    if (!userId) return;
+    setAvatarError(null);
+    setUploadingAvatar(true);
+    try {
+      const { error: removeError } = await removeAvatar(userId);
+      if (removeError) {
+        setAvatarError(`Suppression impossible : ${removeError.message}`);
+        return;
+      }
+      setAvatarUrl(null);
     } finally {
       setUploadingAvatar(false);
     }
@@ -125,6 +150,11 @@ export default function ProfileScreen() {
               )}
             </View>
           </Pressable>
+          {avatarUrl && !uploadingAvatar && (
+            <Pressable onPress={handleRemoveAvatar} hitSlop={4} style={styles.removeAvatar}>
+              <Text style={styles.removeAvatarText}>Supprimer la photo</Text>
+            </Pressable>
+          )}
           {avatarError && <Text style={styles.error}>{avatarError}</Text>}
 
           <Text style={[styles.eyebrow, styles.sectionSpacing]}>Nom d’utilisateur</Text>
@@ -135,6 +165,8 @@ export default function ProfileScreen() {
         <View style={[styles.prediscoreCard, styles.sectionSpacing]}>
           {!prediscoreLoaded ? (
             <ActivityIndicator color={colors.gold} style={styles.loader} />
+          ) : prediscoreError ? (
+            <Text style={styles.error}>{prediscoreError}</Text>
           ) : (
             <PrediscoreGauge score={prediscore} />
           )}
@@ -246,6 +278,8 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   avatarEditText: { color: colors.background, fontSize: 10, fontWeight: '700' },
+  removeAvatar: { marginTop: 10 },
+  removeAvatarText: { fontSize: 12, fontWeight: '600', color: colors.danger },
   username: { fontFamily: fonts.serifItalic, fontSize: 22, color: colors.text, marginTop: 6 },
   email: { fontSize: 13, color: colors.textFaint, marginTop: 4 },
   loader: { marginTop: 24 },

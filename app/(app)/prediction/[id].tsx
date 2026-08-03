@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AudioPlayerButton } from '../../../components/AudioPlayerButton';
+import { Avatar } from '../../../components/Avatar';
 import { InlineComments } from '../../../components/InlineComments';
 import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { useAuth } from '../../../lib/auth';
@@ -279,7 +280,10 @@ export default function PredictionDetailScreen() {
                     ) : (
                       addableFriends.map((friend) => (
                         <View key={friend.id} style={styles.row}>
-                          <Text style={styles.username}>{friend.username}</Text>
+                          <View style={styles.usernameRow}>
+                            <Avatar url={friend.avatar_url} username={friend.username} size={24} />
+                            <Text style={styles.username}>{friend.username}</Text>
+                          </View>
                           <Pressable
                             onPress={() => handleAdd(friend.id)}
                             disabled={pendingId === friend.id}
@@ -339,7 +343,12 @@ export default function PredictionDetailScreen() {
             )}
 
             <Text style={[styles.eyebrow, styles.sectionSpacing]}>Discussion</Text>
-            <InlineComments predictionId={id} userId={userId!} revealed={revealed} />
+            <InlineComments
+              predictionId={id}
+              userId={userId!}
+              revealed={revealed}
+              isPredictionAuthor={!!isAuthor}
+            />
           </>
         ) : null}
       </ScrollView>
@@ -423,6 +432,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   username: { fontSize: 15, color: colors.text, fontWeight: '600' },
+  usernameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   pillGold: {
     backgroundColor: colors.gold,
     borderRadius: radius.pill,

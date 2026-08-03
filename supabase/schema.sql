@@ -1100,13 +1100,20 @@ create policy "prediction_comments_insert"
     )
   );
 
--- Chacun peut retirer son propre commentaire — aucune autre modification.
+-- Chacun peut retirer son propre commentaire ; l'auteur de la prédiction peut
+-- aussi modérer les commentaires laissés par d'autres sur ses propres scellés.
 drop policy if exists "prediction_comments_delete_own" on public.prediction_comments;
 create policy "prediction_comments_delete_own"
   on public.prediction_comments
   for delete
   to authenticated
-  using (author_id = auth.uid());
+  using (
+    author_id = auth.uid()
+    or exists (
+      select 1 from public.predictions p
+      where p.id = prediction_comments.prediction_id and p.author_id = auth.uid()
+    )
+  );
 
 -- ---------------------------------------------------------------------------
 -- 16. Statut final d'une prédiction — majorité des votes des destinataires
