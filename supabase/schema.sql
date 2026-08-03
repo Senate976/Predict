@@ -267,6 +267,12 @@ create index if not exists predictions_reveal_at_idx
 -- qui reste `reveal_at <= now()` partout, sans exception.
 alter table public.predictions add column if not exists open_ended boolean not null default false;
 
+-- Catégorie choisie à la création, pour classer/filtrer le Fil (section 26).
+alter table public.predictions add column if not exists category text not null default 'autre';
+alter table public.predictions drop constraint if exists predictions_category_valid;
+alter table public.predictions add constraint predictions_category_valid
+  check (category in ('politique', 'sport', 'amour', 'star', 'business', 'culture', 'amis', 'autre'));
+
 drop trigger if exists predictions_set_updated_at on public.predictions;
 create trigger predictions_set_updated_at
   before update on public.predictions
@@ -1613,12 +1619,12 @@ alter table public.predictions drop constraint if exists predictions_scope_valid
 alter table public.predictions add constraint predictions_scope_valid
   check (scope in ('circle', 'selected', 'group'));
 
--- `create_prediction` gagne deux paramètres optionnels, `p_mentioned_ids` et
--- `p_open_ended`, ajoutés en fin de liste pour ne pas casser les appels
--- existants. Signature différente de celle créée section 12 -> `drop
--- function` d'abord.
+-- `create_prediction` gagne un paramètre optionnel `p_category`, ajouté en
+-- fin de liste pour ne pas casser les appels existants. Signature différente
+-- de celle créée section 12 -> `drop function` d'abord.
 drop function if exists public.create_prediction(text, text, timestamptz, text, uuid[]);
 drop function if exists public.create_prediction(text, text, timestamptz, text, uuid[], uuid);
+drop function if exists public.create_prediction(text, text, timestamptz, text, uuid[], uuid, uuid[], boolean);
 
 create or replace function public.create_prediction(
   p_teaser text,
@@ -1628,7 +1634,8 @@ create or replace function public.create_prediction(
   p_friend_ids uuid[] default array[]::uuid[],
   p_group_id uuid default null,
   p_mentioned_ids uuid[] default array[]::uuid[],
-  p_open_ended boolean default false
+  p_open_ended boolean default false,
+  p_category text default 'autre'
 )
 returns uuid
 language plpgsql
@@ -1639,8 +1646,8 @@ declare
   v_id uuid;
   v_recipient uuid;
 begin
-  insert into public.predictions (author_id, teaser, reveal_at, scope, open_ended)
-  values (auth.uid(), p_teaser, p_reveal_at, p_scope, p_open_ended)
+  insert into public.predictions (author_id, teaser, reveal_at, scope, open_ended, category)
+  values (auth.uid(), p_teaser, p_reveal_at, p_scope, p_open_ended, p_category)
   returning id into v_id;
 
   insert into public.prediction_contents (prediction_id, content)
@@ -1698,8 +1705,8 @@ begin
 end;
 $$;
 
-revoke all on function public.create_prediction(text, text, timestamptz, text, uuid[], uuid, uuid[], boolean) from public;
-grant execute on function public.create_prediction(text, text, timestamptz, text, uuid[], uuid, uuid[], boolean) to authenticated;
+revoke all on function public.create_prediction(text, text, timestamptz, text, uuid[], uuid, uuid[], boolean, text) from public;
+grant execute on function public.create_prediction(text, text, timestamptz, text, uuid[], uuid, uuid[], boolean, text) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- 20. Photo de profil
@@ -1913,7 +1920,196 @@ revoke all on function public.reveal_prediction_now(uuid) from public;
 grant execute on function public.reveal_prediction_now(uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 25. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 25. Favoris, masquage, et réactions emoji
+-- ---------------------------------------------------------------------------
+--
+-- Favori/masqué sont des préférences propres à chaque spectateur d'une
+-- prédiction (l'auteur peut la masquer sans que ça masque quoi que ce soit
+-- pour ses destinataires) — une ligne par (prédiction, utilisateur), jamais
+-- partagée. Pas de RLS basée sur l'accès à la prédiction : inutile, une ligne
+-- n'a de sens que pour son propre auteur (`user_id = auth.uid()`), et une
+-- prédiction hors de portée n'apparaît de toute façon jamais dans le Fil pour
+-- y poser ce genre de préférence.
+create table if not exists public.prediction_user_state (
+  prediction_id uuid not null references public.predictions (id) on delete cascade,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  favorite boolean not null default false,
+  hidden boolean not null default false,
+  updated_at timestamptz not null default now(),
+  primary key (prediction_id, user_id)
+);
+
+drop trigger if exists prediction_user_state_set_updated_at on public.prediction_user_state;
+create trigger prediction_user_state_set_updated_at
+  before update on public.prediction_user_state
+  for each row execute function public.set_updated_at();
+
+alter table public.prediction_user_state enable row level security;
+
+drop policy if exists "prediction_user_state_select_own" on public.prediction_user_state;
+create policy "prediction_user_state_select_own"
+  on public.prediction_user_state
+  for select
+  to authenticated
+  using (user_id = auth.uid());
+
+drop policy if exists "prediction_user_state_insert_own" on public.prediction_user_state;
+create policy "prediction_user_state_insert_own"
+  on public.prediction_user_state
+  for insert
+  to authenticated
+  with check (user_id = auth.uid());
+
+drop policy if exists "prediction_user_state_update_own" on public.prediction_user_state;
+create policy "prediction_user_state_update_own"
+  on public.prediction_user_state
+  for update
+  to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+-- Réaction emoji sur une prédiction — une par destinataire, changeable
+-- librement (contrairement à l'ancien choix Confiance/Pas confiance,
+-- irréversible et retiré) : `upsert` côté client, pas de policy update
+-- séparée nécessaire puisque l'insert avec `on conflict` suffit à changer
+-- d'avis, et la ligne peut aussi être supprimée pour retirer sa réaction.
+create table if not exists public.prediction_emoji_reactions (
+  prediction_id uuid not null references public.predictions (id) on delete cascade,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  emoji text not null check (emoji in ('👍', '🖕', '❤️', '👎', '😊', '😮', '😢')),
+  created_at timestamptz not null default now(),
+  primary key (prediction_id, user_id)
+);
+
+alter table public.prediction_emoji_reactions enable row level security;
+
+-- Lecture ouverte à l'auteur et aux destinataires, comme les votes et les
+-- commentaires : le bilan des réactions doit être visible par tous.
+drop policy if exists "prediction_emoji_reactions_select" on public.prediction_emoji_reactions;
+create policy "prediction_emoji_reactions_select"
+  on public.prediction_emoji_reactions
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1 from public.prediction_access pa
+      where pa.prediction_id = prediction_emoji_reactions.prediction_id and pa.user_id = auth.uid()
+    )
+    or exists (
+      select 1 from public.predictions p
+      where p.id = prediction_emoji_reactions.prediction_id and p.author_id = auth.uid()
+    )
+  );
+
+-- Réagir : auteur ou destinataire, sur son propre id, à tout moment (avant ou
+-- après révélation) — une réaction emoji porte sur la prédiction dans son
+-- ensemble, pas spécifiquement sur le teaser ou le contenu révélé.
+drop policy if exists "prediction_emoji_reactions_insert" on public.prediction_emoji_reactions;
+create policy "prediction_emoji_reactions_insert"
+  on public.prediction_emoji_reactions
+  for insert
+  to authenticated
+  with check (
+    user_id = auth.uid()
+    and (
+      exists (
+        select 1 from public.prediction_access pa
+        where pa.prediction_id = prediction_emoji_reactions.prediction_id and pa.user_id = auth.uid()
+      )
+      or exists (
+        select 1 from public.predictions p
+        where p.id = prediction_emoji_reactions.prediction_id and p.author_id = auth.uid()
+      )
+    )
+  );
+
+drop policy if exists "prediction_emoji_reactions_update_own" on public.prediction_emoji_reactions;
+create policy "prediction_emoji_reactions_update_own"
+  on public.prediction_emoji_reactions
+  for update
+  to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+drop policy if exists "prediction_emoji_reactions_delete_own" on public.prediction_emoji_reactions;
+create policy "prediction_emoji_reactions_delete_own"
+  on public.prediction_emoji_reactions
+  for delete
+  to authenticated
+  using (user_id = auth.uid());
+
+-- `predictions_feed` reprend sa définition de la section 18 et ajoute :
+-- `category` (simple colonne de `predictions`) ; `is_favorite`/`is_hidden`
+-- (sous-requêtes corrélées sur `prediction_user_state`, propres à l'appelant
+-- — jamais de `left join` direct, même raison que `my_reaction` avant elle :
+-- éviter de multiplier les lignes déjà agrégées par `prediction_votes`) ;
+-- `emoji_counts` (objet `{emoji: nombre}` agrégé en sous-requête) et
+-- `my_emoji_reaction` (la réaction de l'appelant, ou `null`).
+drop view if exists public.predictions_feed;
+
+create view public.predictions_feed
+with (security_invoker = true) as
+select
+  p.id,
+  p.author_id,
+  p.teaser,
+  pc.content,
+  pc.audio_path,
+  p.reveal_at,
+  p.scope,
+  p.open_ended,
+  p.category,
+  p.created_at,
+  (p.reveal_at <= now()) as is_revealed,
+  coalesce(sum((v.vote_value = 'realized')::int), 0) as realized_votes,
+  coalesce(sum((v.vote_value = 'missed')::int), 0) as missed_votes,
+  case
+    when p.reveal_at > now() then 'pending'
+    when coalesce(sum((v.vote_value = 'realized')::int), 0)
+       > coalesce(sum((v.vote_value = 'missed')::int), 0) then 'realized'
+    when coalesce(sum((v.vote_value = 'missed')::int), 0)
+       > coalesce(sum((v.vote_value = 'realized')::int), 0) then 'missed'
+    else 'pending'
+  end as final_status,
+  coalesce(
+    (
+      select us.favorite from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_favorite,
+  coalesce(
+    (
+      select us.hidden from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_hidden,
+  coalesce(
+    (
+      select jsonb_object_agg(counts.emoji, counts.total)
+      from (
+        select emoji, count(*) as total
+        from public.prediction_emoji_reactions er
+        where er.prediction_id = p.id
+        group by emoji
+      ) counts
+    ),
+    '{}'::jsonb
+  ) as emoji_counts,
+  (
+    select er2.emoji from public.prediction_emoji_reactions er2
+    where er2.prediction_id = p.id and er2.user_id = auth.uid()
+  ) as my_emoji_reaction
+from public.predictions p
+left join public.prediction_contents pc on pc.prediction_id = p.id
+left join public.prediction_votes v on v.prediction_id = p.id
+group by p.id, p.author_id, p.teaser, pc.content, pc.audio_path, p.reveal_at, p.scope, p.open_ended, p.category, p.created_at;
+
+grant select on public.predictions_feed to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 26. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une

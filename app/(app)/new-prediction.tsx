@@ -25,6 +25,8 @@ import { formatCountdown, formatRevealAt } from '../../lib/datetime';
 import { fetchFriendships, otherProfile, type FriendProfile } from '../../lib/friends';
 import { fetchGroups, type FriendGroup } from '../../lib/groups';
 import {
+  CATEGORIES,
+  CATEGORY_LABEL,
   MAX_CONTENT_LENGTH,
   MAX_TEASER_LENGTH,
   MIN_REVEAL_DELAY_MS,
@@ -32,6 +34,7 @@ import {
   createPrediction,
   extractMentionedUsernames,
   predictionErrorMessage,
+  type PredictionCategory,
   type PredictionScope,
 } from '../../lib/predictions';
 import { colors, fonts, radius, spacing } from '../../lib/theme';
@@ -75,6 +78,7 @@ export default function NewPredictionScreen() {
   // l'auteur le déclenche depuis son écran (bouton « Révéler maintenant »).
   const [openEnded, setOpenEnded] = useState(false);
 
+  const [category, setCategory] = useState<PredictionCategory>('autre');
   const [scope, setScope] = useState<PredictionScope>('circle');
   const [friends, setFriends] = useState<FriendProfile[] | null>(null);
   const [selectedFriendIds, setSelectedFriendIds] = useState<Set<string>>(new Set());
@@ -213,6 +217,7 @@ export default function NewPredictionScreen() {
         groupId: selectedGroupId,
         mentionedFriendIds,
         openEnded,
+        category,
       });
 
       if (insertError) {
@@ -329,6 +334,25 @@ export default function NewPredictionScreen() {
               <PredictionRecorder uri={audioUri} onChange={setAudioUri} disabled={submitting} />
             </View>
           )}
+
+          <Text style={[styles.label, styles.sectionLabel]}>Catégorie</Text>
+          <View style={styles.friendsBox}>
+            {CATEGORIES.map((cat) => {
+              const selected = category === cat;
+              return (
+                <Pressable
+                  key={cat}
+                  onPress={() => setCategory(cat)}
+                  disabled={submitting}
+                  style={[styles.friendChip, selected && styles.friendChipActive]}
+                >
+                  <Text style={[styles.friendChipText, selected && styles.friendChipTextActive]}>
+                    {CATEGORY_LABEL[cat]}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
 
           <Text style={[styles.label, styles.sectionLabel]}>Révélation</Text>
 

@@ -38,6 +38,7 @@ const TICK_MS = 30_000;
 type AuthorInfo = { username: string; avatar_url: string | null };
 type AuthorMap = Record<string, AuthorInfo>;
 type Tab = 'upcoming' | 'past';
+type SortOrder = 'recent' | 'oldest';
 
 /** Fil d'actualité — Archives a été fusionné ici, sous forme de deux onglets. */
 export default function HomeScreen() {
@@ -55,6 +56,15 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [tab, setTab] = useState<Tab>('upcoming');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [authorFilter, setAuthorFilter] = useState<string | null>(null);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  // Par défaut (`false`), l'ordre de chaque onglet reste celui déjà établi
+  // (À venir par publication, Passées par date de révélation) — ce tri par
+  // date de scellé est une bascule optionnelle, pas un nouveau défaut.
+  const [sortBySealDate, setSortBySealDate] = useState(false);
+  const [sortOrder, setSortOrder] = useState<SortOrder>('recent');
+  const [showHidden, setShowHidden] = useState(false);
 
   const userId = session?.user.id;
 
@@ -155,13 +165,45 @@ export default function HomeScreen() {
     setFeed((prev) => (prev ?? []).filter((item) => item.id !== predictionId));
   }
 
-  const upcoming = (feed ?? []).filter((item) => !item.is_revealed);
-  // Passées : la plus récemment révélée en tête, indépendamment de l'ordre de
-  // publication (`created_at`) utilisé pour le reste du fil.
-  const past = (feed ?? [])
-    .filter((item) => item.is_revealed)
-    .sort((a, b) => new Date(b.reveal_at).getTime() - new Date(a.reveal_at).getTime());
-  const shown = tab === 'upcoming' ? upcoming : past;
+  // Tient `feed` à jour immédiatement quand une carte bascule favori/masqué —
+  // sans ça, les filtres de cet écran resteraient basés sur l'état chargé au
+  // départ jusqu'au prochain rafraîchissement complet.
+  function handleFavoriteChange(predictionId: string, isFavorite: boolean) {
+    setFeed((prev) =>
+      (prev ?? []).map((item) => (item.id === predictionId ? { ...item, is_favorite: isFavorite } : item))
+    );
+  }
+
+  function handleHiddenChange(predictionId: string, isHidden: boolean) {
+    setFeed((prev) =>
+      (prev ?? []).map((item) => (item.id === predictionId ? { ...item, is_hidden: isHidden } : item))
+    );
+  }
+
+  const byTab = (feed ?? []).filter((item) => (tab === 'upcoming' ? !item.is_revealed : item.is_revealed));
+  const hiddenCount = byTab.filter((item) => item.is_hidden).length;
+
+  const authorEntries = Array.from(new Set(byTab.map((item) => item.author_id))).map((id) => ({
+    id,
+    username: authors[id]?.username ?? '…',
+  }));
+
+  const filtered = byTab
+    .filter((item) => showHidden || !item.is_hidden)
+    .filter((item) => !authorFilter || item.author_id === authorFilter)
+    .filter((item) => !favoritesOnly || item.is_favorite);
+
+  const shown = [...filtered].sort((a, b) => {
+    if (sortBySealDate) {
+      const diff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      return sortOrder === 'recent' ? diff : -diff;
+    }
+    // Défaut inchangé : À venir par ordre de publication, Passées par date de
+    // révélation la plus récente.
+    return tab === 'past'
+      ? new Date(b.reveal_at).getTime() - new Date(a.reveal_at).getTime()
+      : new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -209,6 +251,81 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
+      <Pressable onPress={() => setFiltersOpen((o) => !o)} style={styles.filtersToggle} hitSlop={4}>
+        <Text style={styles.filtersToggleText}>Filtres{filtersOpen ? ' ▲' : ' ▼'}</Text>
+      </Pressable>
+
+      {filtersOpen && (
+        <View style={styles.filtersPanel}>
+          <Text style={styles.filterLabel}>Auteur</Text>
+          <View style={styles.filterChipsRow}>
+            <Pressable
+              onPress={() => setAuthorFilter(null)}
+              style={[styles.filterChip, authorFilter === null && styles.filterChipActive]}
+            >
+              <Text style={[styles.filterChipText, authorFilter === null && styles.filterChipTextActive]}>
+                Tous
+              </Text>
+            </Pressable>
+            {authorEntries.map((a) => (
+              <Pressable
+                key={a.id}
+                onPress={() => setAuthorFilter(a.id)}
+                style={[styles.filterChip, authorFilter === a.id && styles.filterChipActive]}
+              >
+                <Text style={[styles.filterChipText, authorFilter === a.id && styles.filterChipTextActive]}>
+                  {a.username}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={[styles.filterLabel, styles.filterSpacing]}>Date de scellé</Text>
+          <View style={styles.filterChipsRow}>
+            <Pressable
+              onPress={() => setSortBySealDate((o) => !o)}
+              style={[styles.filterChip, sortBySealDate && styles.filterChipActive]}
+            >
+              <Text style={[styles.filterChipText, sortBySealDate && styles.filterChipTextActive]}>
+                Trier par date de scellé
+              </Text>
+            </Pressable>
+            {sortBySealDate && (
+              <Pressable
+                onPress={() => setSortOrder((o) => (o === 'recent' ? 'oldest' : 'recent'))}
+                style={styles.filterChip}
+              >
+                <Text style={styles.filterChipText}>
+                  {sortOrder === 'recent' ? 'Plus récent d’abord' : 'Plus ancien d’abord'}
+                </Text>
+              </Pressable>
+            )}
+          </View>
+
+          <Text style={[styles.filterLabel, styles.filterSpacing]}>Favoris</Text>
+          <View style={styles.filterChipsRow}>
+            <Pressable
+              onPress={() => setFavoritesOnly((o) => !o)}
+              style={[styles.filterChip, favoritesOnly && styles.filterChipActive]}
+            >
+              <Text style={[styles.filterChipText, favoritesOnly && styles.filterChipTextActive]}>
+                ★ Favoris uniquement
+              </Text>
+            </Pressable>
+          </View>
+
+          {hiddenCount > 0 && (
+            <Pressable onPress={() => setShowHidden((o) => !o)} style={styles.showHiddenLink}>
+              <Text style={styles.showHiddenLinkText}>
+                {showHidden
+                  ? 'Masquer à nouveau les prédictions masquées'
+                  : `${hiddenCount} prédiction${hiddenCount > 1 ? 's' : ''} masquée${hiddenCount > 1 ? 's' : ''} — afficher`}
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.gold} />}
@@ -242,6 +359,8 @@ export default function HomeScreen() {
               hasVoted={votedIds.has(item.id)}
               onPress={() => router.push(`/prediction/${item.id}`)}
               onDelete={() => handleDeletePrediction(item.id)}
+              onFavoriteChange={(isFavorite) => handleFavoriteChange(item.id, isFavorite)}
+              onHiddenChange={(isHidden) => handleHiddenChange(item.id, isHidden)}
             />
           ))
         )}
@@ -293,6 +412,32 @@ const styles = StyleSheet.create({
   tabActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
   tabText: { fontSize: 12, fontWeight: '700', letterSpacing: 1, color: colors.textMuted, textTransform: 'uppercase' },
   tabTextActive: { color: colors.gold },
+  filtersToggle: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, alignSelf: 'flex-start' },
+  filtersToggleText: { fontSize: 12, fontWeight: '700', color: colors.textFaint },
+  filtersPanel: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+  filterLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: colors.textFaint,
+    marginBottom: 6,
+  },
+  filterSpacing: { marginTop: spacing.md },
+  filterChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  filterChip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: colors.surface,
+  },
+  filterChipActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
+  filterChipText: { fontSize: 12, fontWeight: '600', color: colors.textMuted },
+  filterChipTextActive: { color: colors.gold },
+  showHiddenLink: { marginTop: spacing.md },
+  showHiddenLinkText: { fontSize: 12, fontWeight: '600', color: colors.gold },
   scroll: { padding: spacing.lg, paddingBottom: 8, flexGrow: 1 },
   loader: { marginTop: 32 },
   empty: { paddingVertical: 24, alignItems: 'center' },

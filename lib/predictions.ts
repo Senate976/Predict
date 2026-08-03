@@ -4,6 +4,33 @@ import { supabase } from './supabase';
 
 export type PredictionScope = 'circle' | 'selected' | 'group';
 
+export type PredictionCategory =
+  | 'politique'
+  | 'sport'
+  | 'amour'
+  | 'star'
+  | 'business'
+  | 'culture'
+  | 'amis'
+  | 'autre';
+
+export const CATEGORY_LABEL: Record<PredictionCategory, string> = {
+  politique: 'Politique',
+  sport: 'Sport',
+  amour: 'Amour',
+  star: 'Star',
+  business: 'Business',
+  culture: 'Culture',
+  amis: 'Amis',
+  autre: 'Autre',
+};
+
+export const CATEGORIES = Object.keys(CATEGORY_LABEL) as PredictionCategory[];
+
+export type EmojiReaction = '👍' | '🖕' | '❤️' | '👎' | '😊' | '😮' | '😢';
+
+export const EMOJI_REACTIONS: EmojiReaction[] = ['👍', '❤️', '😊', '😮', '😢', '👎', '🖕'];
+
 /**
  * Une prédiction telle que renvoyée par la vue `public.predictions_feed`.
  *
@@ -26,12 +53,19 @@ export type PredictionFeedItem = {
    * lointaine sans signification propre — ne jamais l'afficher tel quel dans
    * ce cas, seule la révélation manuelle (`revealPredictionNow`) compte. */
   open_ended: boolean;
+  category: PredictionCategory;
   created_at: string;
   is_revealed: boolean;
   /** Nombre de votes, et verdict à la majorité des votants effectifs — voir prediction_outcomes. */
   realized_votes: number;
   missed_votes: number;
   final_status: PredictionOutcomeStatus;
+  /** Préférences propres à l'appelant — jamais partagées avec les autres. */
+  is_favorite: boolean;
+  is_hidden: boolean;
+  /** `{ '👍': 2, '❤️': 1, ... }` — absent des clés sans aucune réaction. */
+  emoji_counts: Partial<Record<EmojiReaction, number>>;
+  my_emoji_reaction: EmojiReaction | null;
 };
 
 /** Doivent rester alignés sur les contraintes `predictions_*_length` du SQL. */
@@ -103,7 +137,8 @@ export function predictionErrorMessage(error: PostgrestError): string {
  * dans lequel les choses ont été publiées, pas celui de leur révélation.
  */
 const FEED_COLUMNS =
-  'id, author_id, teaser, content, audio_path, reveal_at, scope, open_ended, created_at, is_revealed, realized_votes, missed_votes, final_status';
+  'id, author_id, teaser, content, audio_path, reveal_at, scope, open_ended, category, created_at, ' +
+  'is_revealed, realized_votes, missed_votes, final_status, is_favorite, is_hidden, emoji_counts, my_emoji_reaction';
 
 export async function fetchPredictionsFeed() {
   return supabase
@@ -135,6 +170,7 @@ export async function createPrediction(input: {
   /** Aucune date fixée par l'auteur : `revealAt` porte alors un repère
    * technique lointain (voir `computeOpenEndedRevealAt`), jamais affiché. */
   openEnded?: boolean;
+  category?: PredictionCategory;
 }) {
   const result = await supabase.rpc('create_prediction', {
     p_teaser: input.teaser.trim(),
@@ -145,6 +181,7 @@ export async function createPrediction(input: {
     p_group_id: input.scope === 'group' ? input.groupId ?? null : null,
     p_mentioned_ids: input.mentionedFriendIds ?? [],
     p_open_ended: input.openEnded ?? false,
+    p_category: input.category ?? 'autre',
   });
   return result as { data: string | null; error: PostgrestError | null };
 }
@@ -178,6 +215,48 @@ export function extractMentionedUsernames(text: string): string[] {
  */
 export async function revealPredictionNow(predictionId: string) {
   return supabase.rpc('reveal_prediction_now', { p_prediction_id: predictionId });
+}
+
+/**
+ * Favori/masqué : une préférence propre à l'appelant, jamais partagée.
+ * `upsert` plutôt qu'un `update` : la ligne peut ne pas exister encore (aucune
+ * préférence posée jusque-là) — `onConflict` bascule alors en update sans
+ * écraser l'autre champ (`favorite` ou `hidden`) que celui qu'on modifie.
+ */
+export async function setPredictionUserState(
+  predictionId: string,
+  userId: string,
+  patch: { favorite?: boolean; hidden?: boolean }
+) {
+  return supabase
+    .from('prediction_user_state')
+    .upsert(
+      { prediction_id: predictionId, user_id: userId, ...patch },
+      { onConflict: 'prediction_id,user_id' }
+    );
+}
+
+/**
+ * Pose ou change sa réaction emoji sur une prédiction — `upsert` : contrairement
+ * à l'ancien choix Confiance/Pas confiance (irréversible, retiré), on peut
+ * changer d'avis librement.
+ */
+export async function castEmojiReaction(predictionId: string, userId: string, emoji: EmojiReaction) {
+  return supabase
+    .from('prediction_emoji_reactions')
+    .upsert(
+      { prediction_id: predictionId, user_id: userId, emoji },
+      { onConflict: 'prediction_id,user_id' }
+    );
+}
+
+/** Retire sa réaction — refaire le même emoji bascule en « aucune réaction ». */
+export async function removeEmojiReaction(predictionId: string, userId: string) {
+  return supabase
+    .from('prediction_emoji_reactions')
+    .delete()
+    .eq('prediction_id', predictionId)
+    .eq('user_id', userId);
 }
 
 /** Un destinataire d'une prédiction, avec son profil assemblé côté client. */
