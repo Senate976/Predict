@@ -1149,7 +1149,7 @@ group by p.id, p.author_id, p.teaser, p.reveal_at, p.created_at;
 grant select on public.prediction_outcomes to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 17. Gamification — célébration et badges de prestige
+-- 17. Gamification — célébration de prédiction approuvée
 -- ---------------------------------------------------------------------------
 
 -- Nouveau type de notification, réservé à l'auteur (les précédents sont tous
@@ -1200,51 +1200,10 @@ create trigger prediction_votes_notify_approved
   after insert or update on public.prediction_votes
   for each row execute function public.notify_prediction_approved();
 
--- Nombre de prédictions d'un utilisateur passées 'realized' (majorité des
--- votes) et révélées dans les 30 derniers jours — la mesure qui détermine son
--- badge de prestige. `security definer` pour pouvoir compter les prédictions
--- de quelqu'un d'autre (un ami) sans que l'appelant ait besoin d'être
--- destinataire de chacune ; la garde se fait explicitement dans le `where`
--- (soi-même, ou un ami accepté) plutôt qu'en s'appuyant sur la RLS des tables
--- sous-jacentes — sans elle, n'importe qui pourrait sonder le score de
--- n'importe qui.
---
--- Renvoie un compte agrégé, jamais le contenu ni l'identité des prédictions
--- comptées : rien de sensible n'est exposé au-delà de ce nombre.
-create or replace function public.get_realized_count_30d(target_user uuid)
-returns integer
-language sql
-security definer
-stable
-set search_path = ''
-as $$
-  select count(*)::int
-  from public.predictions p
-  where p.author_id = target_user
-    and p.reveal_at >= now() - interval '30 days'
-    and (
-      target_user = auth.uid()
-      or exists (
-        select 1 from public.friendships f
-        where f.status = 'accepted'
-          and (
-            (f.requester_id = auth.uid() and f.addressee_id = target_user)
-            or (f.addressee_id = auth.uid() and f.requester_id = target_user)
-          )
-      )
-    )
-    and exists (
-      select 1
-      from public.prediction_votes v
-      where v.prediction_id = p.id
-      group by v.prediction_id
-      having coalesce(sum((v.vote_value = 'realized')::int), 0)
-           > coalesce(sum((v.vote_value = 'missed')::int), 0)
-    );
-$$;
-
-revoke all on function public.get_realized_count_30d(uuid) from public;
-grant execute on function public.get_realized_count_30d(uuid) to authenticated;
+-- Le système de badges de prestige (fer/bronze/argent/or, sur ce compte à
+-- 30 jours) est retiré au profit du Prediscore pondéré (section 24) — cette
+-- fonction n'a plus aucun appelant côté client, on la supprime de la base.
+drop function if exists public.get_realized_count_30d(uuid);
 
 -- ---------------------------------------------------------------------------
 -- 18. Prédictions vocales — bucket de stockage et politiques
@@ -1797,7 +1756,198 @@ revoke all on function public.get_prediction_stats(uuid) from public;
 grant execute on function public.get_prediction_stats(uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 22. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 22. Réactions sur le teaser — Confiance / Pas confiance
+-- ---------------------------------------------------------------------------
+--
+-- Un avis posé par un destinataire sur le teaser seul, avant que le contenu
+-- scellé ne soit connu — jamais l'auteur. Contrairement au vote (qui juge
+-- après révélation), ce choix est définitif : une seule ligne par
+-- destinataire et par prédiction, ni modifiable ni supprimable (aucune
+-- policy update/delete plus bas).
+create table if not exists public.prediction_reactions (
+  id uuid primary key default gen_random_uuid(),
+  prediction_id uuid not null references public.predictions (id) on delete cascade,
+  voter_id uuid not null references public.profiles (id) on delete cascade,
+  reaction_value text not null check (reaction_value in ('confiance', 'pas_confiance')),
+  created_at timestamptz not null default now()
+);
+
+create unique index if not exists prediction_reactions_unique_voter
+  on public.prediction_reactions (prediction_id, voter_id);
+
+alter table public.prediction_reactions enable row level security;
+
+-- Lecture ouverte à l'auteur et aux destinataires, comme les votes : le bilan
+-- des réactions doit être visible par tous, pas seulement par l'auteur.
+drop policy if exists "prediction_reactions_select" on public.prediction_reactions;
+create policy "prediction_reactions_select"
+  on public.prediction_reactions
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1 from public.prediction_access pa
+      where pa.prediction_id = prediction_reactions.prediction_id and pa.user_id = auth.uid()
+    )
+    or exists (
+      select 1 from public.predictions p
+      where p.id = prediction_reactions.prediction_id and p.author_id = auth.uid()
+    )
+  );
+
+-- Réagir : uniquement un destinataire, sur son propre id, et seulement avant
+-- la révélation — passé ce moment, ce n'est plus un avis sur le teaser mais
+-- un jugement après coup, déjà couvert par le vote.
+drop policy if exists "prediction_reactions_insert" on public.prediction_reactions;
+create policy "prediction_reactions_insert"
+  on public.prediction_reactions
+  for insert
+  to authenticated
+  with check (
+    voter_id = auth.uid()
+    and exists (
+      select 1 from public.prediction_access pa
+      where pa.prediction_id = prediction_reactions.prediction_id and pa.user_id = auth.uid()
+    )
+    and exists (
+      select 1 from public.predictions p
+      where p.id = prediction_reactions.prediction_id and p.reveal_at > now()
+    )
+  );
+
+-- ---------------------------------------------------------------------------
+-- 23. predictions_feed enrichie du bilan des réactions
+-- ---------------------------------------------------------------------------
+--
+-- `confiance_count`/`pas_confiance_count` : sous-requêtes corrélées plutôt
+-- qu'un troisième `left join` direct sur `prediction_reactions` — cette vue
+-- fait déjà un `left join` sur `prediction_votes` (un-à-plusieurs) agrégé par
+-- `group by` ; un second `left join` un-à-plusieurs multiplierait les lignes
+-- de vote avant l'agrégation et fausserait `realized_votes`/`missed_votes`
+-- (même piège déjà rencontré et évité pour les destinataires). `my_reaction` :
+-- la réaction de l'appelant lui-même, pour savoir si la carte doit encore
+-- proposer les deux boutons ou son choix déjà posé.
+drop view if exists public.predictions_feed;
+
+create view public.predictions_feed
+with (security_invoker = true) as
+select
+  p.id,
+  p.author_id,
+  p.teaser,
+  pc.content,
+  pc.audio_path,
+  p.reveal_at,
+  p.scope,
+  p.created_at,
+  (p.reveal_at <= now()) as is_revealed,
+  coalesce(sum((v.vote_value = 'realized')::int), 0) as realized_votes,
+  coalesce(sum((v.vote_value = 'missed')::int), 0) as missed_votes,
+  case
+    when p.reveal_at > now() then 'pending'
+    when coalesce(sum((v.vote_value = 'realized')::int), 0)
+       > coalesce(sum((v.vote_value = 'missed')::int), 0) then 'realized'
+    when coalesce(sum((v.vote_value = 'missed')::int), 0)
+       > coalesce(sum((v.vote_value = 'realized')::int), 0) then 'missed'
+    else 'pending'
+  end as final_status,
+  coalesce(
+    (
+      select count(*) from public.prediction_reactions r
+      where r.prediction_id = p.id and r.reaction_value = 'confiance'
+    ),
+    0
+  ) as confiance_count,
+  coalesce(
+    (
+      select count(*) from public.prediction_reactions r
+      where r.prediction_id = p.id and r.reaction_value = 'pas_confiance'
+    ),
+    0
+  ) as pas_confiance_count,
+  (
+    select r2.reaction_value from public.prediction_reactions r2
+    where r2.prediction_id = p.id and r2.voter_id = auth.uid()
+  ) as my_reaction
+from public.predictions p
+left join public.prediction_contents pc on pc.prediction_id = p.id
+left join public.prediction_votes v on v.prediction_id = p.id
+group by p.id, p.author_id, p.teaser, pc.content, pc.audio_path, p.reveal_at, p.scope, p.created_at;
+
+grant select on public.predictions_feed to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 24. Prediscore pondéré
+-- ---------------------------------------------------------------------------
+--
+-- Remplace le badge de prestige : pourcentage pondéré des prédictions
+-- révélées (avec un verdict tranché — les 'pending' n'entrent pas dans le
+-- calcul) qui se sont avérées « Réalisée ». Pondération par anticipation —
+-- plus la prédiction a été posée tôt, plus elle pèse : moins de 7 jours
+-- d'avance = coefficient 1, de 8 jours à 1 mois = coefficient 3, plus d'un
+-- mois = coefficient 5.
+--
+-- `security definer`, même garde que l'ancien `get_realized_count_30d` :
+-- soi-même ou un ami accepté, jamais quelqu'un d'autre. `score` à `null`
+-- tant qu'aucune prédiction pondérable n'existe encore — distinct de `0`,
+-- qui serait un vrai (mauvais) score.
+create or replace function public.get_prediscore(target_user uuid)
+returns table (score numeric, weighted_count numeric)
+language sql
+security definer
+stable
+set search_path = ''
+as $$
+  with weighted as (
+    select
+      case
+        when extract(epoch from (p.reveal_at - p.created_at)) / 86400 < 7 then 1
+        when extract(epoch from (p.reveal_at - p.created_at)) / 86400 <= 30 then 3
+        else 5
+      end as weight,
+      case
+        when coalesce(sum((v.vote_value = 'realized')::int), 0)
+           > coalesce(sum((v.vote_value = 'missed')::int), 0) then 'realized'
+        when coalesce(sum((v.vote_value = 'missed')::int), 0)
+           > coalesce(sum((v.vote_value = 'realized')::int), 0) then 'missed'
+        else 'pending'
+      end as final_status
+    from public.predictions p
+    left join public.prediction_votes v on v.prediction_id = p.id
+    where p.author_id = target_user
+      and p.reveal_at <= now()
+      and (
+        target_user = auth.uid()
+        or exists (
+          select 1 from public.friendships f
+          where f.status = 'accepted'
+            and (
+              (f.requester_id = auth.uid() and f.addressee_id = target_user)
+              or (f.addressee_id = auth.uid() and f.requester_id = target_user)
+            )
+        )
+      )
+    group by p.id, p.reveal_at, p.created_at
+  )
+  select
+    case
+      when coalesce(sum(weight) filter (where final_status <> 'pending'), 0) > 0
+        then round(
+          100.0 * sum(weight) filter (where final_status = 'realized')
+            / sum(weight) filter (where final_status <> 'pending'),
+          1
+        )
+      else null
+    end as score,
+    coalesce(sum(weight) filter (where final_status <> 'pending'), 0) as weighted_count
+  from weighted;
+$$;
+
+revoke all on function public.get_prediscore(uuid) from public;
+grant execute on function public.get_prediscore(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 25. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une

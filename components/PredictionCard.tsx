@@ -5,7 +5,12 @@ import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native
 
 import { fetchCommentCount } from '../lib/comments';
 import { formatCountdown } from '../lib/datetime';
-import { isRevealed, type PredictionFeedItem } from '../lib/predictions';
+import {
+  castReaction,
+  isRevealed,
+  type PredictionFeedItem,
+  type PredictionReaction,
+} from '../lib/predictions';
 import { colors, fonts, radius } from '../lib/theme';
 import { AudioPlayerButton } from './AudioPlayerButton';
 import { Avatar } from './Avatar';
@@ -47,11 +52,24 @@ export function PredictionCard({
   const router = useRouter();
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentCount, setCommentCount] = useState<number | null>(null);
+  const [myReaction, setMyReaction] = useState<PredictionReaction | null>(item.my_reaction);
+  const [reacting, setReacting] = useState(false);
   const revealAt = new Date(item.reveal_at);
   const revealed = isRevealed(item, now);
   const isAuthor = item.author_id === userId;
 
   const verdict = revealed && item.final_status !== 'pending' ? item.final_status : null;
+
+  async function handleReaction(value: PredictionReaction) {
+    if (reacting || myReaction) return;
+    setReacting(true);
+    try {
+      const { error } = await castReaction(item.id, userId, value);
+      if (!error) setMyReaction(value);
+    } finally {
+      setReacting(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -128,6 +146,41 @@ export function PredictionCard({
           </View>
         )}
       </Pressable>
+
+      {!revealed && !isAuthor && (
+        myReaction ? (
+          <View style={styles.reactionLocked}>
+            <Text style={styles.reactionLockedText}>
+              Tu as indiqué : {myReaction === 'confiance' ? 'Confiance' : 'Pas confiance'}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.reactionRow}>
+            <Pressable
+              onPress={() => handleReaction('confiance')}
+              disabled={reacting}
+              style={styles.reactionButton}
+            >
+              <Text style={styles.reactionButtonText}>Confiance</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => handleReaction('pas_confiance')}
+              disabled={reacting}
+              style={styles.reactionButton}
+            >
+              <Text style={styles.reactionButtonText}>Pas confiance</Text>
+            </Pressable>
+          </View>
+        )
+      )}
+
+      {revealed && (item.confiance_count > 0 || item.pas_confiance_count > 0) && (
+        <View style={styles.bilanRow}>
+          <Text style={styles.bilanText}>
+            Confiance {item.confiance_count} · Pas confiance {item.pas_confiance_count}
+          </Text>
+        </View>
+      )}
 
       {revealed && !isAuthor && !hasVoted && (
         <Pressable onPress={() => onPress?.()} style={styles.voteLink} hitSlop={4}>
@@ -214,6 +267,20 @@ const styles = StyleSheet.create({
   audioRow: { marginTop: 10 },
   voteLink: { marginTop: 10 },
   voteLinkText: { fontSize: 13, fontWeight: '600', color: colors.gold },
+  reactionRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  reactionButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  reactionButtonText: { fontSize: 13, fontWeight: '700', color: colors.textMuted },
+  reactionLocked: { marginTop: 12 },
+  reactionLockedText: { fontSize: 13, fontWeight: '600', color: colors.textFaint },
+  bilanRow: { marginTop: 10 },
+  bilanText: { fontSize: 12, fontWeight: '600', color: colors.textFaint },
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
