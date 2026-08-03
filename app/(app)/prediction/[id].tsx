@@ -14,7 +14,7 @@ import { AudioPlayerButton } from '../../../components/AudioPlayerButton';
 import { InlineComments } from '../../../components/InlineComments';
 import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { useAuth } from '../../../lib/auth';
-import { formatShortDateTime } from '../../../lib/datetime';
+import { formatAdvance, formatShortDateTime } from '../../../lib/datetime';
 import { fetchFriendships, otherProfile, type FriendProfile } from '../../../lib/friends';
 import {
   addRecipient,
@@ -168,17 +168,11 @@ export default function PredictionDetailScreen() {
 
   const isAuthor = prediction && userId && prediction.author_id === userId;
   const revealed = prediction ? isRevealed(prediction, new Date()) : false;
-  // Écart entre le scellé et la révélation, en jours pleins — juste
-  // informatif, pour souligner à quel point la prédiction a été anticipée.
-  const daysInAdvance = prediction
-    ? Math.max(
-        0,
-        Math.round(
-          (new Date(prediction.reveal_at).getTime() - new Date(prediction.created_at).getTime()) /
-            86_400_000
-        )
-      )
-    : 0;
+  // Écart entre le scellé et la révélation — juste informatif, pour souligner
+  // à quel point la prédiction a été anticipée.
+  const advanceLabel = prediction
+    ? formatAdvance(new Date(prediction.created_at), new Date(prediction.reveal_at))
+    : '';
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -199,32 +193,19 @@ export default function PredictionDetailScreen() {
           <>
             <Text style={styles.teaser}>{prediction.teaser}</Text>
 
-            {/* Depuis que le Fil n'affiche plus la date de scellé, cet écran
-                détail est le seul à la montrer — toujours visible. Avant
-                révélation, la date de révélation l'accompagne (centrées,
-                espacées pour la lisibilité) ; une fois révélée, elle
-                n'apporte plus rien et disparaît. */}
+            {/* Avant révélation, seul l'écart annoncé compte — les deux dates
+                elles-mêmes n'apportent rien de plus que le teaser et
+                l'indice « sera révélée le » juste en dessous. Une fois
+                révélée, la date de scellé redevient utile comme repère. */}
             {revealed ? (
               <View style={styles.datesBlock}>
                 <Text style={styles.sealedDate}>
                   Scellée le {formatShortDateTime(new Date(prediction.created_at))}
                 </Text>
-                <Text style={styles.daysAdvance}>
-                  Prédit {daysInAdvance} jour{daysInAdvance > 1 ? 's' : ''} à l’avance
-                </Text>
+                <Text style={styles.daysAdvance}>{advanceLabel}</Text>
               </View>
             ) : (
-              <View style={styles.datesBlockCentered}>
-                <Text style={styles.dateLineCentered}>
-                  Scellée le {formatShortDateTime(new Date(prediction.created_at))}
-                </Text>
-                <Text style={[styles.dateLineCentered, styles.dateLineGap]}>
-                  Révélée le {formatShortDateTime(new Date(prediction.reveal_at))}
-                </Text>
-                <Text style={[styles.dateLineCentered, styles.daysAdvanceGap]}>
-                  Prédit {daysInAdvance} jour{daysInAdvance > 1 ? 's' : ''} à l’avance
-                </Text>
-              </View>
+              <Text style={styles.daysAdvanceCentered}>{advanceLabel}</Text>
             )}
 
             {/* Le cœur de l'écran : le contenu de la prédiction prime sur tout
@@ -381,10 +362,7 @@ const styles = StyleSheet.create({
   datesBlock: { marginTop: 10 },
   sealedDate: { fontSize: 12, color: colors.textFaint },
   daysAdvance: { fontSize: 12, color: colors.textFaint, marginTop: 2 },
-  datesBlockCentered: { marginTop: 10, alignItems: 'center' },
-  dateLineCentered: { fontSize: 12, color: colors.textFaint, textAlign: 'center' },
-  dateLineGap: { marginTop: 14 },
-  daysAdvanceGap: { marginTop: 8 },
+  daysAdvanceCentered: { fontSize: 12, color: colors.textFaint, textAlign: 'center', marginTop: 10 },
   contentHero: {
     marginTop: spacing.xl,
     marginBottom: spacing.lg,

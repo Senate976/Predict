@@ -18,6 +18,7 @@ import { WelcomeOnboarding } from '../../../components/WelcomeOnboarding';
 import { useAuth } from '../../../lib/auth';
 import { fetchNotifications, markNotificationRead } from '../../../lib/notifications';
 import {
+  deletePrediction,
   feedErrorMessage,
   fetchPredictionsFeed,
   type PredictionFeedItem,
@@ -144,6 +145,15 @@ export default function HomeScreen() {
     await markOnboarded();
   }
 
+  async function handleDeletePrediction(predictionId: string) {
+    const { error: deleteError } = await deletePrediction(predictionId);
+    if (deleteError) {
+      setError(`Suppression impossible : ${deleteError.message}`);
+      return;
+    }
+    setFeed((prev) => (prev ?? []).filter((item) => item.id !== predictionId));
+  }
+
   const upcoming = (feed ?? []).filter((item) => !item.is_revealed);
   // Passées : la plus récemment révélée en tête, indépendamment de l'ordre de
   // publication (`created_at`) utilisé pour le reste du fil.
@@ -216,6 +226,7 @@ export default function HomeScreen() {
               userId={userId!}
               hasVoted={votedIds.has(item.id)}
               onPress={() => router.push(`/prediction/${item.id}`)}
+              onDelete={() => handleDeletePrediction(item.id)}
             />
           ))
         )}
