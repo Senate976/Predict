@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { fetchCommentCount } from '../lib/comments';
 import { formatCountdown } from '../lib/datetime';
@@ -64,14 +64,22 @@ export function PredictionCard({
   }, [item.id]);
 
   function handleDeletePress() {
-    Alert.alert(
-      'Supprimer cette prédiction ?',
-      'Cette action est définitive : le contenu, les votes et les commentaires seront perdus pour tout le Cercle.',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Supprimer', style: 'destructive', onPress: () => onDelete?.() },
-      ]
-    );
+    const message =
+      'Cette action est définitive : le contenu, les votes et les commentaires seront perdus pour tout le Cercle.';
+
+    // `Alert.alert` de React Native Web ne fait rien (implémentation vide) —
+    // sans ce repli, le bouton semble ne pas répondre du tout sur le web.
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Supprimer cette prédiction ?\n\n${message}`)) {
+        onDelete?.();
+      }
+      return;
+    }
+
+    Alert.alert('Supprimer cette prédiction ?', message, [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Supprimer', style: 'destructive', onPress: () => onDelete?.() },
+    ]);
   }
 
   return (
