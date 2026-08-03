@@ -108,7 +108,7 @@ export function PredictionCard({
           {!verdict && !revealed && (
             <View style={[styles.badge, styles.badgeLocked]}>
               <Text style={[styles.badgeText, styles.badgeTextLocked]}>
-                {formatCountdown(revealAt, now)}
+                {item.open_ended ? 'Quand l’auteur le décide' : formatCountdown(revealAt, now)}
               </Text>
             </View>
           )}

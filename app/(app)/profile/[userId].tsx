@@ -102,6 +102,7 @@ export default function FriendProfileScreen() {
                 <Avatar url={profile.avatar_url} username={profile.username} size={72} />
               </Pressable>
               <Text style={styles.username}>@{profile.username}</Text>
+              {profile.phone && <Text style={styles.phone}>{profile.phone}</Text>}
             </View>
 
             <View style={[styles.prediscoreCard, styles.sectionSpacing]}>
@@ -188,6 +189,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   username: { fontFamily: fonts.serifItalic, fontSize: 22, color: colors.text, marginTop: 10 },
+  phone: { fontSize: 13, color: colors.textFaint, marginTop: 4 },
   prediscoreCard: {
     paddingVertical: 24,
     borderRadius: radius.xl,

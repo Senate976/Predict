@@ -2,6 +2,8 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,6 +26,7 @@ import {
   fetchPredictionRecipients,
   isRevealed,
   removeRecipient,
+  revealPredictionNow,
   type PredictionFeedItem,
   type PredictionOutcome,
   type PredictionRecipient,
@@ -56,6 +59,8 @@ export default function PredictionDetailScreen() {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [voting, setVoting] = useState(false);
   const [recipientsOpen, setRecipientsOpen] = useState(false);
+  const [revealing, setRevealing] = useState(false);
+  const [revealError, setRevealError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id || !userId) return;
@@ -151,6 +156,36 @@ export default function PredictionDetailScreen() {
     }
   }
 
+  function handleRevealNow() {
+    if (!id) return;
+    const message =
+      'Le contenu deviendra visible pour tes destinataires et le verdict pourra être donné. Cette action est irréversible.';
+
+    const run = async () => {
+      setRevealError(null);
+      setRevealing(true);
+      try {
+        const { error: revealErr } = await revealPredictionNow(id);
+        if (revealErr) {
+          setRevealError(`Révélation impossible : ${revealErr.message}`);
+          return;
+        }
+        await load();
+      } finally {
+        setRevealing(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Révéler cette prédiction maintenant ?\n\n${message}`)) run();
+      return;
+    }
+    Alert.alert('Révéler cette prédiction maintenant ?', message, [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Révéler', style: 'destructive', onPress: run },
+    ]);
+  }
+
   async function handleVote(value: VoteValue) {
     if (!id || !userId) return;
     setVoteError(null);
@@ -170,9 +205,12 @@ export default function PredictionDetailScreen() {
   const isAuthor = prediction && userId && prediction.author_id === userId;
   const revealed = prediction ? isRevealed(prediction, new Date()) : false;
   // Écart entre le scellé et la révélation — juste informatif, pour souligner
-  // à quel point la prédiction a été anticipée.
+  // à quel point la prédiction a été anticipée. Sans objet pour une prédiction
+  // « ouverte » : `reveal_at` n'y porte qu'un repère technique lointain.
   const advanceLabel = prediction
-    ? formatAdvance(new Date(prediction.created_at), new Date(prediction.reveal_at))
+    ? prediction.open_ended && !revealed
+      ? 'Révélation laissée à la discrétion de l’auteur'
+      : formatAdvance(new Date(prediction.created_at), new Date(prediction.reveal_at))
     : '';
 
   return (
@@ -227,10 +265,27 @@ export default function PredictionDetailScreen() {
                 </>
               ) : (
                 <Text style={styles.sealedHint}>
-                  Révélation le {formatShortDateTime(new Date(prediction.reveal_at))}.
+                  {prediction.open_ended
+                    ? 'L’auteur choisira quand la révéler.'
+                    : `Révélation le ${formatShortDateTime(new Date(prediction.reveal_at))}.`}
                 </Text>
               )}
             </View>
+
+            {isAuthor && !revealed && (
+              <View style={styles.revealNowBox}>
+                {revealError && <Text style={styles.error}>{revealError}</Text>}
+                <Pressable
+                  onPress={handleRevealNow}
+                  disabled={revealing}
+                  style={styles.revealNowButton}
+                >
+                  <Text style={styles.revealNowButtonText}>
+                    {revealing ? 'Révélation…' : 'Révéler maintenant'}
+                  </Text>
+                </Pressable>
+              </View>
+            )}
 
             <Pressable
               onPress={() => setRecipientsOpen((o) => !o)}
@@ -397,6 +452,15 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     textAlign: 'center',
   },
+  revealNowBox: { alignItems: 'center', marginTop: spacing.md },
+  revealNowButton: {
+    borderWidth: 1,
+    borderColor: colors.gold,
+    borderRadius: radius.pill,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  revealNowButtonText: { fontSize: 13, fontWeight: '700', color: colors.gold },
   verdictBox: {
     marginTop: spacing.xl,
     paddingVertical: 12,

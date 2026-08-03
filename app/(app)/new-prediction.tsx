@@ -28,7 +28,9 @@ import {
   MAX_CONTENT_LENGTH,
   MAX_TEASER_LENGTH,
   MIN_REVEAL_DELAY_MS,
+  computeOpenEndedRevealAt,
   createPrediction,
+  extractMentionedUsernames,
   predictionErrorMessage,
   type PredictionScope,
 } from '../../lib/predictions';
@@ -69,6 +71,9 @@ export default function NewPredictionScreen() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [hour, setHour] = useState<number | null>(12);
   const [minute, setMinute] = useState<number | null>(0);
+  // `true` : pas de date fixée, la prédiction ne se révèle que lorsque
+  // l'auteur le déclenche depuis son écran (bouton « Révéler maintenant »).
+  const [openEnded, setOpenEnded] = useState(false);
 
   const [scope, setScope] = useState<PredictionScope>('circle');
   const [friends, setFriends] = useState<FriendProfile[] | null>(null);
@@ -119,8 +124,12 @@ export default function NewPredictionScreen() {
     return unsubscribe;
   }, [navigation, hasUnsavedContent, showSeal]);
 
-  const revealAt =
-    selectedDate && hour !== null && minute !== null
+  // Repère technique lointain quand aucune date n'est fixée — jamais affiché
+  // tel quel (cf. `computeOpenEndedRevealAt`) : seule la révélation manuelle
+  // compte pour une prédiction « ouverte ».
+  const revealAt = openEnded
+    ? computeOpenEndedRevealAt()
+    : selectedDate && hour !== null && minute !== null
       ? new Date(
           selectedDate.getFullYear(),
           selectedDate.getMonth(),
@@ -186,6 +195,15 @@ export default function NewPredictionScreen() {
 
     setSubmitting(true);
     try {
+      // « @pseudo » dans le teaser : n'accorde un accès que pour un pseudo
+      // qui correspond vraiment à un ami accepté — revérifié côté base de
+      // toute façon (create_prediction), ce filtre évite juste un appel
+      // inutile pour un « @ » qui ne désigne personne.
+      const mentionedUsernames = extractMentionedUsernames(trimmedTeaser);
+      const mentionedFriendIds = (friends ?? [])
+        .filter((f) => mentionedUsernames.includes(f.username.toLowerCase()))
+        .map((f) => f.id);
+
       const { data: predictionId, error: insertError } = await createPrediction({
         teaser: trimmedTeaser,
         content: contentMode === 'text' ? trimmedContent : AUDIO_PLACEHOLDER,
@@ -193,6 +211,8 @@ export default function NewPredictionScreen() {
         scope,
         friendIds: Array.from(selectedFriendIds),
         groupId: selectedGroupId,
+        mentionedFriendIds,
+        openEnded,
       });
 
       if (insertError) {
@@ -262,6 +282,9 @@ export default function NewPredictionScreen() {
             maxLength={MAX_TEASER_LENGTH}
             style={[styles.input, styles.teaserInput]}
           />
+          <Text style={styles.mentionHint}>
+            Utilise @pseudo pour notifier directement quelqu’un de ton Cercle.
+          </Text>
 
           <Text style={[styles.label, styles.sectionLabel]}>Ma prédiction</Text>
           <View style={styles.scopeRow}>
@@ -308,43 +331,71 @@ export default function NewPredictionScreen() {
           )}
 
           <Text style={[styles.label, styles.sectionLabel]}>Révélation</Text>
-          <Text style={styles.sectionHint}>
-            Le moment que tu veux, à la minute près. L’heure est facultative.
-          </Text>
 
-          <CalendarPicker value={selectedDate} onChange={setSelectedDate} disabled={submitting} />
-
-          <View style={[styles.row, styles.fieldSpacing]}>
-            <View style={styles.timeField}>
-              <SelectField
-                label="Heure"
-                value={hour}
-                options={HOUR_OPTIONS}
-                placeholder="HH"
-                onChange={setHour}
-                disabled={submitting}
-              />
-            </View>
-            <View style={styles.timeField}>
-              <SelectField
-                label="Minute"
-                value={minute}
-                options={MINUTE_OPTIONS}
-                placeholder="MM"
-                onChange={setMinute}
-                disabled={submitting}
-              />
-            </View>
+          <View style={styles.scopeRow}>
+            <Pressable
+              onPress={() => setOpenEnded(false)}
+              disabled={submitting}
+              style={[styles.scopeOption, !openEnded && styles.scopeOptionActive]}
+            >
+              <Text style={[styles.scopeText, !openEnded && styles.scopeTextActive]}>Date fixe</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setOpenEnded(true)}
+              disabled={submitting}
+              style={[styles.scopeOption, openEnded && styles.scopeOptionActive]}
+            >
+              <Text style={[styles.scopeText, openEnded && styles.scopeTextActive]}>
+                Je déciderai plus tard
+              </Text>
+            </Pressable>
           </View>
 
-          {/* Rien tant qu'aucun des champs n'est renseigné : à l'ouverture,
-              un rappel se lirait comme une erreur alors que l'utilisateur
-              n'a encore rien choisi. */}
-          {revealAt && (
-            <Text style={styles.preview}>
-              Se révélera {formatRevealAt(revealAt)} —{' '}
-              {formatCountdown(revealAt, new Date())}.
+          {openEnded ? (
+            <Text style={[styles.sectionHint, styles.fieldSpacing]}>
+              Tu pourras révéler cette prédiction quand tu veux, depuis son écran.
             </Text>
+          ) : (
+            <>
+              <Text style={[styles.sectionHint, styles.fieldSpacing]}>
+                Le moment que tu veux, à la minute près. L’heure est facultative.
+              </Text>
+
+              <CalendarPicker value={selectedDate} onChange={setSelectedDate} disabled={submitting} />
+
+              <View style={[styles.row, styles.fieldSpacing]}>
+                <View style={styles.timeField}>
+                  <SelectField
+                    label="Heure"
+                    value={hour}
+                    options={HOUR_OPTIONS}
+                    placeholder="HH"
+                    onChange={setHour}
+                    disabled={submitting}
+                  />
+                </View>
+                <View style={styles.timeField}>
+                  <SelectField
+                    label="Minute"
+                    value={minute}
+                    options={MINUTE_OPTIONS}
+                    placeholder="MM"
+                    onChange={setMinute}
+                    disabled={submitting}
+                  />
+                </View>
+              </View>
+
+              {/* Rien tant qu'aucun des champs n'est renseigné : à l'ouverture,
+                  un rappel se lirait comme une erreur alors que l'utilisateur
+                  n'a encore rien choisi. */}
+              {revealAt && (
+                <Text style={styles.preview}>
+                  Se révélera {formatRevealAt(revealAt)} —{' '}
+                  {formatCountdown(revealAt, new Date())}.
+                </Text>
+              )}
+            </>
           )}
 
           <Text style={[styles.label, styles.sectionLabel]}>Visible par</Text>
@@ -505,6 +556,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   teaserInput: { minHeight: 60, textAlignVertical: 'top' },
+  mentionHint: { fontSize: 11, color: colors.textFaint, marginTop: 6 },
   contentInput: { minHeight: 110, textAlignVertical: 'top' },
   counter: { fontSize: 12, color: colors.textFaint, marginTop: 6, textAlign: 'right' },
   counterLow: { color: colors.gold },

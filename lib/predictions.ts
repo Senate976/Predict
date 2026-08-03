@@ -22,6 +22,10 @@ export type PredictionFeedItem = {
   /** ISO 8601, en UTC. */
   reveal_at: string;
   scope: PredictionScope;
+  /** `true` : aucune date fixée par l'auteur, `reveal_at` porte une valeur
+   * lointaine sans signification propre — ne jamais l'afficher tel quel dans
+   * ce cas, seule la révélation manuelle (`revealPredictionNow`) compte. */
+  open_ended: boolean;
   created_at: string;
   is_revealed: boolean;
   /** Nombre de votes, et verdict à la majorité des votants effectifs — voir prediction_outcomes. */
@@ -99,7 +103,7 @@ export function predictionErrorMessage(error: PostgrestError): string {
  * dans lequel les choses ont été publiées, pas celui de leur révélation.
  */
 const FEED_COLUMNS =
-  'id, author_id, teaser, content, audio_path, reveal_at, scope, created_at, is_revealed, realized_votes, missed_votes, final_status';
+  'id, author_id, teaser, content, audio_path, reveal_at, scope, open_ended, created_at, is_revealed, realized_votes, missed_votes, final_status';
 
 export async function fetchPredictionsFeed() {
   return supabase
@@ -125,6 +129,12 @@ export async function createPrediction(input: {
   scope: PredictionScope;
   friendIds: string[];
   groupId?: string | null;
+  /** Ids d'amis mentionnés via « @pseudo » dans le teaser — reçoivent un accès
+   * et une notification même hors du scope choisi. Revérifiés côté base. */
+  mentionedFriendIds?: string[];
+  /** Aucune date fixée par l'auteur : `revealAt` porte alors un repère
+   * technique lointain (voir `computeOpenEndedRevealAt`), jamais affiché. */
+  openEnded?: boolean;
 }) {
   const result = await supabase.rpc('create_prediction', {
     p_teaser: input.teaser.trim(),
@@ -133,8 +143,41 @@ export async function createPrediction(input: {
     p_scope: input.scope,
     p_friend_ids: input.scope === 'selected' ? input.friendIds : [],
     p_group_id: input.scope === 'group' ? input.groupId ?? null : null,
+    p_mentioned_ids: input.mentionedFriendIds ?? [],
+    p_open_ended: input.openEnded ?? false,
   });
   return result as { data: string | null; error: PostgrestError | null };
+}
+
+/** Nombre d'années utilisé comme repère technique pour une prédiction
+ * « ouverte » (sans date fixe) — jamais affiché tel quel, cf. `open_ended`. */
+export const OPEN_ENDED_PLACEHOLDER_YEARS = 50;
+
+export function computeOpenEndedRevealAt(): Date {
+  const date = new Date();
+  date.setFullYear(date.getFullYear() + OPEN_ENDED_PLACEHOLDER_YEARS);
+  return date;
+}
+
+/** Repère les « @pseudo » dans un texte — mêmes caractères autorisés que la
+ * validation du pseudo à l'inscription (lettres, chiffres, « _ » et « . »). */
+const MENTION_REGEX = /@([a-zA-Z0-9_.]+)/g;
+
+export function extractMentionedUsernames(text: string): string[] {
+  const usernames = new Set<string>();
+  for (const match of text.matchAll(MENTION_REGEX)) {
+    usernames.add(match[1].toLowerCase());
+  }
+  return Array.from(usernames);
+}
+
+/**
+ * Révélation à la demande de l'auteur, avant (ou sans) date fixe — la RLS de
+ * `reveal_prediction_now` (security definer) réserve l'action à l'auteur et
+ * n'a d'effet que si la prédiction n'est pas déjà révélée.
+ */
+export async function revealPredictionNow(predictionId: string) {
+  return supabase.rpc('reveal_prediction_now', { p_prediction_id: predictionId });
 }
 
 /** Un destinataire d'une prédiction, avec son profil assemblé côté client. */

@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar } from '../../../components/Avatar';
 import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { useAuth } from '../../../lib/auth';
+import { formatTimeAgo } from '../../../lib/datetime';
 import {
   acceptGroupInvite,
   declineGroupInvite,
@@ -20,17 +21,6 @@ import {
 } from '../../../lib/notifications';
 import { supabase } from '../../../lib/supabase';
 import { colors, fonts, radius, spacing } from '../../../lib/theme';
-
-/** « à l’instant », « il y a 12 min », « il y a 3 h », « il y a 2 jours ». */
-function timeAgo(iso: string, now: Date): string {
-  const minutes = Math.floor((now.getTime() - new Date(iso).getTime()) / 60_000);
-  if (minutes < 1) return 'à l’instant';
-  if (minutes < 60) return `il y a ${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `il y a ${hours} h`;
-  const days = Math.floor(hours / 24);
-  return days === 1 ? 'il y a 1 jour' : `il y a ${days} jours`;
-}
 
 function notificationLabel(notification: Notification): string {
   switch (notification.type) {
@@ -190,7 +180,7 @@ export default function NotificationsScreen() {
                       {notification.group.name}
                     </Text>
                   )}
-                  <Text style={styles.time}>{timeAgo(notification.created_at, new Date())}</Text>
+                  <Text style={styles.time}>{formatTimeAgo(notification.created_at, new Date())}</Text>
 
                   {isGroupInvite && !responded && (
                     <View style={styles.inviteActions}>

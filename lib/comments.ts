@@ -10,6 +10,7 @@ export type Comment = {
   author_id: string;
   content: string;
   created_at: string;
+  reply_to_id: string | null;
   author: { username: string; avatar_url: string | null };
 };
 
@@ -28,7 +29,9 @@ export function commentErrorMessage(error: PostgrestError): string {
 export async function fetchComments(predictionId: string) {
   return supabase
     .from('prediction_comments')
-    .select('id, prediction_id, author_id, content, created_at, author:profiles(username, avatar_url)')
+    .select(
+      'id, prediction_id, author_id, content, created_at, reply_to_id, author:profiles(username, avatar_url)'
+    )
     .eq('prediction_id', predictionId)
     .order('created_at', { ascending: true })
     .returns<Comment[]>();
@@ -49,10 +52,20 @@ export async function fetchCommentCount(predictionId: string) {
   return { count: count ?? 0, error };
 }
 
-export async function addComment(predictionId: string, authorId: string, content: string) {
+export async function addComment(
+  predictionId: string,
+  authorId: string,
+  content: string,
+  replyToId?: string | null
+) {
   return supabase
     .from('prediction_comments')
-    .insert({ prediction_id: predictionId, author_id: authorId, content: content.trim() });
+    .insert({
+      prediction_id: predictionId,
+      author_id: authorId,
+      content: content.trim(),
+      reply_to_id: replyToId ?? null,
+    });
 }
 
 /**
