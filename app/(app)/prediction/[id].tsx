@@ -226,7 +226,7 @@ export default function PredictionDetailScreen() {
                 </>
               ) : (
                 <Text style={styles.sealedHint}>
-                  Cette prédiction sera révélée le {formatShortDateTime(new Date(prediction.reveal_at))}.
+                  Révélation le {formatShortDateTime(new Date(prediction.reveal_at))}.
                 </Text>
               )}
             </View>
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
   datesBlock: { marginTop: 10 },
   sealedDate: { fontSize: 12, color: colors.textFaint },
   daysAdvance: { fontSize: 12, color: colors.textFaint, marginTop: 2 },
-  daysAdvanceCentered: { fontSize: 12, color: colors.textFaint, textAlign: 'center', marginTop: 10 },
+  daysAdvanceCentered: { fontSize: 16, fontWeight: '600', color: colors.textMuted, textAlign: 'center', marginTop: 10 },
   contentHero: {
     marginTop: spacing.xl,
     marginBottom: spacing.lg,
