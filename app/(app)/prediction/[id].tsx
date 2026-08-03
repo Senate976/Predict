@@ -32,8 +32,8 @@ import { castVote, fetchMyVote, voteErrorMessage, type Vote, type VoteValue } fr
 
 const STATUS_LABEL: Record<string, string> = {
   pending: 'En attente du verdict',
-  realized: 'Réalisée, selon le Cercle',
-  missed: 'Manquée, selon le Cercle',
+  realized: 'Réalisée',
+  missed: 'Manquée',
 };
 
 export default function PredictionDetailScreen() {
@@ -223,7 +223,7 @@ export default function PredictionDetailScreen() {
               hitSlop={4}
             >
               <Text style={styles.eyebrow}>Destinataires</Text>
-              <Text style={styles.chevron}>{recipientsOpen ? '▲' : '▼'}</Text>
+              <Text style={styles.chevron}>{recipientsOpen ? ' ▲' : ' ▼'}</Text>
             </Pressable>
 
             {recipientsOpen && (
@@ -285,10 +285,6 @@ export default function PredictionDetailScreen() {
               <View style={styles.verdictBox}>
                 <Text style={styles.eyebrowSmall}>Verdict du Cercle</Text>
                 <Text style={styles.verdict}>{STATUS_LABEL[outcome.final_status]}</Text>
-                <Text style={styles.tally}>
-                  {outcome.realized_votes} réalisée{outcome.realized_votes > 1 ? 's' : ''} ·{' '}
-                  {outcome.missed_votes} manquée{outcome.missed_votes > 1 ? 's' : ''}
-                </Text>
 
                 {!isAuthor && (
                   <>
@@ -379,7 +375,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   verdict: { fontFamily: fonts.serifItalic, fontSize: 15, color: colors.text, marginTop: 4 },
-  tally: { fontSize: 12, color: colors.textFaint, marginTop: 4 },
   voteRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
   voteButton: {
     flex: 1,
@@ -393,7 +388,7 @@ const styles = StyleSheet.create({
   voteButtonText: { fontSize: 12, fontWeight: '600', color: colors.textMuted },
   voteLockedText: { fontSize: 14, fontWeight: '700', color: colors.text, marginTop: 10 },
   sectionSpacing: { marginTop: spacing.lg, marginBottom: 8 },
-  sectionToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sectionToggle: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start' },
   chevron: { fontSize: 11, color: colors.textFaint },
   hint: { fontSize: 14, color: colors.textFaint, lineHeight: 20 },
   row: {

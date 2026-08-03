@@ -106,11 +106,9 @@ export function PredictionCard({
         )}
       </Pressable>
 
-      {revealed && (isAuthor || !hasVoted) && (
+      {revealed && !isAuthor && !hasVoted && (
         <Pressable onPress={() => onPress?.()} style={styles.voteLink} hitSlop={4}>
-          <Text style={styles.voteLinkText}>
-            {isAuthor ? 'Voir les destinataires →' : 'Donner mon avis sur cette prédiction →'}
-          </Text>
+          <Text style={styles.voteLinkText}>Donner mon avis sur cette prédiction →</Text>
         </Pressable>
       )}
 
