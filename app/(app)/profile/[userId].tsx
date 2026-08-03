@@ -13,19 +13,22 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
-import { PrestigeBadge } from '../../../components/PrestigeBadge';
+import { PrediscoreGauge } from '../../../components/PrediscoreGauge';
 import { QuickCreateButton } from '../../../components/QuickCreateButton';
-import { fetchRealizedCount30d } from '../../../lib/badges';
 import { fetchProfileById, type FriendProfile } from '../../../lib/friends';
-import { fetchPredictionStats, type PredictionStats } from '../../../lib/predictions';
+import {
+  fetchPredictionStats,
+  fetchPrediscore,
+  type PredictionStats,
+} from '../../../lib/predictions';
 import { colors, eyebrow, fonts, radius, spacing } from '../../../lib/theme';
 
 /**
  * Profil consultable d'un ami — accessible depuis Le Cercle ou depuis le nom
  * d'un auteur de commentaire. Uniquement des éléments publics agrégés
- * (compteurs, badge) : jamais le détail des prédictions elles-mêmes, `get_
- * prediction_stats` (security definer) réserve d'ailleurs l'accès à soi-même
- * ou à un ami accepté.
+ * (compteurs, Prediscore) : jamais le détail des prédictions elles-mêmes,
+ * `get_prediction_stats`/`get_prediscore` (security definer) réservent
+ * d'ailleurs l'accès à soi-même ou à un ami accepté.
  */
 export default function FriendProfileScreen() {
   const { userId } = useLocalSearchParams<{ userId: string }>();
@@ -33,7 +36,8 @@ export default function FriendProfileScreen() {
 
   const [profile, setProfile] = useState<FriendProfile | null>(null);
   const [stats, setStats] = useState<PredictionStats | null>(null);
-  const [badgeCount, setBadgeCount] = useState<number | null>(null);
+  const [prediscore, setPrediscore] = useState<number | null>(null);
+  const [prediscoreLoaded, setPrediscoreLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [avatarOpen, setAvatarOpen] = useState(false);
 
@@ -48,12 +52,13 @@ export default function FriendProfileScreen() {
     setError(null);
     setProfile(data);
 
-    const [{ data: statsData }, { data: count }] = await Promise.all([
+    const [{ data: statsData }, { data: prediscoreData }] = await Promise.all([
       fetchPredictionStats(userId),
-      fetchRealizedCount30d(userId),
+      fetchPrediscore(userId),
     ]);
     setStats(statsData);
-    setBadgeCount(typeof count === 'number' ? count : 0);
+    setPrediscore(prediscoreData.score);
+    setPrediscoreLoaded(true);
   }, [userId]);
 
   useFocusEffect(
@@ -90,12 +95,11 @@ export default function FriendProfileScreen() {
               <Text style={styles.username}>@{profile.username}</Text>
             </View>
 
-            <Text style={[styles.eyebrow, styles.sectionSpacing]}>Prestige</Text>
-            <View style={styles.prestigeCard}>
-              {badgeCount === null ? (
+            <View style={[styles.prediscoreCard, styles.sectionSpacing]}>
+              {!prediscoreLoaded ? (
                 <ActivityIndicator color={colors.gold} style={styles.loader} />
               ) : (
-                <PrestigeBadge count={badgeCount} size="large" />
+                <PrediscoreGauge score={prediscore} />
               )}
             </View>
 
@@ -173,8 +177,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   username: { fontFamily: fonts.serifItalic, fontSize: 22, color: colors.text, marginTop: 10 },
-  prestigeCard: {
-    marginTop: 12,
+  prediscoreCard: {
     paddingVertical: 24,
     borderRadius: radius.xl,
     backgroundColor: colors.surface,

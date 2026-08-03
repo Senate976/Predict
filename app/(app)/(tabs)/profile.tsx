@@ -4,15 +4,15 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
-import { PrestigeBadge } from '../../../components/PrestigeBadge';
+import { PrediscoreGauge } from '../../../components/PrediscoreGauge';
 import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { pickAvatarImage, uploadAvatar } from '../../../lib/avatar';
-import { fetchRealizedCount30d } from '../../../lib/badges';
 import { useAuth } from '../../../lib/auth';
 import { formatRevealAt } from '../../../lib/datetime';
 import { fetchProfileById } from '../../../lib/friends';
 import {
   fetchPredictionOutcomes,
+  fetchPrediscore,
   type PredictionOutcome,
   type PredictionOutcomeStatus,
 } from '../../../lib/predictions';
@@ -40,7 +40,8 @@ export default function ProfileScreen() {
   const userId = session?.user.id;
 
   const [outcomes, setOutcomes] = useState<PredictionOutcome[] | null>(null);
-  const [badgeCount, setBadgeCount] = useState<number | null>(null);
+  const [prediscore, setPrediscore] = useState<number | null>(null);
+  const [prediscoreLoaded, setPrediscoreLoaded] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
@@ -51,8 +52,7 @@ export default function ProfileScreen() {
     if (!userId) return;
 
     // Les trois chargements sont indépendants : l'échec de l'un ne doit pas
-    // laisser les autres bloqués indéfiniment (le badge restait en chargement
-    // perpétuel si les scellés échouaient, faute d'être jamais appelé).
+    // laisser les autres bloqués indéfiniment.
     const { data, error: fetchError } = await fetchPredictionOutcomes(userId);
     if (fetchError) {
       setError(`Chargement impossible : ${fetchError.message}`);
@@ -61,8 +61,9 @@ export default function ProfileScreen() {
       setOutcomes(data ?? []);
     }
 
-    const { data: count, error: badgeError } = await fetchRealizedCount30d(userId);
-    setBadgeCount(!badgeError && typeof count === 'number' ? count : 0);
+    const { data: prediscoreData } = await fetchPrediscore(userId);
+    setPrediscore(prediscoreData.score);
+    setPrediscoreLoaded(true);
 
     const { data: profile } = await fetchProfileById(userId);
     setAvatarUrl(profile?.avatar_url ?? null);
@@ -131,12 +132,11 @@ export default function ProfileScreen() {
           <Text style={styles.email}>{session?.user.email ?? ''}</Text>
         </View>
 
-        <Text style={[styles.eyebrow, styles.sectionSpacing]}>Prestige</Text>
-        <View style={styles.prestigeCard}>
-          {badgeCount === null ? (
+        <View style={[styles.prediscoreCard, styles.sectionSpacing]}>
+          {!prediscoreLoaded ? (
             <ActivityIndicator color={colors.gold} style={styles.loader} />
           ) : (
-            <PrestigeBadge count={badgeCount} size="large" />
+            <PrediscoreGauge score={prediscore} />
           )}
         </View>
 
@@ -249,8 +249,7 @@ const styles = StyleSheet.create({
   username: { fontFamily: fonts.serifItalic, fontSize: 22, color: colors.text, marginTop: 6 },
   email: { fontSize: 13, color: colors.textFaint, marginTop: 4 },
   loader: { marginTop: 24 },
-  prestigeCard: {
-    marginTop: 12,
+  prediscoreCard: {
     paddingVertical: 24,
     borderRadius: radius.xl,
     backgroundColor: colors.surface,

@@ -13,10 +13,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
-import { PrestigeBadge } from '../../../components/PrestigeBadge';
 import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { useAuth } from '../../../lib/auth';
-import { fetchRealizedCount30d } from '../../../lib/badges';
 import {
   acceptFriendRequest,
   fetchFriendships,
@@ -60,7 +58,6 @@ export default function CircleScreen() {
 
   const [tab, setTab] = useState<Tab>('friends');
   const [friendships, setFriendships] = useState<Friendship[] | null>(null);
-  const [friendBadges, setFriendBadges] = useState<Record<string, number>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [query, setQuery] = useState('');
@@ -182,19 +179,7 @@ export default function CircleScreen() {
       return;
     }
     setLoadError(null);
-    const list = data ?? [];
-    setFriendships(list);
-
-    const acceptedIds = list
-      .filter((f) => f.status === 'accepted')
-      .map((f) => otherProfile(f, userId).id);
-    const entries = await Promise.all(
-      acceptedIds.map(async (id) => {
-        const { data: count } = await fetchRealizedCount30d(id);
-        return [id, typeof count === 'number' ? count : 0] as const;
-      })
-    );
-    setFriendBadges(Object.fromEntries(entries));
+    setFriendships(data ?? []);
   }, [userId]);
 
   useFocusEffect(
@@ -411,7 +396,6 @@ export default function CircleScreen() {
                       style={styles.usernameRow}
                     >
                       <Avatar url={profile.avatar_url} username={profile.username} size={28} />
-                      <PrestigeBadge count={friendBadges[profile.id] ?? 0} size="small" />
                       <Text style={styles.username}>{profile.username}</Text>
                     </Pressable>
                     <Pressable
