@@ -153,7 +153,13 @@ export function PredictionCard({
       </View>
 
       {commentsOpen && (
-        <InlineComments predictionId={item.id} userId={userId} truncate revealed={revealed} />
+        <InlineComments
+          predictionId={item.id}
+          userId={userId}
+          truncate
+          revealed={revealed}
+          isPredictionAuthor={isAuthor}
+        />
       )}
     </View>
   );

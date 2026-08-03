@@ -19,6 +19,7 @@ import { fetchProfileById, type FriendProfile } from '../../../lib/friends';
 import {
   fetchPredictionStats,
   fetchPrediscore,
+  isMissingSchema,
   type PredictionStats,
 } from '../../../lib/predictions';
 import { colors, eyebrow, fonts, radius, spacing } from '../../../lib/theme';
@@ -38,6 +39,7 @@ export default function FriendProfileScreen() {
   const [stats, setStats] = useState<PredictionStats | null>(null);
   const [prediscore, setPrediscore] = useState<number | null>(null);
   const [prediscoreLoaded, setPrediscoreLoaded] = useState(false);
+  const [prediscoreError, setPrediscoreError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [avatarOpen, setAvatarOpen] = useState(false);
 
@@ -52,12 +54,19 @@ export default function FriendProfileScreen() {
     setError(null);
     setProfile(data);
 
-    const [{ data: statsData }, { data: prediscoreData }] = await Promise.all([
+    const [{ data: statsData }, { data: prediscoreData, error: prediscoreFetchError }] = await Promise.all([
       fetchPredictionStats(userId),
       fetchPrediscore(userId),
     ]);
     setStats(statsData);
     setPrediscore(prediscoreData.score);
+    setPrediscoreError(
+      prediscoreFetchError
+        ? isMissingSchema(prediscoreFetchError)
+          ? 'Prediscore indisponible : le schéma n’est pas encore à jour.'
+          : `Prediscore indisponible : ${prediscoreFetchError.message}`
+        : null
+    );
     setPrediscoreLoaded(true);
   }, [userId]);
 
@@ -98,6 +107,8 @@ export default function FriendProfileScreen() {
             <View style={[styles.prediscoreCard, styles.sectionSpacing]}>
               {!prediscoreLoaded ? (
                 <ActivityIndicator color={colors.gold} style={styles.loader} />
+              ) : prediscoreError ? (
+                <Text style={styles.error}>{prediscoreError}</Text>
               ) : (
                 <PrediscoreGauge score={prediscore} />
               )}

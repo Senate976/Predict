@@ -22,7 +22,10 @@ export type Notification = {
   type: NotificationType;
   is_read: boolean;
   created_at: string;
-  prediction: { teaser: string } | null;
+  prediction: {
+    teaser: string;
+    author: { username: string; avatar_url: string | null } | null;
+  } | null;
   group: { name: string; owner: { username: string } | null } | null;
 };
 
@@ -51,7 +54,8 @@ export async function fetchNotifications(userId: string) {
     .from('notifications')
     .select(
       'id, user_id, prediction_id, group_id, type, is_read, created_at, ' +
-        'prediction:predictions(teaser), group:groups(name, owner:profiles!groups_owner_id_fkey(username))'
+        'prediction:predictions(teaser, author:profiles(username, avatar_url)), ' +
+        'group:groups(name, owner:profiles!groups_owner_id_fkey(username))'
     )
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
@@ -60,6 +64,16 @@ export async function fetchNotifications(userId: string) {
 
 export async function markNotificationRead(id: string) {
   return supabase.from('notifications').update({ is_read: true }).eq('id', id);
+}
+
+/** Nombre de notifications non lues — pour le badge de l'onglet Notifications. */
+export async function fetchUnreadNotificationCount(userId: string) {
+  const { count, error } = await supabase
+    .from('notifications')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('is_read', false);
+  return { count: count ?? 0, error };
 }
 
 /**

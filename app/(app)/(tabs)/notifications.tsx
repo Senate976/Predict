@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Avatar } from '../../../components/Avatar';
 import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { useAuth } from '../../../lib/auth';
 import {
@@ -169,6 +170,16 @@ export default function NotificationsScreen() {
                 {!notification.is_read && <View style={styles.dot} />}
                 <View style={styles.rowText}>
                   <Text style={styles.label}>{notificationLabel(notification)}</Text>
+                  {notification.prediction?.author && (
+                    <View style={styles.authorRow}>
+                      <Avatar
+                        url={notification.prediction.author.avatar_url}
+                        username={notification.prediction.author.username}
+                        size={18}
+                      />
+                      <Text style={styles.authorName}>{notification.prediction.author.username}</Text>
+                    </View>
+                  )}
                   {notification.prediction && (
                     <Text style={styles.teaser} numberOfLines={2}>
                       {notification.prediction.teaser}
@@ -257,6 +268,8 @@ const styles = StyleSheet.create({
   },
   rowText: { flex: 1 },
   label: { fontSize: 14, fontWeight: '600', color: colors.text },
+  authorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+  authorName: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
   teaser: {
     fontFamily: fonts.serifItalic,
     fontSize: 16,

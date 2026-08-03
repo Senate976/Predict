@@ -1,8 +1,16 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { addComment, commentErrorMessage, fetchComments, MAX_COMMENT_LENGTH, type Comment } from '../lib/comments';
+import {
+  addComment,
+  commentErrorMessage,
+  deleteComment,
+  fetchComments,
+  MAX_COMMENT_LENGTH,
+  type Comment,
+} from '../lib/comments';
 import { colors, radius } from '../lib/theme';
 import { Avatar } from './Avatar';
 
@@ -20,6 +28,7 @@ export function InlineComments({
   userId,
   truncate = false,
   revealed = true,
+  isPredictionAuthor = false,
 }: {
   predictionId: string;
   userId: string;
@@ -31,6 +40,9 @@ export function InlineComments({
    * placeholder invite à réagir sur le Teaser plutôt qu'à commenter un
    * contenu déjà jugé. */
   revealed?: boolean;
+  /** L'auteur de la prédiction peut aussi supprimer les commentaires des
+   * autres sur ses propres scellés (modération), pas seulement les siens. */
+  isPredictionAuthor?: boolean;
 }) {
   const [comments, setComments] = useState<Comment[] | null>(null);
   const [input, setInput] = useState('');
@@ -68,6 +80,27 @@ export function InlineComments({
     }
   }
 
+  function handleDelete(commentId: string) {
+    const message = 'Ce commentaire sera définitivement supprimé.';
+    const run = async () => {
+      const { error: deleteError } = await deleteComment(commentId);
+      if (deleteError) {
+        setError(`Suppression impossible : ${deleteError.message}`);
+        return;
+      }
+      setComments((prev) => (prev ?? []).filter((c) => c.id !== commentId));
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Supprimer ce commentaire ?\n\n${message}`)) run();
+      return;
+    }
+    Alert.alert('Supprimer ce commentaire ?', message, [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Supprimer', style: 'destructive', onPress: run },
+    ]);
+  }
+
   const hiddenCount = comments ? Math.max(0, comments.length - TRUNCATED_COUNT) : 0;
   const visibleComments =
     comments && !showAll ? comments.slice(-TRUNCATED_COUNT) : comments;
@@ -87,19 +120,29 @@ export function InlineComments({
                 </Text>
               </Pressable>
             )}
-            {(visibleComments ?? []).map((comment) => (
-              <View key={comment.id} style={styles.comment}>
-                <Pressable
-                  onPress={() => router.push(`/profile/${comment.author_id}`)}
-                  style={styles.commentAuthorRow}
-                  hitSlop={4}
-                >
-                  <Avatar url={comment.author.avatar_url} username={comment.author.username} size={20} />
-                  <Text style={styles.commentAuthor}>{comment.author.username}</Text>
-                </Pressable>
-                <Text style={styles.commentContent}>{comment.content}</Text>
-              </View>
-            ))}
+            {(visibleComments ?? []).map((comment) => {
+              const canDelete = comment.author_id === userId || isPredictionAuthor;
+              return (
+                <View key={comment.id} style={styles.comment}>
+                  <View style={styles.commentTopRow}>
+                    <Pressable
+                      onPress={() => router.push(`/profile/${comment.author_id}`)}
+                      style={styles.commentAuthorRow}
+                      hitSlop={4}
+                    >
+                      <Avatar url={comment.author.avatar_url} username={comment.author.username} size={20} />
+                      <Text style={styles.commentAuthor}>{comment.author.username}</Text>
+                    </Pressable>
+                    {canDelete && (
+                      <Pressable onPress={() => handleDelete(comment.id)} hitSlop={8}>
+                        <Ionicons name="trash-outline" size={14} color={colors.textFaint} />
+                      </Pressable>
+                    )}
+                  </View>
+                  <Text style={styles.commentContent}>{comment.content}</Text>
+                </View>
+              );
+            })}
           </View>
         )
       )}
@@ -137,6 +180,7 @@ const styles = StyleSheet.create({
   comment: {},
   showMore: { alignSelf: 'flex-start', marginBottom: 2 },
   showMoreText: { fontSize: 12, fontWeight: '600', color: colors.gold },
+  commentTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   commentAuthorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' },
   commentAuthor: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
   commentContent: { fontSize: 14, color: colors.text, marginTop: 4, lineHeight: 19 },
