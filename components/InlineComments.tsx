@@ -111,6 +111,7 @@ export function InlineComments({
           value={input}
           onChangeText={setInput}
           placeholder={revealed ? 'Ajouter un commentaire…' : 'Une idée ? Une réaction ?'}
+          placeholderTextColor={colors.textFaint}
           multiline
           maxLength={MAX_COMMENT_LENGTH}
           editable={!submitting}
