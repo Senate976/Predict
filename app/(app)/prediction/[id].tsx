@@ -296,7 +296,13 @@ export default function PredictionDetailScreen() {
             )}
 
             {revealed && outcome && (
-              <View style={styles.verdictBox}>
+              <View
+                style={[
+                  styles.verdictBox,
+                  outcome.final_status === 'realized' && styles.verdictBoxRealized,
+                  outcome.final_status === 'missed' && styles.verdictBoxMissed,
+                ]}
+              >
                 <Text style={styles.eyebrowSmall}>Verdict du Cercle</Text>
                 <Text style={styles.verdict}>{STATUS_LABEL[outcome.final_status]}</Text>
 
@@ -361,7 +367,7 @@ const styles = StyleSheet.create({
   teaser: { fontFamily: fonts.serifItalic, fontSize: 28, color: colors.text, lineHeight: 36 },
   datesBlock: { marginTop: 10 },
   sealedDate: { fontSize: 12, color: colors.textFaint },
-  daysAdvance: { fontSize: 12, color: colors.textFaint, marginTop: 2 },
+  daysAdvance: { fontSize: 16, fontWeight: '600', color: colors.textMuted, marginTop: 2 },
   daysAdvanceCentered: { fontSize: 16, fontWeight: '600', color: colors.textMuted, textAlign: 'center', marginTop: 10 },
   contentHero: {
     marginTop: spacing.xl,
@@ -391,7 +397,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  verdict: { fontFamily: fonts.serifItalic, fontSize: 15, color: colors.text, marginTop: 4 },
+  verdictBoxRealized: { borderLeftWidth: 4, borderLeftColor: colors.success },
+  verdictBoxMissed: { borderLeftWidth: 4, borderLeftColor: colors.danger },
+  verdict: { fontFamily: fonts.serifItalic, fontSize: 19, color: colors.text, marginTop: 4 },
   voteRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
   voteButton: {
     flex: 1,
@@ -413,8 +421,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
   username: { fontSize: 15, color: colors.text, fontWeight: '600' },
   pillGold: {
