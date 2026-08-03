@@ -19,6 +19,7 @@ export function InlineComments({
   predictionId,
   userId,
   truncate = false,
+  revealed = true,
 }: {
   predictionId: string;
   userId: string;
@@ -26,6 +27,10 @@ export function InlineComments({
    * derrière un bouton « Voir les X autres » — utilisé sur les cartes du Fil
    * et des Archives. L'écran détail, lui, montre toute la discussion. */
   truncate?: boolean;
+  /** Avant révélation, le contenu scellé n'est pas encore connu — le
+   * placeholder invite à réagir sur le Teaser plutôt qu'à commenter un
+   * contenu déjà jugé. */
+  revealed?: boolean;
 }) {
   const [comments, setComments] = useState<Comment[] | null>(null);
   const [input, setInput] = useState('');
@@ -105,7 +110,7 @@ export function InlineComments({
         <TextInput
           value={input}
           onChangeText={setInput}
-          placeholder="Ajouter un commentaire…"
+          placeholder={revealed ? 'Ajouter un commentaire…' : 'Une idée ? Une réaction ?'}
           multiline
           maxLength={MAX_COMMENT_LENGTH}
           editable={!submitting}

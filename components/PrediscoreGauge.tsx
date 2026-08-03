@@ -54,7 +54,10 @@ export function PrediscoreGauge({ score }: { score: number | null }) {
 
       <View style={styles.labelsRow}>
         <Text style={[styles.label, styles.labelLeft]}>Mytho</Text>
-        <Text style={[styles.label, styles.labelRight]}>J’ai raison. Toujours.</Text>
+        <View style={styles.labelRightBlock}>
+          <Text style={[styles.label, styles.labelRight]}>J’ai raison.</Text>
+          <Text style={[styles.label, styles.labelRight]}>Toujours.</Text>
+        </View>
       </View>
     </View>
   );
@@ -94,5 +97,6 @@ const styles = StyleSheet.create({
   },
   label: { fontSize: 11, fontWeight: '700', color: colors.textFaint },
   labelLeft: { color: colors.danger },
-  labelRight: { color: colors.success },
+  labelRightBlock: { alignItems: 'flex-end' },
+  labelRight: { color: colors.success, textAlign: 'right' },
 });

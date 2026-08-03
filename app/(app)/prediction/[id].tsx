@@ -339,7 +339,7 @@ export default function PredictionDetailScreen() {
             )}
 
             <Text style={[styles.eyebrow, styles.sectionSpacing]}>Discussion</Text>
-            <InlineComments predictionId={id} userId={userId!} />
+            <InlineComments predictionId={id} userId={userId!} revealed={revealed} />
           </>
         ) : null}
       </ScrollView>

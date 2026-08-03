@@ -1201,7 +1201,7 @@ create trigger prediction_votes_notify_approved
   for each row execute function public.notify_prediction_approved();
 
 -- Le système de badges de prestige (fer/bronze/argent/or, sur ce compte à
--- 30 jours) est retiré au profit du Prediscore pondéré (section 24) — cette
+-- 30 jours) est retiré au profit du Prediscore pondéré (section 23) — cette
 -- fonction n'a plus aucun appelant côté client, on la supprime de la base.
 drop function if exists public.get_realized_count_30d(uuid);
 
@@ -1756,128 +1756,18 @@ revoke all on function public.get_prediction_stats(uuid) from public;
 grant execute on function public.get_prediction_stats(uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 22. Réactions sur le teaser — Confiance / Pas confiance
+-- 22. Réactions sur le teaser — fonctionnalité retirée
 -- ---------------------------------------------------------------------------
 --
--- Un avis posé par un destinataire sur le teaser seul, avant que le contenu
--- scellé ne soit connu — jamais l'auteur. Contrairement au vote (qui juge
--- après révélation), ce choix est définitif : une seule ligne par
--- destinataire et par prédiction, ni modifiable ni supprimable (aucune
--- policy update/delete plus bas).
-create table if not exists public.prediction_reactions (
-  id uuid primary key default gen_random_uuid(),
-  prediction_id uuid not null references public.predictions (id) on delete cascade,
-  voter_id uuid not null references public.profiles (id) on delete cascade,
-  reaction_value text not null check (reaction_value in ('confiance', 'pas_confiance')),
-  created_at timestamptz not null default now()
-);
-
-create unique index if not exists prediction_reactions_unique_voter
-  on public.prediction_reactions (prediction_id, voter_id);
-
-alter table public.prediction_reactions enable row level security;
-
--- Lecture ouverte à l'auteur et aux destinataires, comme les votes : le bilan
--- des réactions doit être visible par tous, pas seulement par l'auteur.
-drop policy if exists "prediction_reactions_select" on public.prediction_reactions;
-create policy "prediction_reactions_select"
-  on public.prediction_reactions
-  for select
-  to authenticated
-  using (
-    exists (
-      select 1 from public.prediction_access pa
-      where pa.prediction_id = prediction_reactions.prediction_id and pa.user_id = auth.uid()
-    )
-    or exists (
-      select 1 from public.predictions p
-      where p.id = prediction_reactions.prediction_id and p.author_id = auth.uid()
-    )
-  );
-
--- Réagir : uniquement un destinataire, sur son propre id, et seulement avant
--- la révélation — passé ce moment, ce n'est plus un avis sur le teaser mais
--- un jugement après coup, déjà couvert par le vote.
-drop policy if exists "prediction_reactions_insert" on public.prediction_reactions;
-create policy "prediction_reactions_insert"
-  on public.prediction_reactions
-  for insert
-  to authenticated
-  with check (
-    voter_id = auth.uid()
-    and exists (
-      select 1 from public.prediction_access pa
-      where pa.prediction_id = prediction_reactions.prediction_id and pa.user_id = auth.uid()
-    )
-    and exists (
-      select 1 from public.predictions p
-      where p.id = prediction_reactions.prediction_id and p.reveal_at > now()
-    )
-  );
+-- « Confiance »/« Pas confiance » sur le teaser (avant révélation) est
+-- retirée : plus aucun appelant côté client, et `predictions_feed` (section
+-- 18) redevient la définition finale de la vue, sans les colonnes de bilan.
+-- `cascade` emporte l'index unique et les policies de cette table avec elle,
+-- sur une base déjà migrée avec l'ancienne version de ce script.
+drop table if exists public.prediction_reactions cascade;
 
 -- ---------------------------------------------------------------------------
--- 23. predictions_feed enrichie du bilan des réactions
--- ---------------------------------------------------------------------------
---
--- `confiance_count`/`pas_confiance_count` : sous-requêtes corrélées plutôt
--- qu'un troisième `left join` direct sur `prediction_reactions` — cette vue
--- fait déjà un `left join` sur `prediction_votes` (un-à-plusieurs) agrégé par
--- `group by` ; un second `left join` un-à-plusieurs multiplierait les lignes
--- de vote avant l'agrégation et fausserait `realized_votes`/`missed_votes`
--- (même piège déjà rencontré et évité pour les destinataires). `my_reaction` :
--- la réaction de l'appelant lui-même, pour savoir si la carte doit encore
--- proposer les deux boutons ou son choix déjà posé.
-drop view if exists public.predictions_feed;
-
-create view public.predictions_feed
-with (security_invoker = true) as
-select
-  p.id,
-  p.author_id,
-  p.teaser,
-  pc.content,
-  pc.audio_path,
-  p.reveal_at,
-  p.scope,
-  p.created_at,
-  (p.reveal_at <= now()) as is_revealed,
-  coalesce(sum((v.vote_value = 'realized')::int), 0) as realized_votes,
-  coalesce(sum((v.vote_value = 'missed')::int), 0) as missed_votes,
-  case
-    when p.reveal_at > now() then 'pending'
-    when coalesce(sum((v.vote_value = 'realized')::int), 0)
-       > coalesce(sum((v.vote_value = 'missed')::int), 0) then 'realized'
-    when coalesce(sum((v.vote_value = 'missed')::int), 0)
-       > coalesce(sum((v.vote_value = 'realized')::int), 0) then 'missed'
-    else 'pending'
-  end as final_status,
-  coalesce(
-    (
-      select count(*) from public.prediction_reactions r
-      where r.prediction_id = p.id and r.reaction_value = 'confiance'
-    ),
-    0
-  ) as confiance_count,
-  coalesce(
-    (
-      select count(*) from public.prediction_reactions r
-      where r.prediction_id = p.id and r.reaction_value = 'pas_confiance'
-    ),
-    0
-  ) as pas_confiance_count,
-  (
-    select r2.reaction_value from public.prediction_reactions r2
-    where r2.prediction_id = p.id and r2.voter_id = auth.uid()
-  ) as my_reaction
-from public.predictions p
-left join public.prediction_contents pc on pc.prediction_id = p.id
-left join public.prediction_votes v on v.prediction_id = p.id
-group by p.id, p.author_id, p.teaser, pc.content, pc.audio_path, p.reveal_at, p.scope, p.created_at;
-
-grant select on public.predictions_feed to authenticated;
-
--- ---------------------------------------------------------------------------
--- 24. Prediscore pondéré
+-- 23. Prediscore pondéré
 -- ---------------------------------------------------------------------------
 --
 -- Remplace le badge de prestige : pourcentage pondéré des prédictions
@@ -1947,7 +1837,7 @@ revoke all on function public.get_prediscore(uuid) from public;
 grant execute on function public.get_prediscore(uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 25. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 24. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une
