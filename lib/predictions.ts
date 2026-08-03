@@ -28,14 +28,7 @@ export type PredictionFeedItem = {
   realized_votes: number;
   missed_votes: number;
   final_status: PredictionOutcomeStatus;
-  /** Bilan des réactions sur le teaser, avant révélation — voir prediction_reactions. */
-  confiance_count: number;
-  pas_confiance_count: number;
-  /** La réaction du viewer courant sur ce teaser, ou `null` s'il ne s'est pas prononcé. */
-  my_reaction: PredictionReaction | null;
 };
-
-export type PredictionReaction = 'confiance' | 'pas_confiance';
 
 /** Doivent rester alignés sur les contraintes `predictions_*_length` du SQL. */
 export const MAX_TEASER_LENGTH = 160;
@@ -106,7 +99,7 @@ export function predictionErrorMessage(error: PostgrestError): string {
  * dans lequel les choses ont été publiées, pas celui de leur révélation.
  */
 const FEED_COLUMNS =
-  'id, author_id, teaser, content, audio_path, reveal_at, scope, created_at, is_revealed, realized_votes, missed_votes, final_status, confiance_count, pas_confiance_count, my_reaction';
+  'id, author_id, teaser, content, audio_path, reveal_at, scope, created_at, is_revealed, realized_votes, missed_votes, final_status';
 
 export async function fetchPredictionsFeed() {
   return supabase
@@ -306,23 +299,6 @@ export async function fetchPredictionStats(targetUserId: string) {
     } satisfies PredictionStats,
     error: null,
   };
-}
-
-/**
- * Enregistre le choix — irréversible — d'un destinataire sur le teaser d'une
- * prédiction, avant révélation. Un simple `insert` : la RLS n'autorise le
- * destinataire qu'une fois, et l'index unique `(prediction_id, voter_id)` fait
- * échouer toute deuxième tentative, ce qui est le comportement attendu (pas de
- * changement d'avis possible).
- */
-export async function castReaction(
-  predictionId: string,
-  voterId: string,
-  value: PredictionReaction
-) {
-  return supabase
-    .from('prediction_reactions')
-    .insert({ prediction_id: predictionId, voter_id: voterId, reaction_value: value });
 }
 
 export type Prediscore = { score: number | null; weightedCount: number };
