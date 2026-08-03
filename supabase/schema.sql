@@ -60,6 +60,9 @@ alter table public.profiles add column if not exists updated_at timestamptz not 
 -- `false` par défaut : c'est ce qui déclenche l'écran de bienvenue juste
 -- après l'inscription (lib/auth.tsx), avant que l'utilisateur ne le ferme.
 alter table public.profiles add column if not exists onboarded boolean not null default false;
+-- Facultatif — visible par tout le monde au même titre que le pseudo/avatar
+-- (`profiles_select_authenticated`, section 3, ne distingue pas les colonnes).
+alter table public.profiles add column if not exists phone text;
 
 -- ---------------------------------------------------------------------------
 -- 2. Unicité du pseudo
@@ -256,6 +259,13 @@ create index if not exists predictions_author_reveal_idx
 -- récentes sans filtrer par auteur.
 create index if not exists predictions_reveal_at_idx
   on public.predictions (reveal_at desc);
+
+-- `true` : l'auteur n'a pas fixé de date, `reveal_at` porte alors une valeur
+-- lointaine posée par le client à la création — un simple repère technique,
+-- jamais affiché tel quel (section 24, `reveal_prediction_now`). Purement
+-- déclaratif pour l'affichage : ne change rien au calcul de `is_revealed`,
+-- qui reste `reveal_at <= now()` partout, sans exception.
+alter table public.predictions add column if not exists open_ended boolean not null default false;
 
 drop trigger if exists predictions_set_updated_at on public.predictions;
 create trigger predictions_set_updated_at
@@ -1056,6 +1066,12 @@ alter table public.prediction_comments drop constraint if exists prediction_comm
 alter table public.prediction_comments add constraint prediction_comments_length
   check (char_length(btrim(content)) between 1 and 500);
 
+-- Réponse à un commentaire précis — `on delete set null` plutôt que `cascade` :
+-- supprimer le commentaire original ne doit pas emporter ses réponses, qui
+-- restent lisibles (juste sans plus de citation précise à afficher).
+alter table public.prediction_comments
+  add column if not exists reply_to_id uuid references public.prediction_comments (id) on delete set null;
+
 create index if not exists prediction_comments_prediction_idx
   on public.prediction_comments (prediction_id, created_at);
 
@@ -1306,6 +1322,7 @@ select
   pc.audio_path,
   p.reveal_at,
   p.scope,
+  p.open_ended,
   p.created_at,
   (p.reveal_at <= now()) as is_revealed,
   coalesce(sum((v.vote_value = 'realized')::int), 0) as realized_votes,
@@ -1321,7 +1338,7 @@ select
 from public.predictions p
 left join public.prediction_contents pc on pc.prediction_id = p.id
 left join public.prediction_votes v on v.prediction_id = p.id
-group by p.id, p.author_id, p.teaser, pc.content, pc.audio_path, p.reveal_at, p.scope, p.created_at;
+group by p.id, p.author_id, p.teaser, pc.content, pc.audio_path, p.reveal_at, p.scope, p.open_ended, p.created_at;
 
 grant select on public.predictions_feed to authenticated;
 
@@ -1596,11 +1613,12 @@ alter table public.predictions drop constraint if exists predictions_scope_valid
 alter table public.predictions add constraint predictions_scope_valid
   check (scope in ('circle', 'selected', 'group'));
 
--- `create_prediction` gagne un paramètre optionnel `p_group_id`, ajouté en
--- fin de liste (après `p_friend_ids`, qui a déjà un défaut) pour ne pas casser
--- les appels existants. Signature différente de celle créée section 12 ->
--- `drop function` d'abord.
+-- `create_prediction` gagne deux paramètres optionnels, `p_mentioned_ids` et
+-- `p_open_ended`, ajoutés en fin de liste pour ne pas casser les appels
+-- existants. Signature différente de celle créée section 12 -> `drop
+-- function` d'abord.
 drop function if exists public.create_prediction(text, text, timestamptz, text, uuid[]);
+drop function if exists public.create_prediction(text, text, timestamptz, text, uuid[], uuid);
 
 create or replace function public.create_prediction(
   p_teaser text,
@@ -1608,7 +1626,9 @@ create or replace function public.create_prediction(
   p_reveal_at timestamptz,
   p_scope text,
   p_friend_ids uuid[] default array[]::uuid[],
-  p_group_id uuid default null
+  p_group_id uuid default null,
+  p_mentioned_ids uuid[] default array[]::uuid[],
+  p_open_ended boolean default false
 )
 returns uuid
 language plpgsql
@@ -1619,8 +1639,8 @@ declare
   v_id uuid;
   v_recipient uuid;
 begin
-  insert into public.predictions (author_id, teaser, reveal_at, scope)
-  values (auth.uid(), p_teaser, p_reveal_at, p_scope)
+  insert into public.predictions (author_id, teaser, reveal_at, scope, open_ended)
+  values (auth.uid(), p_teaser, p_reveal_at, p_scope, p_open_ended)
   returning id into v_id;
 
   insert into public.prediction_contents (prediction_id, content)
@@ -1655,12 +1675,31 @@ begin
     end loop;
   end if;
 
+  -- Mentions « @pseudo » repérées dans le teaser : accès garanti même hors du
+  -- scope choisi (ex. mentionner un ami hors du groupe ciblé). Revérifié ici
+  -- plutôt que de faire confiance au tri déjà fait côté client : seul un ami
+  -- accepté peut être ajouté, jamais n'importe quel id passé en paramètre.
+  foreach v_recipient in array coalesce(p_mentioned_ids, array[]::uuid[]) loop
+    if exists (
+      select 1 from public.friendships f
+      where f.status = 'accepted'
+        and (
+          (f.requester_id = auth.uid() and f.addressee_id = v_recipient)
+          or (f.addressee_id = auth.uid() and f.requester_id = v_recipient)
+        )
+    ) then
+      insert into public.prediction_access (prediction_id, user_id)
+      values (v_id, v_recipient)
+      on conflict (prediction_id, user_id) do nothing;
+    end if;
+  end loop;
+
   return v_id;
 end;
 $$;
 
-revoke all on function public.create_prediction(text, text, timestamptz, text, uuid[], uuid) from public;
-grant execute on function public.create_prediction(text, text, timestamptz, text, uuid[], uuid) to authenticated;
+revoke all on function public.create_prediction(text, text, timestamptz, text, uuid[], uuid, uuid[], boolean) from public;
+grant execute on function public.create_prediction(text, text, timestamptz, text, uuid[], uuid, uuid[], boolean) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- 20. Photo de profil
@@ -1844,7 +1883,37 @@ revoke all on function public.get_prediscore(uuid) from public;
 grant execute on function public.get_prediscore(uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 24. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 24. Révélation manuelle, sans attendre une date fixe
+-- ---------------------------------------------------------------------------
+--
+-- L'auteur peut révéler sa prédiction à l'instant qu'il choisit — que
+-- `reveal_at` porte une vraie date (révélation anticipée) ou la valeur
+-- lointaine posée pour une prédiction « ouverte » (`open_ended`, section 7).
+-- `security definer` plutôt qu'une policy update ouverte sur `predictions` :
+-- la policy générale (`predictions_update_own_before_reveal`) exige encore
+-- `reveal_at > now()` après modification, ce qu'une révélation immédiate ne
+-- satisfait jamais par construction. Cette fonction porte donc elle-même son
+-- garde-fou (auteur, pas déjà révélée) plutôt que de relâcher cette policy.
+create or replace function public.reveal_prediction_now(p_prediction_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  update public.predictions
+  set reveal_at = now()
+  where id = p_prediction_id
+    and author_id = auth.uid()
+    and reveal_at > now();
+end;
+$$;
+
+revoke all on function public.reveal_prediction_now(uuid) from public;
+grant execute on function public.reveal_prediction_now(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 25. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une

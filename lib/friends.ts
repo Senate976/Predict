@@ -2,7 +2,14 @@ import type { PostgrestError } from '@supabase/supabase-js';
 
 import { supabase } from './supabase';
 
-export type FriendProfile = { id: string; username: string; avatar_url: string | null };
+export type FriendProfile = {
+  id: string;
+  username: string;
+  avatar_url: string | null;
+  /** Facultatif, visible par tout le monde au même titre que le pseudo/avatar
+   * — pas de restriction supplémentaire aux amis côté base (section 1). */
+  phone?: string | null;
+};
 
 export type FriendshipStatus = 'pending' | 'accepted';
 
@@ -132,10 +139,15 @@ export async function sendFriendRequest(requesterId: string, addresseeId: string
 export async function fetchProfileById(userId: string) {
   return supabase
     .from('profiles')
-    .select('id, username, avatar_url')
+    .select('id, username, avatar_url, phone')
     .eq('id', userId)
     .maybeSingle()
     .returns<FriendProfile>();
+}
+
+/** Enregistre (ou efface, avec `null`) son propre numéro de téléphone. */
+export async function updatePhone(userId: string, phone: string | null) {
+  return supabase.from('profiles').update({ phone }).eq('id', userId);
 }
 
 /** Accepter une demande reçue — passe son statut à 'accepted'. */

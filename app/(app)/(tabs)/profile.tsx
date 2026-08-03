@@ -1,6 +1,14 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
@@ -9,7 +17,7 @@ import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { pickAvatarImage, removeAvatar, uploadAvatar } from '../../../lib/avatar';
 import { useAuth } from '../../../lib/auth';
 import { formatRevealAt } from '../../../lib/datetime';
-import { fetchProfileById } from '../../../lib/friends';
+import { fetchProfileById, updatePhone } from '../../../lib/friends';
 import {
   fetchPredictionOutcomes,
   fetchPrediscore,
@@ -47,6 +55,10 @@ export default function ProfileScreen() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [phone, setPhone] = useState('');
+  const [savedPhone, setSavedPhone] = useState('');
+  const [savingPhone, setSavingPhone] = useState(false);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('total');
 
@@ -76,6 +88,8 @@ export default function ProfileScreen() {
 
     const { data: profile } = await fetchProfileById(userId);
     setAvatarUrl(profile?.avatar_url ?? null);
+    setPhone(profile?.phone ?? '');
+    setSavedPhone(profile?.phone ?? '');
   }, [userId]);
 
   async function handlePickAvatar() {
@@ -123,6 +137,24 @@ export default function ProfileScreen() {
     }, [load])
   );
 
+  async function handleSavePhone() {
+    if (!userId) return;
+    const trimmed = phone.trim();
+    setPhoneError(null);
+    setSavingPhone(true);
+    try {
+      const { error: saveError } = await updatePhone(userId, trimmed || null);
+      if (saveError) {
+        setPhoneError(`Enregistrement impossible : ${saveError.message}`);
+        return;
+      }
+      setPhone(trimmed);
+      setSavedPhone(trimmed);
+    } finally {
+      setSavingPhone(false);
+    }
+  }
+
   const realized = (outcomes ?? []).filter((o) => o.final_status === 'realized');
   const missed = (outcomes ?? []).filter((o) => o.final_status === 'missed');
   const pending = (outcomes ?? []).filter((o) => o.final_status === 'pending');
@@ -160,6 +192,28 @@ export default function ProfileScreen() {
           <Text style={[styles.eyebrow, styles.sectionSpacing]}>Nom d’utilisateur</Text>
           <Text style={styles.username}>@{username ?? '…'}</Text>
           <Text style={styles.email}>{session?.user.email ?? ''}</Text>
+
+          <Text style={[styles.eyebrow, styles.sectionSpacing]}>Téléphone (facultatif)</Text>
+          <View style={styles.phoneRow}>
+            <TextInput
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="06 12 34 56 78"
+              placeholderTextColor={colors.textFaint}
+              keyboardType="phone-pad"
+              editable={!savingPhone}
+              style={styles.phoneInput}
+            />
+            <Pressable
+              onPress={handleSavePhone}
+              disabled={savingPhone || phone.trim() === savedPhone}
+              style={styles.phoneSave}
+            >
+              <Text style={styles.phoneSaveText}>{savingPhone ? '…' : 'Enregistrer'}</Text>
+            </Pressable>
+          </View>
+          <Text style={styles.phoneHint}>Visible par tout ton Cercle, comme ton pseudo.</Text>
+          {phoneError && <Text style={styles.error}>{phoneError}</Text>}
         </View>
 
         <View style={[styles.prediscoreCard, styles.sectionSpacing]}>
@@ -282,6 +336,26 @@ const styles = StyleSheet.create({
   removeAvatarText: { fontSize: 12, fontWeight: '600', color: colors.danger },
   username: { fontFamily: fonts.serifItalic, fontSize: 22, color: colors.text, marginTop: 6 },
   email: { fontSize: 13, color: colors.textFaint, marginTop: 4 },
+  phoneRow: { flexDirection: 'row', gap: 8, width: '100%' },
+  phoneInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: colors.text,
+    backgroundColor: colors.surface,
+  },
+  phoneSave: {
+    backgroundColor: colors.gold,
+    borderRadius: radius.sm,
+    paddingHorizontal: 14,
+    justifyContent: 'center',
+  },
+  phoneSaveText: { color: colors.text, fontSize: 13, fontWeight: '700' },
+  phoneHint: { fontSize: 11, color: colors.textFaint, marginTop: 6 },
   loader: { marginTop: 24 },
   prediscoreCard: {
     paddingVertical: 24,
