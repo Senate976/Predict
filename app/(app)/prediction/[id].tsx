@@ -168,6 +168,17 @@ export default function PredictionDetailScreen() {
 
   const isAuthor = prediction && userId && prediction.author_id === userId;
   const revealed = prediction ? isRevealed(prediction, new Date()) : false;
+  // Écart entre le scellé et la révélation, en jours pleins — juste
+  // informatif, pour souligner à quel point la prédiction a été anticipée.
+  const daysInAdvance = prediction
+    ? Math.max(
+        0,
+        Math.round(
+          (new Date(prediction.reveal_at).getTime() - new Date(prediction.created_at).getTime()) /
+            86_400_000
+        )
+      )
+    : 0;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -189,10 +200,32 @@ export default function PredictionDetailScreen() {
             <Text style={styles.teaser}>{prediction.teaser}</Text>
 
             {/* Depuis que le Fil n'affiche plus la date de scellé, cet écran
-                détail est le seul à la montrer — toujours visible. */}
-            <Text style={styles.sealedDate}>
-              Scellé le {formatShortDateTime(new Date(prediction.created_at))}
-            </Text>
+                détail est le seul à la montrer — toujours visible. Avant
+                révélation, la date de révélation l'accompagne (centrées,
+                espacées pour la lisibilité) ; une fois révélée, elle
+                n'apporte plus rien et disparaît. */}
+            {revealed ? (
+              <View style={styles.datesBlock}>
+                <Text style={styles.sealedDate}>
+                  Scellée le {formatShortDateTime(new Date(prediction.created_at))}
+                </Text>
+                <Text style={styles.daysAdvance}>
+                  Prédit {daysInAdvance} jour{daysInAdvance > 1 ? 's' : ''} à l’avance
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.datesBlockCentered}>
+                <Text style={styles.dateLineCentered}>
+                  Scellée le {formatShortDateTime(new Date(prediction.created_at))}
+                </Text>
+                <Text style={[styles.dateLineCentered, styles.dateLineGap]}>
+                  Révélée le {formatShortDateTime(new Date(prediction.reveal_at))}
+                </Text>
+                <Text style={[styles.dateLineCentered, styles.daysAdvanceGap]}>
+                  Prédit {daysInAdvance} jour{daysInAdvance > 1 ? 's' : ''} à l’avance
+                </Text>
+              </View>
+            )}
 
             {/* Le cœur de l'écran : le contenu de la prédiction prime sur tout
                 le reste, y compris le verdict — repoussé tout en bas. Même
@@ -345,7 +378,13 @@ const styles = StyleSheet.create({
   eyebrow: { ...eyebrow },
   eyebrowSmall: { ...eyebrow, fontSize: 10 },
   teaser: { fontFamily: fonts.serifItalic, fontSize: 28, color: colors.text, lineHeight: 36 },
-  sealedDate: { fontSize: 12, color: colors.textFaint, marginTop: 10 },
+  datesBlock: { marginTop: 10 },
+  sealedDate: { fontSize: 12, color: colors.textFaint },
+  daysAdvance: { fontSize: 12, color: colors.textFaint, marginTop: 2 },
+  datesBlockCentered: { marginTop: 10, alignItems: 'center' },
+  dateLineCentered: { fontSize: 12, color: colors.textFaint, textAlign: 'center' },
+  dateLineGap: { marginTop: 14 },
+  daysAdvanceGap: { marginTop: 8 },
   contentHero: {
     marginTop: spacing.xl,
     marginBottom: spacing.lg,
