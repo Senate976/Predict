@@ -427,10 +427,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  brand: { fontFamily: fonts.serifItalic, fontSize: 26, color: colors.text },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  userChip: { flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: '55%' },
-  userChipName: { fontSize: 14, fontWeight: '700', color: colors.text, flexShrink: 1 },
+  brand: { fontFamily: fonts.serifItalic, fontSize: 26, color: colors.text, flexShrink: 0 },
+  // `flexShrink` + `minWidth: 0` en chaîne (plutôt qu'un `maxWidth` en
+  // pourcentage sur `userChip`, calculé contre un parent lui-même sans
+  // largeur définie) : c'est ce qui permet au pseudo de rétrécir avec
+  // ellipse au lieu de s'effondrer à un seul caractère sur certains
+  // navigateurs mobiles.
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 14, flexShrink: 1, minWidth: 0 },
+  userChip: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, minWidth: 0 },
+  userChipName: { fontSize: 14, fontWeight: '700', color: colors.text, flexShrink: 1, minWidth: 0 },
   tabs: {
     flexDirection: 'row',
     gap: 8,

@@ -133,7 +133,10 @@ export function InlineComments({
               const canDelete = comment.author_id === userId || isPredictionAuthor;
               const repliedTo = comment.reply_to_id ? commentsById.get(comment.reply_to_id) : null;
               return (
-                <View key={comment.id} style={styles.comment}>
+                <View
+                  key={comment.id}
+                  style={[styles.comment, repliedTo && styles.commentReply]}
+                >
                   <View style={styles.commentTopRow}>
                     <Pressable
                       onPress={() => router.push(`/profile/${comment.author_id}`)}
@@ -150,12 +153,17 @@ export function InlineComments({
                       </Pressable>
                     )}
                   </View>
-                  {repliedTo && (
-                    <Text style={styles.replyQuote} numberOfLines={1}>
-                      ↳ Réponse à {repliedTo.author.username} : « {repliedTo.content} »
-                    </Text>
-                  )}
-                  <Text style={styles.commentContent}>{comment.content}</Text>
+                  <Text style={styles.commentContent}>
+                    {repliedTo && (
+                      <Text
+                        style={styles.replyMention}
+                        onPress={() => router.push(`/profile/${repliedTo.author_id}`)}
+                      >
+                        {repliedTo.author.username}{' '}
+                      </Text>
+                    )}
+                    {comment.content}
+                  </Text>
                   <Pressable
                     onPress={() =>
                       setReplyingTo({
@@ -218,6 +226,14 @@ const styles = StyleSheet.create({
   loader: { marginVertical: 8 },
   list: { gap: 8, marginBottom: 10 },
   comment: {},
+  // Façon Facebook : une réponse est décalée du bord de page, avec un repère
+  // vertical discret qui la rattache visuellement au fil de discussion.
+  commentReply: {
+    marginLeft: 20,
+    paddingLeft: 10,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.border,
+  },
   showMore: { alignSelf: 'flex-start', marginBottom: 2 },
   showMoreText: { fontSize: 12, fontWeight: '600', color: colors.gold },
   commentTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -225,7 +241,7 @@ const styles = StyleSheet.create({
   commentAuthor: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
   commentTime: { fontSize: 11, color: colors.textFaint },
   commentContent: { fontSize: 14, color: colors.text, marginTop: 4, lineHeight: 19 },
-  replyQuote: { fontSize: 12, color: colors.textFaint, marginTop: 4, fontStyle: 'italic' },
+  replyMention: { fontWeight: '700', color: colors.gold },
   replyLink: { alignSelf: 'flex-start', marginTop: 4 },
   replyLinkText: { fontSize: 11, fontWeight: '600', color: colors.gold },
   replyingBox: {
