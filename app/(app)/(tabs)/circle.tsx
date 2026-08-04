@@ -564,6 +564,7 @@ export default function CircleScreen() {
                             return (
                               <View key={profile.id} style={styles.row}>
                                 <View style={styles.usernameRow}>
+                                  <Avatar url={profile.avatar_url} username={profile.username} size={28} />
                                   <Text style={styles.username}>{profile.username}</Text>
                                   {member?.status === 'accepted' && (
                                     <Text style={styles.groupScore}>

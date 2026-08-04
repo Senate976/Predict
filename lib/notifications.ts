@@ -127,6 +127,11 @@ export async function deleteNotification(id: string) {
   return supabase.from('notifications').delete().eq('id', id);
 }
 
+/** Supprime plusieurs notifications d'un coup — sélection multiple depuis l'écran. */
+export async function deleteNotifications(ids: string[]) {
+  return supabase.from('notifications').delete().in('id', ids);
+}
+
 /** Nombre de notifications non lues — pour le badge de l'onglet Notifications. */
 export async function fetchUnreadNotificationCount(userId: string) {
   const { count, error } = await supabase
