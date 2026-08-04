@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
+import { PredictWord } from '../../../components/PredictWord';
 import { PrediscoreGauge } from '../../../components/PrediscoreGauge';
 import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { fetchProfileById, type FriendProfile } from '../../../lib/friends';
@@ -113,19 +114,23 @@ export default function FriendProfileScreen() {
               ) : (
                 <PrediscoreGauge
                   score={prediscore}
-                  emptyMessage={`Le Prediscore de ${profile.username} apparaîtra après son premier Predict révélé.`}
+                  emptyMessage={`Le Prediscore de ${profile.username} apparaîtra après sa première Predict révélée.`}
                 />
               )}
             </View>
 
-            <Text style={[styles.eyebrow, styles.sectionSpacing]}>Predict</Text>
+            <Text style={[styles.eyebrow, styles.sectionSpacing]}>
+              <PredictWord />
+            </Text>
             {stats === null ? (
               <ActivityIndicator color={colors.gold} style={styles.loader} />
             ) : (
               <View style={styles.statsRow}>
                 <View style={styles.statCard}>
                   <Text style={styles.statValue}>{stats.total}</Text>
-                  <Text style={styles.statLabel}>Predict</Text>
+                  <Text style={styles.statLabel}>
+                    <PredictWord />
+                  </Text>
                 </View>
                 <View style={styles.statCard}>
                   <Text style={[styles.statValue, styles.statValueRealized]}>{stats.realized}</Text>

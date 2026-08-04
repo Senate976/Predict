@@ -122,6 +122,10 @@ export async function markNotificationRead(id: string) {
   return supabase.from('notifications').update({ is_read: true }).eq('id', id);
 }
 
+export async function deleteNotification(id: string) {
+  return supabase.from('notifications').delete().eq('id', id);
+}
+
 /** Nombre de notifications non lues — pour le badge de l'onglet Notifications. */
 export async function fetchUnreadNotificationCount(userId: string) {
   const { count, error } = await supabase

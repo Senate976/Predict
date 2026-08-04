@@ -3,7 +3,9 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
+import { PredictWord } from '../../../components/PredictWord';
 import { PrediscoreGauge } from '../../../components/PrediscoreGauge';
 import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { pickAvatarImage, removeAvatar, uploadAvatar } from '../../../lib/avatar';
@@ -160,6 +163,35 @@ export default function ProfileScreen() {
     }
   }
 
+  function handleDeletePhone() {
+    if (!userId) return;
+    const message = 'Ton numéro sera retiré de ton profil.';
+    const run = async () => {
+      setPhoneError(null);
+      setSavingPhone(true);
+      try {
+        const { error: deleteError } = await updatePhone(userId, null);
+        if (deleteError) {
+          setPhoneError(`Suppression impossible : ${deleteError.message}`);
+          return;
+        }
+        setPhone('');
+        setSavedPhone('');
+      } finally {
+        setSavingPhone(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Supprimer ce numéro ?\n\n${message}`)) run();
+      return;
+    }
+    Alert.alert('Supprimer ce numéro ?', message, [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Supprimer', style: 'destructive', onPress: run },
+    ]);
+  }
+
   const realized = (outcomes ?? []).filter((o) => o.final_status === 'realized');
   const missed = (outcomes ?? []).filter((o) => o.final_status === 'missed');
   const pending = (outcomes ?? []).filter((o) => o.final_status === 'pending');
@@ -214,10 +246,17 @@ export default function ProfileScreen() {
               </Pressable>
             </View>
           ) : (
-            <Pressable onPress={() => setEditingPhone(true)} style={styles.phoneDisplayRow} hitSlop={4}>
-              <Text style={styles.email}>{savedPhone || 'Ajouter un numéro de téléphone'}</Text>
-              <Ionicons name="pencil-outline" size={14} color={colors.textFaint} />
-            </Pressable>
+            <View style={styles.phoneDisplayRow}>
+              <Pressable onPress={() => setEditingPhone(true)} style={styles.phoneDisplayTextRow} hitSlop={4}>
+                <Text style={styles.email}>{savedPhone || 'Ajouter un numéro de téléphone'}</Text>
+                <Ionicons name="pencil-outline" size={14} color={colors.textFaint} />
+              </Pressable>
+              {savedPhone && (
+                <Pressable onPress={handleDeletePhone} hitSlop={8}>
+                  <Ionicons name="trash-outline" size={14} color={colors.textFaint} />
+                </Pressable>
+              )}
+            </View>
           )}
           {phoneError && <Text style={styles.error}>{phoneError}</Text>}
         </View>
@@ -269,7 +308,9 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        <Text style={[styles.eyebrow, styles.sectionSpacing]}>Predict</Text>
+        <Text style={[styles.eyebrow, styles.sectionSpacing]}>
+          <PredictWord />
+        </Text>
 
         {error && <Text style={styles.error}>{error}</Text>}
 
@@ -283,7 +324,9 @@ export default function ProfileScreen() {
                 style={[styles.statCard, filter === 'total' && styles.statCardActive]}
               >
                 <Text style={styles.statValue}>{total.length}</Text>
-                <Text style={styles.statLabel}>Predict</Text>
+                <Text style={styles.statLabel}>
+                  <PredictWord />
+                </Text>
               </Pressable>
               <Pressable
                 onPress={() => setFilter('realized')}
@@ -312,7 +355,9 @@ export default function ProfileScreen() {
               <Text style={styles.signOutText}>Se déconnecter</Text>
             </Pressable>
 
-            <Text style={[styles.eyebrow, styles.sectionSpacing]}>{FILTER_LABEL[filter]}</Text>
+            <Text style={[styles.eyebrow, styles.sectionSpacing]}>
+              {filter === 'total' ? <PredictWord /> : FILTER_LABEL[filter]}
+            </Text>
             {filtered.length === 0 ? (
               <Text style={styles.hint}>Rien ici pour l’instant.</Text>
             ) : (
@@ -377,11 +422,16 @@ const styles = StyleSheet.create({
   avatarEditText: { color: colors.background, fontSize: 10, fontWeight: '700' },
   username: { fontFamily: fonts.serifItalic, fontSize: 22, color: colors.text, marginTop: 6 },
   email: { fontSize: 13, color: colors.textFaint, marginTop: 4 },
-  phoneDisplayRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-  phoneRow: { flexDirection: 'row', gap: 8, width: '100%' },
+  phoneDisplayRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 },
+  phoneDisplayTextRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  // `alignSelf: 'stretch'` plutôt qu'un `width: '100%'` calculé contre le
+  // parent centré (`identityCard`) : c'est ce qui poussait le bouton
+  // Enregistrer à moitié hors cadre, sur la droite.
+  phoneRow: { flexDirection: 'row', gap: 8, alignSelf: 'stretch' },
   phoneRowSpacing: { marginTop: 4 },
   phoneInput: {
     flex: 1,
+    minWidth: 0,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.sm,
@@ -395,6 +445,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.gold,
     borderRadius: radius.sm,
     paddingHorizontal: 14,
+    paddingVertical: 10,
     justifyContent: 'center',
   },
   phoneSaveText: { color: colors.text, fontSize: 13, fontWeight: '700' },

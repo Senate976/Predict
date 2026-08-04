@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import { Animated, Modal, StyleSheet, Text, View } from 'react-native';
 
 import { fonts } from '../lib/theme';
+import { PredictWord } from './PredictWord';
 
 type Props = {
   visible: boolean;
@@ -137,7 +138,9 @@ export function PredictionSeal({ visible, onFinish }: Props) {
           </Animated.View>
         </View>
 
-        <Text style={styles.label}>Predict scellé</Text>
+        <Text style={styles.label}>
+          <PredictWord /> scellée
+        </Text>
       </Animated.View>
     </Modal>
   );

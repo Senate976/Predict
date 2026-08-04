@@ -1,9 +1,14 @@
+import type { ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { colors, fonts, radius, spacing } from '../lib/theme';
+import { PredictWord } from './PredictWord';
 
-const STEPS = [
-  'Scellez votre Predict et définissez sa date de révélation et à qui vous souhaitez le révéler.',
+const STEPS: ReactNode[] = [
+  <>
+    Scellez votre <PredictWord /> et définissez sa date de révélation et à qui vous souhaitez la
+    révéler.
+  </>,
   'Partagez le teaser exclusif à votre Cercle.',
   'Révélez la vérité le jour J et laissez vos proches confirmer si votre intuition était la bonne.',
 ];
@@ -27,14 +32,18 @@ export function WelcomeOnboarding({
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <ScrollView contentContainerStyle={styles.scroll}>
-            <Text style={styles.brand}>Predict</Text>
-            <Text style={styles.title}>Bienvenue sur Predict.</Text>
+            <Text style={styles.brand}>
+              <PredictWord />
+            </Text>
+            <Text style={styles.title}>
+              Bienvenue sur <PredictWord />.
+            </Text>
             <Text style={styles.lead}>
               Prédisez tout, n’importe quoi, mais surtout : prouvez-le à vos amis.
             </Text>
 
             {STEPS.map((step, index) => (
-              <View key={step} style={styles.stepRow}>
+              <View key={index} style={styles.stepRow}>
                 <View style={styles.stepNumber}>
                   <Text style={styles.stepNumberText}>{index + 1}</Text>
                 </View>
@@ -43,7 +52,7 @@ export function WelcomeOnboarding({
             ))}
 
             <Text style={styles.body}>
-              Accumulez les Predict réussis, débloquez des badges de prestige
+              Accumulez les <PredictWord /> réussies, débloquez des badges de prestige
               et montrez à votre réseau qui avait raison depuis le début.
             </Text>
 
@@ -53,7 +62,9 @@ export function WelcomeOnboarding({
               onPress={onStart}
               style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
             >
-              <Text style={styles.ctaText}>Sceller mon premier Predict</Text>
+              <Text style={styles.ctaText}>
+                Sceller ma première <PredictWord />
+              </Text>
             </Pressable>
           </ScrollView>
         </View>

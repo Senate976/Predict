@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { Animated, Dimensions, Modal, StyleSheet, Text, View } from 'react-native';
 
 import { colors, fonts, radius } from '../lib/theme';
+import { PredictWord } from './PredictWord';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PARTICLE_COUNT = 160;
@@ -30,7 +31,7 @@ function makeParticles(): Particle[] {
 
 type Props = {
   visible: boolean;
-  message?: string;
+  message?: ReactNode;
   onFinish: () => void;
 };
 
@@ -42,7 +43,11 @@ type Props = {
  */
 export function CelebrationBurst({
   visible,
-  message = 'Predict approuvé par vos pairs !',
+  message = (
+    <>
+      <PredictWord /> approuvée par vos pairs !
+    </>
+  ),
   onFinish,
 }: Props) {
   const particles = useMemo(() => (visible ? makeParticles() : []), [visible]);
