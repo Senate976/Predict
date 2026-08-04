@@ -1,7 +1,9 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -59,6 +61,8 @@ export default function ProfileScreen() {
   const [savedPhone, setSavedPhone] = useState('');
   const [savingPhone, setSavingPhone] = useState(false);
   const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [editingPhone, setEditingPhone] = useState(false);
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('total');
 
@@ -150,6 +154,7 @@ export default function ProfileScreen() {
       }
       setPhone(trimmed);
       setSavedPhone(trimmed);
+      setEditingPhone(false);
     } finally {
       setSavingPhone(false);
     }
@@ -172,7 +177,7 @@ export default function ProfileScreen() {
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.identityCard}>
-          <Pressable onPress={handlePickAvatar} disabled={uploadingAvatar} style={styles.avatarWrap}>
+          <Pressable onPress={() => setAvatarMenuOpen(true)} disabled={uploadingAvatar} style={styles.avatarWrap}>
             <Avatar url={avatarUrl} username={username} size={84} />
             <View style={styles.avatarEditBadge}>
               {uploadingAvatar ? (
@@ -182,11 +187,6 @@ export default function ProfileScreen() {
               )}
             </View>
           </Pressable>
-          {avatarUrl && !uploadingAvatar && (
-            <Pressable onPress={handleRemoveAvatar} hitSlop={4} style={styles.removeAvatar}>
-              <Text style={styles.removeAvatarText}>Supprimer la photo</Text>
-            </Pressable>
-          )}
           {avatarError && <Text style={styles.error}>{avatarError}</Text>}
 
           <Text style={[styles.eyebrow, styles.sectionSpacing]}>Nom d’utilisateur</Text>
@@ -194,27 +194,71 @@ export default function ProfileScreen() {
           <Text style={styles.email}>{session?.user.email ?? ''}</Text>
 
           <Text style={[styles.eyebrow, styles.sectionSpacing]}>Téléphone (facultatif)</Text>
-          <View style={styles.phoneRow}>
-            <TextInput
-              value={phone}
-              onChangeText={setPhone}
-              placeholder="06 12 34 56 78"
-              placeholderTextColor={colors.textFaint}
-              keyboardType="phone-pad"
-              editable={!savingPhone}
-              style={styles.phoneInput}
-            />
-            <Pressable
-              onPress={handleSavePhone}
-              disabled={savingPhone || phone.trim() === savedPhone}
-              style={styles.phoneSave}
-            >
-              <Text style={styles.phoneSaveText}>{savingPhone ? '…' : 'Enregistrer'}</Text>
+          {editingPhone ? (
+            <View style={styles.phoneRow}>
+              <TextInput
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="06 12 34 56 78"
+                placeholderTextColor={colors.textFaint}
+                keyboardType="phone-pad"
+                editable={!savingPhone}
+                autoFocus
+                style={styles.phoneInput}
+              />
+              <Pressable
+                onPress={handleSavePhone}
+                disabled={savingPhone || phone.trim() === savedPhone}
+                style={styles.phoneSave}
+              >
+                <Text style={styles.phoneSaveText}>{savingPhone ? '…' : 'Enregistrer'}</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable onPress={() => setEditingPhone(true)} style={styles.phoneDisplayRow} hitSlop={4}>
+              <Text style={styles.email}>{savedPhone || 'Ajouter un numéro'}</Text>
+              <Ionicons name="pencil-outline" size={14} color={colors.textFaint} />
             </Pressable>
-          </View>
-          <Text style={styles.phoneHint}>Visible par tout ton Cercle, comme ton pseudo.</Text>
+          )}
           {phoneError && <Text style={styles.error}>{phoneError}</Text>}
         </View>
+
+        <Modal
+          visible={avatarMenuOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setAvatarMenuOpen(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setAvatarMenuOpen(false)}>
+            <View style={styles.avatarMenu}>
+              <Pressable
+                onPress={() => {
+                  setAvatarMenuOpen(false);
+                  handlePickAvatar();
+                }}
+                style={styles.avatarMenuItem}
+              >
+                <Text style={styles.avatarMenuItemText}>Choisir une nouvelle photo</Text>
+              </Pressable>
+              {avatarUrl && (
+                <Pressable
+                  onPress={() => {
+                    setAvatarMenuOpen(false);
+                    handleRemoveAvatar();
+                  }}
+                  style={styles.avatarMenuItem}
+                >
+                  <Text style={[styles.avatarMenuItemText, styles.avatarMenuItemDanger]}>
+                    Supprimer la photo
+                  </Text>
+                </Pressable>
+              )}
+              <Pressable onPress={() => setAvatarMenuOpen(false)} style={styles.avatarMenuItemLast}>
+                <Text style={styles.avatarMenuItemText}>Annuler</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Modal>
 
         <View style={[styles.prediscoreCard, styles.sectionSpacing]}>
           {!prediscoreLoaded ? (
@@ -332,10 +376,9 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   avatarEditText: { color: colors.background, fontSize: 10, fontWeight: '700' },
-  removeAvatar: { marginTop: 10 },
-  removeAvatarText: { fontSize: 12, fontWeight: '600', color: colors.danger },
   username: { fontFamily: fonts.serifItalic, fontSize: 22, color: colors.text, marginTop: 6 },
   email: { fontSize: 13, color: colors.textFaint, marginTop: 4 },
+  phoneDisplayRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   phoneRow: { flexDirection: 'row', gap: 8, width: '100%' },
   phoneInput: {
     flex: 1,
@@ -355,8 +398,33 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   phoneSaveText: { color: colors.text, fontSize: 13, fontWeight: '700' },
-  phoneHint: { fontSize: 11, color: colors.textFaint, marginTop: 6 },
   loader: { marginTop: 24 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  avatarMenu: {
+    width: '100%',
+    maxWidth: 320,
+    borderRadius: radius.xl,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  avatarMenuItem: {
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    alignItems: 'center',
+  },
+  avatarMenuItemLast: { paddingVertical: 16, paddingHorizontal: 20, alignItems: 'center' },
+  avatarMenuItemText: { fontSize: 15, fontWeight: '600', color: colors.text },
+  avatarMenuItemDanger: { color: colors.danger },
   prediscoreCard: {
     paddingVertical: 24,
     borderRadius: radius.xl,

@@ -41,6 +41,18 @@ export function notificationErrorMessage(error: PostgrestError): string {
   return `Chargement impossible : ${error.message}`;
 }
 
+type RawNotification = {
+  id: string;
+  user_id: string;
+  prediction_id: string | null;
+  group_id: string | null;
+  type: NotificationType;
+  is_read: boolean;
+  created_at: string;
+  prediction: { teaser: string; author_id: string } | null;
+  group: { name: string; owner: { username: string } | null } | null;
+};
+
 /**
  * Les notifications de l'utilisateur, les plus récentes en tête.
  *
@@ -48,18 +60,62 @@ export function notificationErrorMessage(error: PostgrestError): string {
  * `group_members` relie déjà `groups` et `profiles` (via `friend_id`), donc
  * sans préciser la contrainte, PostgREST trouve deux chemins possibles entre
  * les deux tables et refuse de deviner lequel embarquer.
+ *
+ * L'auteur de la prédiction n'est PAS embarqué en `predictions(author:
+ * profiles(...))` : PostgREST a renvoyé « more than one relationship was
+ * found for predictions and profiles » sur cette installation — même classe
+ * d'ambiguïté de cache de schéma déjà rencontrée pour `friendships`/`profiles`
+ * (lib/friends.ts) et pour `prediction_access`/`profiles`
+ * (fetchPredictionRecipients). Comme partout ailleurs dans ce fichier : deux
+ * requêtes simples puis un assemblage côté client, jamais un embed profiles
+ * qui dépend du cache de schéma.
  */
 export async function fetchNotifications(userId: string) {
-  return supabase
+  const { data, error } = await supabase
     .from('notifications')
     .select(
       'id, user_id, prediction_id, group_id, type, is_read, created_at, ' +
-        'prediction:predictions(teaser, author:profiles(username, avatar_url)), ' +
+        'prediction:predictions(teaser, author_id), ' +
         'group:groups(name, owner:profiles!groups_owner_id_fkey(username))'
     )
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
-    .returns<Notification[]>();
+    .returns<RawNotification[]>();
+
+  if (error || !data) {
+    return { data: null, error };
+  }
+
+  const authorIds = Array.from(
+    new Set(data.map((n) => n.prediction?.author_id).filter((id): id is string => !!id))
+  );
+
+  const authorsById = new Map<string, { username: string; avatar_url: string | null }>();
+  if (authorIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url')
+      .in('id', authorIds);
+    for (const profile of profiles ?? []) {
+      authorsById.set(profile.id, { username: profile.username, avatar_url: profile.avatar_url });
+    }
+  }
+
+  const notifications: Notification[] = data.map((n) => ({
+    id: n.id,
+    user_id: n.user_id,
+    prediction_id: n.prediction_id,
+    group_id: n.group_id,
+    type: n.type,
+    is_read: n.is_read,
+    created_at: n.created_at,
+    prediction: n.prediction
+      ? { teaser: n.prediction.teaser, author: authorsById.get(n.prediction.author_id) ?? null }
+      : null,
+    group: n.group,
+  }));
+
+  return { data: notifications, error: null };
 }
 
 export async function markNotificationRead(id: string) {

@@ -63,6 +63,7 @@ export function PredictionCard({
   const router = useRouter();
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentCount, setCommentCount] = useState<number | null>(null);
+  const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
   const [isFavorite, setIsFavorite] = useState(item.is_favorite);
   const [isHidden, setIsHidden] = useState(item.is_hidden);
   const [myEmoji, setMyEmoji] = useState<EmojiReaction | null>(item.my_emoji_reaction);
@@ -136,6 +137,7 @@ export function PredictionCard({
   }
 
   async function handleEmojiPress(emoji: EmojiReaction) {
+    setEmojiPanelOpen(false);
     const previous = myEmoji;
     if (previous === emoji) {
       // Retape le même emoji : retire la réaction.
@@ -157,6 +159,8 @@ export function PredictionCard({
       setEmojiCounts((prev) => adjustCounts(prev, emoji, previous));
     }
   }
+
+  const totalReactions = Object.values(emojiCounts).reduce((sum, count) => sum + (count ?? 0), 0);
 
   return (
     <View
@@ -190,8 +194,8 @@ export function PredictionCard({
           )}
         </View>
 
-        <Text style={styles.categoryTag}>{CATEGORY_LABEL[item.category]}</Text>
         <Text style={styles.cardTeaser}>{item.teaser}</Text>
+        <Text style={styles.categoryTag}>(Thème : {CATEGORY_LABEL[item.category]})</Text>
 
         {revealed && item.content && (
           <View style={styles.contentBox}>
@@ -212,26 +216,6 @@ export function PredictionCard({
         </Pressable>
       )}
 
-      <View style={styles.emojiRow}>
-        {EMOJI_REACTIONS.map((emoji) => {
-          const count = emojiCounts[emoji] ?? 0;
-          const selected = myEmoji === emoji;
-          return (
-            <Pressable
-              key={emoji}
-              onPress={() => handleEmojiPress(emoji)}
-              style={[styles.emojiButton, selected && styles.emojiButtonActive]}
-              hitSlop={4}
-            >
-              <Text style={styles.emojiButtonText}>
-                {emoji}
-                {count > 0 ? ` ${count}` : ''}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
       <View style={styles.footerRow}>
         <View style={styles.footerLeft}>
           <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
@@ -241,6 +225,18 @@ export function PredictionCard({
               color={colors.textMuted}
             />
             <Text style={styles.commentsToggleText}>{commentCount ?? 0}</Text>
+          </Pressable>
+
+          {/* Discret, façon Facebook : un pouce en filigrane (ou l'emoji déjà
+              choisi) — le tap ouvre le panneau des 7 réactions possibles au
+              lieu de les afficher toutes en permanence. */}
+          <Pressable onPress={() => setEmojiPanelOpen((o) => !o)} style={styles.reactionTrigger} hitSlop={8}>
+            {myEmoji ? (
+              <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
+            ) : (
+              <Ionicons name="thumbs-up-outline" size={16} color={colors.textFaint} />
+            )}
+            {totalReactions > 0 && <Text style={styles.reactionTriggerCount}>{totalReactions}</Text>}
           </Pressable>
 
           <Pressable onPress={handleToggleFavorite} hitSlop={8}>
@@ -266,6 +262,21 @@ export function PredictionCard({
           </Pressable>
         )}
       </View>
+
+      {emojiPanelOpen && (
+        <View style={styles.emojiPanel}>
+          {EMOJI_REACTIONS.map((emoji) => (
+            <Pressable
+              key={emoji}
+              onPress={() => handleEmojiPress(emoji)}
+              style={[styles.emojiButton, myEmoji === emoji && styles.emojiButtonActive]}
+              hitSlop={4}
+            >
+              <Text style={styles.emojiButtonText}>{emoji}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
 
       {commentsOpen && (
         <InlineComments
@@ -299,12 +310,11 @@ const styles = StyleSheet.create({
   authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, maxWidth: '65%' },
   authorName: { fontSize: 13, fontWeight: '600', color: colors.textMuted, flexShrink: 1 },
   categoryTag: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    fontSize: 12,
+    fontStyle: 'italic',
+    fontWeight: '400',
     color: colors.textFaint,
-    marginBottom: 4,
+    marginTop: 4,
   },
   badge: {
     borderRadius: radius.pill,
@@ -345,7 +355,7 @@ const styles = StyleSheet.create({
   audioRow: { marginTop: 10 },
   voteLink: { marginTop: 10 },
   voteLinkText: { fontSize: 13, fontWeight: '600', color: colors.gold },
-  emojiRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },
+  emojiPanel: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },
   emojiButton: {
     borderRadius: radius.pill,
     borderWidth: 1,
@@ -364,4 +374,7 @@ const styles = StyleSheet.create({
   footerLeft: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   commentsToggle: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   commentsToggleText: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
+  reactionTrigger: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  reactionTriggerEmoji: { fontSize: 16 },
+  reactionTriggerCount: { fontSize: 11, fontWeight: '600', color: colors.textFaint },
 });

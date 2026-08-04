@@ -175,7 +175,7 @@ export default function NewPredictionScreen() {
       return 'La révélation doit être au moins une minute après maintenant.';
     }
     if (scope === 'selected' && selectedFriendIds.size === 0) {
-      return 'Choisis au moins un ami, ou passe sur « Tout mon Cercle ».';
+      return 'Choisis au moins un ami, ou passe sur « Mon Cercle ».';
     }
     if (scope === 'group' && !selectedGroupId) {
       return 'Choisis un groupe.';
@@ -381,10 +381,6 @@ export default function NewPredictionScreen() {
             </Text>
           ) : (
             <>
-              <Text style={[styles.sectionHint, styles.fieldSpacing]}>
-                Le moment que tu veux, à la minute près. L’heure est facultative.
-              </Text>
-
               <CalendarPicker value={selectedDate} onChange={setSelectedDate} disabled={submitting} />
 
               <View style={[styles.row, styles.fieldSpacing]}>
@@ -432,7 +428,7 @@ export default function NewPredictionScreen() {
               <Text
                 style={[styles.scopeText, scope === 'circle' && styles.scopeTextActive]}
               >
-                Tout mon Cercle
+                Mon Cercle
               </Text>
             </Pressable>
             <Pressable
@@ -443,7 +439,7 @@ export default function NewPredictionScreen() {
               <Text
                 style={[styles.scopeText, scope === 'selected' && styles.scopeTextActive]}
               >
-                Amis spécifiques
+                Amis
               </Text>
             </Pressable>
             <Pressable
@@ -452,7 +448,7 @@ export default function NewPredictionScreen() {
               style={[styles.scopeOption, scope === 'group' && styles.scopeOptionActive]}
             >
               <Text style={[styles.scopeText, scope === 'group' && styles.scopeTextActive]}>
-                Groupe d’amis
+                Groupe
               </Text>
             </Pressable>
           </View>
