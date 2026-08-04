@@ -70,7 +70,7 @@ export type PredictionFeedItem = {
 
 /** Doivent rester alignés sur les contraintes `predictions_*_length` du SQL. */
 export const MAX_TEASER_LENGTH = 160;
-export const MAX_CONTENT_LENGTH = 280;
+export const MAX_CONTENT_LENGTH = 560;
 
 /**
  * Marge minimale entre maintenant et la révélation.

@@ -217,44 +217,42 @@ export function PredictionCard({
       )}
 
       <View style={styles.footerRow}>
-        <View style={styles.footerLeft}>
-          <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
-            <Ionicons
-              name={commentsOpen ? 'chatbubble' : 'chatbubble-outline'}
-              size={16}
-              color={colors.textMuted}
-            />
-            <Text style={styles.commentsToggleText}>{commentCount ?? 0}</Text>
-          </Pressable>
+        <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
+          <Ionicons
+            name={commentsOpen ? 'chatbubble' : 'chatbubble-outline'}
+            size={16}
+            color={colors.textMuted}
+          />
+          <Text style={styles.commentsToggleText}>{commentCount ?? 0}</Text>
+        </Pressable>
 
-          {/* Discret, façon Facebook : un pouce en filigrane (ou l'emoji déjà
-              choisi) — le tap ouvre le panneau des 7 réactions possibles au
-              lieu de les afficher toutes en permanence. */}
-          <Pressable onPress={() => setEmojiPanelOpen((o) => !o)} style={styles.reactionTrigger} hitSlop={8}>
-            {myEmoji ? (
-              <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
-            ) : (
-              <Ionicons name="thumbs-up-outline" size={16} color={colors.textFaint} />
-            )}
-            {totalReactions > 0 && <Text style={styles.reactionTriggerCount}>{totalReactions}</Text>}
-          </Pressable>
+        {/* Discret, façon Facebook : un pouce en filigrane (ou l'emoji déjà
+            choisi) — le tap ouvre le panneau des 7 réactions possibles au
+            lieu de les afficher toutes en permanence. */}
+        <Pressable onPress={() => setEmojiPanelOpen((o) => !o)} style={styles.reactionTrigger} hitSlop={8}>
+          {myEmoji ? (
+            <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
+          ) : (
+            <Ionicons name="thumbs-up-outline" size={16} color={colors.textFaint} />
+          )}
+          {totalReactions > 0 && <Text style={styles.reactionTriggerCount}>{totalReactions}</Text>}
+        </Pressable>
 
-          <Pressable onPress={handleToggleFavorite} hitSlop={8}>
-            <Ionicons
-              name={isFavorite ? 'star' : 'star-outline'}
-              size={17}
-              color={isFavorite ? colors.gold : colors.textMuted}
-            />
-          </Pressable>
+        <Pressable onPress={handleToggleFavorite} hitSlop={8}>
+          <Ionicons
+            name={isFavorite ? 'star' : 'star-outline'}
+            size={17}
+            color={isFavorite ? colors.gold : colors.textMuted}
+          />
+        </Pressable>
 
-          <Pressable onPress={handleToggleHidden} hitSlop={8}>
-            <Ionicons
-              name={isHidden ? 'eye-off' : 'eye-off-outline'}
-              size={17}
-              color={isHidden ? colors.gold : colors.textMuted}
-            />
-          </Pressable>
-        </View>
+        <Pressable onPress={handleToggleHidden} hitSlop={8}>
+          <Ionicons
+            name={isHidden ? 'eye-off' : 'eye-off-outline'}
+            size={17}
+            color={isHidden ? colors.gold : colors.textMuted}
+          />
+        </Pressable>
 
         {revealed && isAuthor && onDelete && (
           <Pressable onPress={handleDeletePress} hitSlop={4}>
@@ -371,7 +369,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 10,
   },
-  footerLeft: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   commentsToggle: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   commentsToggleText: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
   reactionTrigger: { flexDirection: 'row', alignItems: 'center', gap: 4 },

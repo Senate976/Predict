@@ -381,7 +381,9 @@ export default function NewPredictionScreen() {
             </Text>
           ) : (
             <>
-              <CalendarPicker value={selectedDate} onChange={setSelectedDate} disabled={submitting} />
+              <View style={styles.fieldSpacing}>
+                <CalendarPicker value={selectedDate} onChange={setSelectedDate} disabled={submitting} />
+              </View>
 
               <View style={[styles.row, styles.fieldSpacing]}>
                 <View style={styles.timeField}>
