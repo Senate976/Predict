@@ -25,7 +25,6 @@ import {
   type PredictionFeedItem,
 } from '../lib/predictions';
 import { colors, fonts, radius } from '../lib/theme';
-import { AudioPlayerButton } from './AudioPlayerButton';
 import { Avatar } from './Avatar';
 import { InlineComments } from './InlineComments';
 
@@ -104,13 +103,13 @@ export function PredictionCard({
     // `Alert.alert` de React Native Web ne fait rien (implémentation vide) —
     // sans ce repli, le bouton semble ne pas répondre du tout sur le web.
     if (Platform.OS === 'web') {
-      if (window.confirm(`Supprimer cette prédiction ?\n\n${message}`)) {
+      if (window.confirm(`Supprimer ce Predict ?\n\n${message}`)) {
         onDelete?.();
       }
       return;
     }
 
-    Alert.alert('Supprimer cette prédiction ?', message, [
+    Alert.alert('Supprimer ce Predict ?', message, [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Supprimer', style: 'destructive', onPress: () => onDelete?.() },
     ]);
@@ -288,23 +287,11 @@ export function PredictionCard({
 
         <Text style={styles.cardTeaser}>{item.teaser}</Text>
         <Text style={styles.categoryTag}>(Thème : {CATEGORY_LABEL[item.category]})</Text>
-
-        {revealed && item.content && (
-          <View style={styles.contentBox}>
-            <Text style={styles.contentLabel}>Prédiction</Text>
-            <Text style={styles.cardContent}>{item.content}</Text>
-            {item.audio_path && (
-              <View style={styles.audioRow}>
-                <AudioPlayerButton path={item.audio_path} />
-              </View>
-            )}
-          </View>
-        )}
       </Pressable>
 
       {revealed && !isAuthor && !hasVoted && (
         <Pressable onPress={() => onPress?.()} style={styles.voteLink} hitSlop={4}>
-          <Text style={styles.voteLinkText}>Donner mon avis sur cette prédiction →</Text>
+          <Text style={styles.voteLinkText}>Donner mon avis sur ce Predict →</Text>
         </Pressable>
       )}
 
@@ -342,15 +329,19 @@ export function PredictionCard({
               }}
             >
               {EMOJI_REACTIONS.map((emoji, i) => (
-                <Animated.View
-                  key={emoji}
-                  style={[
-                    styles.emojiBubbleItem,
-                    myEmoji === emoji && styles.emojiBubbleItemActive,
-                    { transform: [{ scale: scaleAnims[i] }] },
-                  ]}
-                >
-                  <Text style={styles.emojiButtonText}>{emoji}</Text>
+                <Animated.View key={emoji} style={{ transform: [{ scale: scaleAnims[i] }] }}>
+                  {/* Un tap direct sur un emoji le sélectionne toujours,
+                      indépendamment du glissé : sans ça, un utilisateur qui
+                      relâche le pouce puis tape un emoji comme un bouton
+                      normal (au lieu de glisser sans relâcher, à la
+                      Facebook) ne déclenchait jamais rien. */}
+                  <Pressable
+                    onPress={() => handleEmojiPress(emoji)}
+                    style={[styles.emojiBubbleItem, myEmoji === emoji && styles.emojiBubbleItemActive]}
+                    hitSlop={4}
+                  >
+                    <Text style={styles.emojiButtonText}>{emoji}</Text>
+                  </Pressable>
                 </Animated.View>
               ))}
             </View>
@@ -434,27 +425,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     lineHeight: 26,
   },
-  contentBox: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  contentLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.gold,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  cardContent: {
-    fontFamily: fonts.serifItalic,
-    fontSize: 20,
-    color: colors.text,
-    lineHeight: 26,
-  },
-  audioRow: { marginTop: 10 },
   voteLink: { marginTop: 10 },
   voteLinkText: { fontSize: 13, fontWeight: '600', color: colors.gold },
   // Une seule « grande bulle », façon Facebook — flottante au-dessus du

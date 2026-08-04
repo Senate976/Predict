@@ -3,7 +3,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { colors, fonts, radius, spacing } from '../lib/theme';
 
 const STEPS = [
-  'Scellez votre prédiction et définissez sa date de révélation et à qui vous souhaitez la révéler.',
+  'Scellez votre Predict et définissez sa date de révélation et à qui vous souhaitez le révéler.',
   'Partagez le teaser exclusif à votre Cercle.',
   'Révélez la vérité le jour J et laissez vos proches confirmer si votre intuition était la bonne.',
 ];
@@ -43,7 +43,7 @@ export function WelcomeOnboarding({
             ))}
 
             <Text style={styles.body}>
-              Accumulez les prédictions réussies, débloquez des badges de prestige
+              Accumulez les Predict réussis, débloquez des badges de prestige
               et montrez à votre réseau qui avait raison depuis le début.
             </Text>
 
@@ -53,7 +53,7 @@ export function WelcomeOnboarding({
               onPress={onStart}
               style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
             >
-              <Text style={styles.ctaText}>Sceller ma première prédiction</Text>
+              <Text style={styles.ctaText}>Sceller mon premier Predict</Text>
             </Pressable>
           </ScrollView>
         </View>

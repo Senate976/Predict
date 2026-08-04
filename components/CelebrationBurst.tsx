@@ -42,7 +42,7 @@ type Props = {
  */
 export function CelebrationBurst({
   visible,
-  message = 'Prédiction approuvée par vos pairs !',
+  message = 'Predict approuvé par vos pairs !',
   onFinish,
 }: Props) {
   const particles = useMemo(() => (visible ? makeParticles() : []), [visible]);

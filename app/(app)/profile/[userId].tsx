@@ -111,11 +111,14 @@ export default function FriendProfileScreen() {
               ) : prediscoreError ? (
                 <Text style={styles.error}>{prediscoreError}</Text>
               ) : (
-                <PrediscoreGauge score={prediscore} />
+                <PrediscoreGauge
+                  score={prediscore}
+                  emptyMessage={`Le Prediscore de ${profile.username} apparaîtra après son premier Predict révélé.`}
+                />
               )}
             </View>
 
-            <Text style={[styles.eyebrow, styles.sectionSpacing]}>Prédictions</Text>
+            <Text style={[styles.eyebrow, styles.sectionSpacing]}>Predict</Text>
             {stats === null ? (
               <ActivityIndicator color={colors.gold} style={styles.loader} />
             ) : (

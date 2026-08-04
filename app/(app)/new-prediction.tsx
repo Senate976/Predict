@@ -113,14 +113,14 @@ export default function NewPredictionScreen() {
       if (showSeal || !hasUnsavedContent) return;
       e.preventDefault();
 
-      const message = 'Cette prédiction n’est pas scellée : elle sera perdue si tu quittes maintenant.';
+      const message = 'Ce Predict n’est pas scellé : il sera perdu si tu quittes maintenant.';
       const discard = () => navigation.dispatch(e.data.action);
 
       if (Platform.OS === 'web') {
-        if (window.confirm(`Abandonner cette prédiction ?\n\n${message}`)) discard();
+        if (window.confirm(`Abandonner ce Predict ?\n\n${message}`)) discard();
         return;
       }
-      Alert.alert('Abandonner cette prédiction ?', message, [
+      Alert.alert('Abandonner ce Predict ?', message, [
         { text: 'Continuer la rédaction', style: 'cancel' },
         { text: 'Abandonner', style: 'destructive', onPress: discard },
       ]);
@@ -161,12 +161,12 @@ export default function NewPredictionScreen() {
       return `Le teaser ne peut pas dépasser ${MAX_TEASER_LENGTH} caractères.`;
     }
     if (contentMode === 'text') {
-      if (!trimmedContent) return 'Écris le contenu secret de ta prédiction.';
+      if (!trimmedContent) return 'Écris le contenu secret de ton Predict.';
       if (trimmedContent.length > MAX_CONTENT_LENGTH) {
         return `Le contenu secret ne peut pas dépasser ${MAX_CONTENT_LENGTH} caractères.`;
       }
     } else if (!audioUri) {
-      return 'Enregistre ta prédiction avant de la sceller.';
+      return 'Enregistre ton Predict avant de le sceller.';
     }
     if (!revealAt) {
       return 'Choisis la date de la révélation.';
@@ -231,12 +231,12 @@ export default function NewPredictionScreen() {
       if (contentMode === 'audio' && audioUri && predictionId) {
         const { path, error: uploadError } = await uploadPredictionAudio(predictionId, audioUri);
         if (uploadError || !path) {
-          setError(`Prédiction créée, mais l’envoi de l’audio a échoué : ${uploadError?.message ?? 'erreur inconnue'}`);
+          setError(`Predict créé, mais l’envoi de l’audio a échoué : ${uploadError?.message ?? 'erreur inconnue'}`);
           return;
         }
         const { error: pathError } = await setPredictionAudioPath(predictionId, path);
         if (pathError) {
-          setError(`Prédiction créée, mais l’association de l’audio a échoué : ${pathError.message}`);
+          setError(`Predict créé, mais l’association de l’audio a échoué : ${pathError.message}`);
           return;
         }
       }
@@ -267,7 +267,7 @@ export default function NewPredictionScreen() {
           <Pressable onPress={() => router.back()} disabled={submitting} hitSlop={8}>
             <Text style={styles.cancel}>Annuler</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>Nouvelle prédiction</Text>
+          <Text style={styles.headerTitle}>Nouveau Predict</Text>
           {/* Espaceur de même largeur que « Annuler », pour centrer le titre. */}
           <View style={styles.headerSpacer} />
         </View>
@@ -280,7 +280,7 @@ export default function NewPredictionScreen() {
           <TextInput
             value={teaser}
             onChangeText={setTeaser}
-            placeholder="Donnez un indice sur la nature de votre prédiction"
+            placeholder="Donnez un indice sur la nature de votre Predict"
             placeholderTextColor={colors.textFaint}
             multiline
             editable={!submitting}
@@ -291,7 +291,7 @@ export default function NewPredictionScreen() {
             Utilise @pseudo pour notifier directement quelqu’un de ton Cercle.
           </Text>
 
-          <Text style={[styles.label, styles.sectionLabel]}>Ma prédiction</Text>
+          <Text style={[styles.label, styles.sectionLabel]}>Mon Predict</Text>
           <View style={styles.scopeRow}>
             <Pressable
               onPress={() => setContentMode('text')}
@@ -377,7 +377,7 @@ export default function NewPredictionScreen() {
 
           {openEnded ? (
             <Text style={[styles.sectionHint, styles.fieldSpacing]}>
-              Tu pourras révéler cette prédiction quand tu veux, depuis son écran.
+              Tu pourras révéler ce Predict quand tu veux, depuis son écran.
             </Text>
           ) : (
             <>
@@ -533,7 +533,7 @@ export default function NewPredictionScreen() {
             {submitting ? (
               <ActivityIndicator color={colors.text} />
             ) : (
-              <Text style={styles.submitText}>Sceller la prédiction</Text>
+              <Text style={styles.submitText}>Sceller le Predict</Text>
             )}
           </Pressable>
         </ScrollView>

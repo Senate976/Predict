@@ -31,6 +31,7 @@ import {
   type PredictionOutcome,
   type PredictionRecipient,
 } from '../../../lib/predictions';
+import { supabase } from '../../../lib/supabase';
 import { colors, eyebrow, fonts, radius, spacing } from '../../../lib/theme';
 import { castVote, fetchMyVote, voteErrorMessage, type Vote, type VoteValue } from '../../../lib/votes';
 
@@ -47,6 +48,7 @@ export default function PredictionDetailScreen() {
   const userId = session?.user.id;
 
   const [prediction, setPrediction] = useState<PredictionFeedItem | null>(null);
+  const [author, setAuthor] = useState<{ username: string; avatar_url: string | null } | null>(null);
   const [recipients, setRecipients] = useState<PredictionRecipient[] | null>(null);
   const [friends, setFriends] = useState<FriendProfile[] | null>(null);
   const [outcome, setOutcome] = useState<PredictionOutcome | null>(null);
@@ -71,7 +73,7 @@ export default function PredictionDetailScreen() {
       return;
     }
     if (!item) {
-      setError('Prédiction introuvable.');
+      setError('Predict introuvable.');
       return;
     }
     setError(null);
@@ -79,14 +81,18 @@ export default function PredictionDetailScreen() {
 
     const isAuthorNow = item.author_id === userId;
 
-    // Les destinataires se chargent pour tout le monde — ouvrir une prédiction
+    // Les destinataires se chargent pour tout le monde — ouvrir un Predict
     // doit montrer toute l'audience, pas seulement à l'auteur. Seuls l'ajout
     // et le retrait restent réservés à l'auteur (chargement des amis inclus).
-    const [{ data: recipientsData, error: recipientsFetchError }, friendshipsResult] =
+    // L'auteur (avatar + pseudo) se charge aussi pour tout le monde — sans
+    // ça, impossible de savoir qui a écrit ce qu'on est en train de lire.
+    const [{ data: recipientsData, error: recipientsFetchError }, friendshipsResult, { data: authorProfile }] =
       await Promise.all([
         fetchPredictionRecipients(id),
         isAuthorNow ? fetchFriendships(userId) : Promise.resolve({ data: null }),
+        supabase.from('profiles').select('username, avatar_url').eq('id', item.author_id).maybeSingle(),
       ]);
+    setAuthor(authorProfile ?? null);
     if (recipientsFetchError) {
       // Ne jamais confondre une vraie erreur avec « personne pour l'instant » :
       // sans ça, un souci de chargement se lisait comme une prédiction sans
@@ -177,10 +183,10 @@ export default function PredictionDetailScreen() {
     };
 
     if (Platform.OS === 'web') {
-      if (window.confirm(`Révéler cette prédiction maintenant ?\n\n${message}`)) run();
+      if (window.confirm(`Révéler ce Predict maintenant ?\n\n${message}`)) run();
       return;
     }
-    Alert.alert('Révéler cette prédiction maintenant ?', message, [
+    Alert.alert('Révéler ce Predict maintenant ?', message, [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Révéler', style: 'destructive', onPress: run },
     ]);
@@ -219,7 +225,7 @@ export default function PredictionDetailScreen() {
         <Pressable onPress={() => router.back()} hitSlop={8}>
           <Text style={styles.back}>Retour</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>Prédiction</Text>
+        <Text style={styles.headerTitle}>Predict</Text>
         <QuickCreateButton />
       </View>
 
@@ -230,6 +236,17 @@ export default function PredictionDetailScreen() {
           <ActivityIndicator color={colors.gold} style={styles.loader} />
         ) : prediction ? (
           <>
+            {author && (
+              <Pressable
+                onPress={() => router.push(`/profile/${prediction.author_id}`)}
+                style={styles.authorBlock}
+                hitSlop={4}
+              >
+                <Avatar url={author.avatar_url} username={author.username} size={28} />
+                <Text style={styles.authorName}>{author.username}</Text>
+              </Pressable>
+            )}
+
             <Text style={styles.teaser}>{prediction.teaser}</Text>
 
             {/* Avant révélation, seul l'écart annoncé compte — les deux dates
@@ -428,6 +445,8 @@ const styles = StyleSheet.create({
   loader: { marginTop: 24 },
   eyebrow: { ...eyebrow },
   eyebrowSmall: { ...eyebrow, fontSize: 10 },
+  authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginBottom: 12 },
+  authorName: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
   teaser: { fontFamily: fonts.serifItalic, fontSize: 28, color: colors.text, lineHeight: 36 },
   datesBlock: { marginTop: 10 },
   sealedDate: { fontSize: 12, color: colors.textFaint },
