@@ -922,8 +922,16 @@ create policy "notifications_update_own"
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
 
--- Pas de policy insert ni delete pour `authenticated` : la création est
--- réservée aux fonctions `security definer` ci-dessous.
+-- Chacun peut supprimer ses propres notifications (bouton poubelle côté UI).
+drop policy if exists "notifications_delete_own" on public.notifications;
+create policy "notifications_delete_own"
+  on public.notifications
+  for delete
+  to authenticated
+  using (user_id = auth.uid());
+
+-- Pas de policy insert pour `authenticated` : la création est réservée aux
+-- fonctions `security definer` ci-dessous.
 
 -- Un accès accordé (à la création d'une prédiction, ou plus tard quand
 -- l'auteur ajoute quelqu'un) déclenche immédiatement la notification. Couvre

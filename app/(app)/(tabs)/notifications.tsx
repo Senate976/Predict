@@ -1,9 +1,20 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
+import { PredictWord } from '../../../components/PredictWord';
 import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { useAuth } from '../../../lib/auth';
 import { formatTimeAgo } from '../../../lib/datetime';
@@ -14,6 +25,7 @@ import {
   type GroupMemberStatus,
 } from '../../../lib/groups';
 import {
+  deleteNotification,
   fetchNotifications,
   markNotificationRead,
   notificationErrorMessage,
@@ -22,18 +34,30 @@ import {
 import { supabase } from '../../../lib/supabase';
 import { colors, fonts, radius, spacing } from '../../../lib/theme';
 
-function notificationLabel(notification: Notification): string {
+function notificationLabel(notification: Notification) {
   switch (notification.type) {
     case 'prediction_revealed':
-      return 'Un Predict vient d’être révélé';
+      return (
+        <>
+          Une <PredictWord /> vient d’être révélée
+        </>
+      );
     case 'prediction_approved':
-      return 'Un de tes Predict a été approuvé par le Cercle';
+      return (
+        <>
+          Une de tes <PredictWord /> a été approuvée par le Cercle
+        </>
+      );
     case 'group_invite':
       return notification.group?.owner
         ? `${notification.group.owner.username} t’invite dans un groupe`
         : 'Invitation à rejoindre un groupe';
     default:
-      return 'Nouveau Predict dans ton Cercle';
+      return (
+        <>
+          Nouvelle <PredictWord /> dans ton Cercle
+        </>
+      );
   }
 }
 
@@ -88,6 +112,29 @@ export default function NotificationsScreen() {
       markNotificationRead(notification.id);
     }
     router.push(`/prediction/${notification.prediction_id}`);
+  }
+
+  function handleDelete(notificationId: string) {
+    const message = 'Cette notification sera définitivement supprimée.';
+    const run = async () => {
+      const { error: deleteError } = await deleteNotification(notificationId);
+      if (deleteError) {
+        setActionError(`Suppression impossible : ${deleteError.message}`);
+        return;
+      }
+      setNotifications((prev) => (prev ?? []).filter((n) => n.id !== notificationId));
+    };
+
+    // `Alert.alert` de React Native Web ne fait rien (déjà rencontré pour la
+    // suppression d'une prédiction et d'un commentaire).
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Supprimer cette notification ?\n\n${message}`)) run();
+      return;
+    }
+    Alert.alert('Supprimer cette notification ?', message, [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Supprimer', style: 'destructive', onPress: run },
+    ]);
   }
 
   async function handleGroupInviteResponse(notification: Notification, accept: boolean) {
@@ -206,6 +253,14 @@ export default function NotificationsScreen() {
                     </Text>
                   )}
                 </View>
+
+                <Pressable
+                  onPress={() => handleDelete(notification.id)}
+                  hitSlop={8}
+                  style={styles.deleteButton}
+                >
+                  <Ionicons name="trash-outline" size={15} color={colors.textFaint} />
+                </Pressable>
               </Pressable>
             );
           })
@@ -240,6 +295,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   row: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
@@ -256,7 +312,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.gold,
     marginTop: 6,
   },
-  rowText: { flex: 1 },
+  rowText: { flex: 1, paddingRight: 26 },
+  deleteButton: { position: 'absolute', right: 14, bottom: 14 },
   label: { fontSize: 14, fontWeight: '600', color: colors.text },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
   authorName: { fontSize: 12, fontWeight: '700', color: colors.textMuted },

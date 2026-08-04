@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar } from '../../../components/Avatar';
 import { CelebrationBurst } from '../../../components/CelebrationBurst';
 import { PredictionCard } from '../../../components/PredictionCard';
+import { PredictWord } from '../../../components/PredictWord';
 import { WelcomeOnboarding } from '../../../components/WelcomeOnboarding';
 import { useAuth } from '../../../lib/auth';
 import { fetchNotifications, markNotificationRead } from '../../../lib/notifications';
@@ -51,7 +52,7 @@ export default function HomeScreen() {
   const [feed, setFeed] = useState<PredictionFeedItem[] | null>(null);
   const [authors, setAuthors] = useState<AuthorMap>({});
   const [votedIds, setVotedIds] = useState<Set<string>>(new Set());
-  const [celebration, setCelebration] = useState<{ visible: boolean; message: string }>({
+  const [celebration, setCelebration] = useState<{ visible: boolean; message: ReactNode }>({
     visible: false,
     message: '',
   });
@@ -133,9 +134,13 @@ export default function HomeScreen() {
       markNotificationRead(approval.id);
       setCelebration({
         visible: true,
-        message: approval.prediction
-          ? `« ${approval.prediction.teaser} » approuvée par vos pairs !`
-          : 'Predict approuvé par vos pairs !',
+        message: approval.prediction ? (
+          `« ${approval.prediction.teaser} » approuvée par vos pairs !`
+        ) : (
+          <>
+            <PredictWord /> approuvée par vos pairs !
+          </>
+        ),
       });
     }
   }, [userId]);
@@ -375,7 +380,13 @@ export default function HomeScreen() {
         ) : shown.length === 0 ? (
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>
-              {tab === 'upcoming' ? 'Aucun Predict en cours.' : 'Rien de révélé pour l’instant.'}
+              {tab === 'upcoming' ? (
+                <>
+                  Aucune <PredictWord /> en cours.
+                </>
+              ) : (
+                'Rien de révélé pour l’instant.'
+              )}
             </Text>
             {tab === 'upcoming' && (
               <Text style={styles.emptyText}>
@@ -409,7 +420,9 @@ export default function HomeScreen() {
           onPress={() => router.push('/new-prediction')}
           style={({ pressed }) => [styles.create, pressed && styles.createPressed]}
         >
-          <Text style={styles.createText}>Nouveau Predict</Text>
+          <Text style={styles.createText}>
+            Nouvelle <PredictWord />
+          </Text>
         </Pressable>
       </View>
     </SafeAreaView>

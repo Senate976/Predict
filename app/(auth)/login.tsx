@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PredictWord } from '../../components/PredictWord';
 import { supabase } from '../../lib/supabase';
 import { colors, eyebrow, fonts, radius, spacing } from '../../lib/theme';
 
@@ -239,7 +240,9 @@ export default function LoginScreen() {
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.brand}>Predict</Text>
+          <Text style={styles.brand}>
+            <PredictWord />
+          </Text>
           <Text style={styles.title}>
             {isSignUp ? 'Créer un compte' : 'Se connecter'}
           </Text>

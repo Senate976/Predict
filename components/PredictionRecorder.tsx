@@ -11,6 +11,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius } from '../lib/theme';
+import { PredictWord } from './PredictWord';
 
 type Props = {
   /** URI locale de l'enregistrement en cours (natif `file://`, ou `blob:`/`data:` sur web). */
@@ -43,7 +44,7 @@ export function PredictionRecorder({ uri, onChange, disabled }: Props) {
     setPermissionError(null);
     const { granted } = await requestRecordingPermissionsAsync();
     if (!granted) {
-      setPermissionError('Autorise l’accès au micro pour enregistrer ton Predict.');
+      setPermissionError('Autorise l’accès au micro pour enregistrer ta Predict.');
       return;
     }
     await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
@@ -86,9 +87,13 @@ export function PredictionRecorder({ uri, onChange, disabled }: Props) {
       >
         <View style={[styles.dot, recorderState.isRecording && styles.dotSquare]} />
         <Text style={styles.recordButtonText}>
-          {recorderState.isRecording
-            ? `Arrêter · ${formatDuration(recorderState.durationMillis)}`
-            : 'Enregistrer mon Predict'}
+          {recorderState.isRecording ? (
+            `Arrêter · ${formatDuration(recorderState.durationMillis)}`
+          ) : (
+            <>
+              Enregistrer ma <PredictWord />
+            </>
+          )}
         </Text>
       </Pressable>
     </View>

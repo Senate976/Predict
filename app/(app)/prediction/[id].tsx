@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AudioPlayerButton } from '../../../components/AudioPlayerButton';
 import { Avatar } from '../../../components/Avatar';
 import { InlineComments } from '../../../components/InlineComments';
+import { PredictWord } from '../../../components/PredictWord';
 import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { useAuth } from '../../../lib/auth';
 import { formatAdvance, formatShortDateTime } from '../../../lib/datetime';
@@ -183,10 +184,10 @@ export default function PredictionDetailScreen() {
     };
 
     if (Platform.OS === 'web') {
-      if (window.confirm(`Révéler ce Predict maintenant ?\n\n${message}`)) run();
+      if (window.confirm(`Révéler cette Predict maintenant ?\n\n${message}`)) run();
       return;
     }
-    Alert.alert('Révéler ce Predict maintenant ?', message, [
+    Alert.alert('Révéler cette Predict maintenant ?', message, [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Révéler', style: 'destructive', onPress: run },
     ]);
@@ -225,7 +226,9 @@ export default function PredictionDetailScreen() {
         <Pressable onPress={() => router.back()} hitSlop={8}>
           <Text style={styles.back}>Retour</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>Predict</Text>
+        <Text style={styles.headerTitle}>
+          <PredictWord />
+        </Text>
         <QuickCreateButton />
       </View>
 

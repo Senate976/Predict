@@ -27,6 +27,7 @@ import {
 import { colors, fonts, radius } from '../lib/theme';
 import { Avatar } from './Avatar';
 import { InlineComments } from './InlineComments';
+import { PredictWord } from './PredictWord';
 
 /** Largeur fixe de la bulle de réactions — nécessaire pour la centrer
  * précisément au-dessus du pouce via `marginLeft: -largeur/2`. */
@@ -103,13 +104,13 @@ export function PredictionCard({
     // `Alert.alert` de React Native Web ne fait rien (implémentation vide) —
     // sans ce repli, le bouton semble ne pas répondre du tout sur le web.
     if (Platform.OS === 'web') {
-      if (window.confirm(`Supprimer ce Predict ?\n\n${message}`)) {
+      if (window.confirm(`Supprimer cette Predict ?\n\n${message}`)) {
         onDelete?.();
       }
       return;
     }
 
-    Alert.alert('Supprimer ce Predict ?', message, [
+    Alert.alert('Supprimer cette Predict ?', message, [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Supprimer', style: 'destructive', onPress: () => onDelete?.() },
     ]);
@@ -194,6 +195,8 @@ export function PredictionCard({
   emojiPanelOpenRef.current = emojiPanelOpen;
   const handleEmojiPressRef = useRef(handleEmojiPress);
   handleEmojiPressRef.current = handleEmojiPress;
+  const myEmojiRef = useRef(myEmoji);
+  myEmojiRef.current = myEmoji;
 
   function setHovered(index: number | null) {
     if (hoveredIndexRef.current === index) return;
@@ -236,8 +239,16 @@ export function PredictionCard({
         const hovered = hoveredIndexRef.current;
         setHovered(null);
         if (!moved) {
-          // Tap simple, sans glissement : bascule l'ouverture de la bulle.
-          setEmojiPanelOpen(!panelOpenAtGrantRef.current);
+          if (myEmojiRef.current) {
+            // Une réaction est déjà posée : un tap simple sur le pouce
+            // l'annule directement, comme un « unlike » — pas besoin de
+            // rouvrir la bulle pour ça.
+            handleEmojiPressRef.current(myEmojiRef.current);
+            setEmojiPanelOpen(false);
+          } else {
+            // Pas de réaction encore : le tap simple ouvre/ferme la bulle.
+            setEmojiPanelOpen(!panelOpenAtGrantRef.current);
+          }
         } else if (hovered !== null) {
           handleEmojiPressRef.current(EMOJI_REACTIONS[hovered]);
           setEmojiPanelOpen(false);
@@ -276,22 +287,24 @@ export function PredictionCard({
             </Pressable>
           )}
 
-          {!verdict && !revealed && (
-            <View style={[styles.badge, styles.badgeLocked]}>
-              <Text style={[styles.badgeText, styles.badgeTextLocked]}>
-                {item.open_ended ? 'Quand l’auteur le décide' : formatCountdown(revealAt, now)}
-              </Text>
-            </View>
-          )}
+          <View style={styles.cardTopRight}>
+            {!verdict && !revealed && (
+              <View style={[styles.badge, styles.badgeLocked]}>
+                <Text style={[styles.badgeText, styles.badgeTextLocked]}>
+                  {item.open_ended ? 'Quand l’auteur le décide' : formatCountdown(revealAt, now)}
+                </Text>
+              </View>
+            )}
+            <Text style={styles.categoryTag}>(Thème : {CATEGORY_LABEL[item.category]})</Text>
+          </View>
         </View>
 
         <Text style={styles.cardTeaser}>{item.teaser}</Text>
-        <Text style={styles.categoryTag}>(Thème : {CATEGORY_LABEL[item.category]})</Text>
       </Pressable>
 
       {revealed && !isAuthor && !hasVoted && (
         <Pressable onPress={() => onPress?.()} style={styles.voteLink} hitSlop={4}>
-          <Text style={styles.voteLinkText}>Donner mon avis sur ce Predict →</Text>
+          <Text style={styles.voteLinkText}>Donner mon avis sur cette <PredictWord /> →</Text>
         </Pressable>
       )}
 
@@ -391,7 +404,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(173, 138, 62, 0.28)',
     borderRadius: radius.xl,
     padding: 18,
-    marginBottom: 22,
+    marginBottom: 12,
     backgroundColor: colors.surface,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
@@ -402,12 +415,15 @@ const styles = StyleSheet.create({
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 },
   authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, maxWidth: '65%' },
   authorName: { fontSize: 13, fontWeight: '600', color: colors.textMuted, flexShrink: 1 },
+  // Sur la droite de la carte (dans `cardTop`), pas sur sa propre ligne sous
+  // le teaser — ça évite d'ajouter une ligne de hauteur à chaque carte.
+  cardTopRight: { alignItems: 'flex-end', gap: 2 },
   categoryTag: {
     fontSize: 12,
     fontStyle: 'italic',
     fontWeight: '400',
     color: colors.textFaint,
-    marginTop: 4,
+    textAlign: 'right',
   },
   badge: {
     borderRadius: radius.pill,
