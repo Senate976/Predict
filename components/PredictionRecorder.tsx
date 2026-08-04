@@ -44,7 +44,7 @@ export function PredictionRecorder({ uri, onChange, disabled }: Props) {
     setPermissionError(null);
     const { granted } = await requestRecordingPermissionsAsync();
     if (!granted) {
-      setPermissionError('Autorise l’accès au micro pour enregistrer ta Predict.');
+      setPermissionError('Autorise l’accès au micro pour enregistrer ton Predict.');
       return;
     }
     await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
@@ -91,7 +91,7 @@ export function PredictionRecorder({ uri, onChange, disabled }: Props) {
             `Arrêter · ${formatDuration(recorderState.durationMillis)}`
           ) : (
             <>
-              Enregistrer ma <PredictWord />
+              Enregistrer mon <PredictWord />
             </>
           )}
         </Text>

@@ -47,6 +47,7 @@ export function PredictionCard({
   authorLabel,
   authorId,
   authorAvatarUrl,
+  mentionedUsernames,
   userId,
   onPress,
   hasVoted = false,
@@ -59,6 +60,10 @@ export function PredictionCard({
   authorLabel?: string;
   authorId?: string;
   authorAvatarUrl?: string | null;
+  /** Pseudos des amis cités via « @pseudo » dans le teaser — affichés à côté
+   * de l'auteur, sur la même ligne, pour ne pas ajouter de hauteur à
+   * l'étiquette. */
+  mentionedUsernames?: string[];
   userId: string;
   onPress?: () => void;
   /** Le destinataire s'est déjà prononcé sur cette prédiction — masque le lien
@@ -104,13 +109,13 @@ export function PredictionCard({
     // `Alert.alert` de React Native Web ne fait rien (implémentation vide) —
     // sans ce repli, le bouton semble ne pas répondre du tout sur le web.
     if (Platform.OS === 'web') {
-      if (window.confirm(`Supprimer cette Predict ?\n\n${message}`)) {
+      if (window.confirm(`Supprimer ce Predict ?\n\n${message}`)) {
         onDelete?.();
       }
       return;
     }
 
-    Alert.alert('Supprimer cette Predict ?', message, [
+    Alert.alert('Supprimer ce Predict ?', message, [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Supprimer', style: 'destructive', onPress: () => onDelete?.() },
     ]);
@@ -284,6 +289,11 @@ export function PredictionCard({
               <Text style={styles.authorName} numberOfLines={1}>
                 {authorLabel}
               </Text>
+              {mentionedUsernames && mentionedUsernames.length > 0 && (
+                <Text style={styles.mentionTag} numberOfLines={1}>
+                  · a cité {mentionedUsernames.map((u) => `@${u}`).join(', ')}
+                </Text>
+              )}
             </Pressable>
           )}
 
@@ -304,7 +314,7 @@ export function PredictionCard({
 
       {revealed && !isAuthor && !hasVoted && (
         <Pressable onPress={() => onPress?.()} style={styles.voteLink} hitSlop={4}>
-          <Text style={styles.voteLinkText}>Donner mon avis sur cette <PredictWord /> →</Text>
+          <Text style={styles.voteLinkText}>Donner mon avis sur ce <PredictWord /> →</Text>
         </Pressable>
       )}
 
@@ -415,6 +425,7 @@ const styles = StyleSheet.create({
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 },
   authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, maxWidth: '65%' },
   authorName: { fontSize: 13, fontWeight: '600', color: colors.textMuted, flexShrink: 1 },
+  mentionTag: { fontSize: 12, fontWeight: '600', color: colors.gold, flexShrink: 1 },
   // Sur la droite de la carte (dans `cardTop`), pas sur sa propre ligne sous
   // le teaser — ça évite d'ajouter une ligne de hauteur à chaque carte.
   cardTopRight: { alignItems: 'flex-end', gap: 2 },

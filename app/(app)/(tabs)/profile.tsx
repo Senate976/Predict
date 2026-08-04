@@ -3,14 +3,11 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,7 +19,7 @@ import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { pickAvatarImage, removeAvatar, uploadAvatar } from '../../../lib/avatar';
 import { useAuth } from '../../../lib/auth';
 import { formatRevealAt } from '../../../lib/datetime';
-import { fetchProfileById, updatePhone } from '../../../lib/friends';
+import { fetchProfileById } from '../../../lib/friends';
 import {
   fetchPredictionOutcomes,
   fetchPrediscore,
@@ -60,11 +57,6 @@ export default function ProfileScreen() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
-  const [phone, setPhone] = useState('');
-  const [savedPhone, setSavedPhone] = useState('');
-  const [savingPhone, setSavingPhone] = useState(false);
-  const [phoneError, setPhoneError] = useState<string | null>(null);
-  const [editingPhone, setEditingPhone] = useState(false);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('total');
@@ -95,8 +87,6 @@ export default function ProfileScreen() {
 
     const { data: profile } = await fetchProfileById(userId);
     setAvatarUrl(profile?.avatar_url ?? null);
-    setPhone(profile?.phone ?? '');
-    setSavedPhone(profile?.phone ?? '');
   }, [userId]);
 
   async function handlePickAvatar() {
@@ -144,54 +134,6 @@ export default function ProfileScreen() {
     }, [load])
   );
 
-  async function handleSavePhone() {
-    if (!userId) return;
-    const trimmed = phone.trim();
-    setPhoneError(null);
-    setSavingPhone(true);
-    try {
-      const { error: saveError } = await updatePhone(userId, trimmed || null);
-      if (saveError) {
-        setPhoneError(`Enregistrement impossible : ${saveError.message}`);
-        return;
-      }
-      setPhone(trimmed);
-      setSavedPhone(trimmed);
-      setEditingPhone(false);
-    } finally {
-      setSavingPhone(false);
-    }
-  }
-
-  function handleDeletePhone() {
-    if (!userId) return;
-    const message = 'Ton numéro sera retiré de ton profil.';
-    const run = async () => {
-      setPhoneError(null);
-      setSavingPhone(true);
-      try {
-        const { error: deleteError } = await updatePhone(userId, null);
-        if (deleteError) {
-          setPhoneError(`Suppression impossible : ${deleteError.message}`);
-          return;
-        }
-        setPhone('');
-        setSavedPhone('');
-      } finally {
-        setSavingPhone(false);
-      }
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm(`Supprimer ce numéro ?\n\n${message}`)) run();
-      return;
-    }
-    Alert.alert('Supprimer ce numéro ?', message, [
-      { text: 'Annuler', style: 'cancel' },
-      { text: 'Supprimer', style: 'destructive', onPress: run },
-    ]);
-  }
-
   const realized = (outcomes ?? []).filter((o) => o.final_status === 'realized');
   const missed = (outcomes ?? []).filter((o) => o.final_status === 'missed');
   const pending = (outcomes ?? []).filter((o) => o.final_status === 'pending');
@@ -224,41 +166,6 @@ export default function ProfileScreen() {
           <Text style={[styles.eyebrow, styles.sectionSpacing]}>Nom d’utilisateur</Text>
           <Text style={styles.username}>@{username ?? '…'}</Text>
           <Text style={styles.email}>{session?.user.email ?? ''}</Text>
-
-          {editingPhone ? (
-            <View style={[styles.phoneRow, styles.phoneRowSpacing]}>
-              <TextInput
-                value={phone}
-                onChangeText={setPhone}
-                placeholder="06 12 34 56 78"
-                placeholderTextColor={colors.textFaint}
-                keyboardType="phone-pad"
-                editable={!savingPhone}
-                autoFocus
-                style={styles.phoneInput}
-              />
-              <Pressable
-                onPress={handleSavePhone}
-                disabled={savingPhone || phone.trim() === savedPhone}
-                style={styles.phoneSave}
-              >
-                <Text style={styles.phoneSaveText}>{savingPhone ? '…' : 'Enregistrer'}</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <View style={styles.phoneDisplayRow}>
-              <Pressable onPress={() => setEditingPhone(true)} style={styles.phoneDisplayTextRow} hitSlop={4}>
-                <Text style={styles.email}>{savedPhone || 'Ajouter un numéro de téléphone'}</Text>
-                <Ionicons name="pencil-outline" size={14} color={colors.textFaint} />
-              </Pressable>
-              {savedPhone && (
-                <Pressable onPress={handleDeletePhone} hitSlop={8}>
-                  <Ionicons name="trash-outline" size={14} color={colors.textFaint} />
-                </Pressable>
-              )}
-            </View>
-          )}
-          {phoneError && <Text style={styles.error}>{phoneError}</Text>}
         </View>
 
         <Modal
@@ -422,33 +329,6 @@ const styles = StyleSheet.create({
   avatarEditText: { color: colors.background, fontSize: 10, fontWeight: '700' },
   username: { fontFamily: fonts.serifItalic, fontSize: 22, color: colors.text, marginTop: 6 },
   email: { fontSize: 13, color: colors.textFaint, marginTop: 4 },
-  phoneDisplayRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 },
-  phoneDisplayTextRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  // `alignSelf: 'stretch'` plutôt qu'un `width: '100%'` calculé contre le
-  // parent centré (`identityCard`) : c'est ce qui poussait le bouton
-  // Enregistrer à moitié hors cadre, sur la droite.
-  phoneRow: { flexDirection: 'row', gap: 8, alignSelf: 'stretch' },
-  phoneRowSpacing: { marginTop: 4 },
-  phoneInput: {
-    flex: 1,
-    minWidth: 0,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: colors.text,
-    backgroundColor: colors.surface,
-  },
-  phoneSave: {
-    backgroundColor: colors.gold,
-    borderRadius: radius.sm,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    justifyContent: 'center',
-  },
-  phoneSaveText: { color: colors.text, fontSize: 13, fontWeight: '700' },
   loader: { marginTop: 24 },
   modalOverlay: {
     flex: 1,

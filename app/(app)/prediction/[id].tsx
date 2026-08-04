@@ -184,10 +184,10 @@ export default function PredictionDetailScreen() {
     };
 
     if (Platform.OS === 'web') {
-      if (window.confirm(`Révéler cette Predict maintenant ?\n\n${message}`)) run();
+      if (window.confirm(`Révéler ce Predict maintenant ?\n\n${message}`)) run();
       return;
     }
-    Alert.alert('Révéler cette Predict maintenant ?', message, [
+    Alert.alert('Révéler ce Predict maintenant ?', message, [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Révéler', style: 'destructive', onPress: run },
     ]);

@@ -45,7 +45,7 @@ export function CelebrationBurst({
   visible,
   message = (
     <>
-      <PredictWord /> approuvée par vos pairs !
+      <PredictWord /> approuvé par vos pairs !
     </>
   ),
   onFinish,

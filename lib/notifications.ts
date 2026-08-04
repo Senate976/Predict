@@ -6,7 +6,8 @@ export type NotificationType =
   | 'new_teaser'
   | 'prediction_revealed'
   | 'prediction_approved'
-  | 'group_invite';
+  | 'group_invite'
+  | 'prediction_mentioned';
 
 /**
  * Une notification telle que renvoyée par `public.notifications`. Selon le

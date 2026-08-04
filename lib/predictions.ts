@@ -66,6 +66,8 @@ export type PredictionFeedItem = {
   /** `{ '👍': 2, '❤️': 1, ... }` — absent des clés sans aucune réaction. */
   emoji_counts: Partial<Record<EmojiReaction, number>>;
   my_emoji_reaction: EmojiReaction | null;
+  /** Ids des amis explicitement cités via « @pseudo » dans le teaser — voir `extractMentionedUsernames`. */
+  mentioned_user_ids: string[];
 };
 
 /** Doivent rester alignés sur les contraintes `predictions_*_length` du SQL. */
@@ -138,7 +140,8 @@ export function predictionErrorMessage(error: PostgrestError): string {
  */
 const FEED_COLUMNS =
   'id, author_id, teaser, content, audio_path, reveal_at, scope, open_ended, category, created_at, ' +
-  'is_revealed, realized_votes, missed_votes, final_status, is_favorite, is_hidden, emoji_counts, my_emoji_reaction';
+  'is_revealed, realized_votes, missed_votes, final_status, is_favorite, is_hidden, emoji_counts, my_emoji_reaction, ' +
+  'mentioned_user_ids';
 
 export async function fetchPredictionsFeed() {
   return supabase
