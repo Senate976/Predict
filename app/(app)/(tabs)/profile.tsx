@@ -269,7 +269,7 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        <Text style={[styles.eyebrow, styles.sectionSpacing]}>Prédictions</Text>
+        <Text style={[styles.eyebrow, styles.sectionSpacing]}>Predict</Text>
 
         {error && <Text style={styles.error}>{error}</Text>}
 

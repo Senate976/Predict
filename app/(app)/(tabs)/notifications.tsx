@@ -25,15 +25,15 @@ import { colors, fonts, radius, spacing } from '../../../lib/theme';
 function notificationLabel(notification: Notification): string {
   switch (notification.type) {
     case 'prediction_revealed':
-      return 'Une prédiction vient d’être révélée';
+      return 'Un Predict vient d’être révélé';
     case 'prediction_approved':
-      return 'Une de tes prédictions a été approuvée par le Cercle';
+      return 'Un de tes Predict a été approuvé par le Cercle';
     case 'group_invite':
       return notification.group?.owner
         ? `${notification.group.owner.username} t’invite dans un groupe`
         : 'Invitation à rejoindre un groupe';
     default:
-      return 'Nouvelle prédiction dans ton Cercle';
+      return 'Nouveau Predict dans ton Cercle';
   }
 }
 

@@ -135,7 +135,7 @@ export default function HomeScreen() {
         visible: true,
         message: approval.prediction
           ? `« ${approval.prediction.teaser} » approuvée par vos pairs !`
-          : 'Prédiction approuvée par vos pairs !',
+          : 'Predict approuvé par vos pairs !',
       });
     }
   }, [userId]);
@@ -375,7 +375,7 @@ export default function HomeScreen() {
         ) : shown.length === 0 ? (
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>
-              {tab === 'upcoming' ? 'Aucune prédiction en cours.' : 'Rien de révélé pour l’instant.'}
+              {tab === 'upcoming' ? 'Aucun Predict en cours.' : 'Rien de révélé pour l’instant.'}
             </Text>
             {tab === 'upcoming' && (
               <Text style={styles.emptyText}>
@@ -409,7 +409,7 @@ export default function HomeScreen() {
           onPress={() => router.push('/new-prediction')}
           style={({ pressed }) => [styles.create, pressed && styles.createPressed]}
         >
-          <Text style={styles.createText}>Nouvelle prédiction</Text>
+          <Text style={styles.createText}>Nouveau Predict</Text>
         </Pressable>
       </View>
     </SafeAreaView>

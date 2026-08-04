@@ -21,13 +21,20 @@ const VIVID_GREEN = '#34C759';
  * affiche alors un état vide plutôt qu'une jauge à 0%, pour ne pas laisser
  * croire à un mauvais score qui n'existe pas encore.
  */
-export function PrediscoreGauge({ score }: { score: number | null }) {
+export function PrediscoreGauge({
+  score,
+  emptyMessage = 'Ton Prediscore apparaîtra après ton premier Predict révélé.',
+}: {
+  score: number | null;
+  /** Le texte par défaut suppose qu'on regarde son propre profil — sur le
+   * profil d'un ami, l'écran appelant doit passer un message à la 3e
+   * personne, sans quoi « Ton Prediscore… » n'a aucun sens affiché là. */
+  emptyMessage?: string;
+}) {
   if (score === null) {
     return (
       <View style={styles.wrap}>
-        <Text style={styles.emptyText}>
-          Ton Prediscore apparaîtra après ta première prédiction révélée.
-        </Text>
+        <Text style={styles.emptyText}>{emptyMessage}</Text>
       </View>
     );
   }

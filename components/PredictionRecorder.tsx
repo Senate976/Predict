@@ -43,7 +43,7 @@ export function PredictionRecorder({ uri, onChange, disabled }: Props) {
     setPermissionError(null);
     const { granted } = await requestRecordingPermissionsAsync();
     if (!granted) {
-      setPermissionError('Autorise l’accès au micro pour enregistrer ta prédiction.');
+      setPermissionError('Autorise l’accès au micro pour enregistrer ton Predict.');
       return;
     }
     await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
@@ -88,7 +88,7 @@ export function PredictionRecorder({ uri, onChange, disabled }: Props) {
         <Text style={styles.recordButtonText}>
           {recorderState.isRecording
             ? `Arrêter · ${formatDuration(recorderState.durationMillis)}`
-            : 'Enregistrer ma prédiction'}
+            : 'Enregistrer mon Predict'}
         </Text>
       </Pressable>
     </View>
