@@ -6,7 +6,7 @@ import { PredictWord } from './PredictWord';
 
 const STEPS: ReactNode[] = [
   <>
-    Scellez votre <PredictWord /> et définissez sa date de révélation et à qui vous souhaitez la
+    Scellez votre <PredictWord /> et définissez sa date de révélation et à qui vous souhaitez le
     révéler.
   </>,
   'Partagez le teaser exclusif à votre Cercle.',
@@ -52,7 +52,7 @@ export function WelcomeOnboarding({
             ))}
 
             <Text style={styles.body}>
-              Accumulez les <PredictWord /> réussies, débloquez des badges de prestige
+              Accumulez les <PredictWord /> réussis, débloquez des badges de prestige
               et montrez à votre réseau qui avait raison depuis le début.
             </Text>
 
@@ -63,7 +63,7 @@ export function WelcomeOnboarding({
               style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
             >
               <Text style={styles.ctaText}>
-                Sceller ma première <PredictWord />
+                Sceller mon premier <PredictWord />
               </Text>
             </Pressable>
           </ScrollView>

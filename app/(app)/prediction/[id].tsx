@@ -22,6 +22,7 @@ import { formatAdvance, formatShortDateTime } from '../../../lib/datetime';
 import { fetchFriendships, otherProfile, type FriendProfile } from '../../../lib/friends';
 import {
   addRecipient,
+  beliefPercentage,
   fetchPrediction,
   fetchPredictionOutcome,
   fetchPredictionRecipients,
@@ -184,10 +185,10 @@ export default function PredictionDetailScreen() {
     };
 
     if (Platform.OS === 'web') {
-      if (window.confirm(`Révéler cette Predict maintenant ?\n\n${message}`)) run();
+      if (window.confirm(`Révéler ce Predict maintenant ?\n\n${message}`)) run();
       return;
     }
-    Alert.alert('Révéler cette Predict maintenant ?', message, [
+    Alert.alert('Révéler ce Predict maintenant ?', message, [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Révéler', style: 'destructive', onPress: run },
     ]);
@@ -215,9 +216,11 @@ export default function PredictionDetailScreen() {
   // à quel point la prédiction a été anticipée. Sans objet pour une prédiction
   // « ouverte » : `reveal_at` n'y porte qu'un repère technique lointain.
   const advanceLabel = prediction
-    ? prediction.open_ended && !revealed
-      ? 'Révélation laissée à la discrétion de l’auteur'
-      : formatAdvance(new Date(prediction.created_at), new Date(prediction.reveal_at))
+    ? prediction.is_immediate
+      ? 'Révélée immédiatement'
+      : prediction.open_ended && !revealed
+        ? 'Révélation laissée à la discrétion de l’auteur'
+        : formatAdvance(new Date(prediction.created_at), new Date(prediction.reveal_at))
     : '';
 
   return (
@@ -374,7 +377,7 @@ export default function PredictionDetailScreen() {
               </>
             )}
 
-            {revealed && outcome && (
+            {revealed && outcome && !prediction.is_immediate && (
               <View
                 style={[
                   styles.verdictBox,
@@ -409,6 +412,48 @@ export default function PredictionDetailScreen() {
                           style={styles.voteButton}
                         >
                           <Text style={styles.voteButtonText}>Manquée</Text>
+                        </Pressable>
+                      </View>
+                    )}
+                  </>
+                )}
+              </View>
+            )}
+
+            {/* Une prédiction révélée immédiatement n'a rien à constater —
+                pas de « réalisée / manquée », seulement une opinion à donner
+                sur ce qui vient d'être révélé. */}
+            {revealed && prediction.is_immediate && (
+              <View style={styles.verdictBox}>
+                <Text style={styles.eyebrowSmall}>Avis du Cercle</Text>
+                <Text style={styles.verdict}>
+                  {beliefPercentage(prediction) === null
+                    ? 'Personne n’a encore donné son avis.'
+                    : `${beliefPercentage(prediction)}% y croient · ${100 - beliefPercentage(prediction)!}% n’y croient pas`}
+                </Text>
+
+                {!isAuthor && (
+                  <>
+                    {voteError && <Text style={styles.error}>{voteError}</Text>}
+                    {myVote ? (
+                      <Text style={styles.voteLockedText}>
+                        Tu as indiqué : {myVote.vote_value === 'believe' ? 'J’y crois' : 'Je n’y crois pas'}
+                      </Text>
+                    ) : (
+                      <View style={styles.voteRow}>
+                        <Pressable
+                          onPress={() => handleVote('believe')}
+                          disabled={voting}
+                          style={styles.voteButton}
+                        >
+                          <Text style={styles.voteButtonText}>J’y crois</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => handleVote('disbelieve')}
+                          disabled={voting}
+                          style={styles.voteButton}
+                        >
+                          <Text style={styles.voteButtonText}>Je n’y crois pas</Text>
                         </Pressable>
                       </View>
                     )}

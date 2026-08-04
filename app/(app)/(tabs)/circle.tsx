@@ -35,6 +35,7 @@ import {
   declineGroupInvite,
   deleteGroup,
   fetchGroupMembers,
+  fetchGroupPrediscore,
   fetchGroups,
   groupErrorMessage,
   removeGroupMember,
@@ -92,6 +93,9 @@ export default function CircleScreen() {
   const [groupError, setGroupError] = useState<string | null>(null);
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
   const [groupMembers, setGroupMembers] = useState<Record<string, GroupMember[]>>({});
+  // Clé `${groupId}:${friendId}` — Prediscore de ce membre restreint aux
+  // prédictions de ce groupe précis (distinct du Prediscore global du profil).
+  const [groupPrediscores, setGroupPrediscores] = useState<Record<string, number | null>>({});
   const [pendingGroupActionId, setPendingGroupActionId] = useState<string | null>(null);
 
   const loadGroups = useCallback(async () => {
@@ -102,7 +106,23 @@ export default function CircleScreen() {
 
   async function loadGroupMembers(groupId: string) {
     const { data } = await fetchGroupMembers(groupId);
-    setGroupMembers((prev) => ({ ...prev, [groupId]: data ?? [] }));
+    const members = data ?? [];
+    setGroupMembers((prev) => ({ ...prev, [groupId]: members }));
+
+    // Un Prediscore par membre déjà accepté (en attente, il n'a encore rien
+    // pu prédire dans ce groupe) — chargés en parallèle, indépendants les uns
+    // des autres.
+    const accepted = members.filter((m) => m.status === 'accepted');
+    const scores = await Promise.all(
+      accepted.map(async (m) => [m.friend_id, (await fetchGroupPrediscore(groupId, m.friend_id)).score] as const)
+    );
+    setGroupPrediscores((prev) => {
+      const next = { ...prev };
+      for (const [friendId, score] of scores) {
+        next[`${groupId}:${friendId}`] = score;
+      }
+      return next;
+    });
   }
 
   async function handleToggleExpand(groupId: string) {
@@ -537,9 +557,17 @@ export default function CircleScreen() {
                                     : member?.status === 'pending'
                                       ? 'Invitation envoyée'
                                       : 'Inviter';
+                                const score = groupPrediscores[`${group.id}:${profile.id}`];
                                 return (
                                   <View key={profile.id} style={styles.row}>
-                                    <Text style={styles.username}>{profile.username}</Text>
+                                    <View style={styles.usernameRow}>
+                                      <Text style={styles.username}>{profile.username}</Text>
+                                      {member?.status === 'accepted' && (
+                                        <Text style={styles.groupScore}>
+                                          {score === undefined ? '…' : score === null ? '—' : `${score}%`}
+                                        </Text>
+                                      )}
+                                    </View>
                                     <Pressable
                                       onPress={() => handleToggleMember(group.id, profile.id, !!member)}
                                       disabled={pending}
@@ -567,7 +595,23 @@ export default function CircleScreen() {
                           </>
                         ) : (
                           <>
-                            <Text style={styles.muted}>Tu fais partie de ce groupe.</Text>
+                            {members === undefined ? (
+                              <ActivityIndicator style={styles.searchLoader} color={colors.gold} />
+                            ) : (
+                              members
+                                .filter((m) => m.status === 'accepted')
+                                .map((m) => {
+                                  const score = groupPrediscores[`${group.id}:${m.friend_id}`];
+                                  return (
+                                    <View key={m.friend_id} style={styles.rowNoBorder}>
+                                      <Text style={styles.username}>{m.profile.username}</Text>
+                                      <Text style={styles.groupScore}>
+                                        {score === undefined ? '…' : score === null ? '—' : `${score}%`}
+                                      </Text>
+                                    </View>
+                                  );
+                                })
+                            )}
                             <Pressable
                               onPress={() => handleLeaveGroup(group.id)}
                               disabled={pendingGroupActionId === group.id}
@@ -653,6 +697,7 @@ const styles = StyleSheet.create({
   },
   username: { fontSize: 15, color: colors.text, fontWeight: '600' },
   usernameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  groupScore: { fontSize: 13, fontWeight: '700', color: colors.gold },
   actions: { flexDirection: 'row', gap: 8 },
   pillGold: {
     backgroundColor: colors.gold,

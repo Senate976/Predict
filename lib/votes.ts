@@ -2,7 +2,10 @@ import type { PostgrestError } from '@supabase/supabase-js';
 
 import { supabase } from './supabase';
 
-export type VoteValue = 'realized' | 'missed';
+/** `realized`/`missed` : verdict d'une prédiction classique, une fois le
+ * temps écoulé. `believe`/`disbelieve` : opinion sur une prédiction révélée
+ * immédiatement (`is_immediate`) — il n'y a encore rien à constater. */
+export type VoteValue = 'realized' | 'missed' | 'believe' | 'disbelieve';
 
 export type Vote = {
   id: string;

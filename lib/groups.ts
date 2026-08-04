@@ -157,3 +157,21 @@ export async function declineGroupInvite(groupId: string, friendId: string) {
     .eq('group_id', groupId)
     .eq('friend_id', friendId);
 }
+
+/**
+ * Le Prediscore d'un membre, restreint aux seules prédictions liées à ce
+ * groupe (`predictions.group_id`) — distinct du Prediscore global du profil.
+ * `null` tant qu'aucune prédiction pondérable n'existe encore pour ce membre
+ * dans ce groupe précis.
+ */
+export async function fetchGroupPrediscore(groupId: string, targetUserId: string) {
+  const { data, error } = await supabase
+    .rpc('get_group_prediscore', { p_group_id: groupId, p_target_user: targetUserId })
+    .maybeSingle()
+    .returns<{ score: number | null; weighted_count: number }>();
+
+  if (error || !data) {
+    return { score: null as number | null, error };
+  }
+  return { score: data.score === null ? null : Number(data.score), error: null };
+}

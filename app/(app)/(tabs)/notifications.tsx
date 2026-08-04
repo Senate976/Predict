@@ -39,13 +39,20 @@ function notificationLabel(notification: Notification) {
     case 'prediction_revealed':
       return (
         <>
-          Une <PredictWord /> vient d’être révélée
+          Un <PredictWord /> vient d’être révélé
         </>
       );
     case 'prediction_approved':
       return (
         <>
-          Une de tes <PredictWord /> a été approuvée par le Cercle
+          Un de tes <PredictWord /> a été approuvé par le Cercle
+        </>
+      );
+    case 'prediction_mentioned':
+      return (
+        <>
+          {notification.prediction?.author?.username ?? 'Quelqu’un'} t’a cité dans un{' '}
+          <PredictWord />
         </>
       );
     case 'group_invite':
@@ -55,7 +62,7 @@ function notificationLabel(notification: Notification) {
     default:
       return (
         <>
-          Nouvelle <PredictWord /> dans ton Cercle
+          Nouveau <PredictWord /> dans ton Cercle
         </>
       );
   }

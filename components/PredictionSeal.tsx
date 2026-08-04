@@ -139,7 +139,7 @@ export function PredictionSeal({ visible, onFinish }: Props) {
         </View>
 
         <Text style={styles.label}>
-          <PredictWord /> scellée
+          <PredictWord /> scellé
         </Text>
       </Animated.View>
     </Modal>

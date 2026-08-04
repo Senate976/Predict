@@ -2117,7 +2117,492 @@ group by p.id, p.author_id, p.teaser, pc.content, pc.audio_path, p.reveal_at, p.
 grant select on public.predictions_feed to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 26. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 26. Suppression du numéro de téléphone
+-- ---------------------------------------------------------------------------
+--
+-- Fonctionnalité abandonnée : plus de champ téléphone sur le profil, plus de
+-- recherche par numéro (section 111, `searchProfiles`). Colonne retirée
+-- définitivement — les valeurs déjà enregistrées sont perdues.
+alter table public.profiles drop column if exists phone;
+
+-- ---------------------------------------------------------------------------
+-- 27. Mentions « @pseudo » — notification dédiée + tag visible sur l'étiquette
+-- ---------------------------------------------------------------------------
+--
+-- Jusqu'ici, mentionner un ami dans le teaser ne faisait que lui accorder un
+-- accès (silencieusement, via `create_prediction`) : aucune notification
+-- distincte de celle — générique — d'un accès accordé, et rien à voir sur la
+-- carte. `mentioned_user_ids` retient qui a été explicitement cité, pour
+-- l'afficher dans le Fil ; `notify_mention` ajoute la notification dédiée.
+alter table public.predictions add column if not exists mentioned_user_ids uuid[] not null default '{}'::uuid[];
+
+alter table public.notifications drop constraint if exists notifications_type_check;
+alter table public.notifications add constraint notifications_type_check
+  check (type in ('new_teaser', 'prediction_revealed', 'prediction_approved', 'group_invite', 'prediction_mentioned'));
+
+-- `security definer` : la notification est pour le destinataire cité, pas
+-- pour l'auteur qui appelle — elle se revérifie donc elle-même (auteur de la
+-- prédiction, ami accepté) plutôt que de faire confiance à l'appelant, ce qui
+-- lui permet de rester `grant`ée à tout `authenticated` sans risque d'abus.
+create or replace function public.notify_mention(p_prediction_id uuid, p_mentioned_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not exists (
+    select 1 from public.predictions p
+    where p.id = p_prediction_id and p.author_id = auth.uid()
+  ) then
+    return;
+  end if;
+
+  if not exists (
+    select 1 from public.friendships f
+    where f.status = 'accepted'
+      and (
+        (f.requester_id = auth.uid() and f.addressee_id = p_mentioned_id)
+        or (f.addressee_id = auth.uid() and f.requester_id = p_mentioned_id)
+      )
+  ) then
+    return;
+  end if;
+
+  insert into public.notifications (user_id, prediction_id, type)
+  values (p_mentioned_id, p_prediction_id, 'prediction_mentioned')
+  on conflict (user_id, prediction_id, type) do nothing;
+end;
+$$;
+
+revoke all on function public.notify_mention(uuid, uuid) from public;
+grant execute on function public.notify_mention(uuid, uuid) to authenticated;
+
+-- `create_prediction` reprend sa signature de la section 24 : elle enregistre
+-- désormais aussi les mentions valides sur la prédiction elle-même
+-- (`mentioned_user_ids`), et déclenche `notify_mention` pour chacune.
+create or replace function public.create_prediction(
+  p_teaser text,
+  p_content text,
+  p_reveal_at timestamptz,
+  p_scope text,
+  p_friend_ids uuid[] default array[]::uuid[],
+  p_group_id uuid default null,
+  p_mentioned_ids uuid[] default array[]::uuid[],
+  p_open_ended boolean default false,
+  p_category text default 'autre'
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+  v_recipient uuid;
+  v_mentioned_valid uuid[] := array[]::uuid[];
+begin
+  insert into public.predictions (author_id, teaser, reveal_at, scope, open_ended, category)
+  values (auth.uid(), p_teaser, p_reveal_at, p_scope, p_open_ended, p_category)
+  returning id into v_id;
+
+  insert into public.prediction_contents (prediction_id, content)
+  values (v_id, p_content);
+
+  if p_scope = 'circle' then
+    insert into public.prediction_access (prediction_id, user_id)
+    select
+      v_id,
+      case when f.requester_id = auth.uid() then f.addressee_id else f.requester_id end
+    from public.friendships f
+    where f.status = 'accepted'
+      and (f.requester_id = auth.uid() or f.addressee_id = auth.uid());
+  elsif p_scope = 'group' then
+    insert into public.prediction_access (prediction_id, user_id)
+    select v_id, gm.friend_id
+    from public.group_members gm
+    join public.groups g on g.id = gm.group_id
+    where gm.group_id = p_group_id and g.owner_id = auth.uid() and gm.status = 'accepted';
+  else
+    foreach v_recipient in array coalesce(p_friend_ids, array[]::uuid[]) loop
+      insert into public.prediction_access (prediction_id, user_id)
+      values (v_id, v_recipient)
+      on conflict (prediction_id, user_id) do nothing;
+    end loop;
+  end if;
+
+  foreach v_recipient in array coalesce(p_mentioned_ids, array[]::uuid[]) loop
+    if exists (
+      select 1 from public.friendships f
+      where f.status = 'accepted'
+        and (
+          (f.requester_id = auth.uid() and f.addressee_id = v_recipient)
+          or (f.addressee_id = auth.uid() and f.requester_id = v_recipient)
+        )
+    ) then
+      insert into public.prediction_access (prediction_id, user_id)
+      values (v_id, v_recipient)
+      on conflict (prediction_id, user_id) do nothing;
+
+      v_mentioned_valid := array_append(v_mentioned_valid, v_recipient);
+      perform public.notify_mention(v_id, v_recipient);
+    end if;
+  end loop;
+
+  if array_length(v_mentioned_valid, 1) > 0 then
+    update public.predictions set mentioned_user_ids = v_mentioned_valid where id = v_id;
+  end if;
+
+  return v_id;
+end;
+$$;
+
+revoke all on function public.create_prediction(text, text, timestamptz, text, uuid[], uuid, uuid[], boolean, text) from public;
+grant execute on function public.create_prediction(text, text, timestamptz, text, uuid[], uuid, uuid[], boolean, text) to authenticated;
+
+-- `predictions_feed` reprend sa définition de la section 25 et ajoute
+-- `mentioned_user_ids`, pour afficher qui a été cité directement sur la
+-- carte, sans requête séparée.
+drop view if exists public.predictions_feed;
+
+create view public.predictions_feed
+with (security_invoker = true) as
+select
+  p.id,
+  p.author_id,
+  p.teaser,
+  pc.content,
+  pc.audio_path,
+  p.reveal_at,
+  p.scope,
+  p.open_ended,
+  p.category,
+  p.mentioned_user_ids,
+  p.created_at,
+  (p.reveal_at <= now()) as is_revealed,
+  coalesce(sum((v.vote_value = 'realized')::int), 0) as realized_votes,
+  coalesce(sum((v.vote_value = 'missed')::int), 0) as missed_votes,
+  case
+    when p.reveal_at > now() then 'pending'
+    when coalesce(sum((v.vote_value = 'realized')::int), 0)
+       > coalesce(sum((v.vote_value = 'missed')::int), 0) then 'realized'
+    when coalesce(sum((v.vote_value = 'missed')::int), 0)
+       > coalesce(sum((v.vote_value = 'realized')::int), 0) then 'missed'
+    else 'pending'
+  end as final_status,
+  coalesce(
+    (
+      select us.favorite from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_favorite,
+  coalesce(
+    (
+      select us.hidden from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_hidden,
+  coalesce(
+    (
+      select jsonb_object_agg(counts.emoji, counts.total)
+      from (
+        select emoji, count(*) as total
+        from public.prediction_emoji_reactions er
+        where er.prediction_id = p.id
+        group by emoji
+      ) counts
+    ),
+    '{}'::jsonb
+  ) as emoji_counts,
+  (
+    select er2.emoji from public.prediction_emoji_reactions er2
+    where er2.prediction_id = p.id and er2.user_id = auth.uid()
+  ) as my_emoji_reaction
+from public.predictions p
+left join public.prediction_contents pc on pc.prediction_id = p.id
+left join public.prediction_votes v on v.prediction_id = p.id
+group by p.id, p.author_id, p.teaser, pc.content, pc.audio_path, p.reveal_at, p.scope, p.open_ended, p.category, p.mentioned_user_ids, p.created_at;
+
+grant select on public.predictions_feed to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 28. Révélation immédiate — vote « j'y crois / j'y crois pas »
+-- ---------------------------------------------------------------------------
+--
+-- Troisième choix de révélation, en plus de « date fixe » et « je déciderai
+-- plus tard » : révélée dès la validation. Il n'y a alors rien à constater
+-- (aucun délai pour vérifier si la prédiction s'est réalisée), donc le Cercle
+-- ne se prononce pas en « réalisée / manquée » mais en simple opinion —
+-- réutilise `prediction_votes` avec deux nouvelles valeurs plutôt qu'une
+-- table séparée : mêmes policies (select/insert/update déjà conditionnées à
+-- `reveal_at <= now()`, toujours vrai ici), même mécanique de verrouillage
+-- après un premier vote.
+alter table public.predictions add column if not exists is_immediate boolean not null default false;
+
+-- Ajoutée ici (avant `create_prediction` plus bas, qui la renseigne déjà) et
+-- pas seulement section 29 où elle sert vraiment (Prediscore par groupe) :
+-- `predictions.group_id` n'existait pas du tout jusqu'ici (la portée
+-- « groupe » ne peuplait que `prediction_access`, sans garder trace du
+-- groupe visé sur la prédiction elle-même).
+alter table public.predictions add column if not exists group_id uuid references public.groups (id) on delete set null;
+
+alter table public.prediction_votes drop constraint if exists prediction_votes_vote_value_check;
+alter table public.prediction_votes add constraint prediction_votes_vote_value_check
+  check (vote_value in ('realized', 'missed', 'believe', 'disbelieve'));
+
+-- `create_prediction` reprend sa signature de la section 27 et ajoute
+-- `p_is_immediate` : quand `true`, la base pose elle-même `reveal_at = now()`
+-- — pas question de faire confiance à l'horloge du client pour une révélation
+-- qui doit être immédiate.
+--
+-- `drop function` d'abord : une nouvelle liste de paramètres crée un second
+-- `create_prediction` en parallèle de l'ancien plutôt que de le remplacer
+-- (signatures différentes) — PostgREST refuserait alors d'appeler l'un ou
+-- l'autre (« could not choose a best candidate function ») dès qu'un appel
+-- omet un paramètre optionnel commun aux deux.
+drop function if exists public.create_prediction(text, text, timestamptz, text, uuid[], uuid, uuid[], boolean, text);
+
+create or replace function public.create_prediction(
+  p_teaser text,
+  p_content text,
+  p_reveal_at timestamptz,
+  p_scope text,
+  p_friend_ids uuid[] default array[]::uuid[],
+  p_group_id uuid default null,
+  p_mentioned_ids uuid[] default array[]::uuid[],
+  p_open_ended boolean default false,
+  p_category text default 'autre',
+  p_is_immediate boolean default false
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+  v_recipient uuid;
+  v_mentioned_valid uuid[] := array[]::uuid[];
+  v_reveal_at timestamptz := case when p_is_immediate then now() else p_reveal_at end;
+begin
+  insert into public.predictions (author_id, teaser, reveal_at, scope, open_ended, category, is_immediate, group_id)
+  values (
+    auth.uid(),
+    p_teaser,
+    v_reveal_at,
+    p_scope,
+    p_open_ended,
+    p_category,
+    p_is_immediate,
+    case when p_scope = 'group' then p_group_id else null end
+  )
+  returning id into v_id;
+
+  insert into public.prediction_contents (prediction_id, content)
+  values (v_id, p_content);
+
+  if p_scope = 'circle' then
+    insert into public.prediction_access (prediction_id, user_id)
+    select
+      v_id,
+      case when f.requester_id = auth.uid() then f.addressee_id else f.requester_id end
+    from public.friendships f
+    where f.status = 'accepted'
+      and (f.requester_id = auth.uid() or f.addressee_id = auth.uid());
+  elsif p_scope = 'group' then
+    insert into public.prediction_access (prediction_id, user_id)
+    select v_id, gm.friend_id
+    from public.group_members gm
+    join public.groups g on g.id = gm.group_id
+    where gm.group_id = p_group_id and g.owner_id = auth.uid() and gm.status = 'accepted';
+  else
+    foreach v_recipient in array coalesce(p_friend_ids, array[]::uuid[]) loop
+      insert into public.prediction_access (prediction_id, user_id)
+      values (v_id, v_recipient)
+      on conflict (prediction_id, user_id) do nothing;
+    end loop;
+  end if;
+
+  foreach v_recipient in array coalesce(p_mentioned_ids, array[]::uuid[]) loop
+    if exists (
+      select 1 from public.friendships f
+      where f.status = 'accepted'
+        and (
+          (f.requester_id = auth.uid() and f.addressee_id = v_recipient)
+          or (f.addressee_id = auth.uid() and f.requester_id = v_recipient)
+        )
+    ) then
+      insert into public.prediction_access (prediction_id, user_id)
+      values (v_id, v_recipient)
+      on conflict (prediction_id, user_id) do nothing;
+
+      v_mentioned_valid := array_append(v_mentioned_valid, v_recipient);
+      perform public.notify_mention(v_id, v_recipient);
+    end if;
+  end loop;
+
+  if array_length(v_mentioned_valid, 1) > 0 then
+    update public.predictions set mentioned_user_ids = v_mentioned_valid where id = v_id;
+  end if;
+
+  return v_id;
+end;
+$$;
+
+revoke all on function public.create_prediction(text, text, timestamptz, text, uuid[], uuid, uuid[], boolean, text, boolean) from public;
+grant execute on function public.create_prediction(text, text, timestamptz, text, uuid[], uuid, uuid[], boolean, text, boolean) to authenticated;
+
+-- `predictions_feed` reprend sa définition de la section 27 et ajoute
+-- `is_immediate` ainsi que `believe_votes`/`disbelieve_votes` (mêmes
+-- agrégations que `realized_votes`/`missed_votes`, sur les deux nouvelles
+-- valeurs de `vote_value`) — voir `beliefPercentage` côté client.
+drop view if exists public.predictions_feed;
+
+create view public.predictions_feed
+with (security_invoker = true) as
+select
+  p.id,
+  p.author_id,
+  p.teaser,
+  pc.content,
+  pc.audio_path,
+  p.reveal_at,
+  p.scope,
+  p.open_ended,
+  p.is_immediate,
+  p.category,
+  p.mentioned_user_ids,
+  p.created_at,
+  (p.reveal_at <= now()) as is_revealed,
+  coalesce(sum((v.vote_value = 'realized')::int), 0) as realized_votes,
+  coalesce(sum((v.vote_value = 'missed')::int), 0) as missed_votes,
+  case
+    when p.reveal_at > now() then 'pending'
+    when coalesce(sum((v.vote_value = 'realized')::int), 0)
+       > coalesce(sum((v.vote_value = 'missed')::int), 0) then 'realized'
+    when coalesce(sum((v.vote_value = 'missed')::int), 0)
+       > coalesce(sum((v.vote_value = 'realized')::int), 0) then 'missed'
+    else 'pending'
+  end as final_status,
+  coalesce(
+    (
+      select us.favorite from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_favorite,
+  coalesce(
+    (
+      select us.hidden from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_hidden,
+  coalesce(
+    (
+      select jsonb_object_agg(counts.emoji, counts.total)
+      from (
+        select emoji, count(*) as total
+        from public.prediction_emoji_reactions er
+        where er.prediction_id = p.id
+        group by emoji
+      ) counts
+    ),
+    '{}'::jsonb
+  ) as emoji_counts,
+  (
+    select er2.emoji from public.prediction_emoji_reactions er2
+    where er2.prediction_id = p.id and er2.user_id = auth.uid()
+  ) as my_emoji_reaction,
+  coalesce(sum((v.vote_value = 'believe')::int), 0) as believe_votes,
+  coalesce(sum((v.vote_value = 'disbelieve')::int), 0) as disbelieve_votes
+from public.predictions p
+left join public.prediction_contents pc on pc.prediction_id = p.id
+left join public.prediction_votes v on v.prediction_id = p.id
+group by p.id, p.author_id, p.teaser, pc.content, pc.audio_path, p.reveal_at, p.scope, p.open_ended, p.is_immediate, p.category, p.mentioned_user_ids, p.created_at;
+
+grant select on public.predictions_feed to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 29. Prediscore par groupe
+-- ---------------------------------------------------------------------------
+--
+-- Le Prediscore du profil (section 23) porte sur toutes les prédictions d'un
+-- utilisateur. Celui-ci est restreint aux seules prédictions liées à un
+-- groupe donné — `predictions.group_id` (ajoutée section 28, aux côtés de
+-- `is_immediate`, pour que `create_prediction` puisse déjà la renseigner).
+--
+-- Jusqu'ici, un membre ne voyait que sa propre ligne dans `group_members` —
+-- suffisant pour savoir « je suis dans ce groupe », pas pour afficher la
+-- liste de ses co-membres et leur Prediscore. `is_group_member` (section 19)
+-- tourne `security definer` : l'ajouter ici ne redéclenche pas cette policy.
+drop policy if exists "group_members_select_own" on public.group_members;
+create policy "group_members_select_own"
+  on public.group_members
+  for select
+  to authenticated
+  using (
+    friend_id = auth.uid()
+    or public.is_group_owner(group_id, auth.uid())
+    or public.is_group_member(group_id, auth.uid())
+  );
+
+-- `security definer`, même garde que `get_prediscore` : seuls le propriétaire
+-- et les membres du groupe (même en attente — cf. commentaire de
+-- `is_group_member`) peuvent le consulter, jamais un tiers.
+create or replace function public.get_group_prediscore(p_group_id uuid, p_target_user uuid)
+returns table (score numeric, weighted_count numeric)
+language sql
+security definer
+stable
+set search_path = ''
+as $$
+  with weighted as (
+    select
+      case
+        when extract(epoch from (p.reveal_at - p.created_at)) / 86400 < 7 then 1
+        when extract(epoch from (p.reveal_at - p.created_at)) / 86400 <= 30 then 3
+        else 5
+      end as weight,
+      case
+        when coalesce(sum((v.vote_value = 'realized')::int), 0)
+           > coalesce(sum((v.vote_value = 'missed')::int), 0) then 'realized'
+        when coalesce(sum((v.vote_value = 'missed')::int), 0)
+           > coalesce(sum((v.vote_value = 'realized')::int), 0) then 'missed'
+        else 'pending'
+      end as final_status
+    from public.predictions p
+    left join public.prediction_votes v on v.prediction_id = p.id
+    where p.author_id = p_target_user
+      and p.group_id = p_group_id
+      and p.reveal_at <= now()
+      and (
+        public.is_group_owner(p_group_id, auth.uid())
+        or public.is_group_member(p_group_id, auth.uid())
+      )
+    group by p.id, p.reveal_at, p.created_at
+  )
+  select
+    case
+      when coalesce(sum(weight) filter (where final_status <> 'pending'), 0) > 0
+        then round(
+          100.0 * sum(weight) filter (where final_status = 'realized')
+            / sum(weight) filter (where final_status <> 'pending'),
+          1
+        )
+      else null
+    end as score,
+    coalesce(sum(weight) filter (where final_status <> 'pending'), 0) as weighted_count
+  from weighted;
+$$;
+
+revoke all on function public.get_group_prediscore(uuid, uuid) from public;
+grant execute on function public.get_group_prediscore(uuid, uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 30. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une

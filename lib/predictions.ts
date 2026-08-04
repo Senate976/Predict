@@ -53,6 +53,9 @@ export type PredictionFeedItem = {
    * lointaine sans signification propre — ne jamais l'afficher tel quel dans
    * ce cas, seule la révélation manuelle (`revealPredictionNow`) compte. */
   open_ended: boolean;
+  /** Révélée dès la création (pas de suspense à lever) : le vote porte alors
+   * sur « j'y crois / j'y crois pas », jamais sur « réalisée / manquée ». */
+  is_immediate: boolean;
   category: PredictionCategory;
   created_at: string;
   is_revealed: boolean;
@@ -60,12 +63,17 @@ export type PredictionFeedItem = {
   realized_votes: number;
   missed_votes: number;
   final_status: PredictionOutcomeStatus;
+  /** Uniquement pour une prédiction `is_immediate` — voir `beliefPercentage`. */
+  believe_votes: number;
+  disbelieve_votes: number;
   /** Préférences propres à l'appelant — jamais partagées avec les autres. */
   is_favorite: boolean;
   is_hidden: boolean;
   /** `{ '👍': 2, '❤️': 1, ... }` — absent des clés sans aucune réaction. */
   emoji_counts: Partial<Record<EmojiReaction, number>>;
   my_emoji_reaction: EmojiReaction | null;
+  /** Ids des amis explicitement cités via « @pseudo » dans le teaser — voir `extractMentionedUsernames`. */
+  mentioned_user_ids: string[];
 };
 
 /** Doivent rester alignés sur les contraintes `predictions_*_length` du SQL. */
@@ -137,8 +145,21 @@ export function predictionErrorMessage(error: PostgrestError): string {
  * dans lequel les choses ont été publiées, pas celui de leur révélation.
  */
 const FEED_COLUMNS =
-  'id, author_id, teaser, content, audio_path, reveal_at, scope, open_ended, category, created_at, ' +
-  'is_revealed, realized_votes, missed_votes, final_status, is_favorite, is_hidden, emoji_counts, my_emoji_reaction';
+  'id, author_id, teaser, content, audio_path, reveal_at, scope, open_ended, is_immediate, category, created_at, ' +
+  'is_revealed, realized_votes, missed_votes, final_status, is_favorite, is_hidden, emoji_counts, my_emoji_reaction, ' +
+  'mentioned_user_ids, believe_votes, disbelieve_votes';
+
+/**
+ * Pourcentage de destinataires qui « y croient », pour une prédiction
+ * révélée immédiatement (`is_immediate`) — `null` tant que personne n'a
+ * encore voté, pour ne pas afficher un 0 % qui n'existe pas encore (même
+ * logique que le Prediscore vide).
+ */
+export function beliefPercentage(item: PredictionFeedItem): number | null {
+  const total = item.believe_votes + item.disbelieve_votes;
+  if (total === 0) return null;
+  return Math.round((100 * item.believe_votes) / total);
+}
 
 export async function fetchPredictionsFeed() {
   return supabase
@@ -170,6 +191,11 @@ export async function createPrediction(input: {
   /** Aucune date fixée par l'auteur : `revealAt` porte alors un repère
    * technique lointain (voir `computeOpenEndedRevealAt`), jamais affiché. */
   openEnded?: boolean;
+  /** Révélation dès la création — `revealAt` est alors ignoré, la base pose
+   * elle-même `now()` (voir `create_prediction`). Bascule le vote en
+   * « j'y crois / j'y crois pas » plutôt qu'en « réalisée / manquée », vu
+   * qu'il n'y a rien à constater : seulement une opinion à donner. */
+  isImmediate?: boolean;
   category?: PredictionCategory;
 }) {
   const result = await supabase.rpc('create_prediction', {
@@ -182,6 +208,7 @@ export async function createPrediction(input: {
     p_mentioned_ids: input.mentionedFriendIds ?? [],
     p_open_ended: input.openEnded ?? false,
     p_category: input.category ?? 'autre',
+    p_is_immediate: input.isImmediate ?? false,
   });
   return result as { data: string | null; error: PostgrestError | null };
 }

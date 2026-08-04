@@ -27,7 +27,7 @@ import {
   type PredictionFeedItem,
 } from '../../../lib/predictions';
 import { supabase } from '../../../lib/supabase';
-import { colors, fonts, spacing } from '../../../lib/theme';
+import { colors, fonts, radius, spacing } from '../../../lib/theme';
 
 /**
  * Période de rafraîchissement des comptes à rebours.
@@ -80,6 +80,18 @@ export default function HomeScreen() {
     }
   }
 
+  // `showHidden` n'est pas compté : c'est un « afficher plus », pas un filtre
+  // qui cache du contenu — sa propre ligne dans le menu se désactive déjà
+  // d'elle-même en la retapant.
+  const hasActiveFilters = authorFilter !== null || favoritesOnly || sortKey !== 'default';
+
+  function resetFilters() {
+    setAuthorFilter(null);
+    setFavoritesOnly(false);
+    setSortKey('default');
+    setSortOrder('recent');
+  }
+
   const userId = session?.user.id;
 
   const load = useCallback(async () => {
@@ -102,8 +114,12 @@ export default function HomeScreen() {
     setFeed(items);
 
     // Inclut toujours son propre id, même fil vide : c'est aussi la source
-    // de l'avatar affiché dans l'en-tête, à côté de « Predict ».
-    const authorIds = Array.from(new Set([...items.map((item) => item.author_id), userId]));
+    // de l'avatar affiché dans l'en-tête, à côté de « Predict ». Les ids
+    // mentionnés (« @pseudo ») s'y ajoutent, pour résoudre leur pseudo sans
+    // requête séparée — même Map que les auteurs.
+    const authorIds = Array.from(
+      new Set([...items.map((item) => item.author_id), ...items.flatMap((item) => item.mentioned_user_ids), userId])
+    );
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, username, avatar_url')
@@ -135,10 +151,10 @@ export default function HomeScreen() {
       setCelebration({
         visible: true,
         message: approval.prediction ? (
-          `« ${approval.prediction.teaser} » approuvée par vos pairs !`
+          `« ${approval.prediction.teaser} » approuvé par vos pairs !`
         ) : (
           <>
-            <PredictWord /> approuvée par vos pairs !
+            <PredictWord /> approuvé par vos pairs !
           </>
         ),
       });
@@ -261,17 +277,28 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
-      <Pressable
-        onPress={() => {
-          setMenuView('main');
-          setMenuOpen(true);
-        }}
-        style={styles.filtersToggle}
-        hitSlop={4}
-      >
-        <Ionicons name="options-outline" size={14} color={colors.textFaint} />
-        <Text style={styles.filtersToggleText}>Filtres</Text>
-      </Pressable>
+      <View style={styles.filtersRow}>
+        <Pressable
+          onPress={() => {
+            setMenuView('main');
+            setMenuOpen(true);
+          }}
+          style={[styles.filtersToggle, hasActiveFilters && styles.filtersToggleActive]}
+          hitSlop={4}
+        >
+          <Ionicons name="options-outline" size={14} color={hasActiveFilters ? colors.gold : colors.textFaint} />
+          <Text style={[styles.filtersToggleText, hasActiveFilters && styles.filtersToggleTextActive]}>
+            Filtres
+          </Text>
+        </Pressable>
+
+        {hasActiveFilters && (
+          <Pressable onPress={resetFilters} style={styles.filtersReset} hitSlop={4}>
+            <Ionicons name="close-circle" size={14} color={colors.textFaint} />
+            <Text style={styles.filtersResetText}>Réinitialiser</Text>
+          </Pressable>
+        )}
+      </View>
 
       <Modal
         visible={menuOpen}
@@ -315,19 +342,37 @@ export default function HomeScreen() {
                   )}
                 </Pressable>
 
-                <Pressable onPress={() => setFavoritesOnly((o) => !o)} style={styles.menuRow}>
+                <Pressable
+                  onPress={() => setFavoritesOnly((o) => !o)}
+                  style={hiddenCount === 0 && !hasActiveFilters ? styles.menuRowLast : styles.menuRow}
+                >
                   <Text style={[styles.menuRowText, favoritesOnly && styles.menuRowTextActive]}>
                     ★ Favoris uniquement
                   </Text>
                 </Pressable>
 
                 {hiddenCount > 0 && (
-                  <Pressable onPress={() => setShowHidden((o) => !o)} style={styles.menuRowLast}>
+                  <Pressable
+                    onPress={() => setShowHidden((o) => !o)}
+                    style={hasActiveFilters ? styles.menuRow : styles.menuRowLast}
+                  >
                     <Text style={styles.menuRowText}>
                       {showHidden
                         ? 'Masquer à nouveau les masquées'
                         : `${hiddenCount} masquée${hiddenCount > 1 ? 's' : ''} — afficher`}
                     </Text>
+                  </Pressable>
+                )}
+
+                {hasActiveFilters && (
+                  <Pressable
+                    onPress={() => {
+                      resetFilters();
+                      setMenuOpen(false);
+                    }}
+                    style={styles.menuRowLast}
+                  >
+                    <Text style={styles.menuRowTextReset}>Réinitialiser les filtres</Text>
                   </Pressable>
                 )}
               </>
@@ -382,7 +427,7 @@ export default function HomeScreen() {
             <Text style={styles.emptyTitle}>
               {tab === 'upcoming' ? (
                 <>
-                  Aucune <PredictWord /> en cours.
+                  Aucun <PredictWord /> en cours.
                 </>
               ) : (
                 'Rien de révélé pour l’instant.'
@@ -404,6 +449,9 @@ export default function HomeScreen() {
               authorLabel={authors[item.author_id]?.username ?? '…'}
               authorId={item.author_id}
               authorAvatarUrl={authors[item.author_id]?.avatar_url}
+              mentionedUsernames={item.mentioned_user_ids
+                .map((id) => authors[id]?.username)
+                .filter((username): username is string => !!username)}
               userId={userId!}
               hasVoted={votedIds.has(item.id)}
               onPress={() => router.push(`/prediction/${item.id}`)}
@@ -421,7 +469,7 @@ export default function HomeScreen() {
           style={({ pressed }) => [styles.create, pressed && styles.createPressed]}
         >
           <Text style={styles.createText}>
-            Nouvelle <PredictWord />
+            Nouveau <PredictWord />
           </Text>
         </Pressable>
       </View>
@@ -467,15 +515,26 @@ const styles = StyleSheet.create({
   tabActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
   tabText: { fontSize: 12, fontWeight: '700', letterSpacing: 1, color: colors.textMuted, textTransform: 'uppercase' },
   tabTextActive: { color: colors.gold },
+  filtersRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+  },
   filtersToggle: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-    alignSelf: 'flex-start',
+    borderRadius: radius.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
+  filtersToggleActive: { backgroundColor: colors.goldSoft },
   filtersToggleText: { fontSize: 12, fontWeight: '700', color: colors.textFaint },
+  filtersToggleTextActive: { color: colors.gold },
+  filtersReset: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  filtersResetText: { fontSize: 12, fontWeight: '600', color: colors.textFaint },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
@@ -513,6 +572,7 @@ const styles = StyleSheet.create({
   menuRowRight: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, maxWidth: '70%' },
   menuRowText: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
   menuRowTextActive: { color: colors.gold },
+  menuRowTextReset: { fontSize: 14, fontWeight: '600', color: colors.danger },
   menuRowValue: { fontSize: 13, color: colors.textFaint, flexShrink: 1 },
   menuBack: {
     flexDirection: 'row',

@@ -23,7 +23,7 @@ const VIVID_GREEN = '#34C759';
  */
 export function PrediscoreGauge({
   score,
-  emptyMessage = 'Ton Prediscore apparaîtra après ta première Predict révélée.',
+  emptyMessage = 'Ton Prediscore apparaîtra après ton premier Predict révélé.',
 }: {
   score: number | null;
   /** Le texte par défaut suppose qu'on regarde son propre profil — sur le

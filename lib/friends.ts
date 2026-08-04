@@ -6,9 +6,6 @@ export type FriendProfile = {
   id: string;
   username: string;
   avatar_url: string | null;
-  /** Facultatif, visible par tout le monde au même titre que le pseudo/avatar
-   * — pas de restriction supplémentaire aux amis côté base (section 1). */
-  phone?: string | null;
 };
 
 export type FriendshipStatus = 'pending' | 'accepted';
@@ -108,8 +105,8 @@ export async function fetchFriendships(userId: string) {
 }
 
 /**
- * Recherche de profils par pseudo ou par numéro de téléphone, pour ajouter un
- * ami. `excludeUserId` écarte son propre profil des résultats.
+ * Recherche de profils par pseudo, pour ajouter un ami. `excludeUserId`
+ * écarte son propre profil des résultats.
  */
 export async function searchProfiles(query: string, excludeUserId: string) {
   const trimmed = query.trim();
@@ -119,8 +116,8 @@ export async function searchProfiles(query: string, excludeUserId: string) {
 
   return supabase
     .from('profiles')
-    .select('id, username, avatar_url, phone')
-    .or(`username.ilike.%${trimmed}%,phone.ilike.%${trimmed}%`)
+    .select('id, username, avatar_url')
+    .ilike('username', `%${trimmed}%`)
     .neq('id', excludeUserId)
     .order('username', { ascending: true })
     .limit(10)
@@ -139,15 +136,10 @@ export async function sendFriendRequest(requesterId: string, addresseeId: string
 export async function fetchProfileById(userId: string) {
   return supabase
     .from('profiles')
-    .select('id, username, avatar_url, phone')
+    .select('id, username, avatar_url')
     .eq('id', userId)
     .maybeSingle()
     .returns<FriendProfile>();
-}
-
-/** Enregistre (ou efface, avec `null`) son propre numéro de téléphone. */
-export async function updatePhone(userId: string, phone: string | null) {
-  return supabase.from('profiles').update({ phone }).eq('id', userId);
 }
 
 /** Accepter une demande reçue — passe son statut à 'accepted'. */
