@@ -43,18 +43,7 @@ import {
   type GroupMember,
   type GroupVisibility,
 } from '../../../lib/groups';
-import { invitePhoneBySms } from '../../../lib/invites';
 import { colors, eyebrow, fonts, radius, spacing } from '../../../lib/theme';
-
-/** Un pseudo ne contient jamais de chiffre en majorité — distingue une
- * recherche par numéro (proposition d'invitation SMS) d'une recherche par
- * pseudo (juste « aucun résultat »). */
-function looksLikePhone(value: string): boolean {
-  const trimmed = value.trim();
-  if (trimmed.length < 6) return false;
-  if (!/^[0-9+()\s.-]+$/.test(trimmed)) return false;
-  return trimmed.replace(/[^0-9]/g, '').length >= 6;
-}
 
 /**
  * `Alert.alert` de React Native Web ne fait rien (implémentation vide) — sans
@@ -95,9 +84,6 @@ export default function CircleScreen() {
 
   const [pendingActionId, setPendingActionId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-
-  const [invitingPhone, setInvitingPhone] = useState(false);
-  const [inviteFeedback, setInviteFeedback] = useState<{ success: boolean; text: string } | null>(null);
 
   const [groups, setGroups] = useState<FriendGroup[] | null>(null);
   const [newGroupName, setNewGroupName] = useState('');
@@ -224,7 +210,6 @@ export default function CircleScreen() {
   // Recherche différée : on évite un aller-retour réseau à chaque frappe.
   useEffect(() => {
     if (!userId) return;
-    setInviteFeedback(null);
     const trimmed = query.trim();
     if (!trimmed) {
       setResults(null);
@@ -280,22 +265,6 @@ export default function CircleScreen() {
     await runAction(profileId, () => sendFriendRequest(userId, profileId));
   }
 
-  /** Invite par SMS quelqu'un qui n'a pas encore de compte Predict — voir
-   * `handle_phone_invite_match` dans supabase/schema.sql pour la suite : dès
-   * que cette personne crée un compte avec ce même numéro, une demande d'ami
-   * apparaît automatiquement de notre côté, à accepter comme les autres. */
-  async function handleInvitePhone() {
-    setInvitingPhone(true);
-    setInviteFeedback(null);
-    const { error } = await invitePhoneBySms(query.trim());
-    setInvitingPhone(false);
-    setInviteFeedback(
-      error
-        ? { success: false, text: 'Invitation impossible pour le moment. Réessaie plus tard.' }
-        : { success: true, text: 'Invitation envoyée par SMS !' }
-    );
-  }
-
   async function handleAccept(friendshipId: string) {
     await runAction(friendshipId, () => acceptFriendRequest(friendshipId));
   }
@@ -346,28 +315,7 @@ export default function CircleScreen() {
             {searching && <ActivityIndicator style={styles.searchLoader} color={colors.gold} />}
 
             {results && results.length === 0 && !searching && (
-              looksLikePhone(query) ? (
-                <View style={styles.inviteBox}>
-                  <Text style={styles.muted}>Personne n’utilise encore ce numéro sur Predict.</Text>
-                  <Pressable
-                    onPress={handleInvitePhone}
-                    disabled={invitingPhone}
-                    style={styles.pillGold}
-                  >
-                    <Text style={styles.pillGoldText}>
-                      {invitingPhone ? '…' : 'Inviter par SMS'}
-                    </Text>
-                  </Pressable>
-                </View>
-              ) : (
-                <Text style={styles.muted}>Aucun pseudo ne correspond.</Text>
-              )
-            )}
-
-            {inviteFeedback && (
-              <Text style={inviteFeedback.success ? styles.inviteSuccess : styles.error}>
-                {inviteFeedback.text}
-              </Text>
+              <Text style={styles.muted}>Aucun pseudo ne correspond.</Text>
             )}
 
             {results && results.length > 0 && (
@@ -688,8 +636,6 @@ const styles = StyleSheet.create({
   },
   searchLoader: { marginTop: spacing.md },
   muted: { fontSize: 14, color: colors.textFaint, marginTop: spacing.sm, lineHeight: 20 },
-  inviteBox: { marginTop: spacing.sm, gap: 10, alignItems: 'flex-start' },
-  inviteSuccess: { fontSize: 13, fontWeight: '600', color: colors.success, marginTop: spacing.sm },
   resultsBox: { marginTop: spacing.sm },
   row: {
     flexDirection: 'row',
