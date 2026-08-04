@@ -1585,9 +1585,12 @@ create unique index if not exists notifications_group_invite_unique_key
   on public.notifications (user_id, group_id, type)
   where type = 'group_invite';
 
-alter table public.notifications drop constraint if exists notifications_type_check;
-alter table public.notifications add constraint notifications_type_check
-  check (type in ('new_teaser', 'prediction_revealed', 'prediction_approved', 'group_invite'));
+-- La contrainte `notifications_type_check` elle-même n'est posée qu'une
+-- seule fois plus bas (section 27), avec la liste complète et à jour des
+-- types connus — la reposer ici avec une liste plus étroite (celle de
+-- l'époque de cette section) casserait le ré-exécution de ce script sur une
+-- base qui contient déjà des notifications d'un type plus récent (« could
+-- not... check constraint ... is violated by some row »).
 
 -- Exactement l'un des deux selon le type : jamais les deux, jamais aucun.
 alter table public.notifications drop constraint if exists notifications_target_consistency;
