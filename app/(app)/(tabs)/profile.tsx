@@ -193,9 +193,8 @@ export default function ProfileScreen() {
           <Text style={styles.username}>@{username ?? '…'}</Text>
           <Text style={styles.email}>{session?.user.email ?? ''}</Text>
 
-          <Text style={[styles.eyebrow, styles.sectionSpacing]}>Téléphone (facultatif)</Text>
           {editingPhone ? (
-            <View style={styles.phoneRow}>
+            <View style={[styles.phoneRow, styles.phoneRowSpacing]}>
               <TextInput
                 value={phone}
                 onChangeText={setPhone}
@@ -216,7 +215,7 @@ export default function ProfileScreen() {
             </View>
           ) : (
             <Pressable onPress={() => setEditingPhone(true)} style={styles.phoneDisplayRow} hitSlop={4}>
-              <Text style={styles.email}>{savedPhone || 'Ajouter un numéro'}</Text>
+              <Text style={styles.email}>{savedPhone || 'Ajouter un numéro de téléphone'}</Text>
               <Ionicons name="pencil-outline" size={14} color={colors.textFaint} />
             </Pressable>
           )}
@@ -378,8 +377,9 @@ const styles = StyleSheet.create({
   avatarEditText: { color: colors.background, fontSize: 10, fontWeight: '700' },
   username: { fontFamily: fonts.serifItalic, fontSize: 22, color: colors.text, marginTop: 6 },
   email: { fontSize: 13, color: colors.textFaint, marginTop: 4 },
-  phoneDisplayRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  phoneDisplayRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
   phoneRow: { flexDirection: 'row', gap: 8, width: '100%' },
+  phoneRowSpacing: { marginTop: 4 },
   phoneInput: {
     flex: 1,
     borderWidth: 1,
