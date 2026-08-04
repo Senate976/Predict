@@ -26,6 +26,7 @@ import {
 } from '../../../lib/groups';
 import {
   deleteNotification,
+  deleteNotifications,
   fetchNotifications,
   markNotificationRead,
   notificationErrorMessage,
@@ -82,6 +83,10 @@ export default function NotificationsScreen() {
   // pour distinguer « acceptée » de « refusée » après un rechargement —
   // `is_read` seul suffit à savoir qu'on a répondu, mais pas quoi.
   const [membershipStatus, setMembershipStatus] = useState<Record<string, GroupMemberStatus>>({});
+  // Non vide : mode sélection multiple, activé par un appui long sur une
+  // notification — un appui simple bascule alors la sélection au lieu
+  // d'ouvrir/répondre à la notification.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -144,6 +149,39 @@ export default function NotificationsScreen() {
     ]);
   }
 
+  function toggleSelected(notificationId: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(notificationId)) next.delete(notificationId);
+      else next.add(notificationId);
+      return next;
+    });
+  }
+
+  function handleBulkDelete() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    const message = `${ids.length} notification${ids.length > 1 ? 's' : ''} seront définitivement supprimées.`;
+    const run = async () => {
+      const { error: deleteError } = await deleteNotifications(ids);
+      if (deleteError) {
+        setActionError(`Suppression impossible : ${deleteError.message}`);
+        return;
+      }
+      setNotifications((prev) => (prev ?? []).filter((n) => !selectedIds.has(n.id)));
+      setSelectedIds(new Set());
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Supprimer ${ids.length} notification${ids.length > 1 ? 's' : ''} ?\n\n${message}`)) run();
+      return;
+    }
+    Alert.alert(`Supprimer ${ids.length} notification${ids.length > 1 ? 's' : ''} ?`, message, [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Supprimer', style: 'destructive', onPress: run },
+    ]);
+  }
+
   async function handleGroupInviteResponse(notification: Notification, accept: boolean) {
     if (!userId || !notification.group_id) return;
     const groupId = notification.group_id;
@@ -178,8 +216,24 @@ export default function NotificationsScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Notifications</Text>
-        <QuickCreateButton />
+        {selectedIds.size > 0 ? (
+          <>
+            <Pressable onPress={() => setSelectedIds(new Set())} hitSlop={8}>
+              <Text style={styles.cancelSelection}>Annuler</Text>
+            </Pressable>
+            <Text style={styles.headerTitle}>
+              {selectedIds.size} sélectionnée{selectedIds.size > 1 ? 's' : ''}
+            </Text>
+            <Pressable onPress={handleBulkDelete} hitSlop={8}>
+              <Ionicons name="trash-outline" size={22} color={colors.danger} />
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <Text style={styles.headerTitle}>Notifications</Text>
+            <QuickCreateButton />
+          </>
+        )}
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -200,18 +254,27 @@ export default function NotificationsScreen() {
             const accepted = isGroupInvite && notification.group_id
               ? membershipStatus[notification.group_id] === 'accepted'
               : false;
+            const selecting = selectedIds.size > 0;
+            const selected = selectedIds.has(notification.id);
             return (
               <Pressable
                 key={notification.id}
-                onPress={() => handlePress(notification)}
-                disabled={isGroupInvite}
+                onPress={() => (selecting ? toggleSelected(notification.id) : handlePress(notification))}
+                onLongPress={() => toggleSelected(notification.id)}
+                disabled={isGroupInvite && !selecting}
                 style={({ pressed }) => [
                   styles.row,
                   !notification.is_read && styles.rowUnread,
-                  pressed && !isGroupInvite && styles.rowPressed,
+                  pressed && styles.rowPressed,
                 ]}
               >
-                {!notification.is_read && <View style={styles.dot} />}
+                {selecting ? (
+                  <View style={[styles.checkbox, selected && styles.checkboxChecked]}>
+                    {selected && <Ionicons name="checkmark" size={12} color={colors.background} />}
+                  </View>
+                ) : (
+                  !notification.is_read && <View style={styles.dot} />
+                )}
                 <View style={styles.rowText}>
                   <Text style={styles.label}>{notificationLabel(notification)}</Text>
                   {notification.prediction?.author && (
@@ -236,7 +299,7 @@ export default function NotificationsScreen() {
                   )}
                   <Text style={styles.time}>{formatTimeAgo(notification.created_at, new Date())}</Text>
 
-                  {isGroupInvite && !responded && (
+                  {isGroupInvite && !responded && !selecting && (
                     <View style={styles.inviteActions}>
                       <Pressable
                         onPress={() => handleGroupInviteResponse(notification, true)}
@@ -261,13 +324,15 @@ export default function NotificationsScreen() {
                   )}
                 </View>
 
-                <Pressable
-                  onPress={() => handleDelete(notification.id)}
-                  hitSlop={8}
-                  style={styles.deleteButton}
-                >
-                  <Ionicons name="trash-outline" size={15} color={colors.textFaint} />
-                </Pressable>
+                {!selecting && (
+                  <Pressable
+                    onPress={() => handleDelete(notification.id)}
+                    hitSlop={8}
+                    style={styles.deleteButton}
+                  >
+                    <Ionicons name="trash-outline" size={15} color={colors.textFaint} />
+                  </Pressable>
+                )}
               </Pressable>
             );
           })
@@ -290,6 +355,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   headerTitle: { fontFamily: fonts.serifItalic, fontSize: 26, color: colors.text },
+  cancelSelection: { fontSize: 15, color: colors.gold, fontWeight: '600' },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   loader: { marginTop: 32 },
   empty: { fontSize: 14, color: colors.textFaint, textAlign: 'center', marginTop: 32 },
@@ -319,6 +385,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.gold,
     marginTop: 6,
   },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    borderColor: colors.border,
+    marginTop: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxChecked: { backgroundColor: colors.gold, borderColor: colors.gold },
   rowText: { flex: 1, paddingRight: 26 },
   deleteButton: { position: 'absolute', right: 14, bottom: 14 },
   label: { fontSize: 14, fontWeight: '600', color: colors.text },

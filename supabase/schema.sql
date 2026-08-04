@@ -2632,7 +2632,110 @@ create policy "group_members_insert_own"
   );
 
 -- ---------------------------------------------------------------------------
--- 31. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 31. Fix : la révélation immédiate était rejetée par la RLS
+-- ---------------------------------------------------------------------------
+--
+-- `create_prediction` posait `reveal_at = now()` pour une prédiction
+-- immédiate, mais `predictions_insert_own` (section 1) exige `reveal_at >
+-- now()`, strictement — une égalité s'y heurte tout aussi sûrement qu'une
+-- date passée, d'où le « Enregistrement refusé » que voyait l'auteur. `now()`
+-- valant la même chose du début à la fin d'une transaction (c'est
+-- `transaction_timestamp()`), ajouter une seconde suffit à passer cette
+-- vérification de façon fiable, sans dépendre du temps réellement écoulé
+-- pendant l'exécution de la fonction ; le fil la traitera comme révélée dès
+-- son prochain chargement, une seconde plus tard passant inaperçue.
+create or replace function public.create_prediction(
+  p_teaser text,
+  p_content text,
+  p_reveal_at timestamptz,
+  p_scope text,
+  p_friend_ids uuid[] default array[]::uuid[],
+  p_group_id uuid default null,
+  p_mentioned_ids uuid[] default array[]::uuid[],
+  p_open_ended boolean default false,
+  p_category text default 'autre',
+  p_is_immediate boolean default false
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+  v_recipient uuid;
+  v_mentioned_valid uuid[] := array[]::uuid[];
+  v_reveal_at timestamptz := case when p_is_immediate then now() + interval '1 second' else p_reveal_at end;
+begin
+  insert into public.predictions (author_id, teaser, reveal_at, scope, open_ended, category, is_immediate, group_id)
+  values (
+    auth.uid(),
+    p_teaser,
+    v_reveal_at,
+    p_scope,
+    p_open_ended,
+    p_category,
+    p_is_immediate,
+    case when p_scope = 'group' then p_group_id else null end
+  )
+  returning id into v_id;
+
+  insert into public.prediction_contents (prediction_id, content)
+  values (v_id, p_content);
+
+  if p_scope = 'circle' then
+    insert into public.prediction_access (prediction_id, user_id)
+    select
+      v_id,
+      case when f.requester_id = auth.uid() then f.addressee_id else f.requester_id end
+    from public.friendships f
+    where f.status = 'accepted'
+      and (f.requester_id = auth.uid() or f.addressee_id = auth.uid());
+  elsif p_scope = 'group' then
+    insert into public.prediction_access (prediction_id, user_id)
+    select v_id, gm.friend_id
+    from public.group_members gm
+    join public.groups g on g.id = gm.group_id
+    where gm.group_id = p_group_id and g.owner_id = auth.uid() and gm.status = 'accepted';
+  else
+    foreach v_recipient in array coalesce(p_friend_ids, array[]::uuid[]) loop
+      insert into public.prediction_access (prediction_id, user_id)
+      values (v_id, v_recipient)
+      on conflict (prediction_id, user_id) do nothing;
+    end loop;
+  end if;
+
+  foreach v_recipient in array coalesce(p_mentioned_ids, array[]::uuid[]) loop
+    if exists (
+      select 1 from public.friendships f
+      where f.status = 'accepted'
+        and (
+          (f.requester_id = auth.uid() and f.addressee_id = v_recipient)
+          or (f.addressee_id = auth.uid() and f.requester_id = v_recipient)
+        )
+    ) then
+      insert into public.prediction_access (prediction_id, user_id)
+      values (v_id, v_recipient)
+      on conflict (prediction_id, user_id) do nothing;
+
+      v_mentioned_valid := array_append(v_mentioned_valid, v_recipient);
+      perform public.notify_mention(v_id, v_recipient);
+    end if;
+  end loop;
+
+  if array_length(v_mentioned_valid, 1) > 0 then
+    update public.predictions set mentioned_user_ids = v_mentioned_valid where id = v_id;
+  end if;
+
+  return v_id;
+end;
+$$;
+
+revoke all on function public.create_prediction(text, text, timestamptz, text, uuid[], uuid, uuid[], boolean, text, boolean) from public;
+grant execute on function public.create_prediction(text, text, timestamptz, text, uuid[], uuid, uuid[], boolean, text, boolean) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 32. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une
