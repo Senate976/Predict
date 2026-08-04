@@ -525,13 +525,11 @@ export default function CircleScreen() {
                         <Text style={styles.username}>{group.name}</Text>
                         <Text style={styles.groupMeta}>
                           {group.visibility === 'public' ? 'Public' : 'Privé'}
-                          {isOwner && members
+                          {members
                             ? ` · ${acceptedCount} membre${acceptedCount > 1 ? 's' : ''}${
                                 pendingCount > 0 ? ` · ${pendingCount} en attente` : ''
                               }`
-                            : !isOwner
-                              ? ' · Tu es membre'
-                              : ''}
+                            : ''}
                         </Text>
                       </View>
                       <Text style={styles.groupChevron}>{expanded ? '▲' : '▼'}</Text>
@@ -539,87 +537,110 @@ export default function CircleScreen() {
 
                     {expanded && (
                       <View style={styles.groupBody}>
-                        {isOwner ? (
-                          <>
-                            {accepted.length === 0 ? (
-                              <Text style={styles.muted}>
-                                Pas encore d’ami accepté à inviter dans ce groupe.
-                              </Text>
-                            ) : (
-                              accepted.map((f) => {
-                                const profile = otherProfile(f, userId!);
-                                const member = memberById.get(profile.id);
-                                const pending = pendingGroupActionId === `${group.id}:${profile.id}`;
-                                const label = pending
-                                  ? '…'
-                                  : member?.status === 'accepted'
-                                    ? 'Membre'
-                                    : member?.status === 'pending'
-                                      ? 'Invitation envoyée'
-                                      : 'Inviter';
-                                const score = groupPrediscores[`${group.id}:${profile.id}`];
+                        {/* N'importe quel membre peut inviter depuis son propre Cercle,
+                            pas seulement le propriétaire — seul le retrait reste réservé
+                            à ce dernier (RLS `group_members_delete_own`). */}
+                        {accepted.length === 0 ? (
+                          <Text style={styles.muted}>
+                            Pas encore d’ami accepté à inviter dans ce groupe.
+                          </Text>
+                        ) : (
+                          accepted.map((f) => {
+                            const profile = otherProfile(f, userId!);
+                            const member = memberById.get(profile.id);
+                            const pending = pendingGroupActionId === `${group.id}:${profile.id}`;
+                            const label = pending
+                              ? '…'
+                              : member?.status === 'accepted'
+                                ? 'Membre'
+                                : member?.status === 'pending'
+                                  ? 'Invitation envoyée'
+                                  : 'Inviter';
+                            const score = groupPrediscores[`${group.id}:${profile.id}`];
+                            // On peut toujours inviter (pas encore membre) ; retirer
+                            // quelqu'un de déjà membre ou déjà invité reste réservé au
+                            // propriétaire.
+                            const canManage = isOwner || !member;
+                            return (
+                              <View key={profile.id} style={styles.row}>
+                                <View style={styles.usernameRow}>
+                                  <Text style={styles.username}>{profile.username}</Text>
+                                  {member?.status === 'accepted' && (
+                                    <Text style={styles.groupScore}>
+                                      {score === undefined ? '…' : score === null ? '—' : `${score}%`}
+                                    </Text>
+                                  )}
+                                </View>
+                                {canManage ? (
+                                  <Pressable
+                                    onPress={() => handleToggleMember(group.id, profile.id, !!member)}
+                                    disabled={pending}
+                                    style={member ? styles.pillOutline : styles.pillGold}
+                                  >
+                                    <Text style={member ? styles.pillOutlineText : styles.pillGoldText}>
+                                      {label}
+                                    </Text>
+                                  </Pressable>
+                                ) : (
+                                  <Text style={styles.pillOutlineText}>{label}</Text>
+                                )}
+                              </View>
+                            );
+                          })
+                        )}
+
+                        {/* Membres réels du groupe qui ne font pas partie de mon
+                            Cercle (invités par quelqu'un d'autre) — juste pour
+                            information, rien à gérer sur eux depuis cet écran. */}
+                        {(() => {
+                          const myFriendIds = new Set(accepted.map((f) => otherProfile(f, userId!).id));
+                          const others = (members ?? []).filter(
+                            (m) => m.status === 'accepted' && !myFriendIds.has(m.friend_id)
+                          );
+                          if (members === undefined) {
+                            return <ActivityIndicator style={styles.searchLoader} color={colors.gold} />;
+                          }
+                          if (others.length === 0) return null;
+                          return (
+                            <>
+                              <Text style={[styles.muted, styles.sectionSpacing]}>Autres membres</Text>
+                              {others.map((m) => {
+                                const score = groupPrediscores[`${group.id}:${m.friend_id}`];
                                 return (
-                                  <View key={profile.id} style={styles.row}>
-                                    <View style={styles.usernameRow}>
-                                      <Text style={styles.username}>{profile.username}</Text>
-                                      {member?.status === 'accepted' && (
-                                        <Text style={styles.groupScore}>
-                                          {score === undefined ? '…' : score === null ? '—' : `${score}%`}
-                                        </Text>
-                                      )}
-                                    </View>
-                                    <Pressable
-                                      onPress={() => handleToggleMember(group.id, profile.id, !!member)}
-                                      disabled={pending}
-                                      style={member ? styles.pillOutline : styles.pillGold}
-                                    >
-                                      <Text style={member ? styles.pillOutlineText : styles.pillGoldText}>{label}</Text>
-                                    </Pressable>
+                                  <View key={m.friend_id} style={styles.rowNoBorder}>
+                                    <Text style={styles.username}>{m.profile.username}</Text>
+                                    <Text style={styles.groupScore}>
+                                      {score === undefined ? '…' : score === null ? '—' : `${score}%`}
+                                    </Text>
                                   </View>
                                 );
-                              })
-                            )}
-                            <Pressable
-                              onPress={() =>
-                                confirmAndRun(
-                                  'Supprimer ce groupe ?',
-                                  `« ${group.name} » sera définitivement supprimé pour tous ses membres.`,
-                                  () => handleDeleteGroup(group.id)
-                                )
-                              }
-                              disabled={pendingGroupActionId === group.id}
-                              style={styles.deleteGroup}
-                            >
-                              <Text style={styles.deleteGroupText}>Supprimer ce groupe</Text>
-                            </Pressable>
-                          </>
+                              })}
+                            </>
+                          );
+                        })()}
+
+                        {isOwner ? (
+                          <Pressable
+                            onPress={() =>
+                              confirmAndRun(
+                                'Supprimer ce groupe ?',
+                                `« ${group.name} » sera définitivement supprimé pour tous ses membres.`,
+                                () => handleDeleteGroup(group.id)
+                              )
+                            }
+                            disabled={pendingGroupActionId === group.id}
+                            style={styles.deleteGroup}
+                          >
+                            <Text style={styles.deleteGroupText}>Supprimer ce groupe</Text>
+                          </Pressable>
                         ) : (
-                          <>
-                            {members === undefined ? (
-                              <ActivityIndicator style={styles.searchLoader} color={colors.gold} />
-                            ) : (
-                              members
-                                .filter((m) => m.status === 'accepted')
-                                .map((m) => {
-                                  const score = groupPrediscores[`${group.id}:${m.friend_id}`];
-                                  return (
-                                    <View key={m.friend_id} style={styles.rowNoBorder}>
-                                      <Text style={styles.username}>{m.profile.username}</Text>
-                                      <Text style={styles.groupScore}>
-                                        {score === undefined ? '…' : score === null ? '—' : `${score}%`}
-                                      </Text>
-                                    </View>
-                                  );
-                                })
-                            )}
-                            <Pressable
-                              onPress={() => handleLeaveGroup(group.id)}
-                              disabled={pendingGroupActionId === group.id}
-                              style={styles.deleteGroup}
-                            >
-                              <Text style={styles.deleteGroupText}>Quitter ce groupe</Text>
-                            </Pressable>
-                          </>
+                          <Pressable
+                            onPress={() => handleLeaveGroup(group.id)}
+                            disabled={pendingGroupActionId === group.id}
+                            style={styles.deleteGroup}
+                          >
+                            <Text style={styles.deleteGroupText}>Quitter ce groupe</Text>
+                          </Pressable>
                         )}
                       </View>
                     )}
@@ -680,6 +701,7 @@ const styles = StyleSheet.create({
   },
   searchLoader: { marginTop: spacing.md },
   muted: { fontSize: 14, color: colors.textFaint, marginTop: spacing.sm, lineHeight: 20 },
+  sectionSpacing: { marginTop: spacing.md },
   resultsBox: { marginTop: spacing.sm },
   row: {
     flexDirection: 'row',
