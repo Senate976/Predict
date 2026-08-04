@@ -211,11 +211,14 @@ export default function NewPredictionScreen() {
 
     setSubmitting(true);
     try {
-      // « @pseudo » dans le teaser : n'accorde un accès que pour un pseudo
-      // qui correspond vraiment à un ami accepté — revérifié côté base de
-      // toute façon (create_prediction), ce filtre évite juste un appel
-      // inutile pour un « @ » qui ne désigne personne.
-      const mentionedUsernames = extractMentionedUsernames(trimmedTeaser);
+      // « @pseudo » dans la prédiction (le contenu secret, pas le teaser
+      // public) : n'accorde un accès que pour un pseudo qui correspond
+      // vraiment à un ami accepté — revérifié côté base de toute façon
+      // (create_prediction), ce filtre évite juste un appel inutile pour un
+      // « @ » qui ne désigne personne. Sans objet en message vocal : rien à
+      // repérer dans un placeholder.
+      const mentionedUsernames =
+        contentMode === 'text' ? extractMentionedUsernames(trimmedContent) : [];
       const mentionedFriendIds = (friends ?? [])
         .filter((f) => mentionedUsernames.includes(f.username.toLowerCase()))
         .map((f) => f.id);
@@ -295,16 +298,13 @@ export default function NewPredictionScreen() {
           <TextInput
             value={teaser}
             onChangeText={setTeaser}
-            placeholder="Donnez un indice sur la nature de votre Predict"
+            placeholder="Donnez un indice sur votre Predict"
             placeholderTextColor={colors.textFaint}
             multiline
             editable={!submitting}
             maxLength={MAX_TEASER_LENGTH}
             style={[styles.input, styles.teaserInput]}
           />
-          <Text style={styles.mentionHint}>
-            Utilise @pseudo pour notifier directement quelqu’un de ton Cercle.
-          </Text>
 
           <Text style={[styles.label, styles.sectionLabel]}>
             Mon <PredictWord />
@@ -335,7 +335,7 @@ export default function NewPredictionScreen() {
               <TextInput
                 value={content}
                 onChangeText={setContent}
-                placeholder="Écrivez votre predict ici et prouvez à votre cercle, qu’une fois encore, vous aviez raison"
+                placeholder="Écrivez votre Predict ici et prouvez à votre cercle, qu’une fois encore, vous aviez raison"
                 placeholderTextColor={colors.textFaint}
                 multiline
                 editable={!submitting}
@@ -384,21 +384,21 @@ export default function NewPredictionScreen() {
               </Text>
             </Pressable>
             <Pressable
-              onPress={() => setRevealTiming('open_ended')}
-              disabled={submitting}
-              style={[styles.scopeOption, revealTiming === 'open_ended' && styles.scopeOptionActive]}
-            >
-              <Text style={[styles.scopeText, revealTiming === 'open_ended' && styles.scopeTextActive]}>
-                Je déciderai plus tard
-              </Text>
-            </Pressable>
-            <Pressable
               onPress={() => setRevealTiming('immediate')}
               disabled={submitting}
               style={[styles.scopeOption, revealTiming === 'immediate' && styles.scopeOptionActive]}
             >
               <Text style={[styles.scopeText, revealTiming === 'immediate' && styles.scopeTextActive]}>
-                Immédiatement
+                Immédiate
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setRevealTiming('open_ended')}
+              disabled={submitting}
+              style={[styles.scopeOption, revealTiming === 'open_ended' && styles.scopeOptionActive]}
+            >
+              <Text style={[styles.scopeText, revealTiming === 'open_ended' && styles.scopeTextActive]}>
+                En temps voulu
               </Text>
             </Pressable>
           </View>
@@ -613,7 +613,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   teaserInput: { minHeight: 60, textAlignVertical: 'top' },
-  mentionHint: { fontSize: 11, color: colors.textFaint, marginTop: 6 },
   contentInput: { minHeight: 110, textAlignVertical: 'top' },
   counter: { fontSize: 12, color: colors.textFaint, marginTop: 6, textAlign: 'right' },
   counterLow: { color: colors.gold },
@@ -622,18 +621,20 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 12 },
   timeField: { flex: 1 },
   preview: { fontSize: 14, color: colors.success, marginTop: 14 },
-  scopeRow: { flexDirection: 'row', gap: 10 },
+  scopeRow: { flexDirection: 'row', gap: 8 },
   scopeOption: {
     flex: 1,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.pill,
     paddingVertical: 12,
+    paddingHorizontal: 4,
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: colors.surface,
   },
   scopeOptionActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
-  scopeText: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
+  scopeText: { fontSize: 13, fontWeight: '600', color: colors.textMuted, textAlign: 'center' },
   scopeTextActive: { color: colors.gold },
   friendsBox: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: spacing.md },
   searchLoader: { marginTop: spacing.sm },

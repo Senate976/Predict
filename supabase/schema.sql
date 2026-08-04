@@ -2602,7 +2602,37 @@ revoke all on function public.get_group_prediscore(uuid, uuid) from public;
 grant execute on function public.get_group_prediscore(uuid, uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 30. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 30. Inviter dans un groupe : ouvert à tous ses membres, pas seulement au propriétaire
+-- ---------------------------------------------------------------------------
+--
+-- Jusqu'ici, seul le propriétaire pouvait ajouter quelqu'un. Le `exists (...)`
+-- sur `friendships` exigeait déjà que l'invité soit un ami accepté de
+-- l'appelant (`auth.uid()`), pas forcément du propriétaire — il ne restait
+-- donc qu'à lever le `is_group_owner` pour que n'importe quel membre puisse
+-- inviter depuis son propre Cercle, sans rien changer à cette vérification.
+drop policy if exists "group_members_insert_own" on public.group_members;
+create policy "group_members_insert_own"
+  on public.group_members
+  for insert
+  to authenticated
+  with check (
+    status = 'pending'
+    and (
+      public.is_group_owner(group_id, auth.uid())
+      or public.is_group_member(group_id, auth.uid())
+    )
+    and exists (
+      select 1 from public.friendships f
+      where f.status = 'accepted'
+        and (
+          (f.requester_id = auth.uid() and f.addressee_id = group_members.friend_id)
+          or (f.addressee_id = auth.uid() and f.requester_id = group_members.friend_id)
+        )
+    )
+  );
+
+-- ---------------------------------------------------------------------------
+-- 31. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une

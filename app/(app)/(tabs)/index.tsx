@@ -234,7 +234,7 @@ export default function HomeScreen() {
     }
     if (sortKey === 'reveal') {
       const diff = new Date(b.reveal_at).getTime() - new Date(a.reveal_at).getTime();
-      return sortOrder === 'recent' ? diff : -diff;
+      return sortOrder === 'recent' ? -diff : diff;
     }
     // Défaut inchangé : À venir par ordre de publication, Passées par date de
     // révélation la plus récente.
