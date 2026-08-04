@@ -37,6 +37,7 @@ export function PrediscoreGauge({ score }: { score: number | null }) {
 
   return (
     <View style={styles.wrap}>
+      <Text style={styles.scoreLabel}>Prediscore</Text>
       <Text style={styles.scoreValue}>{clamped}%</Text>
 
       <View style={styles.barBox}>
@@ -79,6 +80,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 19,
     paddingVertical: 8,
+  },
+  scoreLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: colors.textFaint,
+    marginBottom: 2,
   },
   scoreValue: {
     fontFamily: 'InstrumentSerif_400Regular',

@@ -29,6 +29,10 @@ import { AudioPlayerButton } from './AudioPlayerButton';
 import { Avatar } from './Avatar';
 import { InlineComments } from './InlineComments';
 
+/** Largeur fixe de la bulle de réactions — nécessaire pour la centrer
+ * précisément au-dessus du pouce via `marginLeft: -largeur/2`. */
+const EMOJI_PANEL_WIDTH = 260;
+
 /**
  * Carte d'une prédiction, partagée entre les onglets À venir et Passées du
  * Fil. Toujours dépliée (teaser, puis contenu une fois révélé) ; un tap sur
@@ -181,6 +185,17 @@ export function PredictionCard({
   const panelOpenAtGrantRef = useRef(false);
   const scaleAnims = useRef(EMOJI_REACTIONS.map(() => new Animated.Value(1))).current;
 
+  // Le PanResponder juste en dessous n'est créé qu'une seule fois
+  // (`useRef`) : ses callbacks ne doivent donc JAMAIS lire directement
+  // `emojiPanelOpen` ou `handleEmojiPress` — ils resteraient figés sur les
+  // valeurs du tout premier rendu (la bulle s'ouvre, mais plus rien ne
+  // répond ensuite). Ces deux refs, remises à jour à chaque rendu, leur
+  // donnent un accès toujours frais.
+  const emojiPanelOpenRef = useRef(emojiPanelOpen);
+  emojiPanelOpenRef.current = emojiPanelOpen;
+  const handleEmojiPressRef = useRef(handleEmojiPress);
+  handleEmojiPressRef.current = handleEmojiPress;
+
   function setHovered(index: number | null) {
     if (hoveredIndexRef.current === index) return;
     const previous = hoveredIndexRef.current;
@@ -197,7 +212,7 @@ export function PredictionCard({
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
-        panelOpenAtGrantRef.current = emojiPanelOpen;
+        panelOpenAtGrantRef.current = emojiPanelOpenRef.current;
         panelLayoutRef.current = null;
         setEmojiPanelOpen(true);
       },
@@ -225,7 +240,7 @@ export function PredictionCard({
           // Tap simple, sans glissement : bascule l'ouverture de la bulle.
           setEmojiPanelOpen(!panelOpenAtGrantRef.current);
         } else if (hovered !== null) {
-          handleEmojiPress(EMOJI_REACTIONS[hovered]);
+          handleEmojiPressRef.current(EMOJI_REACTIONS[hovered]);
           setEmojiPanelOpen(false);
         } else {
           // Glissé hors de la bulle : on annule, comme sur Facebook.
@@ -305,14 +320,41 @@ export function PredictionCard({
 
         {/* Discret, façon Facebook : un pouce en filigrane (ou l'emoji déjà
             choisi) — maintenir le doigt fait apparaître la bulle de
-            réactions, la faire glisser dessus en sélectionne une. */}
-        <View style={styles.reactionTrigger} hitSlop={8} {...panResponder.panHandlers}>
-          {myEmoji ? (
-            <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
-          ) : (
-            <Ionicons name="thumbs-up-outline" size={16} color={colors.textFaint} />
+            réactions au-dessus, la faire glisser dessus en sélectionne une. */}
+        <View style={styles.reactionTriggerWrap}>
+          <View style={styles.reactionTrigger} hitSlop={8} {...panResponder.panHandlers}>
+            {myEmoji ? (
+              <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
+            ) : (
+              <Ionicons name="thumbs-up-outline" size={16} color={colors.textFaint} />
+            )}
+            {totalReactions > 0 && <Text style={styles.reactionTriggerCount}>{totalReactions}</Text>}
+          </View>
+
+          {emojiPanelOpen && (
+            <View
+              ref={panelRef}
+              style={styles.emojiPanel}
+              onLayout={() => {
+                panelRef.current?.measureInWindow((x, y, width, height) => {
+                  panelLayoutRef.current = { x, y, width, height };
+                });
+              }}
+            >
+              {EMOJI_REACTIONS.map((emoji, i) => (
+                <Animated.View
+                  key={emoji}
+                  style={[
+                    styles.emojiBubbleItem,
+                    myEmoji === emoji && styles.emojiBubbleItemActive,
+                    { transform: [{ scale: scaleAnims[i] }] },
+                  ]}
+                >
+                  <Text style={styles.emojiButtonText}>{emoji}</Text>
+                </Animated.View>
+              ))}
+            </View>
           )}
-          {totalReactions > 0 && <Text style={styles.reactionTriggerCount}>{totalReactions}</Text>}
         </View>
 
         <Pressable onPress={handleToggleFavorite} hitSlop={8}>
@@ -337,31 +379,6 @@ export function PredictionCard({
           </Pressable>
         )}
       </View>
-
-      {emojiPanelOpen && (
-        <View
-          ref={panelRef}
-          style={styles.emojiPanel}
-          onLayout={() => {
-            panelRef.current?.measureInWindow((x, y, width, height) => {
-              panelLayoutRef.current = { x, y, width, height };
-            });
-          }}
-        >
-          {EMOJI_REACTIONS.map((emoji, i) => (
-            <Animated.View
-              key={emoji}
-              style={[
-                styles.emojiBubbleItem,
-                myEmoji === emoji && styles.emojiBubbleItemActive,
-                { transform: [{ scale: scaleAnims[i] }] },
-              ]}
-            >
-              <Text style={styles.emojiButtonText}>{emoji}</Text>
-            </Animated.View>
-          ))}
-        </View>
-      )}
 
       {commentsOpen && (
         <InlineComments
@@ -440,8 +457,17 @@ const styles = StyleSheet.create({
   audioRow: { marginTop: 10 },
   voteLink: { marginTop: 10 },
   voteLinkText: { fontSize: 13, fontWeight: '600', color: colors.gold },
-  // Une seule « grande bulle », façon Facebook — pas des puces séparées.
+  // Une seule « grande bulle », façon Facebook — flottante au-dessus du
+  // pouce (pas en dessous) pour ne pas être masquée par le doigt qui la
+  // fait glisser, et pas des puces séparées.
   emojiPanel: {
+    position: 'absolute',
+    bottom: '100%',
+    left: '50%',
+    marginLeft: -EMOJI_PANEL_WIDTH / 2,
+    marginBottom: 10,
+    width: EMOJI_PANEL_WIDTH,
+    zIndex: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -451,12 +477,11 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    marginTop: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
   },
   emojiBubbleItem: {
     width: 32,
@@ -475,6 +500,7 @@ const styles = StyleSheet.create({
   },
   commentsToggle: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   commentsToggleText: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
+  reactionTriggerWrap: { position: 'relative' },
   reactionTrigger: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   reactionTriggerEmoji: { fontSize: 16 },
   reactionTriggerCount: { fontSize: 11, fontWeight: '600', color: colors.textFaint },
