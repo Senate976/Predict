@@ -15,6 +15,7 @@ import {
 import { fetchCommentCount } from '../lib/comments';
 import { formatCountdown } from '../lib/datetime';
 import {
+  beliefPercentage,
   CATEGORY_LABEL,
   castEmojiReaction,
   EMOJI_REACTIONS,
@@ -91,6 +92,7 @@ export function PredictionCard({
   const isAuthor = item.author_id === userId;
 
   const verdict = revealed && item.final_status !== 'pending' ? item.final_status : null;
+  const belief = item.is_immediate ? beliefPercentage(item) : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -305,11 +307,19 @@ export function PredictionCard({
                 </Text>
               </View>
             )}
-            <Text style={styles.categoryTag}>(Thème : {CATEGORY_LABEL[item.category]})</Text>
+            <Text style={styles.categoryTag}>Thème : {CATEGORY_LABEL[item.category]}</Text>
           </View>
         </View>
 
         <Text style={styles.cardTeaser}>{item.teaser}</Text>
+
+        {item.is_immediate && (
+          <Text style={styles.beliefScore}>
+            {belief === null
+              ? 'Personne n’a encore donné son avis.'
+              : `${belief}% y croient · ${100 - belief}% n’y croient pas`}
+          </Text>
+        )}
       </Pressable>
 
       {revealed && !isAuthor && !hasVoted && (
@@ -322,7 +332,7 @@ export function PredictionCard({
         <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
           <Ionicons
             name={commentsOpen ? 'chatbubble' : 'chatbubble-outline'}
-            size={16}
+            size={17}
             color={colors.textMuted}
           />
           <Text style={styles.commentsToggleText}>{commentCount ?? 0}</Text>
@@ -336,7 +346,7 @@ export function PredictionCard({
             {myEmoji ? (
               <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
             ) : (
-              <Ionicons name="thumbs-up-outline" size={16} color={colors.textFaint} />
+              <Ionicons name="thumbs-up-outline" size={17} color={colors.textFaint} />
             )}
             {totalReactions > 0 && <Text style={styles.reactionTriggerCount}>{totalReactions}</Text>}
           </View>
@@ -374,7 +384,7 @@ export function PredictionCard({
         <Pressable onPress={handleToggleFavorite} hitSlop={8}>
           <Ionicons
             name={isFavorite ? 'star' : 'star-outline'}
-            size={17}
+            size={18}
             color={isFavorite ? colors.gold : colors.textMuted}
           />
         </Pressable>
@@ -382,7 +392,7 @@ export function PredictionCard({
         <Pressable onPress={handleToggleHidden} hitSlop={8}>
           <Ionicons
             name={isHidden ? 'eye-off' : 'eye-off-outline'}
-            size={17}
+            size={18}
             color={isHidden ? colors.gold : colors.textMuted}
           />
         </Pressable>
@@ -452,6 +462,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     lineHeight: 26,
   },
+  beliefScore: { fontSize: 13, fontWeight: '700', color: colors.gold, marginTop: 8 },
   voteLink: { marginTop: 10 },
   voteLinkText: { fontSize: 13, fontWeight: '600', color: colors.gold },
   // Une seule « grande bulle », façon Facebook — flottante au-dessus du
@@ -499,6 +510,6 @@ const styles = StyleSheet.create({
   commentsToggleText: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
   reactionTriggerWrap: { position: 'relative' },
   reactionTrigger: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  reactionTriggerEmoji: { fontSize: 16 },
+  reactionTriggerEmoji: { fontSize: 17 },
   reactionTriggerCount: { fontSize: 11, fontWeight: '600', color: colors.textFaint },
 });

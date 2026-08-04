@@ -41,6 +41,11 @@ import {
 import { colors, fonts, radius, spacing } from '../../lib/theme';
 
 type ContentMode = 'text' | 'audio';
+/** `scheduled` : date fixée par l'auteur. `open_ended` : révélée quand
+ * l'auteur le déclenche depuis son écran. `immediate` : révélée dès la
+ * validation — le Cercle vote alors « j'y crois / j'y crois pas » plutôt que
+ * « réalisée / manquée », faute de rien à constater encore. */
+type RevealTiming = 'scheduled' | 'open_ended' | 'immediate';
 
 /** Contenu écrit à la place du texte quand la prédiction est uniquement vocale. */
 const AUDIO_PLACEHOLDER = '🎙️ Message vocal';
@@ -75,9 +80,7 @@ export default function NewPredictionScreen() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [hour, setHour] = useState<number | null>(12);
   const [minute, setMinute] = useState<number | null>(0);
-  // `true` : pas de date fixée, la prédiction ne se révèle que lorsque
-  // l'auteur le déclenche depuis son écran (bouton « Révéler maintenant »).
-  const [openEnded, setOpenEnded] = useState(false);
+  const [revealTiming, setRevealTiming] = useState<RevealTiming>('scheduled');
 
   const [category, setCategory] = useState<PredictionCategory>('autre');
   const [scope, setScope] = useState<PredictionScope>('circle');
@@ -131,20 +134,26 @@ export default function NewPredictionScreen() {
 
   // Repère technique lointain quand aucune date n'est fixée — jamais affiché
   // tel quel (cf. `computeOpenEndedRevealAt`) : seule la révélation manuelle
-  // compte pour une prédiction « ouverte ».
-  const revealAt = openEnded
-    ? computeOpenEndedRevealAt()
-    : selectedDate && hour !== null && minute !== null
-      ? new Date(
-          selectedDate.getFullYear(),
-          selectedDate.getMonth(),
-          selectedDate.getDate(),
-          hour,
-          minute,
-          0,
-          0
-        )
-      : null;
+  // compte pour une prédiction « ouverte ». Pour « immédiatement », la valeur
+  // exacte n'a pas d'importance : la base pose son propre `now()` de toute
+  // façon (voir `create_prediction`) — celle-ci ne sert qu'à satisfaire la
+  // validation locale.
+  const revealAt =
+    revealTiming === 'immediate'
+      ? new Date()
+      : revealTiming === 'open_ended'
+        ? computeOpenEndedRevealAt()
+        : selectedDate && hour !== null && minute !== null
+          ? new Date(
+              selectedDate.getFullYear(),
+              selectedDate.getMonth(),
+              selectedDate.getDate(),
+              hour,
+              minute,
+              0,
+              0
+            )
+          : null;
 
   function toggleFriend(id: string) {
     setSelectedFriendIds((prev) => {
@@ -169,11 +178,13 @@ export default function NewPredictionScreen() {
     } else if (!audioUri) {
       return 'Enregistre ton Predict avant de le sceller.';
     }
-    if (!revealAt) {
-      return 'Choisis la date de la révélation.';
-    }
-    if (revealAt.getTime() - Date.now() < MIN_REVEAL_DELAY_MS) {
-      return 'La révélation doit être au moins une minute après maintenant.';
+    if (revealTiming === 'scheduled') {
+      if (!revealAt) {
+        return 'Choisis la date de la révélation.';
+      }
+      if (revealAt.getTime() - Date.now() < MIN_REVEAL_DELAY_MS) {
+        return 'La révélation doit être au moins une minute après maintenant.';
+      }
     }
     if (scope === 'selected' && selectedFriendIds.size === 0) {
       return 'Choisis au moins un ami, ou passe sur « Mon Cercle ».';
@@ -217,7 +228,8 @@ export default function NewPredictionScreen() {
         friendIds: Array.from(selectedFriendIds),
         groupId: selectedGroupId,
         mentionedFriendIds,
-        openEnded,
+        openEnded: revealTiming === 'open_ended',
+        isImmediate: revealTiming === 'immediate',
         category,
       });
 
@@ -363,26 +375,42 @@ export default function NewPredictionScreen() {
 
           <View style={styles.scopeRow}>
             <Pressable
-              onPress={() => setOpenEnded(false)}
+              onPress={() => setRevealTiming('scheduled')}
               disabled={submitting}
-              style={[styles.scopeOption, !openEnded && styles.scopeOptionActive]}
+              style={[styles.scopeOption, revealTiming === 'scheduled' && styles.scopeOptionActive]}
             >
-              <Text style={[styles.scopeText, !openEnded && styles.scopeTextActive]}>Date fixe</Text>
+              <Text style={[styles.scopeText, revealTiming === 'scheduled' && styles.scopeTextActive]}>
+                Date fixe
+              </Text>
             </Pressable>
             <Pressable
-              onPress={() => setOpenEnded(true)}
+              onPress={() => setRevealTiming('open_ended')}
               disabled={submitting}
-              style={[styles.scopeOption, openEnded && styles.scopeOptionActive]}
+              style={[styles.scopeOption, revealTiming === 'open_ended' && styles.scopeOptionActive]}
             >
-              <Text style={[styles.scopeText, openEnded && styles.scopeTextActive]}>
+              <Text style={[styles.scopeText, revealTiming === 'open_ended' && styles.scopeTextActive]}>
                 Je déciderai plus tard
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setRevealTiming('immediate')}
+              disabled={submitting}
+              style={[styles.scopeOption, revealTiming === 'immediate' && styles.scopeOptionActive]}
+            >
+              <Text style={[styles.scopeText, revealTiming === 'immediate' && styles.scopeTextActive]}>
+                Immédiatement
               </Text>
             </Pressable>
           </View>
 
-          {openEnded ? (
+          {revealTiming === 'open_ended' ? (
             <Text style={[styles.sectionHint, styles.fieldSpacing]}>
               Tu pourras révéler ce <PredictWord /> quand tu veux, depuis son écran.
+            </Text>
+          ) : revealTiming === 'immediate' ? (
+            <Text style={[styles.sectionHint, styles.fieldSpacing]}>
+              Ce <PredictWord /> sera révélé dès la validation : ton Cercle pourra tout de suite dire
+              s’il y croit ou pas.
             </Text>
           ) : (
             <>
