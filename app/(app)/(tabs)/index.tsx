@@ -3,6 +3,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -39,6 +40,8 @@ type AuthorInfo = { username: string; avatar_url: string | null };
 type AuthorMap = Record<string, AuthorInfo>;
 type Tab = 'upcoming' | 'past';
 type SortOrder = 'recent' | 'oldest';
+type SortKey = 'default' | 'seal' | 'reveal';
+type MenuView = 'main' | 'author';
 
 /** Fil d'actualité — Archives a été fusionné ici, sous forme de deux onglets. */
 export default function HomeScreen() {
@@ -56,15 +59,25 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [tab, setTab] = useState<Tab>('upcoming');
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuView, setMenuView] = useState<MenuView>('main');
   const [authorFilter, setAuthorFilter] = useState<string | null>(null);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
-  // Par défaut (`false`), l'ordre de chaque onglet reste celui déjà établi
-  // (À venir par publication, Passées par date de révélation) — ce tri par
-  // date de scellé est une bascule optionnelle, pas un nouveau défaut.
-  const [sortBySealDate, setSortBySealDate] = useState(false);
+  // `'default'` : l'ordre de chaque onglet reste celui déjà établi (À venir
+  // par publication, Passées par date de révélation) — un tri par date de
+  // scellé ou de révélation est une bascule optionnelle, pas un nouveau défaut.
+  const [sortKey, setSortKey] = useState<SortKey>('default');
   const [sortOrder, setSortOrder] = useState<SortOrder>('recent');
   const [showHidden, setShowHidden] = useState(false);
+
+  function toggleSortKey(key: 'seal' | 'reveal') {
+    if (sortKey === key) {
+      setSortOrder((o) => (o === 'recent' ? 'oldest' : 'recent'));
+    } else {
+      setSortKey(key);
+      setSortOrder('recent');
+    }
+  }
 
   const userId = session?.user.id;
 
@@ -194,8 +207,12 @@ export default function HomeScreen() {
     .filter((item) => !favoritesOnly || item.is_favorite);
 
   const shown = [...filtered].sort((a, b) => {
-    if (sortBySealDate) {
+    if (sortKey === 'seal') {
       const diff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      return sortOrder === 'recent' ? diff : -diff;
+    }
+    if (sortKey === 'reveal') {
+      const diff = new Date(b.reveal_at).getTime() - new Date(a.reveal_at).getTime();
       return sortOrder === 'recent' ? diff : -diff;
     }
     // Défaut inchangé : À venir par ordre de publication, Passées par date de
@@ -251,80 +268,113 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
-      <Pressable onPress={() => setFiltersOpen((o) => !o)} style={styles.filtersToggle} hitSlop={4}>
-        <Text style={styles.filtersToggleText}>Filtres{filtersOpen ? ' ▲' : ' ▼'}</Text>
+      <Pressable
+        onPress={() => {
+          setMenuView('main');
+          setMenuOpen(true);
+        }}
+        style={styles.filtersToggle}
+        hitSlop={4}
+      >
+        <Ionicons name="options-outline" size={14} color={colors.textFaint} />
+        <Text style={styles.filtersToggleText}>Filtres</Text>
       </Pressable>
 
-      {filtersOpen && (
-        <View style={styles.filtersPanel}>
-          <Text style={styles.filterLabel}>Auteur</Text>
-          <View style={styles.filterChipsRow}>
-            <Pressable
-              onPress={() => setAuthorFilter(null)}
-              style={[styles.filterChip, authorFilter === null && styles.filterChipActive]}
-            >
-              <Text style={[styles.filterChipText, authorFilter === null && styles.filterChipTextActive]}>
-                Tous
-              </Text>
-            </Pressable>
-            {authorEntries.map((a) => (
-              <Pressable
-                key={a.id}
-                onPress={() => setAuthorFilter(a.id)}
-                style={[styles.filterChip, authorFilter === a.id && styles.filterChipActive]}
-              >
-                <Text style={[styles.filterChipText, authorFilter === a.id && styles.filterChipTextActive]}>
-                  {a.username}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+      <Modal
+        visible={menuOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuOpen(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setMenuOpen(false)}>
+          <Pressable style={styles.menuBox} onPress={() => {}}>
+            {menuView === 'main' ? (
+              <>
+                <Pressable onPress={() => setMenuView('author')} style={styles.menuRow}>
+                  <Text style={styles.menuRowText}>Auteur</Text>
+                  <View style={styles.menuRowRight}>
+                    <Text style={styles.menuRowValue} numberOfLines={1}>
+                      {authorFilter ? authors[authorFilter]?.username ?? '…' : 'Tous'}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+                  </View>
+                </Pressable>
 
-          <Text style={[styles.filterLabel, styles.filterSpacing]}>Date de scellé</Text>
-          <View style={styles.filterChipsRow}>
-            <Pressable
-              onPress={() => setSortBySealDate((o) => !o)}
-              style={[styles.filterChip, sortBySealDate && styles.filterChipActive]}
-            >
-              <Text style={[styles.filterChipText, sortBySealDate && styles.filterChipTextActive]}>
-                Trier par date de scellé
-              </Text>
-            </Pressable>
-            {sortBySealDate && (
-              <Pressable
-                onPress={() => setSortOrder((o) => (o === 'recent' ? 'oldest' : 'recent'))}
-                style={styles.filterChip}
-              >
-                <Text style={styles.filterChipText}>
-                  {sortOrder === 'recent' ? 'Plus récent d’abord' : 'Plus ancien d’abord'}
-                </Text>
-              </Pressable>
+                <Pressable onPress={() => toggleSortKey('seal')} style={styles.menuRow}>
+                  <Text style={[styles.menuRowText, sortKey === 'seal' && styles.menuRowTextActive]}>
+                    Par date de scellé
+                  </Text>
+                  {sortKey === 'seal' && (
+                    <Text style={styles.menuRowValue}>
+                      {sortOrder === 'recent' ? 'Plus récent' : 'Plus ancien'}
+                    </Text>
+                  )}
+                </Pressable>
+
+                <Pressable onPress={() => toggleSortKey('reveal')} style={styles.menuRow}>
+                  <Text style={[styles.menuRowText, sortKey === 'reveal' && styles.menuRowTextActive]}>
+                    Par date de révélation
+                  </Text>
+                  {sortKey === 'reveal' && (
+                    <Text style={styles.menuRowValue}>
+                      {sortOrder === 'recent' ? 'Plus récent' : 'Plus ancien'}
+                    </Text>
+                  )}
+                </Pressable>
+
+                <Pressable onPress={() => setFavoritesOnly((o) => !o)} style={styles.menuRow}>
+                  <Text style={[styles.menuRowText, favoritesOnly && styles.menuRowTextActive]}>
+                    ★ Favoris uniquement
+                  </Text>
+                </Pressable>
+
+                {hiddenCount > 0 && (
+                  <Pressable onPress={() => setShowHidden((o) => !o)} style={styles.menuRowLast}>
+                    <Text style={styles.menuRowText}>
+                      {showHidden
+                        ? 'Masquer à nouveau les masquées'
+                        : `${hiddenCount} masquée${hiddenCount > 1 ? 's' : ''} — afficher`}
+                    </Text>
+                  </Pressable>
+                )}
+              </>
+            ) : (
+              <>
+                <Pressable onPress={() => setMenuView('main')} style={styles.menuBack}>
+                  <Ionicons name="chevron-back" size={16} color={colors.gold} />
+                  <Text style={styles.menuBackText}>Auteur</Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => {
+                    setAuthorFilter(null);
+                    setMenuView('main');
+                  }}
+                  style={styles.menuRow}
+                >
+                  <Text style={[styles.menuRowText, authorFilter === null && styles.menuRowTextActive]}>
+                    Tous
+                  </Text>
+                </Pressable>
+                {authorEntries.map((a, i) => (
+                  <Pressable
+                    key={a.id}
+                    onPress={() => {
+                      setAuthorFilter(a.id);
+                      setMenuView('main');
+                    }}
+                    style={i === authorEntries.length - 1 ? styles.menuRowLast : styles.menuRow}
+                  >
+                    <Text style={[styles.menuRowText, authorFilter === a.id && styles.menuRowTextActive]}>
+                      {a.username}
+                    </Text>
+                  </Pressable>
+                ))}
+              </>
             )}
-          </View>
-
-          <Text style={[styles.filterLabel, styles.filterSpacing]}>Favoris</Text>
-          <View style={styles.filterChipsRow}>
-            <Pressable
-              onPress={() => setFavoritesOnly((o) => !o)}
-              style={[styles.filterChip, favoritesOnly && styles.filterChipActive]}
-            >
-              <Text style={[styles.filterChipText, favoritesOnly && styles.filterChipTextActive]}>
-                ★ Favoris uniquement
-              </Text>
-            </Pressable>
-          </View>
-
-          {hiddenCount > 0 && (
-            <Pressable onPress={() => setShowHidden((o) => !o)} style={styles.showHiddenLink}>
-              <Text style={styles.showHiddenLinkText}>
-                {showHidden
-                  ? 'Masquer à nouveau les prédictions masquées'
-                  : `${hiddenCount} prédiction${hiddenCount > 1 ? 's' : ''} masquée${hiddenCount > 1 ? 's' : ''} — afficher`}
-              </Text>
-            </Pressable>
-          )}
-        </View>
-      )}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -412,32 +462,63 @@ const styles = StyleSheet.create({
   tabActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
   tabText: { fontSize: 12, fontWeight: '700', letterSpacing: 1, color: colors.textMuted, textTransform: 'uppercase' },
   tabTextActive: { color: colors.gold },
-  filtersToggle: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, alignSelf: 'flex-start' },
-  filtersToggleText: { fontSize: 12, fontWeight: '700', color: colors.textFaint },
-  filtersPanel: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
-  filterLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    color: colors.textFaint,
-    marginBottom: 6,
+  filtersToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    alignSelf: 'flex-start',
   },
-  filterSpacing: { marginTop: spacing.md },
-  filterChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  filterChip: {
+  filtersToggleText: { fontSize: 12, fontWeight: '700', color: colors.textFaint },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  menuBox: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: 16,
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: colors.surface,
+    overflow: 'hidden',
   },
-  filterChipActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
-  filterChipText: { fontSize: 12, fontWeight: '600', color: colors.textMuted },
-  filterChipTextActive: { color: colors.gold },
-  showHiddenLink: { marginTop: spacing.md },
-  showHiddenLinkText: { fontSize: 12, fontWeight: '600', color: colors.gold },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    gap: 10,
+  },
+  menuRowLast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    gap: 10,
+  },
+  menuRowRight: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, maxWidth: '70%' },
+  menuRowText: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
+  menuRowTextActive: { color: colors.gold },
+  menuRowValue: { fontSize: 13, color: colors.textFaint, flexShrink: 1 },
+  menuBack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  menuBackText: { fontSize: 13, fontWeight: '700', color: colors.gold },
   scroll: { padding: spacing.lg, paddingBottom: 8, flexGrow: 1 },
   loader: { marginTop: 32 },
   empty: { paddingVertical: 24, alignItems: 'center' },

@@ -108,10 +108,10 @@ export async function fetchFriendships(userId: string) {
 }
 
 /**
- * Recherche de profils par pseudo, pour ajouter un ami. `excludeUserId` écarte
- * son propre profil des résultats.
+ * Recherche de profils par pseudo ou par numéro de téléphone, pour ajouter un
+ * ami. `excludeUserId` écarte son propre profil des résultats.
  */
-export async function searchProfilesByUsername(query: string, excludeUserId: string) {
+export async function searchProfiles(query: string, excludeUserId: string) {
   const trimmed = query.trim();
   if (!trimmed) {
     return { data: [] as FriendProfile[], error: null };
@@ -119,8 +119,8 @@ export async function searchProfilesByUsername(query: string, excludeUserId: str
 
   return supabase
     .from('profiles')
-    .select('id, username, avatar_url')
-    .ilike('username', `%${trimmed}%`)
+    .select('id, username, avatar_url, phone')
+    .or(`username.ilike.%${trimmed}%,phone.ilike.%${trimmed}%`)
     .neq('id', excludeUserId)
     .order('username', { ascending: true })
     .limit(10)

@@ -24,7 +24,7 @@ import {
   isMissingTable,
   otherProfile,
   removeFriendship,
-  searchProfilesByUsername,
+  searchProfiles,
   sendFriendRequest,
   type Friendship,
   type FriendProfile,
@@ -217,7 +217,7 @@ export default function CircleScreen() {
     }
     setSearching(true);
     const timer = setTimeout(async () => {
-      const { data } = await searchProfilesByUsername(trimmed, userId);
+      const { data } = await searchProfiles(trimmed, userId);
       setResults(data ?? []);
       setSearching(false);
     }, 300);
@@ -306,6 +306,7 @@ export default function CircleScreen() {
               value={query}
               onChangeText={setQuery}
               placeholder="Chercher un pseudo"
+              placeholderTextColor={colors.textFaint}
               autoCapitalize="none"
               autoCorrect={false}
               style={styles.input}
@@ -408,7 +409,7 @@ export default function CircleScreen() {
               accepted.map((f) => {
                 const profile = otherProfile(f, userId!);
                 return (
-                  <View key={f.id} style={styles.row}>
+                  <View key={f.id} style={styles.rowNoBorder}>
                     <Pressable
                       onPress={() => router.push(`/profile/${profile.id}`)}
                       style={styles.usernameRow}
@@ -643,6 +644,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+  },
+  rowNoBorder: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
   },
   username: { fontSize: 15, color: colors.text, fontWeight: '600' },
   usernameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
