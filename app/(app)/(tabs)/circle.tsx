@@ -16,7 +16,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
 import { CreateFab } from '../../../components/CreateFab';
-import { PredictWatermark } from '../../../components/PredictWatermark';
 import { useAuth } from '../../../lib/auth';
 import {
   acceptFriendRequest,
@@ -296,8 +295,6 @@ export default function CircleScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <PredictWatermark opacity={0.05} />
-
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Cercle</Text>
       </View>
@@ -678,22 +675,24 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: colors.text,
   },
+  // Trait sous le choix plutôt qu'un bouton de couleur — plus sobre, plus
+  // « presse ». Le trait actif reprend le jaune de marque.
   tabs: {
     flexDirection: 'row',
     marginHorizontal: spacing.lg,
     marginTop: spacing.md,
-    backgroundColor: 'rgba(30, 30, 36, 0.05)',
-    borderRadius: radius.pill,
-    padding: 4,
-    gap: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   tab: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 12,
     alignItems: 'center',
-    borderRadius: radius.pill,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+    marginBottom: -1,
   },
-  tabActive: { backgroundColor: colors.gold },
+  tabActive: { borderBottomColor: colors.gold },
   tabText: {
     fontFamily: fonts.sansBold,
     fontSize: 12,
@@ -701,7 +700,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textTransform: 'uppercase',
   },
-  // Texte noir sur le fond jaune de l'onglet actif — du blanc y serait peu lisible.
   tabTextActive: { color: colors.text },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   sectionLabel: { marginTop: spacing.lg, marginBottom: 8 },
@@ -777,7 +775,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  visibilityOptionActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
+  visibilityOptionActive: { borderWidth: 2, borderColor: colors.gold },
   visibilityText: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
   visibilityTextActive: { color: colors.text },
   visibilityHint: { fontSize: 12, color: colors.textFaint, marginTop: 6 },

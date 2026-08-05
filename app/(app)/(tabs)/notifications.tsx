@@ -15,7 +15,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
 import { CreateFab } from '../../../components/CreateFab';
-import { PredictWatermark } from '../../../components/PredictWatermark';
 import { PredictWord } from '../../../components/PredictWord';
 import { useAuth } from '../../../lib/auth';
 import { formatTimeAgo } from '../../../lib/datetime';
@@ -216,8 +215,6 @@ export default function NotificationsScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <PredictWatermark opacity={0.05} />
-
       <View style={styles.header}>
         {selectedIds.size > 0 ? (
           <>
@@ -408,7 +405,7 @@ const styles = StyleSheet.create({
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
   authorName: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
   teaser: {
-    fontFamily: fonts.serifSemiBold,
+    fontFamily: fonts.sansBold,
     fontSize: 16,
     color: colors.text,
     marginTop: 4,

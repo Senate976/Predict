@@ -637,7 +637,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.surface,
   },
-  scopeOptionActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
+  // Blanc, liseré jaune pour marquer le choix — pas de fond de couleur.
+  scopeOptionActive: { borderWidth: 2, borderColor: colors.gold },
   scopeText: { fontSize: 13, fontWeight: '600', color: colors.textMuted, textAlign: 'center' },
   scopeTextActive: { color: colors.text },
   friendsBox: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: spacing.md },
@@ -653,7 +654,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     backgroundColor: colors.surface,
   },
-  friendChipActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
+  friendChipActive: { borderWidth: 2, borderColor: colors.gold },
   friendChipText: { fontSize: 13, color: colors.textMuted, fontWeight: '600' },
   friendChipTextActive: { color: colors.text },
   error: {

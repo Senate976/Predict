@@ -13,7 +13,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
 import { CreateFab } from '../../../components/CreateFab';
-import { PredictWatermark } from '../../../components/PredictWatermark';
 import { PredictWord } from '../../../components/PredictWord';
 import { PrediscoreGauge } from '../../../components/PrediscoreGauge';
 import { pickAvatarImage, removeAvatar, uploadAvatar } from '../../../lib/avatar';
@@ -144,8 +143,6 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <PredictWatermark opacity={0.05} />
-
       <View style={styles.header}>
         <Text style={styles.brand}>Profil</Text>
       </View>
@@ -379,7 +376,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: 'center',
   },
-  statCardActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
+  statCardActive: { borderWidth: 2, borderColor: colors.gold },
   // Pas de code couleur réalisé/manqué : seul le libellé sous le nombre
   // porte le sens, conformément à la palette stricte noir/blanc/jaune.
   statValue: { fontFamily: fonts.display, fontSize: 26, color: colors.text },
@@ -406,7 +403,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  historyTeaser: { fontFamily: fonts.serifSemiBold, fontSize: 17, color: colors.text },
+  historyTeaser: { fontFamily: fonts.sansBold, fontSize: 17, color: colors.text },
   historyMeta: { fontSize: 12, color: colors.textFaint, marginTop: 4 },
   error: {
     color: colors.danger,

@@ -25,14 +25,16 @@ import {
   type EmojiReaction,
   type PredictionFeedItem,
 } from '../lib/predictions';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors, fonts, radius } from '../lib/theme';
 import { Avatar } from './Avatar';
 import { InlineComments } from './InlineComments';
 import { PredictWord } from './PredictWord';
 
-/** Largeur fixe de la bulle de réactions — nécessaire pour la centrer
- * précisément au-dessus du pouce via `marginLeft: -largeur/2`. */
+/** Largeur fixe de la bulle de réactions, ancrée par son bord droit sur le pouce. */
 const EMOJI_PANEL_WIDTH = 260;
+/** Diamètre du curseur de la jauge de confiance. */
+const CONFIDENCE_CURSOR_SIZE = 10;
 
 /**
  * Carte d'une prédiction, partagée entre les onglets À venir et Passées du
@@ -296,23 +298,30 @@ export function PredictionCard({
 
           <View style={styles.headerSpacer} />
 
-          {!verdict && !revealed && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>
-                {item.open_ended ? 'Quand l’auteur le décide' : formatCountdown(revealAt, now)}
-              </Text>
-            </View>
-          )}
-          {verdict && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{verdict === 'realized' ? 'Réalisé' : 'Manqué'}</Text>
-            </View>
-          )}
-
           <Pressable onPress={() => setMenuOpen(true)} style={styles.menuButton} hitSlop={8}>
             <MoreHorizontal size={18} color={colors.textFaint} strokeWidth={1.75} />
           </Pressable>
         </View>
+
+        {/* Sur sa propre ligne, sous le pseudo — pour que celui-ci s'affiche
+            toujours en entier (y compris « Réalisé »/« Manqué »), sans
+            grossir l'étiquette elle-même. */}
+        {!verdict && !revealed && (
+          <View style={styles.badgeRow}>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {item.open_ended ? 'En temps voulu' : formatCountdown(revealAt, now)}
+              </Text>
+            </View>
+          </View>
+        )}
+        {verdict && (
+          <View style={styles.badgeRow}>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{verdict === 'realized' ? 'Réalisé' : 'Manqué'}</Text>
+            </View>
+          </View>
+        )}
 
         <Text style={styles.cardTeaser}>{item.teaser}</Text>
 
@@ -322,11 +331,24 @@ export function PredictionCard({
               <Text style={styles.beliefScore}>Personne n’a encore donné son avis.</Text>
             ) : (
               <>
-                <View style={styles.confidenceBar}>
-                  <View style={[styles.confidenceFillBelieve, { flex: belief }]} />
-                  <View style={[styles.confidenceFillDisbelieve, { flex: 100 - belief }]} />
+                <View style={styles.confidenceLabelRow}>
+                  <Text style={styles.confidenceLabel}>Confiance</Text>
+                  <Text style={styles.confidenceValue}>{belief}%</Text>
                 </View>
-                <Text style={styles.confidenceLabel}>{belief}% y croient</Text>
+                <View style={styles.confidenceTrack}>
+                  <LinearGradient
+                    colors={[colors.text, colors.gold]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.confidenceGradient}
+                  />
+                  <View
+                    style={[
+                      styles.confidenceCursor,
+                      { left: `${belief}%`, marginLeft: -CONFIDENCE_CURSOR_SIZE / 2 },
+                    ]}
+                  />
+                </View>
               </>
             )}
           </View>
@@ -460,12 +482,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   // Une seule ligne : [avatar][pseudo] ...espace flexible... [badge délai] [menu].
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
   headerSpacer: { flex: 1, minWidth: 8 },
-  authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, maxWidth: '55%' },
+  // Plus de plafond à 55% : sur sa propre ligne face au seul bouton « ... »,
+  // le pseudo (et la citation éventuelle) peut s'afficher en entier.
+  authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
   authorName: { fontSize: 14, fontWeight: '500', color: colors.text, flexShrink: 1 },
   mentionTag: { fontSize: 12, fontWeight: '500', color: colors.textMuted, flexShrink: 1 },
   menuButton: { padding: 2 },
+  badgeRow: { alignItems: 'flex-start', marginBottom: 10 },
   // Un seul traitement pour tous les badges d'état (délai, réalisé, manqué) :
   // fond jaune très clair, texte noir — pas de distinction de couleur entre
   // eux, le libellé porte le sens.
@@ -483,19 +508,24 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   beliefScore: { fontSize: 13, fontWeight: '700', color: colors.text, marginTop: 8 },
-  // Jauge de vote sobre : une fine ligne noire/jaune plutôt qu'une barre
-  // épaisse, avec le pourcentage en texte discret en dessous.
+  // « Confiance » : dégradé noir → jaune, comme le Prediscore, mais en
+  // format réduit pour ne pas grossir l'étiquette de la carte. Le curseur
+  // marque le pourcentage plutôt qu'un remplissage bicolore.
   confidenceBlock: { marginTop: 10 },
-  confidenceBar: {
-    flexDirection: 'row',
-    height: 3,
-    borderRadius: radius.pill,
-    overflow: 'hidden',
-    backgroundColor: colors.border,
+  confidenceLabelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  confidenceLabel: { fontSize: 11, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  confidenceValue: { fontSize: 12, fontWeight: '800', color: colors.text },
+  confidenceTrack: { height: CONFIDENCE_CURSOR_SIZE, justifyContent: 'center' },
+  confidenceGradient: { height: 3, borderRadius: radius.pill },
+  confidenceCursor: {
+    position: 'absolute',
+    width: CONFIDENCE_CURSOR_SIZE,
+    height: CONFIDENCE_CURSOR_SIZE,
+    borderRadius: CONFIDENCE_CURSOR_SIZE / 2,
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: colors.text,
   },
-  confidenceFillBelieve: { backgroundColor: colors.text },
-  confidenceFillDisbelieve: { backgroundColor: colors.gold },
-  confidenceLabel: { fontSize: 12, color: colors.textMuted, marginTop: 5 },
   voteLink: { marginTop: 10 },
   voteLinkText: { fontSize: 13, fontWeight: '600', color: colors.text, textDecorationLine: 'underline' },
   modalOverlay: {
@@ -526,11 +556,13 @@ const styles = StyleSheet.create({
   // Une seule « grande bulle », façon Facebook — flottante au-dessus du
   // pouce (pas en dessous) pour ne pas être masquée par le doigt qui la
   // fait glisser, et pas des puces séparées.
+  // Ancrée par son bord droit sur le pouce (plutôt que centrée) : le pouce
+  // est proche du bord droit de la carte, une bulle centrée débordait hors
+  // de l'écran.
   emojiPanel: {
     position: 'absolute',
     bottom: '100%',
-    left: '50%',
-    marginLeft: -EMOJI_PANEL_WIDTH / 2,
+    right: 0,
     marginBottom: 10,
     width: EMOJI_PANEL_WIDTH,
     zIndex: 20,
