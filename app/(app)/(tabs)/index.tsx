@@ -17,6 +17,7 @@ import { Avatar } from '../../../components/Avatar';
 import { CelebrationBurst } from '../../../components/CelebrationBurst';
 import { PredictionCard } from '../../../components/PredictionCard';
 import { PredictWord } from '../../../components/PredictWord';
+import { ScreenBackground } from '../../../components/ScreenBackground';
 import { WelcomeOnboarding } from '../../../components/WelcomeOnboarding';
 import { useAuth } from '../../../lib/auth';
 import { fetchNotifications, markNotificationRead } from '../../../lib/notifications';
@@ -245,6 +246,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <ScreenBackground />
       <WelcomeOnboarding visible={onboarded === false} onStart={handleStartFirstPrediction} />
 
       <CelebrationBurst
@@ -273,7 +275,7 @@ export default function HomeScreen() {
           <Text style={[styles.tabText, tab === 'upcoming' && styles.tabTextActive]}>À venir</Text>
         </Pressable>
         <Pressable onPress={() => setTab('past')} style={[styles.tab, tab === 'past' && styles.tabActive]}>
-          <Text style={[styles.tabText, tab === 'past' && styles.tabTextActive]}>Passées</Text>
+          <Text style={[styles.tabText, tab === 'past' && styles.tabTextActive]}>Révélées</Text>
         </Pressable>
       </View>
 
