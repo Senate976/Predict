@@ -8,15 +8,15 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from 'react-native';
+import { Text } from '../../../components/Text';
+import { TextInput } from '../../../components/TextInput';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
+import { CreateFab } from '../../../components/CreateFab';
 import { PredictWatermark } from '../../../components/PredictWatermark';
-import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { useAuth } from '../../../lib/auth';
 import {
   acceptFriendRequest,
@@ -300,7 +300,6 @@ export default function CircleScreen() {
 
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Cercle</Text>
-        <QuickCreateButton />
       </View>
 
       <View style={styles.tabs}>
@@ -655,6 +654,8 @@ export default function CircleScreen() {
           </>
         )}
       </ScrollView>
+
+      <CreateFab />
     </SafeAreaView>
   );
 }

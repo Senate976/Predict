@@ -1,5 +1,6 @@
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from './Text';
 
 import { colors, fonts } from '../lib/theme';
 

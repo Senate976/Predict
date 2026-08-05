@@ -1,5 +1,5 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
+import { Bell, CircleUserRound, Star, Users } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
 
@@ -48,7 +48,7 @@ export default function TabsLayout() {
         options={{
           title: 'Fil',
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'star' : 'star-outline'} size={size} color={color} />
+            <Star size={size} color={color} strokeWidth={focused ? 2 : 1.5} />
           ),
         }}
       />
@@ -61,7 +61,7 @@ export default function TabsLayout() {
           tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
           tabBarBadgeStyle: styles.badge,
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'notifications' : 'notifications-outline'} size={size} color={color} />
+            <Bell size={size} color={color} strokeWidth={focused ? 2 : 1.5} />
           ),
         }}
       />
@@ -70,7 +70,7 @@ export default function TabsLayout() {
         options={{
           title: 'Cercle',
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'people' : 'people-outline'} size={size} color={color} />
+            <Users size={size} color={color} strokeWidth={focused ? 2 : 1.5} />
           ),
         }}
       />
@@ -79,7 +79,7 @@ export default function TabsLayout() {
         options={{
           title: 'Profil',
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'person-circle' : 'person-circle-outline'} size={size} color={color} />
+            <CircleUserRound size={size} color={color} strokeWidth={focused ? 2 : 1.5} />
           ),
         }}
       />

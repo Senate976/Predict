@@ -8,7 +8,8 @@ import {
   useAudioRecorderState,
 } from 'expo-audio';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from './Text';
 
 import { colors, radius } from '../lib/theme';
 import { PredictWord } from './PredictWord';

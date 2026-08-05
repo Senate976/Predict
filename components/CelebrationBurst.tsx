@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, type ReactNode } from 'react';
-import { Animated, Dimensions, Modal, StyleSheet, Text, View } from 'react-native';
+import { Animated, Dimensions, Modal, StyleSheet, View } from 'react-native';
+import { Text } from './Text';
 
 import { colors, fonts, radius } from '../lib/theme';
 import { PredictWord } from './PredictWord';

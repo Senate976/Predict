@@ -7,16 +7,16 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '../../../components/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AudioPlayerButton } from '../../../components/AudioPlayerButton';
 import { Avatar } from '../../../components/Avatar';
+import { CreateFab } from '../../../components/CreateFab';
 import { InlineComments } from '../../../components/InlineComments';
 import { PredictWord } from '../../../components/PredictWord';
-import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { useAuth } from '../../../lib/auth';
 import { formatAdvance, formatShortDateTime } from '../../../lib/datetime';
 import { fetchFriendships, otherProfile, type FriendProfile } from '../../../lib/friends';
@@ -232,7 +232,7 @@ export default function PredictionDetailScreen() {
         <Text style={styles.headerTitle}>
           <PredictWord />
         </Text>
-        <QuickCreateButton />
+        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -472,6 +472,8 @@ export default function PredictionDetailScreen() {
           </>
         ) : null}
       </ScrollView>
+
+      <CreateFab />
     </SafeAreaView>
   );
 }
@@ -495,6 +497,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   back: { fontSize: 15, color: colors.gold, width: 56 },
+  headerSpacer: { width: 56 },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   loader: { marginTop: 24 },
   eyebrow: { ...eyebrow },

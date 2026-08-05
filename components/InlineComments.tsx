@@ -1,7 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { Trash2, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from './Text';
+import { TextInput } from './TextInput';
 
 import {
   addComment,
@@ -149,7 +151,7 @@ export function InlineComments({
                     </Pressable>
                     {canDelete && (
                       <Pressable onPress={() => handleDelete(comment.id)} hitSlop={8}>
-                        <Ionicons name="trash-outline" size={14} color={colors.textFaint} />
+                        <Trash2 size={14} color={colors.textFaint} strokeWidth={1.75} />
                       </Pressable>
                     )}
                   </View>
@@ -192,7 +194,7 @@ export function InlineComments({
             Réponse à {replyingTo.username} : « {replyingTo.preview} »
           </Text>
           <Pressable onPress={() => setReplyingTo(null)} hitSlop={8}>
-            <Ionicons name="close" size={14} color={colors.textFaint} />
+            <X size={14} color={colors.textFaint} strokeWidth={1.75} />
           </Pressable>
         </View>
       )}

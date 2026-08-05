@@ -7,10 +7,10 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from 'react-native';
+import { Text } from '../../components/Text';
+import { TextInput } from '../../components/TextInput';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PredictWord } from '../../components/PredictWord';

@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
@@ -7,16 +6,16 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '../../../components/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
+import { CreateFab } from '../../../components/CreateFab';
 import { PredictWatermark } from '../../../components/PredictWatermark';
 import { PredictWord } from '../../../components/PredictWord';
 import { PrediscoreGauge } from '../../../components/PrediscoreGauge';
-import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { pickAvatarImage, removeAvatar, uploadAvatar } from '../../../lib/avatar';
 import { useAuth } from '../../../lib/auth';
 import { formatRevealAt } from '../../../lib/datetime';
@@ -149,7 +148,6 @@ export default function ProfileScreen() {
 
       <View style={styles.header}>
         <Text style={styles.brand}>Profil</Text>
-        <QuickCreateButton />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -288,6 +286,8 @@ export default function ProfileScreen() {
           </>
         )}
       </ScrollView>
+
+      <CreateFab />
     </SafeAreaView>
   );
 }

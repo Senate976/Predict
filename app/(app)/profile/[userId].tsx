@@ -7,16 +7,16 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '../../../components/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
+import { CreateFab } from '../../../components/CreateFab';
 import { PredictWatermark } from '../../../components/PredictWatermark';
 import { PredictWord } from '../../../components/PredictWord';
 import { PrediscoreGauge } from '../../../components/PrediscoreGauge';
-import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { fetchProfileById, type FriendProfile } from '../../../lib/friends';
 import {
   fetchPredictionStats,
@@ -87,7 +87,7 @@ export default function FriendProfileScreen() {
           <Text style={styles.back}>Retour</Text>
         </Pressable>
         <Text style={styles.headerTitle}>Profil</Text>
-        <QuickCreateButton />
+        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -168,6 +168,8 @@ export default function FriendProfileScreen() {
           )}
         </Pressable>
       </Modal>
+
+      <CreateFab />
     </SafeAreaView>
   );
 }
@@ -191,6 +193,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   back: { fontSize: 15, color: colors.gold, width: 56 },
+  headerSpacer: { width: 56 },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   loader: { marginTop: 24 },
   eyebrow: { ...eyebrow },

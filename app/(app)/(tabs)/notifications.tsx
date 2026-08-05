@@ -1,5 +1,5 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { Check, Trash2 } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -8,15 +8,15 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '../../../components/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
+import { CreateFab } from '../../../components/CreateFab';
 import { PredictWatermark } from '../../../components/PredictWatermark';
 import { PredictWord } from '../../../components/PredictWord';
-import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { useAuth } from '../../../lib/auth';
 import { formatTimeAgo } from '../../../lib/datetime';
 import {
@@ -228,14 +228,11 @@ export default function NotificationsScreen() {
               {selectedIds.size} sélectionnée{selectedIds.size > 1 ? 's' : ''}
             </Text>
             <Pressable onPress={handleBulkDelete} hitSlop={8}>
-              <Ionicons name="trash-outline" size={22} color={colors.danger} />
+              <Trash2 size={22} color={colors.danger} strokeWidth={1.75} />
             </Pressable>
           </>
         ) : (
-          <>
-            <Text style={styles.headerTitle}>Notifications</Text>
-            <QuickCreateButton />
-          </>
+          <Text style={styles.headerTitle}>Notifications</Text>
         )}
       </View>
 
@@ -273,7 +270,7 @@ export default function NotificationsScreen() {
               >
                 {selecting ? (
                   <View style={[styles.checkbox, selected && styles.checkboxChecked]}>
-                    {selected && <Ionicons name="checkmark" size={12} color={colors.background} />}
+                    {selected && <Check size={12} color={colors.background} strokeWidth={2.5} />}
                   </View>
                 ) : (
                   !notification.is_read && <View style={styles.dot} />
@@ -333,7 +330,7 @@ export default function NotificationsScreen() {
                     hitSlop={8}
                     style={styles.deleteButton}
                   >
-                    <Ionicons name="trash-outline" size={15} color={colors.textFaint} />
+                    <Trash2 size={15} color={colors.textFaint} strokeWidth={1.75} />
                   </Pressable>
                 )}
               </Pressable>
@@ -341,6 +338,8 @@ export default function NotificationsScreen() {
           })
         )}
       </ScrollView>
+
+      <CreateFab />
     </SafeAreaView>
   );
 }

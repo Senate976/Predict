@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from './Text';
 
 import { MONTHS } from '../lib/datetime';
 import { colors, fonts, radius } from '../lib/theme';

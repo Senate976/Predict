@@ -1,5 +1,5 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { ChevronLeft, ChevronRight, SlidersHorizontal, XCircle } from 'lucide-react-native';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -8,13 +8,14 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '../../../components/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
 import { CelebrationBurst } from '../../../components/CelebrationBurst';
+import { CreateFab } from '../../../components/CreateFab';
 import { PredictionCard } from '../../../components/PredictionCard';
 import { PredictWord } from '../../../components/PredictWord';
 import { WelcomeOnboarding } from '../../../components/WelcomeOnboarding';
@@ -286,7 +287,7 @@ export default function HomeScreen() {
           style={[styles.filtersToggle, hasActiveFilters && styles.filtersToggleActive]}
           hitSlop={4}
         >
-          <Ionicons name="options-outline" size={14} color={hasActiveFilters ? colors.gold : colors.textFaint} />
+          <SlidersHorizontal size={14} color={hasActiveFilters ? colors.gold : colors.textFaint} strokeWidth={1.75} />
           <Text style={[styles.filtersToggleText, hasActiveFilters && styles.filtersToggleTextActive]}>
             Filtres
           </Text>
@@ -294,7 +295,7 @@ export default function HomeScreen() {
 
         {hasActiveFilters && (
           <Pressable onPress={resetFilters} style={styles.filtersReset} hitSlop={4}>
-            <Ionicons name="close-circle" size={14} color={colors.textFaint} />
+            <XCircle size={14} color={colors.textFaint} strokeWidth={1.75} />
             <Text style={styles.filtersResetText}>Réinitialiser</Text>
           </Pressable>
         )}
@@ -316,7 +317,7 @@ export default function HomeScreen() {
                     <Text style={styles.menuRowValue} numberOfLines={1}>
                       {authorFilter ? authors[authorFilter]?.username ?? '…' : 'Tous'}
                     </Text>
-                    <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+                    <ChevronRight size={16} color={colors.textFaint} strokeWidth={1.75} />
                   </View>
                 </Pressable>
 
@@ -379,7 +380,7 @@ export default function HomeScreen() {
             ) : (
               <>
                 <Pressable onPress={() => setMenuView('main')} style={styles.menuBack}>
-                  <Ionicons name="chevron-back" size={16} color={colors.gold} />
+                  <ChevronLeft size={16} color={colors.gold} strokeWidth={1.75} />
                   <Text style={styles.menuBackText}>Auteur</Text>
                 </Pressable>
 
@@ -463,12 +464,7 @@ export default function HomeScreen() {
         )}
       </ScrollView>
 
-      <Pressable
-        onPress={() => router.push('/new-prediction')}
-        style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
-      >
-        <Ionicons name="add" size={28} color="#FFFFFF" />
-      </Pressable>
+      <CreateFab />
     </SafeAreaView>
   );
 }
@@ -604,23 +600,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 12,
   },
-  // Bouton flottant (FAB) : action principale de l'écran, doit rester
-  // visible et contrastée par-dessus le fil qui défile dessous.
-  fab: {
-    position: 'absolute',
-    bottom: 24,
-    right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.gold,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  fabPressed: { backgroundColor: colors.goldBright },
 });

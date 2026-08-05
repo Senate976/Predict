@@ -8,8 +8,8 @@ export const colors = {
   surface: '#FFFFFF',
   surfaceRaised: '#FFFFFF',
   border: '#E5E7EB',
-  text: '#1A1A1A',
-  textMuted: '#6C757D',
+  text: '#111827',
+  textMuted: '#4B5563',
   textFaint: '#9CA3AF',
   gold: '#AD8A3E',
   goldBright: '#C7A458',
@@ -18,6 +18,10 @@ export const colors = {
   dangerSoft: 'rgba(162, 59, 54, 0.10)',
   success: '#3C6E52',
   successSoft: 'rgba(60, 110, 82, 0.10)',
+  // Fond/texte neutres des petits badges d'info (délai avant révélation...) —
+  // le doré/beige y était illisible faute de contraste suffisant.
+  badgeNeutral: '#F3F4F6',
+  badgeNeutralText: '#374151',
   // Réservées au sceau de cire (components/PredictionSeal.tsx).
   wax: '#7A2331',
   waxDark: '#5C1A25',
@@ -26,7 +30,9 @@ export const colors = {
   navBar: '#FFFFFF',
   navBarBorder: '#E5E7EB',
   navBarActive: '#AD8A3E',
-  navBarInactive: '#6C757D',
+  navBarInactive: '#4B5563',
+  // Bouton d'action flottant (FAB), unique et standardisé sur tout l'app.
+  fab: '#09090B',
 } as const;
 
 export const radius = {
