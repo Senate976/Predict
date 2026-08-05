@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from './Text';
 
 import { colors, fonts, radius } from '../lib/theme';
 
@@ -115,7 +116,7 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   sheetTitle: {
-    fontFamily: fonts.serifItalic,
+    fontFamily: fonts.sansBold,
     fontSize: 20,
     color: colors.text,
     textAlign: 'center',
@@ -130,5 +131,5 @@ const styles = StyleSheet.create({
   },
   optionActive: { backgroundColor: colors.goldSoft },
   optionText: { fontSize: 15, color: colors.text },
-  optionTextActive: { color: colors.gold, fontWeight: '700' },
+  optionTextActive: { color: colors.text, fontWeight: '700' },
 });

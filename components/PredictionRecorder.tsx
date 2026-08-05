@@ -8,7 +8,8 @@ import {
   useAudioRecorderState,
 } from 'expo-audio';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from './Text';
 
 import { colors, radius } from '../lib/theme';
 import { PredictWord } from './PredictWord';
@@ -120,7 +121,7 @@ const styles = StyleSheet.create({
   dot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.danger },
   dotSquare: { borderRadius: 3 },
   playButton: { alignSelf: 'flex-start' },
-  playButtonText: { fontSize: 15, fontWeight: '600', color: colors.gold },
+  playButtonText: { fontSize: 15, fontWeight: '600', color: colors.text, textDecorationLine: 'underline' },
   duration: { fontSize: 13, color: colors.textFaint, marginTop: 8 },
   resetButton: { marginTop: 10, alignSelf: 'flex-start' },
   resetButtonText: { fontSize: 13, color: colors.textMuted, fontWeight: '600' },

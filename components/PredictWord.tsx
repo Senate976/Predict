@@ -1,4 +1,4 @@
-import { Text } from 'react-native';
+import { Text } from './Text';
 
 /**
  * Rendu unifié du mot « Predict » dans l'UI : toujours avec une majuscule, et

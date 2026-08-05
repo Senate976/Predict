@@ -8,15 +8,15 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from 'react-native';
+import { Text } from '../../../components/Text';
+import { TextInput } from '../../../components/TextInput';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
+import { CreateFab } from '../../../components/CreateFab';
 import { PredictWatermark } from '../../../components/PredictWatermark';
-import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { useAuth } from '../../../lib/auth';
 import {
   acceptFriendRequest,
@@ -300,7 +300,6 @@ export default function CircleScreen() {
 
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Cercle</Text>
-        <QuickCreateButton />
       </View>
 
       <View style={styles.tabs}>
@@ -335,7 +334,7 @@ export default function CircleScreen() {
               style={styles.input}
             />
 
-            {searching && <ActivityIndicator style={styles.searchLoader} color={colors.gold} />}
+            {searching && <ActivityIndicator style={styles.searchLoader} color={colors.text} />}
 
             {results && results.length === 0 && !searching && (
               <Text style={styles.muted}>Aucun pseudo ne correspond.</Text>
@@ -423,7 +422,7 @@ export default function CircleScreen() {
               Mes amis {accepted.length > 0 ? `(${accepted.length})` : ''}
             </Text>
             {friendships === null && !loadError ? (
-              <ActivityIndicator style={styles.searchLoader} color={colors.gold} />
+              <ActivityIndicator style={styles.searchLoader} color={colors.text} />
             ) : accepted.length === 0 ? (
               <Text style={styles.muted}>
                 Pas encore d’ami. Cherche un pseudo ci-dessus pour envoyer une demande.
@@ -510,7 +509,7 @@ export default function CircleScreen() {
             {groupError && <Text style={styles.error}>{groupError}</Text>}
 
             {groups === null ? (
-              <ActivityIndicator style={styles.searchLoader} color={colors.gold} />
+              <ActivityIndicator style={styles.searchLoader} color={colors.text} />
             ) : groups.length === 0 ? (
               <Text style={styles.muted}>Aucun groupe pour l’instant.</Text>
             ) : (
@@ -602,7 +601,7 @@ export default function CircleScreen() {
                             (m) => m.status === 'accepted' && !myFriendIds.has(m.friend_id)
                           );
                           if (members === undefined) {
-                            return <ActivityIndicator style={styles.searchLoader} color={colors.gold} />;
+                            return <ActivityIndicator style={styles.searchLoader} color={colors.text} />;
                           }
                           if (others.length === 0) return null;
                           return (
@@ -655,6 +654,8 @@ export default function CircleScreen() {
           </>
         )}
       </ScrollView>
+
+      <CreateFab />
     </SafeAreaView>
   );
 }
@@ -675,26 +676,32 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontFamily: fonts.display,
     fontSize: 24,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
     color: colors.text,
   },
   tabs: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    backgroundColor: 'rgba(30, 30, 36, 0.05)',
+    borderRadius: radius.pill,
+    padding: 4,
+    gap: 4,
   },
   tab: {
     flex: 1,
     paddingVertical: 10,
     alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
+    borderRadius: radius.pill,
   },
-  tabActive: { borderBottomColor: colors.gold },
-  tabText: { fontSize: 12, fontWeight: '700', letterSpacing: 1, color: colors.textFaint, textTransform: 'uppercase' },
+  tabActive: { backgroundColor: colors.gold },
+  tabText: {
+    fontFamily: fonts.sansBold,
+    fontSize: 12,
+    letterSpacing: 0.5,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+  },
+  // Texte noir sur le fond jaune de l'onglet actif — du blanc y serait peu lisible.
   tabTextActive: { color: colors.text },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   sectionLabel: { marginTop: spacing.lg, marginBottom: 8 },
@@ -728,7 +735,7 @@ const styles = StyleSheet.create({
   },
   username: { fontSize: 15, color: colors.text, fontWeight: '600' },
   usernameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  groupScore: { fontSize: 13, fontWeight: '700', color: colors.gold },
+  groupScore: { fontSize: 13, fontWeight: '700', color: colors.text },
   actions: { flexDirection: 'row', gap: 8 },
   pillGold: {
     backgroundColor: colors.gold,
@@ -772,7 +779,7 @@ const styles = StyleSheet.create({
   },
   visibilityOptionActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
   visibilityText: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
-  visibilityTextActive: { color: colors.gold },
+  visibilityTextActive: { color: colors.text },
   visibilityHint: { fontSize: 12, color: colors.textFaint, marginTop: 6 },
   groupMeta: { fontSize: 11, color: colors.textFaint, marginTop: 2 },
   groupBox: {

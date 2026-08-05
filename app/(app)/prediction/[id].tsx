@@ -7,22 +7,23 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '../../../components/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AudioPlayerButton } from '../../../components/AudioPlayerButton';
 import { Avatar } from '../../../components/Avatar';
+import { CreateFab } from '../../../components/CreateFab';
 import { InlineComments } from '../../../components/InlineComments';
 import { PredictWord } from '../../../components/PredictWord';
-import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { useAuth } from '../../../lib/auth';
 import { formatAdvance, formatShortDateTime } from '../../../lib/datetime';
 import { fetchFriendships, otherProfile, type FriendProfile } from '../../../lib/friends';
 import {
   addRecipient,
   beliefPercentage,
+  CATEGORY_LABEL,
   fetchPrediction,
   fetchPredictionOutcome,
   fetchPredictionRecipients,
@@ -232,14 +233,14 @@ export default function PredictionDetailScreen() {
         <Text style={styles.headerTitle}>
           <PredictWord />
         </Text>
-        <QuickCreateButton />
+        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
         {error && <Text style={styles.error}>{error}</Text>}
 
         {!prediction && !error ? (
-          <ActivityIndicator color={colors.gold} style={styles.loader} />
+          <ActivityIndicator color={colors.text} style={styles.loader} />
         ) : prediction ? (
           <>
             {author && (
@@ -252,6 +253,10 @@ export default function PredictionDetailScreen() {
                 <Text style={styles.authorName}>{author.username}</Text>
               </Pressable>
             )}
+
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryBadgeText}>{CATEGORY_LABEL[prediction.category]}</Text>
+            </View>
 
             <Text style={styles.teaser}>{prediction.teaser}</Text>
 
@@ -324,7 +329,7 @@ export default function PredictionDetailScreen() {
                 {recipientsError && <Text style={styles.error}>{recipientsError}</Text>}
                 {actionError && <Text style={styles.error}>{actionError}</Text>}
                 {recipients === null ? (
-                  <ActivityIndicator color={colors.gold} style={styles.loader} />
+                  <ActivityIndicator color={colors.text} style={styles.loader} />
                 ) : recipients.length === 0 ? (
                   <Text style={styles.hint}>Personne pour l’instant.</Text>
                 ) : (
@@ -350,7 +355,7 @@ export default function PredictionDetailScreen() {
                   <>
                     <Text style={[styles.eyebrow, styles.sectionSpacing]}>Ajouter depuis le Cercle</Text>
                     {friends === null ? (
-                      <ActivityIndicator color={colors.gold} style={styles.loader} />
+                      <ActivityIndicator color={colors.text} style={styles.loader} />
                     ) : addableFriends.length === 0 ? (
                       <Text style={styles.hint}>
                         Tout ton Cercle a déjà accès, ou tu n’as pas encore d’ami.
@@ -472,6 +477,8 @@ export default function PredictionDetailScreen() {
           </>
         ) : null}
       </ScrollView>
+
+      <CreateFab />
     </SafeAreaView>
   );
 }
@@ -490,17 +497,35 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontFamily: fonts.display,
     fontSize: 17,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
     color: colors.text,
   },
-  back: { fontSize: 15, color: colors.gold, width: 56 },
+  back: { fontSize: 15, color: colors.text, width: 56 },
+  headerSpacer: { width: 56 },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   loader: { marginTop: 24 },
   eyebrow: { ...eyebrow },
   eyebrowSmall: { ...eyebrow, fontSize: 10 },
   authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginBottom: 12 },
   authorName: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
+  // La catégorie n'apparaît plus sur la carte du Fil — seulement ici, une
+  // fois le Predict ouvert. Jaune réservé aux éléments interactifs majeurs :
+  // ici, simple étiquette au trait noir.
+  categoryBadge: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: colors.text,
+    borderRadius: radius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    marginBottom: 10,
+  },
+  categoryBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.text,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   teaser: { fontFamily: fonts.serifItalic, fontSize: 28, color: colors.text, lineHeight: 36 },
   datesBlock: { marginTop: 10 },
   sealedDate: { fontSize: 12, color: colors.textFaint },
@@ -526,14 +551,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   revealNowBox: { alignItems: 'center', marginTop: spacing.md },
+  // Bouton d'action majeur : rempli jaune, texte noir — pas un lien en
+  // couleur, illisible sur blanc.
   revealNowButton: {
-    borderWidth: 1,
-    borderColor: colors.gold,
+    backgroundColor: colors.gold,
     borderRadius: radius.pill,
     paddingHorizontal: 18,
     paddingVertical: 10,
   },
-  revealNowButtonText: { fontSize: 13, fontWeight: '700', color: colors.gold },
+  revealNowButtonText: { fontSize: 13, fontWeight: '700', color: colors.text },
   verdictBox: {
     marginTop: spacing.xl,
     paddingVertical: 12,
@@ -543,8 +569,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  verdictBoxRealized: { borderLeftWidth: 4, borderLeftColor: colors.success },
-  verdictBoxMissed: { borderLeftWidth: 4, borderLeftColor: colors.danger },
+  // Pas de code couleur réalisé/manqué : seul le libellé porte le sens ;
+  // « réalisée » reçoit simplement la mise en avant jaune.
+  verdictBoxRealized: { borderLeftWidth: 4, borderLeftColor: colors.gold },
+  verdictBoxMissed: { borderLeftWidth: 4, borderLeftColor: colors.border },
   verdict: { fontFamily: fonts.serifItalic, fontSize: 19, color: colors.text, marginTop: 4 },
   voteRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
   voteButton: {

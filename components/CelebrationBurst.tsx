@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, type ReactNode } from 'react';
-import { Animated, Dimensions, Modal, StyleSheet, Text, View } from 'react-native';
+import { Animated, Dimensions, Modal, StyleSheet, View } from 'react-native';
+import { Text } from './Text';
 
 import { colors, fonts, radius } from '../lib/theme';
 import { PredictWord } from './PredictWord';
@@ -7,7 +8,7 @@ import { PredictWord } from './PredictWord';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PARTICLE_COUNT = 160;
 const HOLD_MS = 3000;
-const GOLD_TONES = ['#D4AF37', '#E4C978', '#C9A24B', '#F0D77B'];
+const GOLD_TONES = ['#FACC15', '#EAB308', '#111827'];
 
 type Particle = {
   left: number;
@@ -138,7 +139,7 @@ const styles = StyleSheet.create({
     left: 24,
     right: 24,
     alignItems: 'center',
-    backgroundColor: 'rgba(250, 248, 243, 0.92)',
+    backgroundColor: 'rgba(251, 251, 249, 0.94)',
     borderRadius: radius.xl,
     paddingVertical: 20,
     paddingHorizontal: 24,

@@ -1,5 +1,5 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { Check, Trash2 } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -8,15 +8,15 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '../../../components/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
+import { CreateFab } from '../../../components/CreateFab';
 import { PredictWatermark } from '../../../components/PredictWatermark';
 import { PredictWord } from '../../../components/PredictWord';
-import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { useAuth } from '../../../lib/auth';
 import { formatTimeAgo } from '../../../lib/datetime';
 import {
@@ -228,14 +228,11 @@ export default function NotificationsScreen() {
               {selectedIds.size} sélectionnée{selectedIds.size > 1 ? 's' : ''}
             </Text>
             <Pressable onPress={handleBulkDelete} hitSlop={8}>
-              <Ionicons name="trash-outline" size={22} color={colors.danger} />
+              <Trash2 size={22} color={colors.danger} strokeWidth={1.75} />
             </Pressable>
           </>
         ) : (
-          <>
-            <Text style={styles.headerTitle}>Notifications</Text>
-            <QuickCreateButton />
-          </>
+          <Text style={styles.headerTitle}>Notifications</Text>
         )}
       </View>
 
@@ -244,7 +241,7 @@ export default function NotificationsScreen() {
         {actionError && <Text style={styles.error}>{actionError}</Text>}
 
         {notifications === null && !error ? (
-          <ActivityIndicator color={colors.gold} style={styles.loader} />
+          <ActivityIndicator color={colors.text} style={styles.loader} />
         ) : notifications && notifications.length === 0 ? (
           <Text style={styles.empty}>Rien pour l’instant.</Text>
         ) : (
@@ -273,7 +270,7 @@ export default function NotificationsScreen() {
               >
                 {selecting ? (
                   <View style={[styles.checkbox, selected && styles.checkboxChecked]}>
-                    {selected && <Ionicons name="checkmark" size={12} color={colors.background} />}
+                    {selected && <Check size={12} color={colors.background} strokeWidth={2.5} />}
                   </View>
                 ) : (
                   !notification.is_read && <View style={styles.dot} />
@@ -333,7 +330,7 @@ export default function NotificationsScreen() {
                     hitSlop={8}
                     style={styles.deleteButton}
                   >
-                    <Ionicons name="trash-outline" size={15} color={colors.textFaint} />
+                    <Trash2 size={15} color={colors.textFaint} strokeWidth={1.75} />
                   </Pressable>
                 )}
               </Pressable>
@@ -341,6 +338,8 @@ export default function NotificationsScreen() {
           })
         )}
       </ScrollView>
+
+      <CreateFab />
     </SafeAreaView>
   );
 }
@@ -360,11 +359,9 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontFamily: fonts.display,
     fontSize: 22,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
     color: colors.text,
   },
-  cancelSelection: { fontSize: 15, color: colors.gold, fontWeight: '600' },
+  cancelSelection: { fontSize: 15, color: colors.text, fontWeight: '600' },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   loader: { marginTop: 32 },
   empty: { fontSize: 14, color: colors.textFaint, textAlign: 'center', marginTop: 32 },
@@ -411,7 +408,7 @@ const styles = StyleSheet.create({
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
   authorName: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
   teaser: {
-    fontFamily: fonts.serifItalic,
+    fontFamily: fonts.serifSemiBold,
     fontSize: 16,
     color: colors.text,
     marginTop: 4,

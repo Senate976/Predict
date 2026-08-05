@@ -1,5 +1,5 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { MessageCircle, MoreHorizontal, ThumbsUp } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -9,15 +9,14 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from './Text';
 
 import { fetchCommentCount } from '../lib/comments';
 import { formatCountdown } from '../lib/datetime';
 import {
   beliefPercentage,
-  CATEGORY_LABEL,
   castEmojiReaction,
   EMOJI_REACTIONS,
   isRevealed,
@@ -275,19 +274,15 @@ export function PredictionCard({
 
   return (
     <View style={styles.card}>
-      <Pressable onPress={() => setMenuOpen(true)} style={styles.menuButton} hitSlop={8}>
-        <Ionicons name="ellipsis-horizontal" size={18} color={colors.textFaint} />
-      </Pressable>
-
       <Pressable onPress={() => onPress?.()} style={({ pressed }) => pressed && styles.cardPressed}>
-        <View style={styles.cardTop}>
+        <View style={styles.cardHeader}>
           {authorLabel && (
             <Pressable
               onPress={() => authorId && router.push(`/profile/${authorId}`)}
               style={styles.authorBlock}
               hitSlop={4}
             >
-              <Avatar url={authorAvatarUrl} username={authorLabel} size={30} />
+              <Avatar url={authorAvatarUrl} username={authorLabel} size={32} />
               <Text style={styles.authorName} numberOfLines={1}>
                 {authorLabel}
               </Text>
@@ -299,38 +294,42 @@ export function PredictionCard({
             </Pressable>
           )}
 
-          <View style={styles.cardTopRight}>
-            {!verdict && !revealed && (
-              <View style={[styles.badge, styles.badgeLocked]}>
-                <Text style={[styles.badgeText, styles.badgeTextLocked]}>
-                  {item.open_ended ? 'Quand l’auteur le décide' : formatCountdown(revealAt, now)}
-                </Text>
-              </View>
-            )}
-            {verdict && (
-              <View style={[styles.badge, verdict === 'realized' ? styles.badgeRealized : styles.badgeMissed]}>
-                <Text
-                  style={[
-                    styles.badgeText,
-                    verdict === 'realized' ? styles.badgeTextRealized : styles.badgeTextMissed,
-                  ]}
-                >
-                  {verdict === 'realized' ? 'Réalisé' : 'Manqué'}
-                </Text>
-              </View>
-            )}
-            <Text style={styles.categoryTag}>{CATEGORY_LABEL[item.category]}</Text>
-          </View>
+          <View style={styles.headerSpacer} />
+
+          {!verdict && !revealed && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {item.open_ended ? 'Quand l’auteur le décide' : formatCountdown(revealAt, now)}
+              </Text>
+            </View>
+          )}
+          {verdict && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{verdict === 'realized' ? 'Réalisé' : 'Manqué'}</Text>
+            </View>
+          )}
+
+          <Pressable onPress={() => setMenuOpen(true)} style={styles.menuButton} hitSlop={8}>
+            <MoreHorizontal size={18} color={colors.textFaint} strokeWidth={1.75} />
+          </Pressable>
         </View>
 
         <Text style={styles.cardTeaser}>{item.teaser}</Text>
 
         {item.is_immediate && (
-          <Text style={styles.beliefScore}>
-            {belief === null
-              ? 'Personne n’a encore donné son avis.'
-              : `${belief}% y croient · ${100 - belief}% n’y croient pas`}
-          </Text>
+          <View style={styles.confidenceBlock}>
+            {belief === null ? (
+              <Text style={styles.beliefScore}>Personne n’a encore donné son avis.</Text>
+            ) : (
+              <>
+                <View style={styles.confidenceBar}>
+                  <View style={[styles.confidenceFillBelieve, { flex: belief }]} />
+                  <View style={[styles.confidenceFillDisbelieve, { flex: 100 - belief }]} />
+                </View>
+                <Text style={styles.confidenceLabel}>{belief}% y croient</Text>
+              </>
+            )}
+          </View>
         )}
       </Pressable>
 
@@ -342,10 +341,11 @@ export function PredictionCard({
 
       <View style={styles.footerRow}>
         <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
-          <Ionicons
-            name={commentsOpen ? 'chatbubble' : 'chatbubble-outline'}
+          <MessageCircle
             size={17}
             color={colors.textMuted}
+            strokeWidth={1.75}
+            fill={commentsOpen ? colors.textMuted : 'none'}
           />
           <Text style={styles.commentsToggleText}>{commentCount ?? 0}</Text>
         </Pressable>
@@ -358,7 +358,7 @@ export function PredictionCard({
             {myEmoji ? (
               <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
             ) : (
-              <Ionicons name="thumbs-up-outline" size={17} color={colors.textFaint} />
+              <ThumbsUp size={17} color={colors.textFaint} strokeWidth={1.75} />
             )}
             {totalReactions > 0 && <Text style={styles.reactionTriggerCount}>{totalReactions}</Text>}
           </View>
@@ -449,66 +449,55 @@ export function PredictionCard({
 
 const styles = StyleSheet.create({
   cardPressed: { opacity: 0.85 },
+  // Fine bordure noire, fond blanc pur, pas d'ombre lourde — carte sobre
+  // façon presse plutôt que carte « flottante ».
   card: {
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.xl,
     padding: 18,
-    paddingTop: 36,
     marginBottom: 12,
     backgroundColor: colors.surface,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
   },
-  // Menu secondaire (favoris, masquer, supprimer) — coin supérieur droit,
-  // hors du flux de `cardTop` pour ne jamais se chevaucher avec les badges.
-  menuButton: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    padding: 4,
-    zIndex: 1,
-  },
-  cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 },
-  authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, maxWidth: '65%' },
-  authorName: { fontSize: 13, fontWeight: '600', color: colors.text, flexShrink: 1 },
-  mentionTag: { fontSize: 12, fontWeight: '600', color: colors.textMuted, flexShrink: 1 },
-  // Sur la droite de la carte (dans `cardTop`), pas sur sa propre ligne sous
-  // le teaser — ça évite d'ajouter une ligne de hauteur à chaque carte.
-  cardTopRight: { alignItems: 'flex-end', gap: 4 },
-  categoryTag: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textMuted,
-    backgroundColor: colors.background,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
-  },
+  // Une seule ligne : [avatar][pseudo] ...espace flexible... [badge délai] [menu].
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  headerSpacer: { flex: 1, minWidth: 8 },
+  authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, maxWidth: '55%' },
+  authorName: { fontSize: 14, fontWeight: '500', color: colors.text, flexShrink: 1 },
+  mentionTag: { fontSize: 12, fontWeight: '500', color: colors.textMuted, flexShrink: 1 },
+  menuButton: { padding: 2 },
+  // Un seul traitement pour tous les badges d'état (délai, réalisé, manqué) :
+  // fond jaune très clair, texte noir — pas de distinction de couleur entre
+  // eux, le libellé porte le sens.
   badge: {
     borderRadius: radius.pill,
     paddingHorizontal: 10,
     paddingVertical: 4,
+    backgroundColor: colors.badgeBg,
   },
-  badgeLocked: { backgroundColor: colors.goldSoft },
-  badgeText: { fontSize: 12, fontWeight: '700' },
-  badgeTextLocked: { color: colors.gold },
-  badgeRealized: { backgroundColor: colors.successSoft },
-  badgeMissed: { backgroundColor: colors.dangerSoft },
-  badgeTextRealized: { color: colors.success },
-  badgeTextMissed: { color: colors.danger },
+  badgeText: { fontSize: 12, fontWeight: '700', color: colors.badgeText },
   cardTeaser: {
-    fontFamily: fonts.serifSemiBold,
-    fontSize: 18,
+    fontFamily: fonts.sansBold,
+    fontSize: 16,
     color: colors.text,
-    lineHeight: 24,
+    lineHeight: 22,
   },
   beliefScore: { fontSize: 13, fontWeight: '700', color: colors.text, marginTop: 8 },
+  // Jauge de vote sobre : une fine ligne noire/jaune plutôt qu'une barre
+  // épaisse, avec le pourcentage en texte discret en dessous.
+  confidenceBlock: { marginTop: 10 },
+  confidenceBar: {
+    flexDirection: 'row',
+    height: 3,
+    borderRadius: radius.pill,
+    overflow: 'hidden',
+    backgroundColor: colors.border,
+  },
+  confidenceFillBelieve: { backgroundColor: colors.text },
+  confidenceFillDisbelieve: { backgroundColor: colors.gold },
+  confidenceLabel: { fontSize: 12, color: colors.textMuted, marginTop: 5 },
   voteLink: { marginTop: 10 },
-  voteLinkText: { fontSize: 13, fontWeight: '600', color: colors.gold },
+  voteLinkText: { fontSize: 13, fontWeight: '600', color: colors.text, textDecorationLine: 'underline' },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',

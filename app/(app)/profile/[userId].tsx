@@ -7,16 +7,16 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '../../../components/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
+import { CreateFab } from '../../../components/CreateFab';
 import { PredictWatermark } from '../../../components/PredictWatermark';
 import { PredictWord } from '../../../components/PredictWord';
 import { PrediscoreGauge } from '../../../components/PrediscoreGauge';
-import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { fetchProfileById, type FriendProfile } from '../../../lib/friends';
 import {
   fetchPredictionStats,
@@ -87,14 +87,14 @@ export default function FriendProfileScreen() {
           <Text style={styles.back}>Retour</Text>
         </Pressable>
         <Text style={styles.headerTitle}>Profil</Text>
-        <QuickCreateButton />
+        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
         {error && <Text style={styles.error}>{error}</Text>}
 
         {!profile && !error ? (
-          <ActivityIndicator color={colors.gold} style={styles.loader} />
+          <ActivityIndicator color={colors.text} style={styles.loader} />
         ) : profile ? (
           <>
             <View style={styles.identityCard}>
@@ -110,7 +110,7 @@ export default function FriendProfileScreen() {
 
             <View style={[styles.prediscoreCard, styles.sectionSpacing]}>
               {!prediscoreLoaded ? (
-                <ActivityIndicator color={colors.gold} style={styles.loader} />
+                <ActivityIndicator color={colors.text} style={styles.loader} />
               ) : prediscoreError ? (
                 <Text style={styles.error}>{prediscoreError}</Text>
               ) : (
@@ -125,7 +125,7 @@ export default function FriendProfileScreen() {
               <PredictWord />
             </Text>
             {stats === null ? (
-              <ActivityIndicator color={colors.gold} style={styles.loader} />
+              <ActivityIndicator color={colors.text} style={styles.loader} />
             ) : (
               <View style={styles.statsRow}>
                 <View style={styles.statCard}>
@@ -135,11 +135,11 @@ export default function FriendProfileScreen() {
                   </Text>
                 </View>
                 <View style={styles.statCard}>
-                  <Text style={[styles.statValue, styles.statValueRealized]}>{stats.realized}</Text>
+                  <Text style={styles.statValue}>{stats.realized}</Text>
                   <Text style={styles.statLabel}>Réalisés</Text>
                 </View>
                 <View style={styles.statCard}>
-                  <Text style={[styles.statValue, styles.statValueMissed]}>{stats.missed}</Text>
+                  <Text style={styles.statValue}>{stats.missed}</Text>
                   <Text style={styles.statLabel}>Manqués</Text>
                 </View>
                 <View style={styles.statCard}>
@@ -168,6 +168,8 @@ export default function FriendProfileScreen() {
           )}
         </Pressable>
       </Modal>
+
+      <CreateFab />
     </SafeAreaView>
   );
 }
@@ -186,11 +188,10 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontFamily: fonts.display,
     fontSize: 17,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
     color: colors.text,
   },
-  back: { fontSize: 15, color: colors.gold, width: 56 },
+  back: { fontSize: 15, color: colors.text, width: 56 },
+  headerSpacer: { width: 56 },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   loader: { marginTop: 24 },
   eyebrow: { ...eyebrow },
@@ -223,9 +224,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: 'center',
   },
-  statValue: { fontFamily: fonts.serifItalic, fontSize: 26, color: colors.text },
-  statValueRealized: { color: colors.success },
-  statValueMissed: { color: colors.danger },
+  statValue: { fontFamily: fonts.display, fontSize: 26, color: colors.text },
   statLabel: { fontSize: 11, color: colors.textFaint, marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 },
   error: {
     color: colors.danger,

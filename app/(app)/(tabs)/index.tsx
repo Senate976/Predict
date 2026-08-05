@@ -1,5 +1,5 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { ChevronLeft, ChevronRight, SlidersHorizontal, XCircle } from 'lucide-react-native';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -8,13 +8,14 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '../../../components/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
 import { CelebrationBurst } from '../../../components/CelebrationBurst';
+import { CreateFab } from '../../../components/CreateFab';
 import { PredictionCard } from '../../../components/PredictionCard';
 import { PredictWord } from '../../../components/PredictWord';
 import { WelcomeOnboarding } from '../../../components/WelcomeOnboarding';
@@ -286,7 +287,7 @@ export default function HomeScreen() {
           style={[styles.filtersToggle, hasActiveFilters && styles.filtersToggleActive]}
           hitSlop={4}
         >
-          <Ionicons name="options-outline" size={14} color={hasActiveFilters ? colors.gold : colors.textFaint} />
+          <SlidersHorizontal size={14} color={hasActiveFilters ? colors.text : colors.textFaint} strokeWidth={1.75} />
           <Text style={[styles.filtersToggleText, hasActiveFilters && styles.filtersToggleTextActive]}>
             Filtres
           </Text>
@@ -294,7 +295,7 @@ export default function HomeScreen() {
 
         {hasActiveFilters && (
           <Pressable onPress={resetFilters} style={styles.filtersReset} hitSlop={4}>
-            <Ionicons name="close-circle" size={14} color={colors.textFaint} />
+            <XCircle size={14} color={colors.textFaint} strokeWidth={1.75} />
             <Text style={styles.filtersResetText}>Réinitialiser</Text>
           </Pressable>
         )}
@@ -316,7 +317,7 @@ export default function HomeScreen() {
                     <Text style={styles.menuRowValue} numberOfLines={1}>
                       {authorFilter ? authors[authorFilter]?.username ?? '…' : 'Tous'}
                     </Text>
-                    <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+                    <ChevronRight size={16} color={colors.textFaint} strokeWidth={1.75} />
                   </View>
                 </Pressable>
 
@@ -379,7 +380,7 @@ export default function HomeScreen() {
             ) : (
               <>
                 <Pressable onPress={() => setMenuView('main')} style={styles.menuBack}>
-                  <Ionicons name="chevron-back" size={16} color={colors.gold} />
+                  <ChevronLeft size={16} color={colors.text} strokeWidth={1.75} />
                   <Text style={styles.menuBackText}>Auteur</Text>
                 </Pressable>
 
@@ -416,12 +417,12 @@ export default function HomeScreen() {
 
       <ScrollView
         contentContainerStyle={styles.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.gold} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.text} />}
       >
         {error && <Text style={styles.error}>{error}</Text>}
 
         {feed === null && !error ? (
-          <ActivityIndicator style={styles.loader} color={colors.gold} />
+          <ActivityIndicator style={styles.loader} color={colors.text} />
         ) : shown.length === 0 ? (
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>
@@ -463,12 +464,7 @@ export default function HomeScreen() {
         )}
       </ScrollView>
 
-      <Pressable
-        onPress={() => router.push('/new-prediction')}
-        style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
-      >
-        <Ionicons name="add" size={28} color="#FFFFFF" />
-      </Pressable>
+      <CreateFab />
     </SafeAreaView>
   );
 }
@@ -487,8 +483,6 @@ const styles = StyleSheet.create({
   brand: {
     fontFamily: fonts.display,
     fontSize: 24,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
     color: colors.text,
     flexShrink: 0,
   },
@@ -502,20 +496,27 @@ const styles = StyleSheet.create({
   userChipName: { fontSize: 14, fontWeight: '700', color: colors.text, flexShrink: 1, minWidth: 0 },
   tabs: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    backgroundColor: 'rgba(30, 30, 36, 0.05)',
+    borderRadius: radius.pill,
+    padding: 4,
+    gap: 4,
   },
   tab: {
     flex: 1,
     paddingVertical: 10,
     alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
+    borderRadius: radius.pill,
   },
-  tabActive: { borderBottomColor: colors.gold },
-  tabText: { fontSize: 12, fontWeight: '700', letterSpacing: 1, color: colors.textFaint, textTransform: 'uppercase' },
+  tabActive: { backgroundColor: colors.gold },
+  tabText: {
+    fontFamily: fonts.sansBold,
+    fontSize: 12,
+    letterSpacing: 0.5,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+  },
   tabTextActive: { color: colors.text },
   filtersRow: {
     flexDirection: 'row',
@@ -534,7 +535,7 @@ const styles = StyleSheet.create({
   },
   filtersToggleActive: { backgroundColor: colors.goldSoft },
   filtersToggleText: { fontSize: 12, fontWeight: '700', color: colors.textFaint },
-  filtersToggleTextActive: { color: colors.gold },
+  filtersToggleTextActive: { color: colors.text },
   filtersReset: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   filtersResetText: { fontSize: 12, fontWeight: '600', color: colors.textFaint },
   modalOverlay: {
@@ -573,7 +574,7 @@ const styles = StyleSheet.create({
   },
   menuRowRight: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, maxWidth: '70%' },
   menuRowText: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
-  menuRowTextActive: { color: colors.gold },
+  menuRowTextActive: { color: colors.text, fontWeight: '700' },
   menuRowTextReset: { fontSize: 14, fontWeight: '600', color: colors.danger },
   menuRowValue: { fontSize: 13, color: colors.textFaint, flexShrink: 1 },
   menuBack: {
@@ -585,7 +586,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  menuBackText: { fontSize: 13, fontWeight: '700', color: colors.gold },
+  menuBackText: { fontSize: 13, fontWeight: '700', color: colors.text },
   scroll: { padding: spacing.lg, paddingBottom: 88, flexGrow: 1 },
   loader: { marginTop: 32 },
   empty: { paddingVertical: 24, alignItems: 'center' },
@@ -604,23 +605,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 12,
   },
-  // Bouton flottant (FAB) : action principale de l'écran, doit rester
-  // visible et contrastée par-dessus le fil qui défile dessous.
-  fab: {
-    position: 'absolute',
-    bottom: 24,
-    right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.gold,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  fabPressed: { backgroundColor: colors.goldBright },
 });

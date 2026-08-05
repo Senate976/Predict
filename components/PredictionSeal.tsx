@@ -1,6 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef } from 'react';
-import { Animated, Modal, StyleSheet, Text, View } from 'react-native';
+import { Animated, Modal, StyleSheet, View } from 'react-native';
+import { Text } from './Text';
 
 import { fonts } from '../lib/theme';
 import { PredictWord } from './PredictWord';

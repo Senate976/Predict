@@ -1,6 +1,7 @@
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
+import { Text } from './Text';
 
 import { getPredictionAudioUrl } from '../lib/audio';
 import { colors, radius } from '../lib/theme';
@@ -46,7 +47,7 @@ export function AudioPlayerButton({ path }: { path: string }) {
       style={styles.button}
     >
       {!url ? (
-        <ActivityIndicator size="small" color={colors.gold} />
+        <ActivityIndicator size="small" color={colors.text} />
       ) : (
         <Text style={styles.text}>
           {status.playing ? '❙❙ Pause' : '▶ Écouter le message vocal'}
@@ -66,6 +67,6 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     backgroundColor: colors.goldSoft,
   },
-  text: { fontSize: 13, fontWeight: '600', color: colors.gold },
+  text: { fontSize: 13, fontWeight: '600', color: colors.text },
   errorText: { fontSize: 12, color: colors.textFaint, fontStyle: 'italic' },
 });

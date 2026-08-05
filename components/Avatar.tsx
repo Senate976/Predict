@@ -1,4 +1,5 @@
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
+import { Text } from './Text';
 
 import { colors } from '../lib/theme';
 
@@ -33,5 +34,5 @@ export function Avatar({
 const styles = StyleSheet.create({
   image: { backgroundColor: colors.border },
   fallback: { backgroundColor: colors.goldSoft, alignItems: 'center', justifyContent: 'center' },
-  fallbackText: { color: colors.gold, fontWeight: '700' },
+  fallbackText: { color: colors.text, fontWeight: '700' },
 });

@@ -7,10 +7,10 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from 'react-native';
+import { Text } from '../../components/Text';
+import { TextInput } from '../../components/TextInput';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PredictWord } from '../../components/PredictWord';
@@ -339,16 +339,14 @@ const styles = StyleSheet.create({
     fontFamily: fonts.display,
     fontSize: 18,
     letterSpacing: 4,
-    color: colors.gold,
+    color: colors.text,
     textTransform: 'uppercase',
     marginBottom: 8,
   },
   title: {
     fontFamily: fonts.display,
     fontSize: 30,
-    letterSpacing: 1,
     color: colors.text,
-    textTransform: 'uppercase',
     marginBottom: 28,
   },
   field: { marginBottom: spacing.md },
@@ -373,7 +371,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   notice: {
-    color: colors.goldBright,
+    color: colors.text,
     backgroundColor: colors.goldSoft,
     borderRadius: radius.sm,
     padding: 12,
@@ -382,7 +380,7 @@ const styles = StyleSheet.create({
   },
   submit: {
     backgroundColor: colors.gold,
-    borderRadius: radius.sm,
+    borderRadius: radius.pill,
     paddingVertical: 15,
     alignItems: 'center',
     marginTop: 4,
@@ -391,7 +389,8 @@ const styles = StyleSheet.create({
   },
   submitPressed: { backgroundColor: colors.goldBright },
   submitDisabled: { opacity: 0.6 },
-  submitText: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  // Texte noir sur le bouton jaune — du blanc y serait peu lisible.
+  submitText: { fontFamily: fonts.sansBold, color: colors.text, fontSize: 16, textTransform: 'uppercase', letterSpacing: 0.5 },
   switch: { marginTop: 18, alignItems: 'center' },
-  switchText: { color: colors.gold, fontSize: 14, fontWeight: '600' },
+  switchText: { color: colors.text, fontSize: 14, fontWeight: '600', textDecorationLine: 'underline' },
 });

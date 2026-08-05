@@ -1,41 +1,58 @@
-// Charte graphique « Neutre & sobre » : fond gris très clair, texte sombre à
-// fort contraste, doré réservé aux accents (états actifs, CTA principal). Un
-// seul endroit à changer si la palette évolue — tous les écrans importent
-// d'ici plutôt que de coder leurs propres couleurs.
+// Charte graphique « Éditorial Chic & Premium » : presse/magazine moderne,
+// strictement blanc / noir / jaune. Le blanc domine (fonds, cartes), le noir
+// porte tout le texte et les bordures fines, le jaune est réservé aux
+// éléments interactifs majeurs (FAB, onglet actif, badges d'état, jauges) —
+// jamais comme couleur de texte courant, son contraste sur blanc est trop
+// faible. Un seul endroit à changer si la palette évolue — tous les écrans
+// importent d'ici plutôt que de coder leurs propres couleurs.
 
 export const colors = {
-  background: '#F8F9FA',
+  // Blanc cassé très sobre, aspect papier — jamais un blanc pur en fond de
+  // page, pour que les cartes (blanc pur) tranchent légèrement dessus.
+  background: '#FBFBF9',
   surface: '#FFFFFF',
   surfaceRaised: '#FFFFFF',
-  border: '#E5E7EB',
-  text: '#1A1A1A',
-  textMuted: '#6C757D',
+  // Fine bordure « encre » plutôt qu'un gris neutre — cohérent avec le noir
+  // profond du texte.
+  border: 'rgba(17, 24, 39, 0.10)',
+  text: '#111827',
+  textMuted: '#6B7280',
   textFaint: '#9CA3AF',
-  gold: '#AD8A3E',
-  goldBright: '#C7A458',
-  goldSoft: 'rgba(173, 138, 62, 0.12)',
-  danger: '#A23B36',
-  dangerSoft: 'rgba(162, 59, 54, 0.10)',
-  success: '#3C6E52',
-  successSoft: 'rgba(60, 110, 82, 0.10)',
-  // Réservées au sceau de cire (components/PredictionSeal.tsx).
-  wax: '#7A2331',
-  waxDark: '#5C1A25',
-  // Barre de navigation : neutre comme le reste de l'interface — seule
-  // l'icône active porte l'accent doré de la marque.
+  // Accent jaune — uniquement fonds/bordures d'éléments interactifs majeurs
+  // (jamais en couleur de texte : illisible sur blanc).
+  gold: '#FACC15',
+  goldBright: '#EAB308',
+  goldSoft: 'rgba(250, 204, 21, 0.20)',
+  // Rouge fonctionnel, réservé aux erreurs et actions destructrices — pas une
+  // couleur de marque, un signal d'alerte standard.
+  danger: '#B91C1C',
+  dangerSoft: 'rgba(185, 28, 28, 0.08)',
+  // Pastille de notification (badge de la cloche).
+  notificationBadge: '#DC2626',
+  // Badges d'état de carte (délai, réalisé, manqué) : un seul traitement,
+  // volontairement sans distinction de couleur entre eux — fond jaune très
+  // clair, texte noir, comme demandé pour rester lisible et élégant.
+  badgeBg: 'rgba(250, 204, 21, 0.20)',
+  badgeText: '#111827',
+  // Barre de navigation : blanc pur, tranche sur le fond papier.
   navBar: '#FFFFFF',
-  navBarBorder: '#E5E7EB',
-  navBarActive: '#AD8A3E',
-  navBarInactive: '#6C757D',
+  navBarBorder: 'rgba(17, 24, 39, 0.10)',
+  navBarActive: '#111827',
+  navBarActiveSoft: 'rgba(250, 204, 21, 0.35)',
+  navBarInactive: '#9CA3AF',
+  // Bouton d'action flottant (FAB), unique et standardisé sur tout l'app :
+  // cercle jaune, icône noire.
+  fab: '#FACC15',
+  fabIcon: '#111827',
 } as const;
 
 export const radius = {
   sm: 8,
   md: 12,
   lg: 18,
-  // Coins très prononcés — cartes d'info, cartes de statistiques, la carte
-  // « à sceller » des écrans profil/accueil. `lg` reste pour les éléments plus
-  // petits (chips, champs).
+  // Arrondi très généreux (façon `rounded-3xl`) — cartes de prédiction,
+  // cartes d'info, la carte « à sceller » des écrans profil/accueil. `lg`
+  // reste pour les éléments plus petits (chips, champs).
   xl: 28,
   pill: 999,
 } as const;
@@ -49,18 +66,23 @@ export const spacing = {
 } as const;
 
 /**
- * Une seule famille sans-serif moderne (Inter) pour toute l'interface — les
- * quatre clés ne varient plus que par la graisse, pas par la police, pour
- * une hiérarchie cohérente sans effet « habillage » (titres en majuscules,
- * teaser en semi-gras — plus d'italique nulle part). Chaque nom doit
- * correspondre exactement à la clé passée à `useFonts` dans `app/_layout.tsx`,
- * faute de quoi React Native retombe silencieusement sur la police système.
+ * `display` (Playfair Display, serif) : réservée au titre principal du Fil,
+ * au mot-symbole « Predict » et aux grands en-têtes de page — jamais aux
+ * boutons, onglets ou titres de carte. `serifItalic` (Playfair Display
+ * italique) : gros texte éditorial (teaser/contenu à l'ouverture d'un
+ * Predict, pull-quotes, verdict). `serif`/`serifSemiBold` (Plus Jakarta
+ * Sans) : corps de texte courant. `sansBold` (Plus Jakarta Sans gras) :
+ * titres de carte, boutons, onglets — tout ce qui doit rester très lisible.
+ * Chaque nom doit correspondre exactement à la clé passée à `useFonts` dans
+ * `app/_layout.tsx`, faute de quoi React Native retombe silencieusement sur
+ * la police système.
  */
 export const fonts = {
-  display: 'Inter_700Bold',
-  serif: 'Inter_400Regular',
-  serifItalic: 'Inter_600SemiBold',
-  serifSemiBold: 'Inter_600SemiBold',
+  display: 'PlayfairDisplay_700Bold',
+  serifItalic: 'PlayfairDisplay_600SemiBold_Italic',
+  serif: 'PlusJakartaSans_400Regular',
+  serifSemiBold: 'PlusJakartaSans_600SemiBold',
+  sansBold: 'PlusJakartaSans_700Bold',
 } as const;
 
 /**
