@@ -21,12 +21,13 @@ export const colors = {
   // Réservées au sceau de cire (components/PredictionSeal.tsx).
   wax: '#7A2331',
   waxDark: '#5C1A25',
-  // Barre de navigation : marron chaud ton sur ton avec le vitrail du logo,
-  // contrastant volontairement avec le fond doré des écrans.
-  navBar: '#4E2E1A',
-  navBarBorder: '#3A2113',
-  navBarActive: '#F0C766',
-  navBarInactive: 'rgba(240, 223, 189, 0.5)',
+  // Barre de navigation : jaune moutarde/doré (texture de grain appliquée
+  // par-dessus, voir components/NavBarBackground.tsx), avec des icônes brun
+  // foncé façon détails du vitrail pour rester lisible sur ce fond clair.
+  navBar: '#D4A017',
+  navBarBorder: '#A67C0A',
+  navBarActive: '#3A2113',
+  navBarInactive: 'rgba(58, 33, 19, 0.45)',
 } as const;
 
 export const radius = {
