@@ -13,8 +13,8 @@ import {
   View,
 } from 'react-native';
 import { Text } from './Text';
-import { LinearGradient } from 'expo-linear-gradient';
 
+import { ConfidenceGauge } from './ConfidenceGauge';
 import { fetchCommentCount } from '../lib/comments';
 import { formatCountdown } from '../lib/datetime';
 import {
@@ -37,8 +37,6 @@ import { PredictWord } from './PredictWord';
 
 /** Largeur fixe de la bulle de réactions, ancrée par son bord droit sur le pouce. */
 const EMOJI_PANEL_WIDTH = 260;
-/** Diamètre du curseur de la jauge d'opinion. */
-const CONFIDENCE_CURSOR_SIZE = 12;
 
 /**
  * Carte d'une prédiction, partagée entre les onglets À venir et Passées du
@@ -355,6 +353,14 @@ export function PredictionCard({
               {item.open_ended ? 'En temps voulu' : formatCountdown(revealAt, now)}
             </Text>
           )}
+          {/* Révélée mais sans majorité encore formée (aucun vote, ou égalité)
+              — sans ça, l'en-tête restait vide sur l'onglet Predict alors que
+              la prédiction est bien révélée. */}
+          {!verdict && revealed && (
+            <Text style={styles.badgeText} numberOfLines={1}>
+              Révélée
+            </Text>
+          )}
           {verdict && (
             // Liseré très discret sur le bord gauche plutôt qu'une pastille
             // pleine — juste de quoi confirmer le sens du mot d'un coup d'œil.
@@ -404,24 +410,7 @@ export function PredictionCard({
                     {believeVotes + disbelieveVotes > 1 ? 's' : ''})
                   </Text>
                 </View>
-                <View style={styles.confidenceTrack}>
-                  {/* Même dégradé noir → ambre → jaune que le Prediscore du
-                      profil — pas une interpolation directe à deux couleurs,
-                      qui traverse un brun terne au milieu. */}
-                  <LinearGradient
-                    colors={[colors.text, colors.goldTransition, colors.gold]}
-                    locations={[0, 0.5, 1]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.confidenceTrackLine}
-                  />
-                  <View
-                    style={[
-                      styles.confidenceCursor,
-                      { left: `${belief}%`, marginLeft: -CONFIDENCE_CURSOR_SIZE / 2 },
-                    ]}
-                  />
-                </View>
+                <ConfidenceGauge belief={belief} />
               </>
             )}
           </View>
@@ -655,31 +644,6 @@ const styles = StyleSheet.create({
   confidenceBlock: { marginTop: 12 },
   confidenceLabelRow: { flexDirection: 'row', marginBottom: 4 },
   confidenceLabel: { fontSize: 12, fontWeight: '700', color: colors.text },
-  confidenceTrack: {
-    height: CONFIDENCE_CURSOR_SIZE,
-    justifyContent: 'center',
-  },
-  confidenceTrackLine: {
-    height: 3,
-    borderRadius: radius.pill,
-    overflow: 'hidden',
-  },
-  // Même traitement que le curseur du Prediscore (blanc, bord noir) — la
-  // jauge de confiance suit désormais le même schéma visuel de bout en bout.
-  confidenceCursor: {
-    position: 'absolute',
-    width: CONFIDENCE_CURSOR_SIZE,
-    height: CONFIDENCE_CURSOR_SIZE,
-    borderRadius: CONFIDENCE_CURSOR_SIZE / 2,
-    backgroundColor: colors.surface,
-    borderWidth: 2,
-    borderColor: colors.text,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.25,
-    shadowRadius: 2,
-    elevation: 2,
-  },
   // Deux actions d'engagement immédiat, sans quitter le Fil. Contour fin +
   // fond blanc : présentes sans écraser la carte.
   quickVoteRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
