@@ -151,7 +151,7 @@ export function InlineComments({
                     </Pressable>
                     {canDelete && (
                       <Pressable onPress={() => handleDelete(comment.id)} hitSlop={8}>
-                        <Trash2 size={14} color={colors.textFaint} strokeWidth={1.75} />
+                        <Trash2 size={14} color={colors.icon} strokeWidth={1.75} />
                       </Pressable>
                     )}
                   </View>
@@ -194,7 +194,7 @@ export function InlineComments({
             Réponse à {replyingTo.username} : « {replyingTo.preview} »
           </Text>
           <Pressable onPress={() => setReplyingTo(null)} hitSlop={8}>
-            <X size={14} color={colors.textFaint} strokeWidth={1.75} />
+            <X size={14} color={colors.icon} strokeWidth={1.75} />
           </Pressable>
         </View>
       )}

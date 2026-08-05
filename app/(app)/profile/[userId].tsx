@@ -102,7 +102,7 @@ export default function FriendProfileScreen() {
               >
                 <Avatar url={profile.avatar_url} username={profile.username} size={72} />
               </Pressable>
-              <Text style={styles.username}>@{profile.username}</Text>
+              <Text style={styles.username}>{profile.username}</Text>
             </View>
 
             <View style={[styles.prediscoreCard, styles.sectionSpacing]}>

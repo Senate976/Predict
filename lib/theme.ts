@@ -29,11 +29,15 @@ export const colors = {
   dangerSoft: 'rgba(185, 28, 28, 0.08)',
   // Pastille de notification (badge de la cloche).
   notificationBadge: '#DC2626',
-  // Badges d'état de carte (délai, réalisé, manqué) : un seul traitement,
-  // volontairement sans distinction de couleur entre eux — fond jaune très
-  // clair, texte noir, comme demandé pour rester lisible et élégant.
-  badgeBg: 'rgba(250, 204, 21, 0.20)',
-  badgeText: '#111827',
+  // Verdict d'une prédiction révélée : un liseré sur le bord gauche de la
+  // carte, jamais une pastille de couleur. Verts/rouges volontairement
+  // désaturés — assez pour se lire d'un coup d'œil, pas assez pour jurer avec
+  // le jaune de la charte.
+  verdictRealized: '#3F7D5C',
+  verdictMissed: '#A6544D',
+  // Trait des icônes (Lucide) : noir adouci plutôt que gris clair, pour
+  // qu'elles ressortent sans être aussi dures qu'un noir pur.
+  icon: '#374151',
   // Barre de navigation : blanc pur, tranche sur le fond papier.
   navBar: '#FFFFFF',
   navBarBorder: 'rgba(17, 24, 39, 0.10)',

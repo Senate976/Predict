@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { MessageCircle, MoreHorizontal, ThumbsUp } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   Modal,
@@ -19,13 +20,15 @@ import {
   beliefPercentage,
   castEmojiReaction,
   EMOJI_REACTIONS,
+  fetchEmojiReactors,
   isRevealed,
   removeEmojiReaction,
   setPredictionUserState,
   type EmojiReaction,
+  type EmojiReactor,
   type PredictionFeedItem,
 } from '../lib/predictions';
-import { LinearGradient } from 'expo-linear-gradient';
+import { castVote, voteErrorMessage } from '../lib/votes';
 import { colors, fonts, radius } from '../lib/theme';
 import { Avatar } from './Avatar';
 import { InlineComments } from './InlineComments';
@@ -33,8 +36,8 @@ import { PredictWord } from './PredictWord';
 
 /** Largeur fixe de la bulle de réactions, ancrée par son bord droit sur le pouce. */
 const EMOJI_PANEL_WIDTH = 260;
-/** Diamètre du curseur de la jauge de confiance. */
-const CONFIDENCE_CURSOR_SIZE = 10;
+/** Diamètre du curseur de la jauge d'opinion. */
+const CONFIDENCE_CURSOR_SIZE = 12;
 
 /**
  * Carte d'une prédiction, partagée entre les onglets À venir et Passées du
@@ -90,12 +93,24 @@ export function PredictionCard({
   const [isHidden, setIsHidden] = useState(item.is_hidden);
   const [myEmoji, setMyEmoji] = useState<EmojiReaction | null>(item.my_emoji_reaction);
   const [emojiCounts, setEmojiCounts] = useState(item.emoji_counts);
+  const [reactorsOpen, setReactorsOpen] = useState(false);
+  const [reactors, setReactors] = useState<EmojiReactor[] | null>(null);
+  const [reactorsLoading, setReactorsLoading] = useState(false);
+  const [reactorsError, setReactorsError] = useState<string | null>(null);
+  const [believeVotes, setBelieveVotes] = useState(item.believe_votes);
+  const [disbelieveVotes, setDisbelieveVotes] = useState(item.disbelieve_votes);
+  const [localVote, setLocalVote] = useState<'believe' | 'disbelieve' | null>(null);
+  const [voting, setVoting] = useState(false);
+  const [voteError, setVoteError] = useState<string | null>(null);
   const revealAt = new Date(item.reveal_at);
   const revealed = isRevealed(item, now);
   const isAuthor = item.author_id === userId;
 
   const verdict = revealed && item.final_status !== 'pending' ? item.final_status : null;
-  const belief = item.is_immediate ? beliefPercentage(item) : null;
+  const belief = item.is_immediate
+    ? beliefPercentage({ ...item, believe_votes: believeVotes, disbelieve_votes: disbelieveVotes })
+    : null;
+  const voted = hasVoted || localVote !== null;
 
   useEffect(() => {
     let cancelled = false;
@@ -146,6 +161,41 @@ export function PredictionCard({
       setIsHidden(!next);
       onHiddenChange?.(!next);
     }
+  }
+
+  /** Vote rapide « 🔥 confiant / ❌ pas confiant », posé sans quitter le Fil. */
+  async function handleQuickVote(value: 'believe' | 'disbelieve') {
+    if (voting) return;
+    setVoting(true);
+    setVoteError(null);
+    const { error } = await castVote(item.id, userId, value);
+    setVoting(false);
+    if (error) {
+      setVoteError(voteErrorMessage(error));
+      return;
+    }
+    setLocalVote(value);
+    if (value === 'believe') setBelieveVotes((v) => v + 1);
+    else setDisbelieveVotes((v) => v + 1);
+  }
+
+  /** Charge le détail « qui a réagi avec quoi », une seule fois par carte. */
+  async function openReactors() {
+    setReactorsOpen(true);
+    if (reactors !== null) return;
+    setReactorsLoading(true);
+    const { data, error } = await fetchEmojiReactors(item.id);
+    // Ne jamais confondre un échec de chargement avec « personne n'a réagi » :
+    // ce panneau ne s'ouvre que si le compteur est > 0, donc une liste vide
+    // serait forcément un mensonge. `reactors` reste `null` pour permettre un
+    // nouvel essai à la prochaine ouverture.
+    if (error) {
+      setReactorsError('Chargement impossible.');
+    } else {
+      setReactorsError(null);
+      setReactors(data ?? []);
+    }
+    setReactorsLoading(false);
   }
 
   function adjustCounts(
@@ -277,6 +327,7 @@ export function PredictionCard({
   return (
     <View style={styles.card}>
       <Pressable onPress={() => onPress?.()} style={({ pressed }) => pressed && styles.cardPressed}>
+        {/* Une seule ligne : [avatar][pseudo] ...espace flexible... [badge] [menu]. */}
         <View style={styles.cardHeader}>
           {authorLabel && (
             <Pressable
@@ -298,30 +349,24 @@ export function PredictionCard({
 
           <View style={styles.headerSpacer} />
 
-          <Pressable onPress={() => setMenuOpen(true)} style={styles.menuButton} hitSlop={8}>
-            <MoreHorizontal size={18} color={colors.textFaint} strokeWidth={1.75} />
-          </Pressable>
-        </View>
-
-        {/* Sur sa propre ligne, sous le pseudo — pour que celui-ci s'affiche
-            toujours en entier (y compris « Réalisé »/« Manqué »), sans
-            grossir l'étiquette elle-même. */}
-        {!verdict && !revealed && (
-          <View style={styles.badgeRow}>
+          {!verdict && !revealed && (
+            <Text style={styles.badgeText} numberOfLines={1}>
+              {item.open_ended ? 'En temps voulu' : formatCountdown(revealAt, now)}
+            </Text>
+          )}
+          {verdict && (
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>
-                {item.open_ended ? 'En temps voulu' : formatCountdown(revealAt, now)}
-              </Text>
-            </View>
-          </View>
-        )}
-        {verdict && (
-          <View style={styles.badgeRow}>
-            <View style={styles.badge}>
+              {/* Liseré très discret plutôt qu'une pastille pleine — juste de
+                  quoi confirmer le sens du mot d'un coup d'œil. */}
+              <View style={[styles.badgeDot, verdict === 'realized' ? styles.badgeDotRealized : styles.badgeDotMissed]} />
               <Text style={styles.badgeText}>{verdict === 'realized' ? 'Réalisé' : 'Manqué'}</Text>
             </View>
-          </View>
-        )}
+          )}
+
+          <Pressable onPress={() => setMenuOpen(true)} style={styles.menuButton} hitSlop={8}>
+            <MoreHorizontal size={18} color={colors.icon} strokeWidth={1.75} />
+          </Pressable>
+        </View>
 
         <Text style={styles.cardTeaser}>{item.teaser}</Text>
 
@@ -331,17 +376,27 @@ export function PredictionCard({
               <Text style={styles.beliefScore}>Personne n’a encore donné son avis.</Text>
             ) : (
               <>
-                <View style={styles.confidenceLabelRow}>
-                  <Text style={styles.confidenceLabel}>Confiance</Text>
-                  <Text style={styles.confidenceValue}>{belief}%</Text>
+                {/* Le chiffre flotte au-dessus du curseur plutôt que sur sa
+                    propre ligne pleine largeur — rien d'écrit sur la jauge
+                    elle-même, juste ce repère ponctuel. Positionné via
+                    `justifyContent` (gauche/centre/droite selon le tiers où
+                    tombe le curseur) plutôt qu'un pourcentage exact : robuste
+                    sans mesurer la largeur du texte. */}
+                <View
+                  style={[
+                    styles.confidenceLabelRow,
+                    {
+                      justifyContent: belief < 35 ? 'flex-start' : belief > 65 ? 'flex-end' : 'center',
+                    },
+                  ]}
+                >
+                  <Text style={styles.confidenceLabel}>
+                    {belief}% confiants ({believeVotes + disbelieveVotes} vote
+                    {believeVotes + disbelieveVotes > 1 ? 's' : ''})
+                  </Text>
                 </View>
                 <View style={styles.confidenceTrack}>
-                  <LinearGradient
-                    colors={[colors.text, colors.gold]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.confidenceGradient}
-                  />
+                  <View style={styles.confidenceTrackLine} />
                   <View
                     style={[
                       styles.confidenceCursor,
@@ -355,34 +410,68 @@ export function PredictionCard({
         )}
       </Pressable>
 
-      {revealed && !isAuthor && !hasVoted && (
+      {item.is_immediate && revealed && !isAuthor && !voted && (
+        <View style={styles.quickVoteRow}>
+          <Pressable
+            onPress={() => handleQuickVote('believe')}
+            disabled={voting}
+            style={styles.quickVotePill}
+            hitSlop={4}
+          >
+            <Text style={styles.quickVotePillText}>🔥 confiant</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => handleQuickVote('disbelieve')}
+            disabled={voting}
+            style={styles.quickVotePill}
+            hitSlop={4}
+          >
+            <Text style={styles.quickVotePillText}>❌ pas confiant</Text>
+          </Pressable>
+        </View>
+      )}
+      {voteError && <Text style={styles.voteError}>{voteError}</Text>}
+
+      {!item.is_immediate && revealed && !isAuthor && !hasVoted && (
         <Pressable onPress={() => onPress?.()} style={styles.voteLink} hitSlop={4}>
           <Text style={styles.voteLinkText}>Donner mon avis sur ce <PredictWord /> →</Text>
         </Pressable>
       )}
 
       <View style={styles.footerRow}>
+        {/* Sobre quand il n'y a rien à voir ; icône plus marquée et chiffre
+            en gras noir dès qu'il y a au moins un commentaire. */}
         <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
           <MessageCircle
             size={17}
-            color={colors.textMuted}
+            color={(commentCount ?? 0) > 0 ? colors.icon : colors.textFaint}
             strokeWidth={1.75}
-            fill={commentsOpen ? colors.textMuted : 'none'}
+            fill={commentsOpen ? colors.icon : 'none'}
           />
-          <Text style={styles.commentsToggleText}>{commentCount ?? 0}</Text>
+          {(commentCount ?? 0) > 0 && (
+            <Text style={styles.commentsToggleText}>{commentCount}</Text>
+          )}
         </Pressable>
 
         {/* Discret, façon Facebook : un pouce en filigrane (ou l'emoji déjà
             choisi) — maintenir le doigt fait apparaître la bulle de
-            réactions au-dessus, la faire glisser dessus en sélectionne une. */}
+            réactions au-dessus, la faire glisser dessus en sélectionne une.
+            Le chiffre est un bouton à part : un tap dessus ouvre le détail
+            de qui a réagi avec quoi, sans interférer avec le geste du pouce. */}
         <View style={styles.reactionTriggerWrap}>
-          <View style={styles.reactionTrigger} hitSlop={8} {...panResponder.panHandlers}>
-            {myEmoji ? (
-              <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
-            ) : (
-              <ThumbsUp size={17} color={colors.textFaint} strokeWidth={1.75} />
+          <View style={styles.reactionTriggerRow}>
+            <View style={styles.reactionTrigger} hitSlop={8} {...panResponder.panHandlers}>
+              {myEmoji ? (
+                <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
+              ) : (
+                <ThumbsUp size={17} color={totalReactions > 0 ? colors.icon : colors.textFaint} strokeWidth={1.75} />
+              )}
+            </View>
+            {totalReactions > 0 && (
+              <Pressable onPress={openReactors} hitSlop={8}>
+                <Text style={styles.reactionTriggerCount}>{totalReactions}</Text>
+              </Pressable>
             )}
-            {totalReactions > 0 && <Text style={styles.reactionTriggerCount}>{totalReactions}</Text>}
           </View>
 
           {emojiPanelOpen && (
@@ -465,6 +554,36 @@ export function PredictionCard({
           </Pressable>
         </Pressable>
       </Modal>
+
+      <Modal
+        visible={reactorsOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setReactorsOpen(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setReactorsOpen(false)}>
+          <Pressable style={styles.reactorsBox} onPress={() => {}}>
+            <Text style={styles.reactorsTitle}>Réactions</Text>
+            {reactorsLoading ? (
+              <ActivityIndicator color={colors.text} style={styles.reactorsLoader} />
+            ) : reactorsError ? (
+              <Text style={styles.reactorsEmpty}>{reactorsError}</Text>
+            ) : reactors && reactors.length > 0 ? (
+              reactors.map((r) => (
+                <View key={r.user_id} style={styles.reactorRow}>
+                  <Avatar url={r.avatar_url} username={r.username} size={26} />
+                  <Text style={styles.reactorName} numberOfLines={1}>
+                    {r.username}
+                  </Text>
+                  <Text style={styles.reactorEmoji}>{r.emoji}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.reactorsEmpty}>Personne n’a encore réagi.</Text>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -481,51 +600,76 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     backgroundColor: colors.surface,
   },
-  // Une seule ligne : [avatar][pseudo] ...espace flexible... [badge délai] [menu].
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  // Tout sur une seule ligne :
+  // [avatar 32][pseudo] ...espace flexible... [badge temps] [menu '...'].
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   headerSpacer: { flex: 1, minWidth: 8 },
-  // Plus de plafond à 55% : sur sa propre ligne face au seul bouton « ... »,
-  // le pseudo (et la citation éventuelle) peut s'afficher en entier.
-  authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
-  authorName: { fontSize: 14, fontWeight: '500', color: colors.text, flexShrink: 1 },
+  // `flexShrink` sur le bloc auteur ET sur le pseudo : c'est le pseudo qui se
+  // tronque avec ellipse si la place manque, jamais le badge ni le menu.
+  authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, minWidth: 0 },
+  authorName: { fontSize: 14, fontWeight: '600', color: colors.text, flexShrink: 1, minWidth: 0 },
   mentionTag: { fontSize: 12, fontWeight: '500', color: colors.textMuted, flexShrink: 1 },
   menuButton: { padding: 2 },
-  badgeRow: { alignItems: 'flex-start', marginBottom: 10 },
-  // Un seul traitement pour tous les badges d'état (délai, réalisé, manqué) :
-  // fond jaune très clair, texte noir — pas de distinction de couleur entre
-  // eux, le libellé porte le sens.
-  badge: {
-    borderRadius: radius.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: colors.badgeBg,
-  },
-  badgeText: { fontSize: 12, fontWeight: '700', color: colors.badgeText },
+  // Texte simple pour le délai (rien à signaler encore) ; pour le verdict,
+  // un point très discret devant le mot plutôt qu'une pastille pleine — le
+  // jaune plein ne convenait pas ici, réservé aux éléments interactifs
+  // majeurs. `flexShrink: 0` : jamais compressé par un long pseudo.
+  badge: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 0 },
+  badgeDot: { width: 6, height: 6, borderRadius: 3 },
+  badgeDotRealized: { backgroundColor: colors.verdictRealized },
+  badgeDotMissed: { backgroundColor: colors.verdictMissed },
+  badgeText: { fontSize: 12, fontWeight: '600', color: colors.textMuted, flexShrink: 0 },
   cardTeaser: {
     fontFamily: fonts.sansBold,
     fontSize: 16,
     color: colors.text,
     lineHeight: 22,
   },
-  beliefScore: { fontSize: 13, fontWeight: '700', color: colors.text, marginTop: 8 },
-  // « Confiance » : dégradé noir → jaune, comme le Prediscore, mais en
-  // format réduit pour ne pas grossir l'étiquette de la carte. Le curseur
-  // marque le pourcentage plutôt qu'un remplissage bicolore.
-  confidenceBlock: { marginTop: 10 },
-  confidenceLabelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  confidenceLabel: { fontSize: 11, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  confidenceValue: { fontSize: 12, fontWeight: '800', color: colors.text },
-  confidenceTrack: { height: CONFIDENCE_CURSOR_SIZE, justifyContent: 'center' },
-  confidenceGradient: { height: 3, borderRadius: radius.pill },
+  beliefScore: { fontSize: 13, color: colors.textMuted, marginTop: 10 },
+  // Jauge d'opinion : rien d'écrit sur la barre elle-même — juste un curseur
+  // à la position du pourcentage, et le chiffre qui flotte au-dessus.
+  confidenceBlock: { marginTop: 12 },
+  confidenceLabelRow: { flexDirection: 'row', marginBottom: 4 },
+  confidenceLabel: { fontSize: 12, fontWeight: '700', color: colors.text },
+  confidenceTrack: {
+    height: CONFIDENCE_CURSOR_SIZE,
+    justifyContent: 'center',
+  },
+  confidenceTrackLine: {
+    height: 3,
+    borderRadius: radius.pill,
+    backgroundColor: '#E5E7EB',
+  },
   confidenceCursor: {
     position: 'absolute',
     width: CONFIDENCE_CURSOR_SIZE,
     height: CONFIDENCE_CURSOR_SIZE,
     borderRadius: CONFIDENCE_CURSOR_SIZE / 2,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.gold,
     borderWidth: 2,
-    borderColor: colors.text,
+    borderColor: colors.surface,
+    // Ombre légère : le curseur doit se détacher de la ligne, jaune sur
+    // gris clair manque sinon de relief.
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 2,
+    elevation: 2,
   },
+  // Deux actions d'engagement immédiat, sans quitter le Fil. Contour fin +
+  // fond blanc : présentes sans écraser la carte.
+  quickVoteRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  quickVotePill: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingVertical: 9,
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+  },
+  quickVotePillText: { fontSize: 13, fontWeight: '700', color: colors.text },
+  voteError: { fontSize: 12, color: colors.danger, marginTop: 8 },
   voteLink: { marginTop: 10 },
   voteLinkText: { fontSize: 13, fontWeight: '600', color: colors.text, textDecorationLine: 'underline' },
   modalOverlay: {
@@ -597,9 +741,30 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   commentsToggle: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  commentsToggleText: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
+  // Affiché seulement s'il y a au moins un commentaire — donc toujours en
+  // gras noir : c'est une interaction réelle, pas un zéro décoratif.
+  commentsToggleText: { fontSize: 13, fontWeight: '700', color: colors.text },
   reactionTriggerWrap: { position: 'relative' },
-  reactionTrigger: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  reactionTriggerRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  reactionTrigger: { flexDirection: 'row', alignItems: 'center' },
   reactionTriggerEmoji: { fontSize: 17 },
-  reactionTriggerCount: { fontSize: 11, fontWeight: '600', color: colors.textFaint },
+  reactionTriggerCount: { fontSize: 13, fontWeight: '700', color: colors.text },
+  // Détail « qui a réagi avec quoi » — une ligne par personne, ouverte en
+  // tapant le compteur de réactions.
+  reactorsBox: {
+    width: '100%',
+    maxWidth: 320,
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+  },
+  reactorsTitle: { fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 10 },
+  reactorsLoader: { marginVertical: 12 },
+  reactorsEmpty: { fontSize: 13, color: colors.textFaint },
+  reactorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7 },
+  reactorName: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.text },
+  reactorEmoji: { fontSize: 18 },
 });

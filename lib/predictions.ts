@@ -286,6 +286,55 @@ export async function removeEmojiReaction(predictionId: string, userId: string) 
     .eq('user_id', userId);
 }
 
+/** Qui a réagi, et avec quel emoji — pour le détail « qui a mis quoi ». */
+export type EmojiReactor = {
+  user_id: string;
+  emoji: EmojiReaction;
+  username: string;
+  avatar_url: string | null;
+};
+
+/**
+ * Le détail des réactions d'une prédiction, une par personne. Deux requêtes
+ * plutôt qu'un embed PostgREST — même raison que `fetchPredictionRecipients`
+ * ci-dessus.
+ */
+export async function fetchEmojiReactors(predictionId: string) {
+  const { data, error } = await supabase
+    .from('prediction_emoji_reactions')
+    .select('user_id, emoji')
+    .eq('prediction_id', predictionId)
+    .order('created_at', { ascending: true });
+
+  if (error || !data) {
+    return { data: null, error };
+  }
+
+  if (data.length === 0) {
+    return { data: [] as EmojiReactor[], error: null };
+  }
+
+  const userIds = data.map((r) => r.user_id);
+  const { data: profiles, error: profilesError } = await supabase
+    .from('profiles')
+    .select('id, username, avatar_url')
+    .in('id', userIds);
+
+  if (profilesError) {
+    return { data: null, error: profilesError };
+  }
+
+  const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
+  const reactors: EmojiReactor[] = data.map((r) => ({
+    user_id: r.user_id,
+    emoji: r.emoji as EmojiReaction,
+    username: byId.get(r.user_id)?.username ?? '…',
+    avatar_url: byId.get(r.user_id)?.avatar_url ?? null,
+  }));
+
+  return { data: reactors, error: null };
+}
+
 /** Un destinataire d'une prédiction, avec son profil assemblé côté client. */
 export type PredictionRecipient = {
   user_id: string;

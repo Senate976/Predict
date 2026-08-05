@@ -28,7 +28,7 @@ import {
   type PredictionFeedItem,
 } from '../../../lib/predictions';
 import { supabase } from '../../../lib/supabase';
-import { colors, fonts, radius, spacing } from '../../../lib/theme';
+import { colors, fonts, spacing } from '../../../lib/theme';
 
 /**
  * Période de rafraîchissement des comptes à rebours.
@@ -295,7 +295,7 @@ export default function HomeScreen() {
 
         {hasActiveFilters && (
           <Pressable onPress={resetFilters} style={styles.filtersReset} hitSlop={4}>
-            <XCircle size={14} color={colors.textFaint} strokeWidth={1.75} />
+            <XCircle size={14} color={colors.icon} strokeWidth={1.75} />
             <Text style={styles.filtersResetText}>Réinitialiser</Text>
           </Pressable>
         )}
@@ -317,7 +317,7 @@ export default function HomeScreen() {
                     <Text style={styles.menuRowValue} numberOfLines={1}>
                       {authorFilter ? authors[authorFilter]?.username ?? '…' : 'Tous'}
                     </Text>
-                    <ChevronRight size={16} color={colors.textFaint} strokeWidth={1.75} />
+                    <ChevronRight size={16} color={colors.icon} strokeWidth={1.75} />
                   </View>
                 </Pressable>
 

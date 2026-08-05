@@ -598,11 +598,15 @@ const styles = StyleSheet.create({
   },
   username: { fontSize: 15, color: colors.text, fontWeight: '600' },
   usernameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  // Actions en ligne, allégées comme dans le Cercle : contour plutôt que
+  // jaune plein.
   pillGold: {
-    backgroundColor: colors.gold,
+    borderWidth: 1,
+    borderColor: colors.text,
     borderRadius: radius.pill,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 7,
+    backgroundColor: colors.surface,
   },
   pillGoldText: { color: colors.text, fontSize: 13, fontWeight: '700' },
   pillOutline: {
@@ -610,7 +614,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.pill,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 7,
   },
   pillOutlineText: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
   error: {
