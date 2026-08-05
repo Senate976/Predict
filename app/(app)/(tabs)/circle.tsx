@@ -17,7 +17,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar } from '../../../components/Avatar';
 import { PredictWatermark } from '../../../components/PredictWatermark';
 import { QuickCreateButton } from '../../../components/QuickCreateButton';
-import { ScreenBackground } from '../../../components/ScreenBackground';
 import { useAuth } from '../../../lib/auth';
 import {
   acceptFriendRequest,
@@ -297,7 +296,6 @@ export default function CircleScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScreenBackground />
       <PredictWatermark opacity={0.05} />
 
       <View style={styles.header}>
@@ -662,7 +660,7 @@ export default function CircleScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: 'transparent' },
+  safe: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

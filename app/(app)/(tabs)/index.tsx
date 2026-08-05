@@ -17,7 +17,6 @@ import { Avatar } from '../../../components/Avatar';
 import { CelebrationBurst } from '../../../components/CelebrationBurst';
 import { PredictionCard } from '../../../components/PredictionCard';
 import { PredictWord } from '../../../components/PredictWord';
-import { ScreenBackground } from '../../../components/ScreenBackground';
 import { WelcomeOnboarding } from '../../../components/WelcomeOnboarding';
 import { useAuth } from '../../../lib/auth';
 import { fetchNotifications, markNotificationRead } from '../../../lib/notifications';
@@ -246,7 +245,6 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScreenBackground />
       <WelcomeOnboarding visible={onboarded === false} onStart={handleStartFirstPrediction} />
 
       <CelebrationBurst
@@ -465,22 +463,18 @@ export default function HomeScreen() {
         )}
       </ScrollView>
 
-      <View style={styles.footer}>
-        <Pressable
-          onPress={() => router.push('/new-prediction')}
-          style={({ pressed }) => [styles.create, pressed && styles.createPressed]}
-        >
-          <Text style={styles.createText}>
-            Nouveau <PredictWord />
-          </Text>
-        </Pressable>
-      </View>
+      <Pressable
+        onPress={() => router.push('/new-prediction')}
+        style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+      >
+        <Ionicons name="add" size={28} color="#FFFFFF" />
+      </Pressable>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: 'transparent' },
+  safe: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -592,7 +586,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   menuBackText: { fontSize: 13, fontWeight: '700', color: colors.gold },
-  scroll: { padding: spacing.lg, paddingBottom: 8, flexGrow: 1 },
+  scroll: { padding: spacing.lg, paddingBottom: 88, flexGrow: 1 },
   loader: { marginTop: 32 },
   empty: { paddingVertical: 24, alignItems: 'center' },
   emptyTitle: { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 6 },
@@ -610,25 +604,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 12,
   },
-  footer: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: 12,
-    paddingBottom: 20,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+  // Bouton flottant (FAB) : action principale de l'écran, doit rester
+  // visible et contrastée par-dessus le fil qui défile dessous.
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.gold,
     alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  create: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gold,
-  },
-  createPressed: { opacity: 0.6 },
-  createText: {
-    color: colors.gold,
-    fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
-  },
+  fabPressed: { backgroundColor: colors.goldBright },
 });

@@ -1,16 +1,16 @@
-// Charte graphique « Luxe & minimaliste » : fond ivoire, typographie
-// quasi-noire épurée, accents dorés réservés aux éléments d'interaction. Un
+// Charte graphique « Neutre & sobre » : fond gris très clair, texte sombre à
+// fort contraste, doré réservé aux accents (états actifs, CTA principal). Un
 // seul endroit à changer si la palette évolue — tous les écrans importent
 // d'ici plutôt que de coder leurs propres couleurs.
 
 export const colors = {
-  background: '#FAF8F3',
+  background: '#F8F9FA',
   surface: '#FFFFFF',
   surfaceRaised: '#FFFFFF',
-  border: '#E7E2D6',
-  text: '#171512',
-  textMuted: '#6E6A61',
-  textFaint: '#A39D8E',
+  border: '#E5E7EB',
+  text: '#1A1A1A',
+  textMuted: '#6C757D',
+  textFaint: '#9CA3AF',
   gold: '#AD8A3E',
   goldBright: '#C7A458',
   goldSoft: 'rgba(173, 138, 62, 0.12)',
@@ -21,13 +21,12 @@ export const colors = {
   // Réservées au sceau de cire (components/PredictionSeal.tsx).
   wax: '#7A2331',
   waxDark: '#5C1A25',
-  // Barre de navigation : jaune moutarde/doré (texture de grain appliquée
-  // par-dessus, voir components/NavBarBackground.tsx), avec des icônes brun
-  // foncé façon détails du vitrail pour rester lisible sur ce fond clair.
-  navBar: '#D4A017',
-  navBarBorder: '#A67C0A',
-  navBarActive: '#3A2113',
-  navBarInactive: 'rgba(58, 33, 19, 0.45)',
+  // Barre de navigation : neutre comme le reste de l'interface — seule
+  // l'icône active porte l'accent doré de la marque.
+  navBar: '#FFFFFF',
+  navBarBorder: '#E5E7EB',
+  navBarActive: '#AD8A3E',
+  navBarInactive: '#6C757D',
 } as const;
 
 export const radius = {
@@ -50,20 +49,18 @@ export const spacing = {
 } as const;
 
 /**
- * Deux familles, façon logo : `display` (Cinzel, capitales monumentales)
- * pour la marque et les titres d'écran ; `serif`/`serifItalic` (Cormorant
- * Garamond) pour le texte courant qui demande du chic — le teaser et le
- * contenu d'une prédiction, les citations. Le reste de l'interface (labels,
- * boutons, champs) garde la police système, plus lisible en petite taille.
- * Chaque nom doit correspondre exactement à la clé passée à `useFonts` dans
- * `app/_layout.tsx`, faute de quoi React Native retombe silencieusement sur la
- * police système.
+ * Une seule famille sans-serif moderne (Inter) pour toute l'interface — les
+ * quatre clés ne varient plus que par la graisse, pas par la police, pour
+ * une hiérarchie cohérente sans effet « habillage » (titres en majuscules,
+ * teaser en semi-gras — plus d'italique nulle part). Chaque nom doit
+ * correspondre exactement à la clé passée à `useFonts` dans `app/_layout.tsx`,
+ * faute de quoi React Native retombe silencieusement sur la police système.
  */
 export const fonts = {
-  display: 'Cinzel_700Bold',
-  serif: 'CormorantGaramond_500Medium',
-  serifItalic: 'CormorantGaramond_500Medium_Italic',
-  serifSemiBold: 'CormorantGaramond_600SemiBold',
+  display: 'Inter_700Bold',
+  serif: 'Inter_400Regular',
+  serifItalic: 'Inter_600SemiBold',
+  serifSemiBold: 'Inter_600SemiBold',
 } as const;
 
 /**

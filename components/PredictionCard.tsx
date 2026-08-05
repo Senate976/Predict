@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
+  Modal,
   PanResponder,
   Platform,
   Pressable,
@@ -28,7 +29,6 @@ import {
 import { colors, fonts, radius } from '../lib/theme';
 import { Avatar } from './Avatar';
 import { InlineComments } from './InlineComments';
-import { PredictWatermark } from './PredictWatermark';
 import { PredictWord } from './PredictWord';
 
 /** Largeur fixe de la bulle de réactions — nécessaire pour la centrer
@@ -84,6 +84,7 @@ export function PredictionCard({
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentCount, setCommentCount] = useState<number | null>(null);
   const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [isFavorite, setIsFavorite] = useState(item.is_favorite);
   const [isHidden, setIsHidden] = useState(item.is_hidden);
   const [myEmoji, setMyEmoji] = useState<EmojiReaction | null>(item.my_emoji_reaction);
@@ -273,14 +274,10 @@ export function PredictionCard({
   ).current;
 
   return (
-    <View
-      style={[
-        styles.card,
-        verdict === 'realized' && styles.cardRealized,
-        verdict === 'missed' && styles.cardMissed,
-      ]}
-    >
-      <PredictWatermark opacity={0.07} size={130} />
+    <View style={styles.card}>
+      <Pressable onPress={() => setMenuOpen(true)} style={styles.menuButton} hitSlop={8}>
+        <Ionicons name="ellipsis-horizontal" size={18} color={colors.textFaint} />
+      </Pressable>
 
       <Pressable onPress={() => onPress?.()} style={({ pressed }) => pressed && styles.cardPressed}>
         <View style={styles.cardTop}>
@@ -310,7 +307,19 @@ export function PredictionCard({
                 </Text>
               </View>
             )}
-            <Text style={styles.categoryTag}>Thème : {CATEGORY_LABEL[item.category]}</Text>
+            {verdict && (
+              <View style={[styles.badge, verdict === 'realized' ? styles.badgeRealized : styles.badgeMissed]}>
+                <Text
+                  style={[
+                    styles.badgeText,
+                    verdict === 'realized' ? styles.badgeTextRealized : styles.badgeTextMissed,
+                  ]}
+                >
+                  {verdict === 'realized' ? 'Réalisé' : 'Manqué'}
+                </Text>
+              </View>
+            )}
+            <Text style={styles.categoryTag}>{CATEGORY_LABEL[item.category]}</Text>
           </View>
         </View>
 
@@ -383,28 +392,6 @@ export function PredictionCard({
             </View>
           )}
         </View>
-
-        <Pressable onPress={handleToggleFavorite} hitSlop={8}>
-          <Ionicons
-            name={isFavorite ? 'star' : 'star-outline'}
-            size={18}
-            color={isFavorite ? colors.gold : colors.textMuted}
-          />
-        </Pressable>
-
-        <Pressable onPress={handleToggleHidden} hitSlop={8}>
-          <Ionicons
-            name={isHidden ? 'eye-off' : 'eye-off-outline'}
-            size={18}
-            color={isHidden ? colors.gold : colors.textMuted}
-          />
-        </Pressable>
-
-        {revealed && isAuthor && onDelete && (
-          <Pressable onPress={handleDeletePress} hitSlop={4}>
-            <Ionicons name="trash-outline" size={17} color={colors.danger} />
-          </Pressable>
-        )}
       </View>
 
       {commentsOpen && (
@@ -416,6 +403,46 @@ export function PredictionCard({
           isPredictionAuthor={isAuthor}
         />
       )}
+
+      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setMenuOpen(false)}>
+          <Pressable style={styles.menuBox} onPress={() => {}}>
+            <Pressable
+              onPress={() => {
+                setMenuOpen(false);
+                handleToggleFavorite();
+              }}
+              style={styles.menuRow}
+            >
+              <Text style={styles.menuRowText}>
+                {isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                setMenuOpen(false);
+                handleToggleHidden();
+              }}
+              style={revealed && isAuthor && onDelete ? styles.menuRow : styles.menuRowLast}
+            >
+              <Text style={styles.menuRowText}>{isHidden ? 'Afficher à nouveau' : 'Masquer'}</Text>
+            </Pressable>
+
+            {revealed && isAuthor && onDelete && (
+              <Pressable
+                onPress={() => {
+                  setMenuOpen(false);
+                  handleDeletePress();
+                }}
+                style={styles.menuRowLast}
+              >
+                <Text style={styles.menuRowTextDanger}>Supprimer</Text>
+              </Pressable>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -424,30 +451,42 @@ const styles = StyleSheet.create({
   cardPressed: { opacity: 0.85 },
   card: {
     borderWidth: 1,
-    borderColor: 'rgba(173, 138, 62, 0.28)',
+    borderColor: colors.border,
     borderRadius: radius.xl,
     padding: 18,
+    paddingTop: 36,
     marginBottom: 12,
     backgroundColor: colors.surface,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
     elevation: 1,
+  },
+  // Menu secondaire (favoris, masquer, supprimer) — coin supérieur droit,
+  // hors du flux de `cardTop` pour ne jamais se chevaucher avec les badges.
+  menuButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    padding: 4,
+    zIndex: 1,
   },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 },
   authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, maxWidth: '65%' },
-  authorName: { fontSize: 13, fontWeight: '600', color: colors.textMuted, flexShrink: 1 },
-  mentionTag: { fontSize: 12, fontWeight: '600', color: colors.gold, flexShrink: 1 },
+  authorName: { fontSize: 13, fontWeight: '600', color: colors.text, flexShrink: 1 },
+  mentionTag: { fontSize: 12, fontWeight: '600', color: colors.textMuted, flexShrink: 1 },
   // Sur la droite de la carte (dans `cardTop`), pas sur sa propre ligne sous
   // le teaser — ça évite d'ajouter une ligne de hauteur à chaque carte.
-  cardTopRight: { alignItems: 'flex-end', gap: 2 },
+  cardTopRight: { alignItems: 'flex-end', gap: 4 },
   categoryTag: {
-    fontSize: 12,
-    fontStyle: 'italic',
-    fontWeight: '400',
-    color: colors.textFaint,
-    textAlign: 'right',
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textMuted,
+    backgroundColor: colors.background,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
   },
   badge: {
     borderRadius: radius.pill,
@@ -457,17 +496,44 @@ const styles = StyleSheet.create({
   badgeLocked: { backgroundColor: colors.goldSoft },
   badgeText: { fontSize: 12, fontWeight: '700' },
   badgeTextLocked: { color: colors.gold },
-  cardRealized: { borderLeftWidth: 4, borderLeftColor: colors.success },
-  cardMissed: { borderLeftWidth: 4, borderLeftColor: colors.danger },
+  badgeRealized: { backgroundColor: colors.successSoft },
+  badgeMissed: { backgroundColor: colors.dangerSoft },
+  badgeTextRealized: { color: colors.success },
+  badgeTextMissed: { color: colors.danger },
   cardTeaser: {
-    fontFamily: fonts.serifItalic,
-    fontSize: 20,
+    fontFamily: fonts.serifSemiBold,
+    fontSize: 18,
     color: colors.text,
-    lineHeight: 26,
+    lineHeight: 24,
   },
-  beliefScore: { fontSize: 13, fontWeight: '700', color: colors.gold, marginTop: 8 },
+  beliefScore: { fontSize: 13, fontWeight: '700', color: colors.text, marginTop: 8 },
   voteLink: { marginTop: 10 },
   voteLinkText: { fontSize: 13, fontWeight: '600', color: colors.gold },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  menuBox: {
+    width: '100%',
+    maxWidth: 320,
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  menuRow: {
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  menuRowLast: { paddingHorizontal: 18, paddingVertical: 14 },
+  menuRowText: { fontSize: 14, fontWeight: '600', color: colors.text },
+  menuRowTextDanger: { fontSize: 14, fontWeight: '600', color: colors.danger },
   // Une seule « grande bulle », façon Facebook — flottante au-dessus du
   // pouce (pas en dessous) pour ne pas être masquée par le doigt qui la
   // fait glisser, et pas des puces séparées.

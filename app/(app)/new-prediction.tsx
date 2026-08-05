@@ -19,7 +19,6 @@ import { CalendarPicker } from '../../components/CalendarPicker';
 import { PredictionRecorder } from '../../components/PredictionRecorder';
 import { PredictionSeal } from '../../components/PredictionSeal';
 import { PredictWord } from '../../components/PredictWord';
-import { ScreenBackground } from '../../components/ScreenBackground';
 import { SelectField, type SelectOption } from '../../components/SelectField';
 import { setPredictionAudioPath, uploadPredictionAudio } from '../../lib/audio';
 import { useAuth } from '../../lib/auth';
@@ -274,7 +273,6 @@ export default function NewPredictionScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScreenBackground />
       <PredictionSeal visible={showSeal} onFinish={() => router.back()} />
 
       <KeyboardAvoidingView
@@ -580,7 +578,7 @@ export default function NewPredictionScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: 'transparent' },
+  safe: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
   header: {
     flexDirection: 'row',

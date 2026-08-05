@@ -14,7 +14,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PredictWord } from '../../components/PredictWord';
-import { ScreenBackground } from '../../components/ScreenBackground';
 import { supabase } from '../../lib/supabase';
 import { colors, eyebrow, fonts, radius, spacing } from '../../lib/theme';
 
@@ -233,7 +232,6 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScreenBackground />
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -334,7 +332,7 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: 'transparent' },
+  safe: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: spacing.lg },
   brand: {
