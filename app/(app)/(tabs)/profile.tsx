@@ -376,7 +376,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: 'center',
   },
-  statCardActive: { borderWidth: 2, borderColor: colors.gold },
+  // Filtre actif : trait noir plus marqué sous la carte, pas de couleur.
+  statCardActive: { borderBottomWidth: 3, borderBottomColor: colors.text },
   // Pas de code couleur réalisé/manqué : seul le libellé sous le nombre
   // porte le sens, conformément à la palette stricte noir/blanc/jaune.
   statValue: { fontFamily: fonts.display, fontSize: 26, color: colors.text },
