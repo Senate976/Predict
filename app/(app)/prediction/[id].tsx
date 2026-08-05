@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AudioPlayerButton } from '../../../components/AudioPlayerButton';
 import { Avatar } from '../../../components/Avatar';
+import { ConfidenceGauge } from '../../../components/ConfidenceGauge';
 import { CreateFab } from '../../../components/CreateFab';
 import { InlineComments } from '../../../components/InlineComments';
 import { PredictWord } from '../../../components/PredictWord';
@@ -267,7 +268,7 @@ export default function PredictionDetailScreen() {
             {revealed ? (
               <View style={styles.datesBlock}>
                 <Text style={styles.sealedDate}>
-                  Scellée le {formatShortDateTime(new Date(prediction.created_at))}
+                  Scellé le {formatShortDateTime(new Date(prediction.created_at))}
                 </Text>
                 <Text style={styles.daysAdvance}>{advanceLabel}</Text>
               </View>
@@ -434,8 +435,13 @@ export default function PredictionDetailScreen() {
                 <Text style={styles.verdict}>
                   {beliefPercentage(prediction) === null
                     ? 'Personne n’a encore donné son avis.'
-                    : `${beliefPercentage(prediction)}% y croient · ${100 - beliefPercentage(prediction)!}% n’y croient pas`}
+                    : `${beliefPercentage(prediction)}% confiants et ${100 - beliefPercentage(prediction)!}% pas confiants`}
                 </Text>
+                {beliefPercentage(prediction) !== null && (
+                  <View style={styles.confidenceGaugeWrap}>
+                    <ConfidenceGauge belief={beliefPercentage(prediction)!} />
+                  </View>
+                )}
 
                 {!isAuthor && (
                   <>
@@ -528,7 +534,10 @@ const styles = StyleSheet.create({
   },
   teaser: { fontFamily: fonts.sansBold, fontSize: 24, color: colors.text, lineHeight: 30 },
   datesBlock: { marginTop: 10 },
-  sealedDate: { fontSize: 12, color: colors.textFaint },
+  // Un peu plus marqué que les autres repères secondaires de cet écran :
+  // savoir quand le Predict a été scellé reste une information importante,
+  // pas un simple détail à estomper.
+  sealedDate: { fontSize: 13, fontWeight: '700', color: colors.textMuted },
   daysAdvance: { fontSize: 16, fontWeight: '600', color: colors.textMuted, marginTop: 2 },
   daysAdvanceCentered: { fontSize: 16, fontWeight: '600', color: colors.textMuted, textAlign: 'center', marginTop: 10 },
   contentHero: {
@@ -551,13 +560,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   revealNowBox: { alignItems: 'center', marginTop: spacing.md },
-  // Bouton d'action majeur : rempli jaune, texte noir — pas un lien en
-  // couleur, illisible sur blanc.
+  // Même contour noir sur fond blanc que les autres actions de cet écran
+  // (« Ajouter », « Retirer ») — pas un remplissage jaune, réservé au FAB.
   revealNowButton: {
-    backgroundColor: colors.gold,
+    borderWidth: 1,
+    borderColor: colors.text,
     borderRadius: radius.pill,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+    backgroundColor: colors.surface,
   },
   revealNowButtonText: { fontSize: 13, fontWeight: '700', color: colors.text },
   verdictBox: {
@@ -573,7 +584,8 @@ const styles = StyleSheet.create({
   // « réalisée » reçoit simplement la mise en avant jaune.
   verdictBoxRealized: { borderLeftWidth: 4, borderLeftColor: colors.gold },
   verdictBoxMissed: { borderLeftWidth: 4, borderLeftColor: colors.border },
-  verdict: { fontFamily: fonts.serifItalic, fontSize: 19, color: colors.text, marginTop: 4 },
+  verdict: { fontFamily: fonts.sansBold, fontSize: 18, color: colors.text, marginTop: 4 },
+  confidenceGaugeWrap: { marginTop: 10 },
   voteRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
   voteButton: {
     flex: 1,
