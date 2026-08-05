@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
   },
   submit: {
     backgroundColor: colors.gold,
-    borderRadius: radius.sm,
+    borderRadius: radius.pill,
     paddingVertical: 15,
     alignItems: 'center',
     marginTop: 4,
@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
   },
   submitPressed: { backgroundColor: colors.goldBright },
   submitDisabled: { opacity: 0.6 },
-  submitText: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  submitText: { fontFamily: fonts.display, color: '#FFFFFF', fontSize: 16, textTransform: 'uppercase', letterSpacing: 0.5 },
   switch: { marginTop: 18, alignItems: 'center' },
   switchText: { color: colors.gold, fontSize: 14, fontWeight: '600' },
 });

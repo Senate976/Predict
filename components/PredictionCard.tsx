@@ -17,7 +17,6 @@ import { fetchCommentCount } from '../lib/comments';
 import { formatCountdown } from '../lib/datetime';
 import {
   beliefPercentage,
-  CATEGORY_LABEL,
   castEmojiReaction,
   EMOJI_REACTIONS,
   isRevealed,
@@ -325,11 +324,22 @@ export function PredictionCard({
         <Text style={styles.cardTeaser}>{item.teaser}</Text>
 
         {item.is_immediate && (
-          <Text style={styles.beliefScore}>
-            {belief === null
-              ? 'Personne n’a encore donné son avis.'
-              : `${belief}% y croient · ${100 - belief}% n’y croient pas`}
-          </Text>
+          <View style={styles.confidenceBlock}>
+            {belief === null ? (
+              <Text style={styles.beliefScore}>Personne n’a encore donné son avis.</Text>
+            ) : (
+              <>
+                <View style={styles.confidenceLabelRow}>
+                  <Text style={styles.confidenceLabel}>Confiance</Text>
+                  <Text style={styles.confidenceValue}>{belief}%</Text>
+                </View>
+                <View style={styles.confidenceBar}>
+                  <View style={[styles.confidenceFillBelieve, { flex: belief }]} />
+                  <View style={[styles.confidenceFillDisbelieve, { flex: 100 - belief }]} />
+                </View>
+              </>
+            )}
+          </View>
         )}
       </Pressable>
 
@@ -392,8 +402,6 @@ export function PredictionCard({
             </View>
           )}
         </View>
-
-        <Text style={styles.categoryTag}>{CATEGORY_LABEL[item.category]}</Text>
       </View>
 
       {commentsOpen && (
@@ -458,11 +466,12 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 12,
     backgroundColor: colors.surface,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    // Ombre douce teintée de l'accent plutôt qu'un gris neutre.
+    shadowColor: colors.gold,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 2,
   },
   // Une seule ligne : [avatar][pseudo] ...espace flexible... [badge délai] [menu].
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
@@ -471,16 +480,6 @@ const styles = StyleSheet.create({
   authorName: { fontSize: 14, fontWeight: '500', color: colors.text, flexShrink: 1 },
   mentionTag: { fontSize: 12, fontWeight: '500', color: colors.textMuted, flexShrink: 1 },
   menuButton: { padding: 2 },
-  // Thème : en bas de carte à côté des interactions, pas empilé sous le badge de délai.
-  categoryTag: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textMuted,
-    backgroundColor: colors.background,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
-  },
   badge: {
     borderRadius: radius.pill,
     paddingHorizontal: 10,
@@ -495,12 +494,27 @@ const styles = StyleSheet.create({
   badgeTextRealized: { color: colors.badgeRealizedText },
   badgeTextMissed: { color: colors.badgeMissedText },
   cardTeaser: {
-    fontFamily: fonts.serifSemiBold,
+    fontFamily: fonts.display,
     fontSize: 16,
     color: colors.text,
     lineHeight: 22,
   },
   beliefScore: { fontSize: 13, fontWeight: '700', color: colors.text, marginTop: 8 },
+  // Jauge bicolore « confiance » : matérialise les votes y croient/n'y
+  // croient pas d'une prédiction immédiate, en plus du pourcentage en texte.
+  confidenceBlock: { marginTop: 10 },
+  confidenceLabelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  confidenceLabel: { fontSize: 11, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  confidenceValue: { fontSize: 12, fontWeight: '800', color: colors.mint },
+  confidenceBar: {
+    flexDirection: 'row',
+    height: 8,
+    borderRadius: radius.pill,
+    overflow: 'hidden',
+    backgroundColor: colors.border,
+  },
+  confidenceFillBelieve: { backgroundColor: colors.mint },
+  confidenceFillDisbelieve: { backgroundColor: colors.badgeMissedText },
   voteLink: { marginTop: 10 },
   voteLinkText: { fontSize: 13, fontWeight: '600', color: colors.gold },
   modalOverlay: {

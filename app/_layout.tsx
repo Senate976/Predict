@@ -1,5 +1,8 @@
-import { Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
-import { PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
+import {
+  PlusJakartaSans_400Regular,
+  PlusJakartaSans_600SemiBold,
+} from '@expo-google-fonts/plus-jakarta-sans';
+import { Syne_800ExtraBold } from '@expo-google-fonts/syne';
 import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -50,10 +53,9 @@ export default function RootLayout() {
   // sinon React Native retombe silencieusement sur la police système sans
   // avertir.
   const [fontsLoaded] = useFonts({
-    Inter_400Regular,
-    Inter_600SemiBold,
-    Inter_700Bold,
-    PlusJakartaSans_700Bold,
+    PlusJakartaSans_400Regular,
+    PlusJakartaSans_600SemiBold,
+    Syne_800ExtraBold,
   });
 
   if (!fontsLoaded) {

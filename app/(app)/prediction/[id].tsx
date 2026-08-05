@@ -23,6 +23,7 @@ import { fetchFriendships, otherProfile, type FriendProfile } from '../../../lib
 import {
   addRecipient,
   beliefPercentage,
+  CATEGORY_LABEL,
   fetchPrediction,
   fetchPredictionOutcome,
   fetchPredictionRecipients,
@@ -252,6 +253,10 @@ export default function PredictionDetailScreen() {
                 <Text style={styles.authorName}>{author.username}</Text>
               </Pressable>
             )}
+
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryBadgeText}>{CATEGORY_LABEL[prediction.category]}</Text>
+            </View>
 
             <Text style={styles.teaser}>{prediction.teaser}</Text>
 
@@ -502,6 +507,23 @@ const styles = StyleSheet.create({
   eyebrowSmall: { ...eyebrow, fontSize: 10 },
   authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginBottom: 12 },
   authorName: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
+  // La catégorie n'apparaît plus sur la carte du Fil — seulement ici, une
+  // fois le Predict ouvert.
+  categoryBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.violetSoft,
+    borderRadius: radius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    marginBottom: 10,
+  },
+  categoryBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.violet,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   teaser: { fontFamily: fonts.serifItalic, fontSize: 28, color: colors.text, lineHeight: 36 },
   datesBlock: { marginTop: 10 },
   sealedDate: { fontSize: 12, color: colors.textFaint },

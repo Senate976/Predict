@@ -17,27 +17,29 @@ export function CreateFab() {
       style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
       hitSlop={4}
     >
-      <Plus size={26} color="#FFFFFF" strokeWidth={2} />
+      <Plus size={30} color="#FFFFFF" strokeWidth={2.5} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  // Gros, ultra-visible : couleur d'accent nette + ombre bien marquée de la
+  // même teinte, pour qu'il ressorte clairement du fil derrière lui.
   fab: {
     position: 'absolute',
     bottom: 24,
     right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: colors.fab,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: colors.gold,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 8,
     zIndex: 10,
   },
   fabPressed: { opacity: 0.85 },
