@@ -156,13 +156,11 @@ export default function ProfileScreen() {
         <View style={styles.identityCard}>
           <Pressable onPress={() => setAvatarMenuOpen(true)} disabled={uploadingAvatar} style={styles.avatarWrap}>
             <Avatar url={avatarUrl} username={username} size={84} />
-            <View style={styles.avatarEditBadge}>
-              {uploadingAvatar ? (
-                <ActivityIndicator size="small" color={colors.background} />
-              ) : (
-                <Text style={styles.avatarEditText}>Modifier</Text>
-              )}
-            </View>
+            {uploadingAvatar ? (
+              <ActivityIndicator size="small" color={colors.gold} style={styles.avatarEditLoader} />
+            ) : (
+              <Text style={styles.avatarEditText}>Modifier</Text>
+            )}
           </Pressable>
           {avatarError && <Text style={styles.error}>{avatarError}</Text>}
 
@@ -325,17 +323,17 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: 'center',
   },
-  avatarWrap: { position: 'relative' },
-  avatarEditBadge: {
-    position: 'absolute',
-    bottom: -4,
-    alignSelf: 'center',
-    backgroundColor: colors.gold,
-    borderRadius: radius.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
+  avatarWrap: { alignItems: 'center' },
+  avatarEditLoader: { marginTop: 8 },
+  avatarEditText: {
+    color: colors.gold,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    textDecorationLine: 'underline',
+    marginTop: 8,
   },
-  avatarEditText: { color: colors.background, fontSize: 10, fontWeight: '700' },
   username: { fontFamily: fonts.serifItalic, fontSize: 22, color: colors.text, marginTop: 6 },
   email: { fontSize: 13, color: colors.textFaint, marginTop: 4 },
   loader: { marginTop: 24 },

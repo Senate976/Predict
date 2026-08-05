@@ -1,12 +1,13 @@
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text } from 'react-native';
 
-import { colors, radius } from '../lib/theme';
+import { colors } from '../lib/theme';
 
 /**
  * Bouton "+" présent dans le header de chaque page hors Fil (qui a déjà son
  * propre bouton "Nouvelle prédiction" en pied de page) : accès direct à la
- * création sans devoir d'abord revenir au Fil.
+ * création sans devoir d'abord revenir au Fil. Un simple signe souligné,
+ * sans fond ni cercle — discret, pas une action principale de l'écran.
  */
 export function QuickCreateButton() {
   const router = useRouter();
@@ -23,13 +24,11 @@ export function QuickCreateButton() {
 
 const styles = StyleSheet.create({
   button: {
-    width: 34,
-    height: 34,
-    borderRadius: radius.pill,
-    backgroundColor: colors.gold,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: 2,
+    paddingBottom: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gold,
   },
-  buttonPressed: { backgroundColor: colors.goldBright },
-  plus: { color: '#FFFFFF', fontSize: 19, fontWeight: '700', marginTop: -1 },
+  buttonPressed: { opacity: 0.6 },
+  plus: { color: colors.gold, fontSize: 19, fontWeight: '700', lineHeight: 20 },
 });
