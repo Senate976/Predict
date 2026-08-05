@@ -332,11 +332,11 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+  safe: { flex: 1, backgroundColor: 'transparent' },
   flex: { flex: 1 },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: spacing.lg },
   brand: {
-    fontFamily: fonts.serifItalic,
+    fontFamily: fonts.display,
     fontSize: 18,
     letterSpacing: 4,
     color: colors.gold,
@@ -344,9 +344,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   title: {
-    fontFamily: fonts.serifItalic,
-    fontSize: 34,
+    fontFamily: fonts.display,
+    fontSize: 30,
+    letterSpacing: 1,
     color: colors.text,
+    textTransform: 'uppercase',
     marginBottom: 28,
   },
   field: { marginBottom: spacing.md },

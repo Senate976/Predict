@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
 
+import { NavBarBackground } from '../../../components/NavBarBackground';
 import { useAuth } from '../../../lib/auth';
 import { fetchUnreadNotificationCount } from '../../../lib/notifications';
 import { colors } from '../../../lib/theme';
@@ -37,10 +38,11 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.gold,
-        tabBarInactiveTintColor: colors.textFaint,
+        tabBarActiveTintColor: colors.navBarActive,
+        tabBarInactiveTintColor: colors.navBarInactive,
         tabBarStyle: styles.bar,
         tabBarShowLabel: false,
+        tabBarBackground: () => <NavBarBackground />,
       }}
     >
       <Tabs.Screen
@@ -89,8 +91,8 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   bar: {
-    backgroundColor: colors.surface,
-    borderTopColor: colors.border,
+    borderTopColor: colors.navBarBorder,
+    borderTopWidth: 1,
     height: 64,
     paddingTop: 12,
   },

@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
+import { PredictWatermark } from '../../../components/PredictWatermark';
 import { PredictWord } from '../../../components/PredictWord';
 import { PrediscoreGauge } from '../../../components/PrediscoreGauge';
 import { QuickCreateButton } from '../../../components/QuickCreateButton';
@@ -144,6 +145,8 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <PredictWatermark opacity={0.05} />
+
       <View style={styles.header}>
         <Text style={styles.brand}>Profil</Text>
         <QuickCreateButton />
@@ -153,13 +156,11 @@ export default function ProfileScreen() {
         <View style={styles.identityCard}>
           <Pressable onPress={() => setAvatarMenuOpen(true)} disabled={uploadingAvatar} style={styles.avatarWrap}>
             <Avatar url={avatarUrl} username={username} size={84} />
-            <View style={styles.avatarEditBadge}>
-              {uploadingAvatar ? (
-                <ActivityIndicator size="small" color={colors.background} />
-              ) : (
-                <Text style={styles.avatarEditText}>Modifier</Text>
-              )}
-            </View>
+            {uploadingAvatar ? (
+              <ActivityIndicator size="small" color={colors.gold} style={styles.avatarEditLoader} />
+            ) : (
+              <Text style={styles.avatarEditText}>Modifier</Text>
+            )}
           </Pressable>
           {avatarError && <Text style={styles.error}>{avatarError}</Text>}
 
@@ -292,7 +293,7 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+  safe: { flex: 1, backgroundColor: 'transparent' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -306,7 +307,13 @@ const styles = StyleSheet.create({
   scroll: { padding: spacing.lg, paddingBottom: 40 },
   eyebrow: { ...eyebrow },
   sectionSpacing: { marginTop: spacing.xl },
-  brand: { fontFamily: fonts.serifItalic, fontSize: 28, color: colors.text },
+  brand: {
+    fontFamily: fonts.display,
+    fontSize: 24,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    color: colors.text,
+  },
   identityCard: {
     marginTop: spacing.lg,
     padding: 18,
@@ -316,17 +323,17 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: 'center',
   },
-  avatarWrap: { position: 'relative' },
-  avatarEditBadge: {
-    position: 'absolute',
-    bottom: -4,
-    alignSelf: 'center',
-    backgroundColor: colors.gold,
-    borderRadius: radius.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
+  avatarWrap: { alignItems: 'center' },
+  avatarEditLoader: { marginTop: 8 },
+  avatarEditText: {
+    color: colors.gold,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    textDecorationLine: 'underline',
+    marginTop: 8,
   },
-  avatarEditText: { color: colors.background, fontSize: 10, fontWeight: '700' },
   username: { fontFamily: fonts.serifItalic, fontSize: 22, color: colors.text, marginTop: 6 },
   email: { fontSize: 13, color: colors.textFaint, marginTop: 4 },
   loader: { marginTop: 24 },

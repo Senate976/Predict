@@ -21,6 +21,13 @@ export const colors = {
   // Réservées au sceau de cire (components/PredictionSeal.tsx).
   wax: '#7A2331',
   waxDark: '#5C1A25',
+  // Barre de navigation : jaune moutarde/doré (texture de grain appliquée
+  // par-dessus, voir components/NavBarBackground.tsx), avec des icônes brun
+  // foncé façon détails du vitrail pour rester lisible sur ce fond clair.
+  navBar: '#D4A017',
+  navBarBorder: '#A67C0A',
+  navBarActive: '#3A2113',
+  navBarInactive: 'rgba(58, 33, 19, 0.45)',
 } as const;
 
 export const radius = {
@@ -43,16 +50,20 @@ export const spacing = {
 } as const;
 
 /**
- * `serif` habille les éléments principaux (marque, titres d'écran, le texte
- * même des prédictions) pour le côté chic ; le reste de l'interface (labels,
+ * Deux familles, façon logo : `display` (Cinzel, capitales monumentales)
+ * pour la marque et les titres d'écran ; `serif`/`serifItalic` (Cormorant
+ * Garamond) pour le texte courant qui demande du chic — le teaser et le
+ * contenu d'une prédiction, les citations. Le reste de l'interface (labels,
  * boutons, champs) garde la police système, plus lisible en petite taille.
- * Le nom doit correspondre exactement à la clé passée à `useFonts` dans
+ * Chaque nom doit correspondre exactement à la clé passée à `useFonts` dans
  * `app/_layout.tsx`, faute de quoi React Native retombe silencieusement sur la
  * police système.
  */
 export const fonts = {
-  serif: 'InstrumentSerif_400Regular',
-  serifItalic: 'InstrumentSerif_400Regular_Italic',
+  display: 'Cinzel_700Bold',
+  serif: 'CormorantGaramond_500Medium',
+  serifItalic: 'CormorantGaramond_500Medium_Italic',
+  serifSemiBold: 'CormorantGaramond_600SemiBold',
 } as const;
 
 /**

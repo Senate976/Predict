@@ -478,7 +478,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+  safe: { flex: 1, backgroundColor: 'transparent' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -488,7 +488,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  brand: { fontFamily: fonts.serifItalic, fontSize: 26, color: colors.text, flexShrink: 0 },
+  brand: {
+    fontFamily: fonts.display,
+    fontSize: 24,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    color: colors.text,
+    flexShrink: 0,
+  },
   // `flexShrink` + `minWidth: 0` en chaîne (plutôt qu'un `maxWidth` en
   // pourcentage sur `userChip`, calculé contre un parent lui-même sans
   // largeur définie) : c'est ce qui permet au pseudo de rétrécir avec
@@ -499,22 +506,21 @@ const styles = StyleSheet.create({
   userChipName: { fontSize: 14, fontWeight: '700', color: colors.text, flexShrink: 1, minWidth: 0 },
   tabs: {
     flexDirection: 'row',
-    gap: 8,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   tab: {
     flex: 1,
     paddingVertical: 10,
-    borderRadius: 999,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
-  tabActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
-  tabText: { fontSize: 12, fontWeight: '700', letterSpacing: 1, color: colors.textMuted, textTransform: 'uppercase' },
-  tabTextActive: { color: colors.gold },
+  tabActive: { borderBottomColor: colors.gold },
+  tabText: { fontSize: 12, fontWeight: '700', letterSpacing: 1, color: colors.textFaint, textTransform: 'uppercase' },
+  tabTextActive: { color: colors.text },
   filtersRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -608,13 +614,19 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-  },
-  create: {
-    backgroundColor: colors.gold,
-    borderRadius: 8,
-    paddingVertical: 15,
     alignItems: 'center',
   },
-  createPressed: { backgroundColor: colors.goldBright },
-  createText: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  create: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gold,
+  },
+  createPressed: { opacity: 0.6 },
+  createText: {
+    color: colors.gold,
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+  },
 });
