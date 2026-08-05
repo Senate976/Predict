@@ -385,6 +385,15 @@ export function PredictionCard({
 
         <Text style={styles.cardTeaser}>{item.teaser}</Text>
 
+        {/* Le contenu (la vraie prédiction, derrière la promesse du teaser)
+            devient visible directement sur la carte une fois révélée — sans
+            ça, l'onglet Predict n'avait rien de plus à montrer qu'un teaser
+            déjà lu avant révélation. La RLS ne renvoie `content` que si
+            révélée ou si on en est l'auteur, donc ce test suffit. */}
+        {(revealed || isAuthor) && item.content && (
+          <Text style={styles.cardContent}>{item.content}</Text>
+        )}
+
         {item.is_immediate && (
           <View style={styles.confidenceBlock}>
             {belief === null ? (
@@ -637,6 +646,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.text,
     lineHeight: 22,
+  },
+  // Poids plus léger que le teaser : le teaser reste le titre de la carte,
+  // le contenu qui suit en est le corps.
+  cardContent: {
+    fontSize: 14,
+    color: colors.textMuted,
+    lineHeight: 20,
+    marginTop: 6,
   },
   beliefScore: { fontSize: 13, color: colors.textMuted, marginTop: 10 },
   // Jauge d'opinion : rien d'écrit sur la barre elle-même — juste un curseur
