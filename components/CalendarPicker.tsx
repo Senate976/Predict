@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   navButton: { paddingHorizontal: 10, paddingVertical: 4 },
-  nav: { fontSize: 20, color: colors.gold, fontWeight: '700' },
+  nav: { fontSize: 20, color: colors.text, fontWeight: '700' },
   monthLabel: { fontFamily: fonts.serifItalic, fontSize: 18, color: colors.text },
   weekdayRow: { flexDirection: 'row' },
   weekday: {
@@ -210,6 +210,7 @@ const styles = StyleSheet.create({
   cellText: { fontSize: 14, color: colors.text },
   cellTextMuted: { color: colors.border },
   cellTextDisabled: { color: colors.border },
-  cellTextToday: { color: colors.gold, fontWeight: '700' },
-  cellTextSelected: { color: '#FFFFFF', fontWeight: '700' },
+  cellTextToday: { color: colors.text, fontWeight: '700', textDecorationLine: 'underline' },
+  // Texte noir sur la pastille jaune du jour sélectionné — du blanc y serait peu lisible.
+  cellTextSelected: { color: colors.text, fontWeight: '700' },
 });

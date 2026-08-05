@@ -1,8 +1,12 @@
 import {
+  PlayfairDisplay_600SemiBold_Italic,
+  PlayfairDisplay_700Bold,
+} from '@expo-google-fonts/playfair-display';
+import {
   PlusJakartaSans_400Regular,
   PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
 } from '@expo-google-fonts/plus-jakarta-sans';
-import { Syne_800ExtraBold } from '@expo-google-fonts/syne';
 import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -34,7 +38,7 @@ function RootNavigator() {
   if (loading) {
     return (
       <View style={styles.loader}>
-        <ActivityIndicator size="large" color={colors.gold} />
+        <ActivityIndicator size="large" color={colors.text} />
       </View>
     );
   }
@@ -55,13 +59,15 @@ export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     PlusJakartaSans_400Regular,
     PlusJakartaSans_600SemiBold,
-    Syne_800ExtraBold,
+    PlusJakartaSans_700Bold,
+    PlayfairDisplay_700Bold,
+    PlayfairDisplay_600SemiBold_Italic,
   });
 
   if (!fontsLoaded) {
     return (
       <View style={styles.loader}>
-        <ActivityIndicator size="large" color={colors.gold} />
+        <ActivityIndicator size="large" color={colors.text} />
       </View>
     );
   }

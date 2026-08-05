@@ -155,7 +155,7 @@ export default function ProfileScreen() {
           <Pressable onPress={() => setAvatarMenuOpen(true)} disabled={uploadingAvatar} style={styles.avatarWrap}>
             <Avatar url={avatarUrl} username={username} size={84} />
             {uploadingAvatar ? (
-              <ActivityIndicator size="small" color={colors.gold} style={styles.avatarEditLoader} />
+              <ActivityIndicator size="small" color={colors.text} style={styles.avatarEditLoader} />
             ) : (
               <Text style={styles.avatarEditText}>Modifier</Text>
             )}
@@ -206,7 +206,7 @@ export default function ProfileScreen() {
 
         <View style={[styles.prediscoreCard, styles.sectionSpacing]}>
           {!prediscoreLoaded ? (
-            <ActivityIndicator color={colors.gold} style={styles.loader} />
+            <ActivityIndicator color={colors.text} style={styles.loader} />
           ) : prediscoreError ? (
             <Text style={styles.error}>{prediscoreError}</Text>
           ) : (
@@ -221,7 +221,7 @@ export default function ProfileScreen() {
         {error && <Text style={styles.error}>{error}</Text>}
 
         {outcomes === null && !error ? (
-          <ActivityIndicator color={colors.gold} style={styles.loader} />
+          <ActivityIndicator color={colors.text} style={styles.loader} />
         ) : (
           <>
             <View style={styles.statsRow}>
@@ -238,14 +238,14 @@ export default function ProfileScreen() {
                 onPress={() => setFilter('realized')}
                 style={[styles.statCard, filter === 'realized' && styles.statCardActive]}
               >
-                <Text style={[styles.statValue, styles.statValueRealized]}>{realized.length}</Text>
+                <Text style={styles.statValue}>{realized.length}</Text>
                 <Text style={styles.statLabel}>Réalisés</Text>
               </Pressable>
               <Pressable
                 onPress={() => setFilter('missed')}
                 style={[styles.statCard, filter === 'missed' && styles.statCardActive]}
               >
-                <Text style={[styles.statValue, styles.statValueMissed]}>{missed.length}</Text>
+                <Text style={styles.statValue}>{missed.length}</Text>
                 <Text style={styles.statLabel}>Manqués</Text>
               </Pressable>
               <Pressable
@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
   avatarWrap: { alignItems: 'center' },
   avatarEditLoader: { marginTop: 8 },
   avatarEditText: {
-    color: colors.gold,
+    color: colors.text,
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.5,
@@ -380,9 +380,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statCardActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
-  statValue: { fontFamily: fonts.serifItalic, fontSize: 26, color: colors.text },
-  statValueRealized: { color: colors.success },
-  statValueMissed: { color: colors.danger },
+  // Pas de code couleur réalisé/manqué : seul le libellé sous le nombre
+  // porte le sens, conformément à la palette stricte noir/blanc/jaune.
+  statValue: { fontFamily: fonts.display, fontSize: 26, color: colors.text },
   statLabel: {
     fontSize: 10,
     fontWeight: '700',
@@ -406,7 +406,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  historyTeaser: { fontFamily: fonts.serifItalic, fontSize: 17, color: colors.text },
+  historyTeaser: { fontFamily: fonts.serifSemiBold, fontSize: 17, color: colors.text },
   historyMeta: { fontSize: 12, color: colors.textFaint, marginTop: 4 },
   error: {
     color: colors.danger,

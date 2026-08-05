@@ -8,13 +8,6 @@ const BAR_WIDTH = 260;
 const BAR_HEIGHT = 10;
 const CURSOR_SIZE = 18;
 
-// Volontairement plus vives que la palette or/ivoire du reste de l'appli —
-// cette jauge doit se lire comme un thermomètre rouge → orange → vert, pas
-// comme un simple dégradé discret.
-const VIVID_RED = '#FF3B30';
-const VIVID_ORANGE = '#FF9500';
-const VIVID_GREEN = '#34C759';
-
 /**
  * Jauge horizontale du Prediscore — dégradé rouge (« Mytho ») à vert
  * (« J'ai raison. Toujours. »), avec un curseur positionné au score actuel.
@@ -51,10 +44,10 @@ export function PrediscoreGauge({
       <View style={styles.barBox}>
         <Svg width={BAR_WIDTH} height={BAR_HEIGHT}>
           <Defs>
+            {/* Noir → jaune, strictement sur la charte — pas de rouge/vert. */}
             <LinearGradient id="prediscoreGradient" x1="0" y1="0" x2="1" y2="0">
-              <Stop offset="0" stopColor={VIVID_RED} />
-              <Stop offset="0.5" stopColor={VIVID_ORANGE} />
-              <Stop offset="1" stopColor={VIVID_GREEN} />
+              <Stop offset="0" stopColor={colors.text} />
+              <Stop offset="1" stopColor={colors.gold} />
             </LinearGradient>
           </Defs>
           <Rect
@@ -98,7 +91,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   scoreValue: {
-    fontFamily: fonts.serif,
+    fontFamily: fonts.display,
     fontSize: 34,
     color: colors.text,
     marginBottom: 10,
@@ -121,7 +114,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   label: { fontSize: 11, fontWeight: '700', color: colors.textFaint },
-  labelLeft: { color: VIVID_RED },
+  labelLeft: { color: colors.textMuted },
   labelRightBlock: { alignItems: 'flex-end' },
-  labelRight: { color: VIVID_GREEN, textAlign: 'right' },
+  labelRight: { color: colors.text, textAlign: 'right' },
 });

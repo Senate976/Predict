@@ -297,22 +297,15 @@ export function PredictionCard({
           <View style={styles.headerSpacer} />
 
           {!verdict && !revealed && (
-            <View style={[styles.badge, styles.badgeLocked]}>
-              <Text style={[styles.badgeText, styles.badgeTextLocked]}>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
                 {item.open_ended ? 'Quand l’auteur le décide' : formatCountdown(revealAt, now)}
               </Text>
             </View>
           )}
           {verdict && (
-            <View style={[styles.badge, verdict === 'realized' ? styles.badgeRealized : styles.badgeMissed]}>
-              <Text
-                style={[
-                  styles.badgeText,
-                  verdict === 'realized' ? styles.badgeTextRealized : styles.badgeTextMissed,
-                ]}
-              >
-                {verdict === 'realized' ? 'Réalisé' : 'Manqué'}
-              </Text>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{verdict === 'realized' ? 'Réalisé' : 'Manqué'}</Text>
             </View>
           )}
 
@@ -329,14 +322,11 @@ export function PredictionCard({
               <Text style={styles.beliefScore}>Personne n’a encore donné son avis.</Text>
             ) : (
               <>
-                <View style={styles.confidenceLabelRow}>
-                  <Text style={styles.confidenceLabel}>Confiance</Text>
-                  <Text style={styles.confidenceValue}>{belief}%</Text>
-                </View>
                 <View style={styles.confidenceBar}>
                   <View style={[styles.confidenceFillBelieve, { flex: belief }]} />
                   <View style={[styles.confidenceFillDisbelieve, { flex: 100 - belief }]} />
                 </View>
+                <Text style={styles.confidenceLabel}>{belief}% y croient</Text>
               </>
             )}
           </View>
@@ -459,6 +449,8 @@ export function PredictionCard({
 
 const styles = StyleSheet.create({
   cardPressed: { opacity: 0.85 },
+  // Fine bordure noire, fond blanc pur, pas d'ombre lourde — carte sobre
+  // façon presse plutôt que carte « flottante ».
   card: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -466,12 +458,6 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 12,
     backgroundColor: colors.surface,
-    // Ombre douce teintée de l'accent plutôt qu'un gris neutre.
-    shadowColor: colors.gold,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 2,
   },
   // Une seule ligne : [avatar][pseudo] ...espace flexible... [badge délai] [menu].
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
@@ -480,43 +466,38 @@ const styles = StyleSheet.create({
   authorName: { fontSize: 14, fontWeight: '500', color: colors.text, flexShrink: 1 },
   mentionTag: { fontSize: 12, fontWeight: '500', color: colors.textMuted, flexShrink: 1 },
   menuButton: { padding: 2 },
+  // Un seul traitement pour tous les badges d'état (délai, réalisé, manqué) :
+  // fond jaune très clair, texte noir — pas de distinction de couleur entre
+  // eux, le libellé porte le sens.
   badge: {
     borderRadius: radius.pill,
     paddingHorizontal: 10,
     paddingVertical: 4,
+    backgroundColor: colors.badgeBg,
   },
-  // Fond/texte neutres et contrastés — le doré/beige précédent était illisible.
-  badgeLocked: { backgroundColor: colors.badgeLockedBg },
-  badgeText: { fontSize: 12, fontWeight: '700' },
-  badgeTextLocked: { color: colors.badgeLockedText },
-  badgeRealized: { backgroundColor: colors.badgeRealizedBg },
-  badgeMissed: { backgroundColor: colors.badgeMissedBg },
-  badgeTextRealized: { color: colors.badgeRealizedText },
-  badgeTextMissed: { color: colors.badgeMissedText },
+  badgeText: { fontSize: 12, fontWeight: '700', color: colors.badgeText },
   cardTeaser: {
-    fontFamily: fonts.display,
+    fontFamily: fonts.sansBold,
     fontSize: 16,
     color: colors.text,
     lineHeight: 22,
   },
   beliefScore: { fontSize: 13, fontWeight: '700', color: colors.text, marginTop: 8 },
-  // Jauge bicolore « confiance » : matérialise les votes y croient/n'y
-  // croient pas d'une prédiction immédiate, en plus du pourcentage en texte.
+  // Jauge de vote sobre : une fine ligne noire/jaune plutôt qu'une barre
+  // épaisse, avec le pourcentage en texte discret en dessous.
   confidenceBlock: { marginTop: 10 },
-  confidenceLabelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  confidenceLabel: { fontSize: 11, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  confidenceValue: { fontSize: 12, fontWeight: '800', color: colors.mint },
   confidenceBar: {
     flexDirection: 'row',
-    height: 8,
+    height: 3,
     borderRadius: radius.pill,
     overflow: 'hidden',
     backgroundColor: colors.border,
   },
-  confidenceFillBelieve: { backgroundColor: colors.mint },
-  confidenceFillDisbelieve: { backgroundColor: colors.badgeMissedText },
+  confidenceFillBelieve: { backgroundColor: colors.text },
+  confidenceFillDisbelieve: { backgroundColor: colors.gold },
+  confidenceLabel: { fontSize: 12, color: colors.textMuted, marginTop: 5 },
   voteLink: { marginTop: 10 },
-  voteLinkText: { fontSize: 13, fontWeight: '600', color: colors.gold },
+  voteLinkText: { fontSize: 13, fontWeight: '600', color: colors.text, textDecorationLine: 'underline' },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',

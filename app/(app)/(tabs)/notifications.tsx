@@ -241,7 +241,7 @@ export default function NotificationsScreen() {
         {actionError && <Text style={styles.error}>{actionError}</Text>}
 
         {notifications === null && !error ? (
-          <ActivityIndicator color={colors.gold} style={styles.loader} />
+          <ActivityIndicator color={colors.text} style={styles.loader} />
         ) : notifications && notifications.length === 0 ? (
           <Text style={styles.empty}>Rien pour l’instant.</Text>
         ) : (
@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     color: colors.text,
   },
-  cancelSelection: { fontSize: 15, color: colors.gold, fontWeight: '600' },
+  cancelSelection: { fontSize: 15, color: colors.text, fontWeight: '600' },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   loader: { marginTop: 32 },
   empty: { fontSize: 14, color: colors.textFaint, textAlign: 'center', marginTop: 32 },
@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
   authorName: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
   teaser: {
-    fontFamily: fonts.serifItalic,
+    fontFamily: fonts.serifSemiBold,
     fontSize: 16,
     color: colors.text,
     marginTop: 4,

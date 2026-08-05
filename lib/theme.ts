@@ -1,56 +1,49 @@
-// Charte graphique « Fun Social Network » : pop, ludique, vibrant. Fond crème
-// très lumineux, cartes blanches à l'arrondi généreux et à l'ombre teintée,
-// accent corail électrique partout où c'est interactif, touches néon
-// (menthe, violet) pour les statuts et catégories. Un seul endroit à changer
-// si la palette évolue — tous les écrans importent d'ici plutôt que de coder
-// leurs propres couleurs.
+// Charte graphique « Éditorial Chic & Premium » : presse/magazine moderne,
+// strictement blanc / noir / jaune. Le blanc domine (fonds, cartes), le noir
+// porte tout le texte et les bordures fines, le jaune est réservé aux
+// éléments interactifs majeurs (FAB, onglet actif, badges d'état, jauges) —
+// jamais comme couleur de texte courant, son contraste sur blanc est trop
+// faible. Un seul endroit à changer si la palette évolue — tous les écrans
+// importent d'ici plutôt que de coder leurs propres couleurs.
 
 export const colors = {
-  background: '#FAFAF7',
+  // Blanc cassé très sobre, aspect papier — jamais un blanc pur en fond de
+  // page, pour que les cartes (blanc pur) tranchent légèrement dessus.
+  background: '#FBFBF9',
   surface: '#FFFFFF',
   surfaceRaised: '#FFFFFF',
-  border: '#EFECE6',
-  // Noir adouci plutôt que pur, pour un rendu moins « chirurgical ».
-  text: '#1E1E24',
-  textMuted: '#6B6B76',
+  // Fine bordure « encre » plutôt qu'un gris neutre — cohérent avec le noir
+  // profond du texte.
+  border: 'rgba(17, 24, 39, 0.10)',
+  text: '#111827',
+  textMuted: '#6B7280',
   textFaint: '#9CA3AF',
-  // Accent principal : corail électrique (remplace l'ambre terne des rondes
-  // précédentes), réservé aux éléments interactifs/actifs.
-  gold: '#FF4D00',
-  goldBright: '#FF6A2B',
-  goldSoft: 'rgba(255, 77, 0, 0.14)',
-  danger: '#A23B36',
-  dangerSoft: 'rgba(162, 59, 54, 0.10)',
-  success: '#3C6E52',
-  successSoft: 'rgba(60, 110, 82, 0.10)',
-  // Touches néon/pop pour les statuts et catégories.
-  mint: '#10B981',
-  mintSoft: 'rgba(16, 185, 129, 0.14)',
-  violet: '#6366F1',
-  violetSoft: 'rgba(99, 102, 241, 0.14)',
-  // Pastille de notification (badge de la cloche) — rouge vif distinct du
-  // corail (accent) et du rouge sourd `danger` (erreurs/suppressions).
-  notificationBadge: '#FF3B30',
-  // Fond/texte des badges d'état de carte (délai, réalisé, manqué) : pastels
-  // saturés mais toujours un texte nettement plus foncé que le fond, pour
-  // rester lisibles malgré le ton sur ton.
-  badgeLockedBg: 'rgba(255, 77, 0, 0.14)',
-  badgeLockedText: '#C2410C',
-  badgeRealizedBg: '#D1FAE5',
-  badgeRealizedText: '#047857',
-  badgeMissedBg: '#FFE1DE',
-  badgeMissedText: '#DC2626',
-  // Réservées au sceau de cire (components/PredictionSeal.tsx).
-  wax: '#7A2331',
-  waxDark: '#5C1A25',
-  // Barre de navigation : blanc pur, tranche sur le fond crème.
+  // Accent jaune — uniquement fonds/bordures d'éléments interactifs majeurs
+  // (jamais en couleur de texte : illisible sur blanc).
+  gold: '#FACC15',
+  goldBright: '#EAB308',
+  goldSoft: 'rgba(250, 204, 21, 0.20)',
+  // Rouge fonctionnel, réservé aux erreurs et actions destructrices — pas une
+  // couleur de marque, un signal d'alerte standard.
+  danger: '#B91C1C',
+  dangerSoft: 'rgba(185, 28, 28, 0.08)',
+  // Pastille de notification (badge de la cloche).
+  notificationBadge: '#DC2626',
+  // Badges d'état de carte (délai, réalisé, manqué) : un seul traitement,
+  // volontairement sans distinction de couleur entre eux — fond jaune très
+  // clair, texte noir, comme demandé pour rester lisible et élégant.
+  badgeBg: 'rgba(250, 204, 21, 0.20)',
+  badgeText: '#111827',
+  // Barre de navigation : blanc pur, tranche sur le fond papier.
   navBar: '#FFFFFF',
-  navBarBorder: '#EFECE6',
-  navBarActive: '#FF4D00',
-  navBarActiveSoft: 'rgba(255, 77, 0, 0.12)',
+  navBarBorder: 'rgba(17, 24, 39, 0.10)',
+  navBarActive: '#111827',
+  navBarActiveSoft: 'rgba(250, 204, 21, 0.35)',
   navBarInactive: '#9CA3AF',
-  // Bouton d'action flottant (FAB), unique et standardisé sur tout l'app.
-  fab: '#FF4D00',
+  // Bouton d'action flottant (FAB), unique et standardisé sur tout l'app :
+  // cercle jaune, icône noire.
+  fab: '#FACC15',
+  fabIcon: '#111827',
 } as const;
 
 export const radius = {
@@ -73,18 +66,23 @@ export const spacing = {
 } as const;
 
 /**
- * `display` (Syne, très lourde) pour les titres de page, boutons et onglets
- * — le ton « pop » de la marque, en casse normale (jamais en majuscules).
- * `serif`/`serifItalic`/`serifSemiBold` (Plus Jakarta Sans, ronde et
- * amicale) pour le corps de texte. Chaque nom doit correspondre exactement à
- * la clé passée à `useFonts` dans `app/_layout.tsx`, faute de quoi React
- * Native retombe silencieusement sur la police système.
+ * `display` (Playfair Display, serif) : réservée au titre principal du Fil,
+ * au mot-symbole « Predict » et aux grands en-têtes de page — jamais aux
+ * boutons, onglets ou titres de carte. `serifItalic` (Playfair Display
+ * italique) : gros texte éditorial (teaser/contenu à l'ouverture d'un
+ * Predict, pull-quotes, verdict). `serif`/`serifSemiBold` (Plus Jakarta
+ * Sans) : corps de texte courant. `sansBold` (Plus Jakarta Sans gras) :
+ * titres de carte, boutons, onglets — tout ce qui doit rester très lisible.
+ * Chaque nom doit correspondre exactement à la clé passée à `useFonts` dans
+ * `app/_layout.tsx`, faute de quoi React Native retombe silencieusement sur
+ * la police système.
  */
 export const fonts = {
-  display: 'Syne_800ExtraBold',
+  display: 'PlayfairDisplay_700Bold',
+  serifItalic: 'PlayfairDisplay_600SemiBold_Italic',
   serif: 'PlusJakartaSans_400Regular',
-  serifItalic: 'PlusJakartaSans_600SemiBold',
   serifSemiBold: 'PlusJakartaSans_600SemiBold',
+  sansBold: 'PlusJakartaSans_700Bold',
 } as const;
 
 /**

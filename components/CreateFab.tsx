@@ -17,14 +17,15 @@ export function CreateFab() {
       style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
       hitSlop={4}
     >
-      <Plus size={30} color="#FFFFFF" strokeWidth={2.5} />
+      <Plus size={30} color={colors.fabIcon} strokeWidth={2.5} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  // Gros, ultra-visible : couleur d'accent nette + ombre bien marquée de la
-  // même teinte, pour qu'il ressorte clairement du fil derrière lui.
+  // Cercle jaune vibrant, icône noire — élément interactif majeur, seul
+  // endroit de l'app où le jaune s'affiche à cette intensité. Ombre sobre,
+  // pas de halo coloré.
   fab: {
     position: 'absolute',
     bottom: 24,
@@ -35,11 +36,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.fab,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.gold,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45,
-    shadowRadius: 14,
-    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 6,
     zIndex: 10,
   },
   fabPressed: { opacity: 0.85 },

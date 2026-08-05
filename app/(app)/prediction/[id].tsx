@@ -240,7 +240,7 @@ export default function PredictionDetailScreen() {
         {error && <Text style={styles.error}>{error}</Text>}
 
         {!prediction && !error ? (
-          <ActivityIndicator color={colors.gold} style={styles.loader} />
+          <ActivityIndicator color={colors.text} style={styles.loader} />
         ) : prediction ? (
           <>
             {author && (
@@ -329,7 +329,7 @@ export default function PredictionDetailScreen() {
                 {recipientsError && <Text style={styles.error}>{recipientsError}</Text>}
                 {actionError && <Text style={styles.error}>{actionError}</Text>}
                 {recipients === null ? (
-                  <ActivityIndicator color={colors.gold} style={styles.loader} />
+                  <ActivityIndicator color={colors.text} style={styles.loader} />
                 ) : recipients.length === 0 ? (
                   <Text style={styles.hint}>Personne pour l’instant.</Text>
                 ) : (
@@ -355,7 +355,7 @@ export default function PredictionDetailScreen() {
                   <>
                     <Text style={[styles.eyebrow, styles.sectionSpacing]}>Ajouter depuis le Cercle</Text>
                     {friends === null ? (
-                      <ActivityIndicator color={colors.gold} style={styles.loader} />
+                      <ActivityIndicator color={colors.text} style={styles.loader} />
                     ) : addableFriends.length === 0 ? (
                       <Text style={styles.hint}>
                         Tout ton Cercle a déjà accès, ou tu n’as pas encore d’ami.
@@ -499,7 +499,7 @@ const styles = StyleSheet.create({
     fontSize: 17,
     color: colors.text,
   },
-  back: { fontSize: 15, color: colors.gold, width: 56 },
+  back: { fontSize: 15, color: colors.text, width: 56 },
   headerSpacer: { width: 56 },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   loader: { marginTop: 24 },
@@ -508,10 +508,12 @@ const styles = StyleSheet.create({
   authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginBottom: 12 },
   authorName: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
   // La catégorie n'apparaît plus sur la carte du Fil — seulement ici, une
-  // fois le Predict ouvert.
+  // fois le Predict ouvert. Jaune réservé aux éléments interactifs majeurs :
+  // ici, simple étiquette au trait noir.
   categoryBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: colors.violetSoft,
+    borderWidth: 1,
+    borderColor: colors.text,
     borderRadius: radius.pill,
     paddingHorizontal: 12,
     paddingVertical: 5,
@@ -520,7 +522,7 @@ const styles = StyleSheet.create({
   categoryBadgeText: {
     fontSize: 11,
     fontWeight: '800',
-    color: colors.violet,
+    color: colors.text,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -549,14 +551,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   revealNowBox: { alignItems: 'center', marginTop: spacing.md },
+  // Bouton d'action majeur : rempli jaune, texte noir — pas un lien en
+  // couleur, illisible sur blanc.
   revealNowButton: {
-    borderWidth: 1,
-    borderColor: colors.gold,
+    backgroundColor: colors.gold,
     borderRadius: radius.pill,
     paddingHorizontal: 18,
     paddingVertical: 10,
   },
-  revealNowButtonText: { fontSize: 13, fontWeight: '700', color: colors.gold },
+  revealNowButtonText: { fontSize: 13, fontWeight: '700', color: colors.text },
   verdictBox: {
     marginTop: spacing.xl,
     paddingVertical: 12,
@@ -566,8 +569,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  verdictBoxRealized: { borderLeftWidth: 4, borderLeftColor: colors.success },
-  verdictBoxMissed: { borderLeftWidth: 4, borderLeftColor: colors.danger },
+  // Pas de code couleur réalisé/manqué : seul le libellé porte le sens ;
+  // « réalisée » reçoit simplement la mise en avant jaune.
+  verdictBoxRealized: { borderLeftWidth: 4, borderLeftColor: colors.gold },
+  verdictBoxMissed: { borderLeftWidth: 4, borderLeftColor: colors.border },
   verdict: { fontFamily: fonts.serifItalic, fontSize: 19, color: colors.text, marginTop: 4 },
   voteRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
   voteButton: {

@@ -491,7 +491,7 @@ export default function NewPredictionScreen() {
           {scope === 'group' && (
             <View style={styles.friendsBox}>
               {groups === null ? (
-                <ActivityIndicator color={colors.gold} style={styles.searchLoader} />
+                <ActivityIndicator color={colors.text} style={styles.searchLoader} />
               ) : groups.length === 0 ? (
                 <Text style={styles.hint}>
                   Tu n’as pas encore de groupe. Crée-en un depuis l’onglet Cercle.
@@ -521,7 +521,7 @@ export default function NewPredictionScreen() {
           {scope === 'selected' && (
             <View style={styles.friendsBox}>
               {friends === null ? (
-                <ActivityIndicator color={colors.gold} style={styles.searchLoader} />
+                <ActivityIndicator color={colors.text} style={styles.searchLoader} />
               ) : friends.length === 0 ? (
                 <Text style={styles.hint}>
                   Tu n’as pas encore d’ami accepté dans ton Cercle.
@@ -595,10 +595,10 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   headerSpacer: { width: 56 },
-  cancel: { fontSize: 15, color: colors.gold, width: 56 },
+  cancel: { fontSize: 15, color: colors.text, width: 56 },
   scroll: { padding: spacing.lg, paddingBottom: 40 },
   label: {
-    fontFamily: fonts.serifItalic,
+    fontFamily: fonts.sansBold,
     fontSize: 19,
     color: colors.text,
     marginBottom: 6,
@@ -619,12 +619,12 @@ const styles = StyleSheet.create({
   teaserInput: { minHeight: 60, textAlignVertical: 'top' },
   contentInput: { minHeight: 110, textAlignVertical: 'top' },
   counter: { fontSize: 12, color: colors.textFaint, marginTop: 6, textAlign: 'right' },
-  counterLow: { color: colors.gold },
+  counterLow: { color: colors.danger },
   hint: { fontSize: 13, color: colors.textMuted, marginTop: 10, lineHeight: 18 },
   sectionHint: { fontSize: 13, color: colors.textMuted, marginBottom: 10, lineHeight: 18 },
   row: { flexDirection: 'row', gap: 12 },
   timeField: { flex: 1 },
-  preview: { fontSize: 14, color: colors.success, marginTop: 14 },
+  preview: { fontSize: 14, color: colors.textMuted, marginTop: 14 },
   scopeRow: { flexDirection: 'row', gap: 8 },
   scopeOption: {
     flex: 1,
@@ -639,7 +639,7 @@ const styles = StyleSheet.create({
   },
   scopeOptionActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
   scopeText: { fontSize: 13, fontWeight: '600', color: colors.textMuted, textAlign: 'center' },
-  scopeTextActive: { color: colors.gold },
+  scopeTextActive: { color: colors.text },
   friendsBox: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: spacing.md },
   searchLoader: { marginTop: spacing.sm },
   friendChip: {
@@ -655,7 +655,7 @@ const styles = StyleSheet.create({
   },
   friendChipActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
   friendChipText: { fontSize: 13, color: colors.textMuted, fontWeight: '600' },
-  friendChipTextActive: { color: colors.gold },
+  friendChipTextActive: { color: colors.text },
   error: {
     color: colors.danger,
     backgroundColor: colors.dangerSoft,

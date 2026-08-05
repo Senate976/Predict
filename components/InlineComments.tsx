@@ -119,7 +119,7 @@ export function InlineComments({
   return (
     <View style={styles.container}>
       {comments === null ? (
-        <ActivityIndicator color={colors.gold} style={styles.loader} />
+        <ActivityIndicator color={colors.text} style={styles.loader} />
       ) : (
         comments.length > 0 && (
           <View style={styles.list}>
@@ -237,15 +237,15 @@ const styles = StyleSheet.create({
     borderLeftColor: colors.border,
   },
   showMore: { alignSelf: 'flex-start', marginBottom: 2 },
-  showMoreText: { fontSize: 12, fontWeight: '600', color: colors.gold },
+  showMoreText: { fontSize: 12, fontWeight: '600', color: colors.text, textDecorationLine: 'underline' },
   commentTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   commentAuthorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', flexShrink: 1 },
   commentAuthor: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
   commentTime: { fontSize: 11, color: colors.textFaint },
   commentContent: { fontSize: 14, color: colors.text, marginTop: 4, lineHeight: 19 },
-  replyMention: { fontWeight: '700', color: colors.gold },
+  replyMention: { fontWeight: '700', color: colors.text },
   replyLink: { alignSelf: 'flex-start', marginTop: 4 },
-  replyLinkText: { fontSize: 11, fontWeight: '600', color: colors.gold },
+  replyLinkText: { fontSize: 11, fontWeight: '600', color: colors.text, textDecorationLine: 'underline' },
   replyingBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -273,10 +273,10 @@ const styles = StyleSheet.create({
     maxHeight: 80,
   },
   send: {
-    backgroundColor: colors.goldSoft,
+    backgroundColor: colors.gold,
     borderRadius: radius.pill,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  sendText: { color: colors.gold, fontSize: 12, fontWeight: '700' },
+  sendText: { color: colors.text, fontSize: 12, fontWeight: '700' },
 });

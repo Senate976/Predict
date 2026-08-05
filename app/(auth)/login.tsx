@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.display,
     fontSize: 18,
     letterSpacing: 4,
-    color: colors.gold,
+    color: colors.text,
     textTransform: 'uppercase',
     marginBottom: 8,
   },
@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   notice: {
-    color: colors.goldBright,
+    color: colors.text,
     backgroundColor: colors.goldSoft,
     borderRadius: radius.sm,
     padding: 12,
@@ -389,7 +389,8 @@ const styles = StyleSheet.create({
   },
   submitPressed: { backgroundColor: colors.goldBright },
   submitDisabled: { opacity: 0.6 },
-  submitText: { fontFamily: fonts.display, color: '#FFFFFF', fontSize: 16, textTransform: 'uppercase', letterSpacing: 0.5 },
+  // Texte noir sur le bouton jaune — du blanc y serait peu lisible.
+  submitText: { fontFamily: fonts.sansBold, color: colors.text, fontSize: 16, textTransform: 'uppercase', letterSpacing: 0.5 },
   switch: { marginTop: 18, alignItems: 'center' },
-  switchText: { color: colors.gold, fontSize: 14, fontWeight: '600' },
+  switchText: { color: colors.text, fontSize: 14, fontWeight: '600', textDecorationLine: 'underline' },
 });

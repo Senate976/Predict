@@ -287,7 +287,7 @@ export default function HomeScreen() {
           style={[styles.filtersToggle, hasActiveFilters && styles.filtersToggleActive]}
           hitSlop={4}
         >
-          <SlidersHorizontal size={14} color={hasActiveFilters ? colors.gold : colors.textFaint} strokeWidth={1.75} />
+          <SlidersHorizontal size={14} color={hasActiveFilters ? colors.text : colors.textFaint} strokeWidth={1.75} />
           <Text style={[styles.filtersToggleText, hasActiveFilters && styles.filtersToggleTextActive]}>
             Filtres
           </Text>
@@ -380,7 +380,7 @@ export default function HomeScreen() {
             ) : (
               <>
                 <Pressable onPress={() => setMenuView('main')} style={styles.menuBack}>
-                  <ChevronLeft size={16} color={colors.gold} strokeWidth={1.75} />
+                  <ChevronLeft size={16} color={colors.text} strokeWidth={1.75} />
                   <Text style={styles.menuBackText}>Auteur</Text>
                 </Pressable>
 
@@ -417,12 +417,12 @@ export default function HomeScreen() {
 
       <ScrollView
         contentContainerStyle={styles.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.gold} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.text} />}
       >
         {error && <Text style={styles.error}>{error}</Text>}
 
         {feed === null && !error ? (
-          <ActivityIndicator style={styles.loader} color={colors.gold} />
+          <ActivityIndicator style={styles.loader} color={colors.text} />
         ) : shown.length === 0 ? (
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>
@@ -511,13 +511,13 @@ const styles = StyleSheet.create({
   },
   tabActive: { backgroundColor: colors.gold },
   tabText: {
-    fontFamily: fonts.display,
+    fontFamily: fonts.sansBold,
     fontSize: 12,
     letterSpacing: 0.5,
     color: colors.textMuted,
     textTransform: 'uppercase',
   },
-  tabTextActive: { color: '#FFFFFF' },
+  tabTextActive: { color: colors.text },
   filtersRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -535,7 +535,7 @@ const styles = StyleSheet.create({
   },
   filtersToggleActive: { backgroundColor: colors.goldSoft },
   filtersToggleText: { fontSize: 12, fontWeight: '700', color: colors.textFaint },
-  filtersToggleTextActive: { color: colors.gold },
+  filtersToggleTextActive: { color: colors.text },
   filtersReset: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   filtersResetText: { fontSize: 12, fontWeight: '600', color: colors.textFaint },
   modalOverlay: {
@@ -574,7 +574,7 @@ const styles = StyleSheet.create({
   },
   menuRowRight: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, maxWidth: '70%' },
   menuRowText: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
-  menuRowTextActive: { color: colors.gold },
+  menuRowTextActive: { color: colors.text, fontWeight: '700' },
   menuRowTextReset: { fontSize: 14, fontWeight: '600', color: colors.danger },
   menuRowValue: { fontSize: 13, color: colors.textFaint, flexShrink: 1 },
   menuBack: {
@@ -586,7 +586,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  menuBackText: { fontSize: 13, fontWeight: '700', color: colors.gold },
+  menuBackText: { fontSize: 13, fontWeight: '700', color: colors.text },
   scroll: { padding: spacing.lg, paddingBottom: 88, flexGrow: 1 },
   loader: { marginTop: 32 },
   empty: { paddingVertical: 24, alignItems: 'center' },

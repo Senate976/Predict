@@ -94,7 +94,7 @@ export default function FriendProfileScreen() {
         {error && <Text style={styles.error}>{error}</Text>}
 
         {!profile && !error ? (
-          <ActivityIndicator color={colors.gold} style={styles.loader} />
+          <ActivityIndicator color={colors.text} style={styles.loader} />
         ) : profile ? (
           <>
             <View style={styles.identityCard}>
@@ -110,7 +110,7 @@ export default function FriendProfileScreen() {
 
             <View style={[styles.prediscoreCard, styles.sectionSpacing]}>
               {!prediscoreLoaded ? (
-                <ActivityIndicator color={colors.gold} style={styles.loader} />
+                <ActivityIndicator color={colors.text} style={styles.loader} />
               ) : prediscoreError ? (
                 <Text style={styles.error}>{prediscoreError}</Text>
               ) : (
@@ -125,7 +125,7 @@ export default function FriendProfileScreen() {
               <PredictWord />
             </Text>
             {stats === null ? (
-              <ActivityIndicator color={colors.gold} style={styles.loader} />
+              <ActivityIndicator color={colors.text} style={styles.loader} />
             ) : (
               <View style={styles.statsRow}>
                 <View style={styles.statCard}>
@@ -135,11 +135,11 @@ export default function FriendProfileScreen() {
                   </Text>
                 </View>
                 <View style={styles.statCard}>
-                  <Text style={[styles.statValue, styles.statValueRealized]}>{stats.realized}</Text>
+                  <Text style={styles.statValue}>{stats.realized}</Text>
                   <Text style={styles.statLabel}>Réalisés</Text>
                 </View>
                 <View style={styles.statCard}>
-                  <Text style={[styles.statValue, styles.statValueMissed]}>{stats.missed}</Text>
+                  <Text style={styles.statValue}>{stats.missed}</Text>
                   <Text style={styles.statLabel}>Manqués</Text>
                 </View>
                 <View style={styles.statCard}>
@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
     fontSize: 17,
     color: colors.text,
   },
-  back: { fontSize: 15, color: colors.gold, width: 56 },
+  back: { fontSize: 15, color: colors.text, width: 56 },
   headerSpacer: { width: 56 },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   loader: { marginTop: 24 },
@@ -224,9 +224,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: 'center',
   },
-  statValue: { fontFamily: fonts.serifItalic, fontSize: 26, color: colors.text },
-  statValueRealized: { color: colors.success },
-  statValueMissed: { color: colors.danger },
+  statValue: { fontFamily: fonts.display, fontSize: 26, color: colors.text },
   statLabel: { fontSize: 11, color: colors.textFaint, marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 },
   error: {
     color: colors.danger,

@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.display,
     fontSize: 13,
     letterSpacing: 4,
-    color: colors.gold,
+    color: colors.text,
     textTransform: 'uppercase',
     marginBottom: 8,
   },
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 1,
   },
-  stepNumberText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  stepNumberText: { color: colors.text, fontSize: 13, fontWeight: '700' },
   stepText: { flex: 1, fontSize: 15, color: colors.text, lineHeight: 21 },
   body: {
     fontSize: 15,
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
   closing: {
     fontFamily: fonts.serifItalic,
     fontSize: 20,
-    color: colors.gold,
+    color: colors.text,
     marginBottom: spacing.lg,
   },
   cta: {
@@ -146,5 +146,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   ctaPressed: { backgroundColor: colors.goldBright },
-  ctaText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  ctaText: { color: colors.text, fontSize: 16, fontWeight: '700' },
 });
