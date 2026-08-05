@@ -255,7 +255,7 @@ export default function HomeScreen() {
       />
 
       <View style={styles.header}>
-        <Text style={styles.brand}>Actu</Text>
+        <Text style={styles.brand}>Predict</Text>
         <View style={styles.headerActions}>
           <Pressable style={styles.userChip} onPress={() => router.push('/profile')} hitSlop={4}>
             <Avatar url={userId ? authors[userId]?.avatar_url ?? null : null} username={username ?? ''} size={32} />
@@ -494,22 +494,25 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 14, flexShrink: 1, minWidth: 0 },
   userChip: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, minWidth: 0 },
   userChipName: { fontSize: 14, fontWeight: '700', color: colors.text, flexShrink: 1, minWidth: 0 },
+  // Trait sous le choix plutôt qu'un bouton de couleur — plus sobre, plus
+  // « presse ». Le trait actif reprend le jaune de marque, épais pour rester
+  // net face à la fine bordure neutre du reste de la barre.
   tabs: {
     flexDirection: 'row',
     marginHorizontal: spacing.lg,
     marginTop: spacing.md,
-    backgroundColor: 'rgba(30, 30, 36, 0.05)',
-    borderRadius: radius.pill,
-    padding: 4,
-    gap: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   tab: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 12,
     alignItems: 'center',
-    borderRadius: radius.pill,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+    marginBottom: -1,
   },
-  tabActive: { backgroundColor: colors.gold },
+  tabActive: { borderBottomColor: colors.gold },
   tabText: {
     fontFamily: fonts.sansBold,
     fontSize: 12,
@@ -529,11 +532,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    borderRadius: radius.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 2,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
-  filtersToggleActive: { backgroundColor: colors.goldSoft },
+  filtersToggleActive: { borderBottomColor: colors.text },
   filtersToggleText: { fontSize: 12, fontWeight: '700', color: colors.textFaint },
   filtersToggleTextActive: { color: colors.text },
   filtersReset: { flexDirection: 'row', alignItems: 'center', gap: 4 },

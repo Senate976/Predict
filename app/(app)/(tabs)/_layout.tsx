@@ -1,11 +1,18 @@
 import { Tabs } from 'expo-router';
-import { Bell, CircleUserRound, Star, Users } from 'lucide-react-native';
+import { Bell, CircleUserRound, Users } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, type ColorValue } from 'react-native';
+import { Text } from '../../../components/Text';
 
 import { useAuth } from '../../../lib/auth';
 import { fetchUnreadNotificationCount } from '../../../lib/notifications';
-import { colors } from '../../../lib/theme';
+import { colors, fonts } from '../../../lib/theme';
+
+/** Monogramme « P » du Fil, à la place d'une icône générique — c'est
+ * l'onglet qui mène au cœur de l'app (les Predicts), pas juste un favori. */
+function PTabIcon({ color, size }: { color: ColorValue; size: number }) {
+  return <Text style={{ fontFamily: fonts.display, fontSize: size, lineHeight: size, color }}>P</Text>;
+}
 
 /** Fréquence de rafraîchissement du badge — juste assez pour rester à jour
  * sans matraquer la base pendant que l'app reste ouverte. */
@@ -49,7 +56,7 @@ export default function TabsLayout() {
           title: 'Fil',
           tabBarIcon: ({ color, size, focused }) => (
             <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
-              <Star size={size} color={color} strokeWidth={focused ? 2 : 1.5} />
+              <PTabIcon size={size} color={color} />
             </View>
           ),
         }}

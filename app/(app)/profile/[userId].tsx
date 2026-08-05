@@ -14,7 +14,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
 import { CreateFab } from '../../../components/CreateFab';
-import { PredictWatermark } from '../../../components/PredictWatermark';
 import { PredictWord } from '../../../components/PredictWord';
 import { PrediscoreGauge } from '../../../components/PrediscoreGauge';
 import { fetchProfileById, type FriendProfile } from '../../../lib/friends';
@@ -80,8 +79,6 @@ export default function FriendProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <PredictWatermark opacity={0.05} />
-
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={8}>
           <Text style={styles.back}>Retour</Text>
