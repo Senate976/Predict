@@ -578,7 +578,7 @@ export default function NewPredictionScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+  safe: { flex: 1, backgroundColor: 'transparent' },
   flex: { flex: 1 },
   header: {
     flexDirection: 'row',
@@ -589,7 +589,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  headerTitle: { fontFamily: fonts.serifItalic, fontSize: 18, color: colors.text },
+  headerTitle: {
+    fontFamily: fonts.display,
+    fontSize: 17,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: colors.text,
+  },
   headerSpacer: { width: 56 },
   cancel: { fontSize: 15, color: colors.gold, width: 56 },
   scroll: { padding: spacing.lg, paddingBottom: 40 },

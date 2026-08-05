@@ -37,8 +37,8 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.gold,
-        tabBarInactiveTintColor: colors.textFaint,
+        tabBarActiveTintColor: colors.navBarActive,
+        tabBarInactiveTintColor: colors.navBarInactive,
         tabBarStyle: styles.bar,
         tabBarShowLabel: false,
       }}
@@ -89,8 +89,9 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   bar: {
-    backgroundColor: colors.surface,
-    borderTopColor: colors.border,
+    backgroundColor: colors.navBar,
+    borderTopColor: colors.navBarBorder,
+    borderTopWidth: 1,
     height: 64,
     paddingTop: 12,
   },

@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
+import { PredictWatermark } from '../../../components/PredictWatermark';
 import { PredictWord } from '../../../components/PredictWord';
 import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { useAuth } from '../../../lib/auth';
@@ -215,6 +216,8 @@ export default function NotificationsScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <PredictWatermark opacity={0.05} />
+
       <View style={styles.header}>
         {selectedIds.size > 0 ? (
           <>
@@ -343,7 +346,7 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+  safe: { flex: 1, backgroundColor: 'transparent' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -354,7 +357,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  headerTitle: { fontFamily: fonts.serifItalic, fontSize: 26, color: colors.text },
+  headerTitle: {
+    fontFamily: fonts.display,
+    fontSize: 22,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    color: colors.text,
+  },
   cancelSelection: { fontSize: 15, color: colors.gold, fontWeight: '600' },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   loader: { marginTop: 32 },

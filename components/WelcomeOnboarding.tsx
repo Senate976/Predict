@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
   },
   scroll: { padding: spacing.lg },
   brand: {
-    fontFamily: fonts.serifItalic,
+    fontFamily: fonts.display,
     fontSize: 13,
     letterSpacing: 4,
     color: colors.gold,

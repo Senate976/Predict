@@ -28,6 +28,7 @@ import {
 import { colors, fonts, radius } from '../lib/theme';
 import { Avatar } from './Avatar';
 import { InlineComments } from './InlineComments';
+import { PredictWatermark } from './PredictWatermark';
 import { PredictWord } from './PredictWord';
 
 /** Largeur fixe de la bulle de réactions — nécessaire pour la centrer
@@ -279,6 +280,8 @@ export function PredictionCard({
         verdict === 'missed' && styles.cardMissed,
       ]}
     >
+      <PredictWatermark opacity={0.07} size={130} />
+
       <Pressable onPress={() => onPress?.()} style={({ pressed }) => pressed && styles.cardPressed}>
         <View style={styles.cardTop}>
           {authorLabel && (

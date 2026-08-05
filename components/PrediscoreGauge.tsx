@@ -1,7 +1,7 @@
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { colors } from '../lib/theme';
+import { colors, fonts } from '../lib/theme';
 
 const BAR_WIDTH = 260;
 const BAR_HEIGHT = 10;
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   scoreValue: {
-    fontFamily: 'InstrumentSerif_400Regular',
+    fontFamily: fonts.serif,
     fontSize: 34,
     color: colors.text,
     marginBottom: 10,

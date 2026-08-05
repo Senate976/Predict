@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
+import { PredictWatermark } from '../../../components/PredictWatermark';
 import { QuickCreateButton } from '../../../components/QuickCreateButton';
 import { useAuth } from '../../../lib/auth';
 import {
@@ -295,6 +296,8 @@ export default function CircleScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <PredictWatermark opacity={0.05} />
+
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Cercle</Text>
         <QuickCreateButton />
@@ -657,7 +660,7 @@ export default function CircleScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+  safe: { flex: 1, backgroundColor: 'transparent' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -669,7 +672,13 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   eyebrow: { ...eyebrow, marginBottom: 4 },
-  headerTitle: { fontFamily: fonts.serifItalic, fontSize: 26, color: colors.text },
+  headerTitle: {
+    fontFamily: fonts.display,
+    fontSize: 24,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    color: colors.text,
+  },
   tabs: {
     flexDirection: 'row',
     gap: 8,

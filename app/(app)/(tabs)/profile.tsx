@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
+import { PredictWatermark } from '../../../components/PredictWatermark';
 import { PredictWord } from '../../../components/PredictWord';
 import { PrediscoreGauge } from '../../../components/PrediscoreGauge';
 import { QuickCreateButton } from '../../../components/QuickCreateButton';
@@ -144,6 +145,8 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <PredictWatermark opacity={0.05} />
+
       <View style={styles.header}>
         <Text style={styles.brand}>Profil</Text>
         <QuickCreateButton />
@@ -292,7 +295,7 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+  safe: { flex: 1, backgroundColor: 'transparent' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -306,7 +309,13 @@ const styles = StyleSheet.create({
   scroll: { padding: spacing.lg, paddingBottom: 40 },
   eyebrow: { ...eyebrow },
   sectionSpacing: { marginTop: spacing.xl },
-  brand: { fontFamily: fonts.serifItalic, fontSize: 28, color: colors.text },
+  brand: {
+    fontFamily: fonts.display,
+    fontSize: 24,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    color: colors.text,
+  },
   identityCard: {
     marginTop: spacing.lg,
     padding: 18,

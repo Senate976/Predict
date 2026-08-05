@@ -478,7 +478,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+  safe: { flex: 1, backgroundColor: 'transparent' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -488,7 +488,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  brand: { fontFamily: fonts.serifItalic, fontSize: 26, color: colors.text, flexShrink: 0 },
+  brand: {
+    fontFamily: fonts.display,
+    fontSize: 24,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    color: colors.text,
+    flexShrink: 0,
+  },
   // `flexShrink` + `minWidth: 0` en chaîne (plutôt qu'un `maxWidth` en
   // pourcentage sur `userChip`, calculé contre un parent lui-même sans
   // largeur définie) : c'est ce qui permet au pseudo de rétrécir avec
