@@ -17,7 +17,6 @@ import { Avatar } from '../../../components/Avatar';
 import { InlineComments } from '../../../components/InlineComments';
 import { PredictWord } from '../../../components/PredictWord';
 import { QuickCreateButton } from '../../../components/QuickCreateButton';
-import { ScreenBackground } from '../../../components/ScreenBackground';
 import { useAuth } from '../../../lib/auth';
 import { formatAdvance, formatShortDateTime } from '../../../lib/datetime';
 import { fetchFriendships, otherProfile, type FriendProfile } from '../../../lib/friends';
@@ -226,7 +225,6 @@ export default function PredictionDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScreenBackground />
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={8}>
           <Text style={styles.back}>Retour</Text>
@@ -479,7 +477,7 @@ export default function PredictionDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: 'transparent' },
+  safe: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

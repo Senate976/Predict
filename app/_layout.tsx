@@ -1,28 +1,12 @@
-import { Cinzel_700Bold } from '@expo-google-fonts/cinzel';
-import {
-  CormorantGaramond_500Medium,
-  CormorantGaramond_500Medium_Italic,
-  CormorantGaramond_600SemiBold,
-} from '@expo-google-fonts/cormorant-garamond';
+import { Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { useFonts } from 'expo-font';
-import { DefaultTheme, Stack, ThemeProvider, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
-import { ScreenBackground } from '../components/ScreenBackground';
 import { AuthProvider, useAuth } from '../lib/auth';
 import { colors } from '../lib/theme';
-
-// React Navigation peint le fond de chaque écran via ce thème (indépendamment
-// de tout `contentStyle`/`sceneStyle` par écran, qui se heurte à un souci
-// d'ordre de priorité CSS sur React Native Web face à cette valeur par
-// défaut). Le rendre transparent ici, une seule fois, laisse le dégradé de
-// `ScreenBackground` visible derrière tous les écrans/onglets.
-const navTheme = {
-  ...DefaultTheme,
-  colors: { ...DefaultTheme.colors, background: 'transparent' },
-};
 
 function RootNavigator() {
   const { session, loading } = useAuth();
@@ -52,15 +36,10 @@ function RootNavigator() {
   }
 
   return (
-    <View style={styles.root}>
-      <ScreenBackground />
-      <ThemeProvider value={navTheme}>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(app)" />
-        </Stack>
-      </ThemeProvider>
-    </View>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(app)" />
+    </Stack>
   );
 }
 
@@ -70,10 +49,9 @@ export default function RootLayout() {
   // sinon React Native retombe silencieusement sur la police système sans
   // avertir.
   const [fontsLoaded] = useFonts({
-    Cinzel_700Bold,
-    CormorantGaramond_500Medium,
-    CormorantGaramond_500Medium_Italic,
-    CormorantGaramond_600SemiBold,
+    Inter_400Regular,
+    Inter_600SemiBold,
+    Inter_700Bold,
   });
 
   if (!fontsLoaded) {
@@ -93,7 +71,6 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
   loader: {
     flex: 1,
     alignItems: 'center',
