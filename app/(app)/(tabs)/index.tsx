@@ -296,7 +296,7 @@ export default function HomeScreen() {
 
       <View style={styles.tabs}>
         <Pressable onPress={() => setTab('past')} style={[styles.tab, tab === 'past' && styles.tabActive]}>
-          <Text style={[styles.tabText, tab === 'past' && styles.tabTextActive]}>Révélées</Text>
+          <Text style={[styles.tabText, tab === 'past' && styles.tabTextActive]}>Predict</Text>
           {unreadPast > 0 && (
             <View style={styles.tabBadge}>
               <Text style={styles.tabBadgeText}>{unreadPast > 99 ? '99+' : unreadPast}</Text>
