@@ -17,6 +17,7 @@ import { PredictWatermark } from '../../../components/PredictWatermark';
 import { PredictWord } from '../../../components/PredictWord';
 import { PrediscoreGauge } from '../../../components/PrediscoreGauge';
 import { QuickCreateButton } from '../../../components/QuickCreateButton';
+import { ScreenBackground } from '../../../components/ScreenBackground';
 import { fetchProfileById, type FriendProfile } from '../../../lib/friends';
 import {
   fetchPredictionStats,
@@ -80,6 +81,7 @@ export default function FriendProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <ScreenBackground />
       <PredictWatermark opacity={0.05} />
 
       <View style={styles.header}>

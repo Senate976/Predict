@@ -17,6 +17,7 @@ import { Avatar } from '../../../components/Avatar';
 import { PredictWatermark } from '../../../components/PredictWatermark';
 import { PredictWord } from '../../../components/PredictWord';
 import { QuickCreateButton } from '../../../components/QuickCreateButton';
+import { ScreenBackground } from '../../../components/ScreenBackground';
 import { useAuth } from '../../../lib/auth';
 import { formatTimeAgo } from '../../../lib/datetime';
 import {
@@ -216,6 +217,7 @@ export default function NotificationsScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <ScreenBackground />
       <PredictWatermark opacity={0.05} />
 
       <View style={styles.header}>
