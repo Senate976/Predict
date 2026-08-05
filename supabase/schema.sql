@@ -2338,6 +2338,109 @@ group by p.id, p.author_id, p.teaser, pc.content, pc.audio_path, p.reveal_at, p.
 grant select on public.predictions_feed to authenticated;
 
 -- ---------------------------------------------------------------------------
+-- 27a. Validation sociale des prédictions à expiration libre (1/2) — colonnes
+-- et tables, posées ICI (avant le dernier bloc `predictions_feed`, plus bas)
+-- pour que ses colonnes existent déjà quand la vue les lit. Voir la section
+-- 33 pour la suite (fonctions, `prediction_resolutions`, `get_prediscore`) :
+-- celle-ci doit au contraire rester après les sections 23/29 qu'elle
+-- redéfinit, sans quoi elles l'écraseraient en s'exécutant après elle.
+-- ---------------------------------------------------------------------------
+--
+-- Jusqu'ici, une prédiction « à expiration libre » (`open_ended`, révélée à
+-- la discrétion de l'auteur) ne se résolvait, comme les autres, que si des
+-- destinataires votaient Réalisée/Manquée (section 15) — en pratique ce vote
+-- spontané n'arrive presque jamais, donc ces prédictions restent `pending`
+-- indéfiniment et ne contribuent jamais au Prediscore. Ce système remplace le
+-- vote pour ces prédictions-là seulement (les prédictions à date fixe
+-- continuent de se résoudre par vote, section 15/16, sans changement) :
+-- l'auteur déclare lui-même le résultat, les destinataires valident
+-- tacitement (silence = accord) ou contestent, et une contestation massive
+-- ouvre un jury à part.
+--
+-- Cinq statuts, stockés bruts sur `predictions.resolution_status` : `pending`
+-- (rien déclaré), `pending_validation` (l'auteur a déclaré « Réussie », en
+-- attente de la fenêtre de 24h), `mauvaise_foi` (contestation ≥ 25%, jury en
+-- cours), `resolved_success`/`resolved_failed` (issue définitive, posée
+-- directement par l'auteur pour un Manqué).
+alter table public.predictions add column if not exists resolution_status text not null default 'pending';
+alter table public.predictions drop constraint if exists predictions_resolution_status_check;
+alter table public.predictions add constraint predictions_resolution_status_check
+  check (resolution_status in ('pending', 'pending_validation', 'mauvaise_foi', 'resolved_success', 'resolved_failed'));
+
+-- Horodatage de départ de chacune des deux fenêtres de 24h.
+alter table public.predictions add column if not exists auto_verdict_declared_at timestamptz;
+alter table public.predictions add column if not exists bad_faith_vote_started_at timestamptz;
+
+create index if not exists predictions_resolution_status_idx
+  on public.predictions (resolution_status) where resolution_status <> 'pending';
+
+-- Stage 1 (validation tacite / contestation) et stage 2 (jury) : tous les
+-- destinataires (`prediction_access`) sont éligibles aux deux — pas
+-- seulement ceux qui auraient déjà voté Réalisée/Manquée, puisque ce vote-là
+-- n'a justement plus lieu d'être sur une prédiction à expiration libre.
+create table if not exists public.prediction_validations (
+  prediction_id uuid not null references public.predictions (id) on delete cascade,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  response text not null check (response in ('validate', 'contest')),
+  created_at timestamptz not null default now(),
+  primary key (prediction_id, user_id)
+);
+
+alter table public.prediction_validations enable row level security;
+
+drop policy if exists "prediction_validations_select" on public.prediction_validations;
+create policy "prediction_validations_select"
+  on public.prediction_validations
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1 from public.prediction_access pa
+      where pa.prediction_id = prediction_validations.prediction_id and pa.user_id = auth.uid()
+    )
+    or exists (
+      select 1 from public.predictions p
+      where p.id = prediction_validations.prediction_id and p.author_id = auth.uid()
+    )
+  );
+
+-- Pas de policy insert/update pour `authenticated` : seule la fonction
+-- `cast_validation` (`security definer`, section 33) écrit ici — elle doit
+-- pouvoir, dans la même transaction, vérifier le seuil de 25% et faire
+-- basculer la prédiction en `mauvaise_foi`, ce qu'une simple policy ne sait
+-- pas faire.
+
+-- Stage 2 : le jury, une fois la contestation au-delà du seuil.
+create table if not exists public.prediction_bad_faith_votes (
+  prediction_id uuid not null references public.predictions (id) on delete cascade,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  vote text not null check (vote in ('yes', 'no')),
+  created_at timestamptz not null default now(),
+  primary key (prediction_id, user_id)
+);
+
+alter table public.prediction_bad_faith_votes enable row level security;
+
+drop policy if exists "prediction_bad_faith_votes_select" on public.prediction_bad_faith_votes;
+create policy "prediction_bad_faith_votes_select"
+  on public.prediction_bad_faith_votes
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1 from public.prediction_access pa
+      where pa.prediction_id = prediction_bad_faith_votes.prediction_id and pa.user_id = auth.uid()
+    )
+    or exists (
+      select 1 from public.predictions p
+      where p.id = prediction_bad_faith_votes.prediction_id and p.author_id = auth.uid()
+    )
+  );
+
+-- Même chose : uniquement via `cast_bad_faith_vote` (section 33), pas de
+-- policy insert.
+
+-- ---------------------------------------------------------------------------
 -- 28. Révélation immédiate — vote « j'y crois / j'y crois pas »
 -- ---------------------------------------------------------------------------
 --
@@ -2816,107 +2919,24 @@ revoke all on function public.create_prediction(text, text, timestamptz, text, u
 grant execute on function public.create_prediction(text, text, timestamptz, text, uuid[], uuid, uuid[], boolean, text, boolean) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 33. Validation sociale des prédictions à expiration libre
+-- 33. Validation sociale des prédictions à expiration libre (2/2)
 -- ---------------------------------------------------------------------------
 --
--- Jusqu'ici, une prédiction « à expiration libre » (`open_ended`, révélée à
--- la discrétion de l'auteur) ne se résolvait, comme les autres, que si des
--- destinataires votaient Réalisée/Manquée (section 15) — en pratique ce vote
--- spontané n'arrive presque jamais, donc ces prédictions restent `pending`
--- indéfiniment et ne contribuent jamais au Prediscore. Ce système remplace le
--- vote pour ces prédictions-là seulement (les prédictions à date fixe
--- continuent de se résoudre par vote, section 15/16, sans changement) :
--- l'auteur déclare lui-même le résultat, les destinataires valident
--- tacitement (silence = accord) ou contestent, et une contestation massive
--- ouvre un jury à part.
+-- Suite de la section 27a (colonnes de `predictions` et tables
+-- `prediction_validations`/`prediction_bad_faith_votes`, posées plus haut
+-- pour que le dernier bloc `predictions_feed`, section 28, puisse déjà les
+-- lire). Ici : les fonctions qui écrivent ces statuts, la vue qui les
+-- traduit en issue pour le Prediscore, et les redéfinitions de
+-- `get_prediscore`/`get_group_prediscore` qui s'appuient dessus — celles-ci
+-- doivent au contraire rester APRÈS les sections 23/29 qui les définissent,
+-- sans quoi elles seraient écrasées par l'ancienne logique en s'exécutant
+-- après elles.
 --
--- Cinq statuts, stockés bruts sur `predictions.resolution_status` : `pending`
--- (rien déclaré), `pending_validation` (l'auteur a déclaré « Réussie », en
--- attente de la fenêtre de 24h), `mauvaise_foi` (contestation ≥ 25%, jury en
--- cours), `resolved_success`/`resolved_failed` (issue définitive, posée
--- directement par l'auteur pour un Manqué). Comme pour
--- `is_revealed`/`final_status` ailleurs dans ce fichier, l'écoulement d'une
--- fenêtre de 24h n'est JAMAIS écrit par une tâche planifiée (pg_cron n'est
--- pas garanti disponible selon le plan Supabase) : chaque lecture
--- (`predictions_feed`, `get_prediscore`) recalcule le statut EFFECTIF à partir
--- de l'horodatage et des votes déjà enregistrés — voir `predictions_feed`
--- (section 28, bloc final) pour ce calcul côté affichage.
-alter table public.predictions add column if not exists resolution_status text not null default 'pending';
-alter table public.predictions drop constraint if exists predictions_resolution_status_check;
-alter table public.predictions add constraint predictions_resolution_status_check
-  check (resolution_status in ('pending', 'pending_validation', 'mauvaise_foi', 'resolved_success', 'resolved_failed'));
-
--- Horodatage de départ de chacune des deux fenêtres de 24h.
-alter table public.predictions add column if not exists auto_verdict_declared_at timestamptz;
-alter table public.predictions add column if not exists bad_faith_vote_started_at timestamptz;
-
-create index if not exists predictions_resolution_status_idx
-  on public.predictions (resolution_status) where resolution_status <> 'pending';
-
--- Stage 1 (validation tacite / contestation) et stage 2 (jury) : tous les
--- destinataires (`prediction_access`) sont éligibles aux deux — pas
--- seulement ceux qui auraient déjà voté Réalisée/Manquée, puisque ce vote-là
--- n'a justement plus lieu d'être sur une prédiction à expiration libre.
-create table if not exists public.prediction_validations (
-  prediction_id uuid not null references public.predictions (id) on delete cascade,
-  user_id uuid not null references public.profiles (id) on delete cascade,
-  response text not null check (response in ('validate', 'contest')),
-  created_at timestamptz not null default now(),
-  primary key (prediction_id, user_id)
-);
-
-alter table public.prediction_validations enable row level security;
-
-drop policy if exists "prediction_validations_select" on public.prediction_validations;
-create policy "prediction_validations_select"
-  on public.prediction_validations
-  for select
-  to authenticated
-  using (
-    exists (
-      select 1 from public.prediction_access pa
-      where pa.prediction_id = prediction_validations.prediction_id and pa.user_id = auth.uid()
-    )
-    or exists (
-      select 1 from public.predictions p
-      where p.id = prediction_validations.prediction_id and p.author_id = auth.uid()
-    )
-  );
-
--- Pas de policy insert/update pour `authenticated` : seule la fonction
--- `cast_validation` (`security definer`, plus bas) écrit ici — elle doit
--- pouvoir, dans la même transaction, vérifier le seuil de 25% et faire
--- basculer la prédiction en `mauvaise_foi`, ce qu'une simple policy ne sait
--- pas faire.
-
--- Stage 2 : le jury, une fois la contestation au-delà du seuil.
-create table if not exists public.prediction_bad_faith_votes (
-  prediction_id uuid not null references public.predictions (id) on delete cascade,
-  user_id uuid not null references public.profiles (id) on delete cascade,
-  vote text not null check (vote in ('yes', 'no')),
-  created_at timestamptz not null default now(),
-  primary key (prediction_id, user_id)
-);
-
-alter table public.prediction_bad_faith_votes enable row level security;
-
-drop policy if exists "prediction_bad_faith_votes_select" on public.prediction_bad_faith_votes;
-create policy "prediction_bad_faith_votes_select"
-  on public.prediction_bad_faith_votes
-  for select
-  to authenticated
-  using (
-    exists (
-      select 1 from public.prediction_access pa
-      where pa.prediction_id = prediction_bad_faith_votes.prediction_id and pa.user_id = auth.uid()
-    )
-    or exists (
-      select 1 from public.predictions p
-      where p.id = prediction_bad_faith_votes.prediction_id and p.author_id = auth.uid()
-    )
-  );
-
--- Même chose : uniquement via `cast_bad_faith_vote`, pas de policy insert.
+-- Comme pour `is_revealed`/`final_status` ailleurs dans ce fichier,
+-- l'écoulement d'une fenêtre de 24h n'est JAMAIS écrit par une tâche
+-- planifiée (pg_cron n'est pas garanti disponible selon le plan Supabase) :
+-- chaque lecture (`predictions_feed`, `get_prediscore`) recalcule le statut
+-- EFFECTIF à partir de l'horodatage et des votes déjà enregistrés.
 
 alter table public.notifications drop constraint if exists notifications_type_check;
 alter table public.notifications add constraint notifications_type_check
@@ -3170,7 +3190,12 @@ as $$
     case
       when coalesce(sum(weight) filter (where outcome <> 'pending'), 0) > 0
         then round(
-          100.0 * sum(weight) filter (where outcome = 'realized')
+          -- `coalesce(..., 0)` sur le numérateur : sans lui, un utilisateur
+          -- dont AUCUNE prédiction résolue n'est « realized » (tout est
+          -- manqué) obtient un `sum(...) filter(...)` NULL sur zéro ligne
+          -- filtrée, qui propage en score NULL — lu comme « pas encore de
+          -- Prediscore » plutôt qu'un score de 0%, bien réel lui.
+          100.0 * coalesce(sum(weight) filter (where outcome = 'realized'), 0)
             / sum(weight) filter (where outcome <> 'pending'),
           1
         )
@@ -3214,7 +3239,12 @@ as $$
     case
       when coalesce(sum(weight) filter (where outcome <> 'pending'), 0) > 0
         then round(
-          100.0 * sum(weight) filter (where outcome = 'realized')
+          -- `coalesce(..., 0)` sur le numérateur : sans lui, un utilisateur
+          -- dont AUCUNE prédiction résolue n'est « realized » (tout est
+          -- manqué) obtient un `sum(...) filter(...)` NULL sur zéro ligne
+          -- filtrée, qui propage en score NULL — lu comme « pas encore de
+          -- Prediscore » plutôt qu'un score de 0%, bien réel lui.
+          100.0 * coalesce(sum(weight) filter (where outcome = 'realized'), 0)
             / sum(weight) filter (where outcome <> 'pending'),
           1
         )
