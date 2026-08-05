@@ -735,13 +735,19 @@ const styles = StyleSheet.create({
   usernameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   groupScore: { fontSize: 13, fontWeight: '700', color: colors.text },
   actions: { flexDirection: 'row', gap: 8 },
+  // Actions en ligne (Ajouter, Accepter, Créer, gestion des membres) : le
+  // jaune plein était trop lourd répété à chaque ligne de liste. Contour noir
+  // fin + fond blanc pour l'action principale, contour gris pour l'action
+  // secondaire — le jaune plein reste au FAB et au bouton de publication.
   pillGold: {
-    backgroundColor: colors.gold,
+    borderWidth: 1,
+    borderColor: colors.text,
     borderRadius: radius.pill,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 7,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.surface,
   },
   pillGoldText: { color: colors.text, fontSize: 13, fontWeight: '700' },
   pillOutline: {
@@ -749,7 +755,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.pill,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 7,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -30,10 +30,13 @@ export const colors = {
   // Pastille de notification (badge de la cloche).
   notificationBadge: '#DC2626',
   // Badges d'état de carte (délai, réalisé, manqué) : un seul traitement,
-  // volontairement sans distinction de couleur entre eux — fond jaune très
-  // clair, texte noir, comme demandé pour rester lisible et élégant.
-  badgeBg: 'rgba(250, 204, 21, 0.20)',
-  badgeText: '#111827',
+  // volontairement sans distinction de couleur entre eux — fond jaune pâle,
+  // texte ambre foncé, comme demandé pour rester lisible et élégant.
+  badgeBg: '#FEF08A',
+  badgeText: '#854D0E',
+  // Trait des icônes (Lucide) : noir adouci plutôt que gris clair, pour
+  // qu'elles ressortent sans être aussi dures qu'un noir pur.
+  icon: '#374151',
   // Barre de navigation : blanc pur, tranche sur le fond papier.
   navBar: '#FFFFFF',
   navBarBorder: 'rgba(17, 24, 39, 0.10)',

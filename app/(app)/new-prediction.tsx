@@ -283,9 +283,11 @@ export default function NewPredictionScreen() {
           <Pressable onPress={() => router.back()} disabled={submitting} hitSlop={8}>
             <Text style={styles.cancel}>Annuler</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>
-            Nouveau <PredictWord />
-          </Text>
+          {/* Titres de section : « Predict » s'écrit en clair plutôt qu'avec
+              `PredictWord`. Le titre est déjà entièrement en gras, donc le P
+              renforcé du composant n'ajoutait rien — il créait juste une
+              rupture de graisse au milieu du mot. */}
+          <Text style={styles.headerTitle}>Nouveau Predict</Text>
           {/* Espaceur de même largeur que « Annuler », pour centrer le titre. */}
           <View style={styles.headerSpacer} />
         </View>
@@ -306,9 +308,7 @@ export default function NewPredictionScreen() {
             style={[styles.input, styles.teaserInput]}
           />
 
-          <Text style={[styles.label, styles.sectionLabel]}>
-            Mon <PredictWord />
-          </Text>
+          <Text style={[styles.label, styles.sectionLabel]}>Mon Predict</Text>
           <View style={styles.scopeRow}>
             <Pressable
               onPress={() => setContentMode('text')}

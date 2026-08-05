@@ -160,7 +160,7 @@ export default function ProfileScreen() {
           {avatarError && <Text style={styles.error}>{avatarError}</Text>}
 
           <Text style={[styles.eyebrow, styles.sectionSpacing]}>Nom d’utilisateur</Text>
-          <Text style={styles.username}>@{username ?? '…'}</Text>
+          <Text style={styles.username}>{username ?? '…'}</Text>
           <Text style={styles.email}>{session?.user.email ?? ''}</Text>
         </View>
 

@@ -327,7 +327,7 @@ export default function NotificationsScreen() {
                     hitSlop={8}
                     style={styles.deleteButton}
                   >
-                    <Trash2 size={15} color={colors.textFaint} strokeWidth={1.75} />
+                    <Trash2 size={15} color={colors.icon} strokeWidth={1.75} />
                   </Pressable>
                 )}
               </Pressable>
@@ -412,11 +412,15 @@ const styles = StyleSheet.create({
   },
   time: { fontSize: 12, color: colors.textFaint, marginTop: 6 },
   inviteActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  // Même traitement léger que les actions du Cercle (invitations de groupe) :
+  // contour plutôt que jaune plein.
   pillGold: {
-    backgroundColor: colors.gold,
+    borderWidth: 1,
+    borderColor: colors.text,
     borderRadius: radius.pill,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 7,
+    backgroundColor: colors.surface,
   },
   pillGoldText: { color: colors.text, fontSize: 13, fontWeight: '700' },
   pillOutline: {
@@ -424,7 +428,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.pill,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 7,
   },
   pillOutlineText: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
   respondedText: { fontSize: 12, color: colors.textFaint, marginTop: 8, fontStyle: 'italic' },

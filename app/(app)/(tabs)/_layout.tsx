@@ -8,10 +8,26 @@ import { useAuth } from '../../../lib/auth';
 import { fetchUnreadNotificationCount } from '../../../lib/notifications';
 import { colors, fonts } from '../../../lib/theme';
 
+/** Taille et épaisseur communes aux quatre onglets — une seule source, pour
+ * qu'aucune icône ne détonne dans la rangée. */
+const ICON_SIZE = 24;
+const STROKE = 1.75;
+
 /** Monogramme « P » du Fil, à la place d'une icône générique — c'est
  * l'onglet qui mène au cœur de l'app (les Predicts), pas juste un favori. */
 function PTabIcon({ color, size }: { color: ColorValue; size: number }) {
   return <Text style={{ fontFamily: fonts.display, fontSize: size, lineHeight: size, color }}>P</Text>;
+}
+
+/** Enveloppe commune : boîte de taille fixe (alignement) + point jaune sous
+ * l'onglet actif. */
+function TabIcon({ focused, children }: { focused: boolean; children: React.ReactNode }) {
+  return (
+    <View style={{ alignItems: 'center' }}>
+      <View style={styles.iconBox}>{children}</View>
+      <View style={[styles.dot, focused && styles.dotActive]} />
+    </View>
+  );
 }
 
 /** Fréquence de rafraîchissement du badge — juste assez pour rester à jour
@@ -54,10 +70,10 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Fil',
-          tabBarIcon: ({ color, size, focused }) => (
-            <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
-              <PTabIcon size={size} color={color} />
-            </View>
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon focused={focused}>
+              <PTabIcon size={ICON_SIZE} color={color} />
+            </TabIcon>
           ),
         }}
       />
@@ -69,10 +85,10 @@ export default function TabsLayout() {
           // React Navigation, cohérents entre iOS/Android/web sans CSS maison.
           tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
           tabBarBadgeStyle: styles.badge,
-          tabBarIcon: ({ color, size, focused }) => (
-            <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
-              <Bell size={size} color={color} strokeWidth={focused ? 2 : 1.5} />
-            </View>
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon focused={focused}>
+              <Bell size={ICON_SIZE} color={color} strokeWidth={STROKE} />
+            </TabIcon>
           ),
         }}
       />
@@ -80,10 +96,10 @@ export default function TabsLayout() {
         name="circle"
         options={{
           title: 'Cercle',
-          tabBarIcon: ({ color, size, focused }) => (
-            <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
-              <Users size={size} color={color} strokeWidth={focused ? 2 : 1.5} />
-            </View>
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon focused={focused}>
+              <Users size={ICON_SIZE} color={color} strokeWidth={STROKE} />
+            </TabIcon>
           ),
         }}
       />
@@ -91,10 +107,10 @@ export default function TabsLayout() {
         name="profile"
         options={{
           title: 'Profil',
-          tabBarIcon: ({ color, size, focused }) => (
-            <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
-              <CircleUserRound size={size} color={color} strokeWidth={focused ? 2 : 1.5} />
-            </View>
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon focused={focused}>
+              <CircleUserRound size={ICON_SIZE} color={color} strokeWidth={STROKE} />
+            </TabIcon>
           ),
         }}
       />
@@ -108,16 +124,29 @@ const styles = StyleSheet.create({
     borderTopColor: colors.navBarBorder,
     borderTopWidth: 1,
     height: 64,
-    paddingTop: 12,
+    paddingTop: 10,
   },
-  // Petit fond pastel derrière l'icône active — discret repère visuel plutôt
-  // que la seule couleur, sans agrandir la barre.
-  iconWrap: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 999,
+  // Boîte de taille fixe : c'est elle qui aligne les quatre onglets entre eux.
+  // Sans ça, le monogramme « P » (un glyphe texte, avec sa propre hauteur de
+  // ligne) ne tombait pas sur la même ligne optique que les icônes Lucide.
+  iconBox: {
+    width: ICON_SIZE + 8,
+    height: ICON_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  iconWrapActive: { backgroundColor: colors.navBarActiveSoft },
+  // Point jaune sous l'onglet actif, plutôt qu'une pastille autour de
+  // l'icône : le repère se lit sans déformer l'alignement de la rangée. Un
+  // emplacement toujours réservé (transparent si inactif) garde les icônes
+  // strictement à la même hauteur d'un onglet à l'autre.
+  dot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    marginTop: 5,
+    backgroundColor: 'transparent',
+  },
+  dotActive: { backgroundColor: colors.gold },
   badge: {
     backgroundColor: colors.notificationBadge,
     fontSize: 10,
