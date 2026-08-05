@@ -44,9 +44,12 @@ export function PrediscoreGauge({
       <View style={styles.barBox}>
         <Svg width={BAR_WIDTH} height={BAR_HEIGHT}>
           <Defs>
-            {/* Noir → jaune, strictement sur la charte — pas de rouge/vert. */}
+            {/* Noir → jaune, strictement sur la charte — pas de rouge/vert.
+                Une étape ambre au milieu évite le brun terne qu'une simple
+                interpolation à deux couleurs produirait à mi-parcours. */}
             <LinearGradient id="prediscoreGradient" x1="0" y1="0" x2="1" y2="0">
               <Stop offset="0" stopColor={colors.text} />
+              <Stop offset="0.5" stopColor={colors.goldTransition} />
               <Stop offset="1" stopColor={colors.gold} />
             </LinearGradient>
           </Defs>

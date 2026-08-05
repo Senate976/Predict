@@ -69,6 +69,9 @@ export type PredictionFeedItem = {
   /** Préférences propres à l'appelant — jamais partagées avec les autres. */
   is_favorite: boolean;
   is_hidden: boolean;
+  /** Posée au premier tap sur la carte — sert au badge de compteur des
+   * onglets et au surlignage des cartes non lues. */
+  is_seen: boolean;
   /** `{ '👍': 2, '❤️': 1, ... }` — absent des clés sans aucune réaction. */
   emoji_counts: Partial<Record<EmojiReaction, number>>;
   my_emoji_reaction: EmojiReaction | null;
@@ -146,7 +149,7 @@ export function predictionErrorMessage(error: PostgrestError): string {
  */
 const FEED_COLUMNS =
   'id, author_id, teaser, content, audio_path, reveal_at, scope, open_ended, is_immediate, category, created_at, ' +
-  'is_revealed, realized_votes, missed_votes, final_status, is_favorite, is_hidden, emoji_counts, my_emoji_reaction, ' +
+  'is_revealed, realized_votes, missed_votes, final_status, is_favorite, is_hidden, is_seen, emoji_counts, my_emoji_reaction, ' +
   'mentioned_user_ids, believe_votes, disbelieve_votes';
 
 /**
@@ -235,6 +238,50 @@ export function extractMentionedUsernames(text: string): string[] {
   return Array.from(usernames);
 }
 
+/** Choix stable (pas un vrai tirage à chaque rendu, qui ferait clignoter le
+ * nom affiché) dérivé de l'id de la prédiction — se comporte comme un
+ * aléatoire différent d'une prédiction à l'autre, sans jamais changer pour
+ * une même carte entre deux rendus. */
+function stableIndex(seed: string, length: number): number {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  return hash % length;
+}
+
+/**
+ * Étiquette « X cité » à afficher pour les amis mentionnés (« @pseudo ») dans
+ * un teaser — jamais la liste complète (ça empiète sur le pseudo de
+ * l'auteur, sur la même ligne). Personnalisée : une personne citée voit
+ * toujours son propre nom en premier ; les autres destinataires voient un nom
+ * choisi de préférence parmi leurs propres amis quand l'un des cités en fait
+ * partie, sinon un choix stable parmi tous les cités.
+ */
+export function buildMentionLabel(
+  predictionId: string,
+  mentionedIds: string[],
+  usernameById: Record<string, string | undefined>,
+  viewerId: string,
+  viewerFriendIds: ReadonlySet<string>
+): string | null {
+  if (mentionedIds.length === 0) return null;
+
+  let featuredId: string;
+  if (mentionedIds.includes(viewerId)) {
+    featuredId = viewerId;
+  } else {
+    const friendMatches = mentionedIds.filter((id) => viewerFriendIds.has(id));
+    const pool = friendMatches.length > 0 ? friendMatches : mentionedIds;
+    featuredId = pool[stableIndex(predictionId, pool.length)];
+  }
+
+  const featuredName = usernameById[featuredId] ?? '…';
+  return mentionedIds.length === 1
+    ? `${featuredName} cité`
+    : `${featuredName} cité, ainsi que d’autres personnes`;
+}
+
 /**
  * Révélation à la demande de l'auteur, avant (ou sans) date fixe — la RLS de
  * `reveal_prediction_now` (security definer) réserve l'action à l'auteur et
@@ -253,7 +300,7 @@ export async function revealPredictionNow(predictionId: string) {
 export async function setPredictionUserState(
   predictionId: string,
   userId: string,
-  patch: { favorite?: boolean; hidden?: boolean }
+  patch: { favorite?: boolean; hidden?: boolean; seen?: boolean }
 ) {
   return supabase
     .from('prediction_user_state')

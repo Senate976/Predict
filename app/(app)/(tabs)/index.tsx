@@ -20,15 +20,18 @@ import { PredictionCard } from '../../../components/PredictionCard';
 import { PredictWord } from '../../../components/PredictWord';
 import { WelcomeOnboarding } from '../../../components/WelcomeOnboarding';
 import { useAuth } from '../../../lib/auth';
+import { fetchFriendships } from '../../../lib/friends';
 import { fetchNotifications, markNotificationRead } from '../../../lib/notifications';
 import {
+  buildMentionLabel,
   deletePrediction,
   feedErrorMessage,
   fetchPredictionsFeed,
+  setPredictionUserState,
   type PredictionFeedItem,
 } from '../../../lib/predictions';
 import { supabase } from '../../../lib/supabase';
-import { colors, fonts, spacing } from '../../../lib/theme';
+import { colors, fonts, radius, spacing } from '../../../lib/theme';
 
 /**
  * Période de rafraîchissement des comptes à rebours.
@@ -53,6 +56,9 @@ export default function HomeScreen() {
   const [feed, setFeed] = useState<PredictionFeedItem[] | null>(null);
   const [authors, setAuthors] = useState<AuthorMap>({});
   const [votedIds, setVotedIds] = useState<Set<string>>(new Set());
+  // Amis acceptés du viewer — sert uniquement à choisir, parmi plusieurs
+  // personnes citées dans un teaser, un nom que le viewer reconnaîtra.
+  const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
   const [celebration, setCelebration] = useState<{ visible: boolean; message: ReactNode }>({
     visible: false,
     message: '',
@@ -60,7 +66,9 @@ export default function HomeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => new Date());
-  const [tab, setTab] = useState<Tab>('upcoming');
+  // « Révélées » par défaut, à gauche — c'est ce qu'on veut voir en premier
+  // en ouvrant l'app : ce qui vient de se passer, pas ce qui reste à venir.
+  const [tab, setTab] = useState<Tab>('past');
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuView, setMenuView] = useState<MenuView>('main');
   const [authorFilter, setAuthorFilter] = useState<string | null>(null);
@@ -140,6 +148,12 @@ export default function HomeScreen() {
       .eq('voter_id', userId);
     setVotedIds(new Set((myVotes ?? []).map((v) => v.prediction_id)));
 
+    const { data: friendships } = await fetchFriendships(userId);
+    const accepted = (friendships ?? []).filter((f) => f.status === 'accepted');
+    setFriendIds(
+      new Set(accepted.map((f) => (f.requester_id === userId ? f.addressee_id : f.requester_id)))
+    );
+
     // La première approbation non vue déclenche la célébration, une seule
     // fois — marquée lue tout de suite pour qu'un focus ultérieur de cet
     // écran ne la rejoue pas.
@@ -215,8 +229,22 @@ export default function HomeScreen() {
     );
   }
 
+  // Posé à l'ouverture de la carte — c'est ce qui fait baisser le compteur du
+  // badge d'onglet et retire le surlignage « non lue ».
+  function handleMarkSeen(predictionId: string) {
+    setFeed((prev) =>
+      (prev ?? []).map((item) => (item.id === predictionId ? { ...item, is_seen: true } : item))
+    );
+    if (userId) setPredictionUserState(predictionId, userId, { seen: true });
+  }
+
   const byTab = (feed ?? []).filter((item) => (tab === 'upcoming' ? !item.is_revealed : item.is_revealed));
   const hiddenCount = byTab.filter((item) => item.is_hidden).length;
+
+  // Comptés indépendamment de l'onglet actif : le badge de « À venir » doit
+  // rester juste même quand on regarde « Révélées », et inversement.
+  const unreadPast = (feed ?? []).filter((item) => item.is_revealed && !item.is_seen).length;
+  const unreadUpcoming = (feed ?? []).filter((item) => !item.is_revealed && !item.is_seen).length;
 
   const authorEntries = Array.from(new Set(byTab.map((item) => item.author_id))).map((id) => ({
     id,
@@ -267,14 +295,24 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.tabs}>
+        <Pressable onPress={() => setTab('past')} style={[styles.tab, tab === 'past' && styles.tabActive]}>
+          <Text style={[styles.tabText, tab === 'past' && styles.tabTextActive]}>Révélées</Text>
+          {unreadPast > 0 && (
+            <View style={styles.tabBadge}>
+              <Text style={styles.tabBadgeText}>{unreadPast > 99 ? '99+' : unreadPast}</Text>
+            </View>
+          )}
+        </Pressable>
         <Pressable
           onPress={() => setTab('upcoming')}
           style={[styles.tab, tab === 'upcoming' && styles.tabActive]}
         >
           <Text style={[styles.tabText, tab === 'upcoming' && styles.tabTextActive]}>À venir</Text>
-        </Pressable>
-        <Pressable onPress={() => setTab('past')} style={[styles.tab, tab === 'past' && styles.tabActive]}>
-          <Text style={[styles.tabText, tab === 'past' && styles.tabTextActive]}>Révélées</Text>
+          {unreadUpcoming > 0 && (
+            <View style={styles.tabBadge}>
+              <Text style={styles.tabBadgeText}>{unreadUpcoming > 99 ? '99+' : unreadUpcoming}</Text>
+            </View>
+          )}
         </Pressable>
       </View>
 
@@ -450,12 +488,20 @@ export default function HomeScreen() {
               authorLabel={authors[item.author_id]?.username ?? '…'}
               authorId={item.author_id}
               authorAvatarUrl={authors[item.author_id]?.avatar_url}
-              mentionedUsernames={item.mentioned_user_ids
-                .map((id) => authors[id]?.username)
-                .filter((username): username is string => !!username)}
+              mentionLabel={buildMentionLabel(
+                item.id,
+                item.mentioned_user_ids,
+                Object.fromEntries(item.mentioned_user_ids.map((id) => [id, authors[id]?.username])),
+                userId!,
+                friendIds
+              )}
               userId={userId!}
               hasVoted={votedIds.has(item.id)}
-              onPress={() => router.push(`/prediction/${item.id}`)}
+              unseen={!item.is_seen}
+              onPress={() => {
+                handleMarkSeen(item.id);
+                router.push(`/prediction/${item.id}`);
+              }}
               onDelete={() => handleDeletePrediction(item.id)}
               onFavoriteChange={(isFavorite) => handleFavoriteChange(item.id, isFavorite)}
               onHiddenChange={(isHidden) => handleHiddenChange(item.id, isHidden)}
@@ -506,13 +552,28 @@ const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
     paddingVertical: 12,
     alignItems: 'center',
+    gap: 6,
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
     marginBottom: -1,
   },
   tabActive: { borderBottomColor: colors.gold },
+  // Même principe que le badge de la cloche de notifications — rouge plein,
+  // texte blanc, taille fixe pour ne pas déplacer le libellé de l'onglet.
+  tabBadge: {
+    backgroundColor: colors.notificationBadge,
+    borderRadius: radius.pill,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabBadgeText: { fontSize: 10, fontWeight: '700', color: '#FFFFFF' },
   tabText: {
     fontFamily: fonts.sansBold,
     fontSize: 12,

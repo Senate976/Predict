@@ -23,6 +23,11 @@ export const colors = {
   gold: '#FACC15',
   goldBright: '#EAB308',
   goldSoft: 'rgba(250, 204, 21, 0.20)',
+  // Étape intermédiaire des dégradés noir → jaune (Prediscore, jauge de
+  // confiance) : une interpolation RVB directe entre #111827 et #FACC15
+  // traverse un brun/kaki terne au milieu. Cet ambre chaud comme étape
+  // du milieu donne une transition propre plutôt que ce ventre mou.
+  goldTransition: '#B45309',
   // Rouge fonctionnel, réservé aux erreurs et actions destructrices — pas une
   // couleur de marque, un signal d'alerte standard.
   danger: '#B91C1C',

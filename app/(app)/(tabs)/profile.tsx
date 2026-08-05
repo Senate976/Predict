@@ -1,4 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
+import { Settings } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -145,6 +146,9 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <Text style={styles.brand}>Profil</Text>
+        <Pressable onPress={() => router.push('/settings')} hitSlop={8}>
+          <Settings size={22} color={colors.icon} strokeWidth={1.75} />
+        </Pressable>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>

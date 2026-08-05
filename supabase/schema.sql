@@ -1950,6 +1950,13 @@ create table if not exists public.prediction_user_state (
   primary key (prediction_id, user_id)
 );
 
+-- Marque une prédiction comme vue par ce destinataire — posée au premier
+-- tap sur la carte (comme `is_read` sur une notification), pas seulement au
+-- passage dans la liste : un teaser aperçu en défilant vite n'est pas
+-- forcément « lu ». Sert au badge de compteur des onglets et au surlignage
+-- des cartes non lues dans le Fil.
+alter table public.prediction_user_state add column if not exists seen boolean not null default false;
+
 drop trigger if exists prediction_user_state_set_updated_at on public.prediction_user_state;
 create trigger prediction_user_state_set_updated_at
   before update on public.prediction_user_state
@@ -2503,6 +2510,13 @@ select
     ),
     false
   ) as is_hidden,
+  coalesce(
+    (
+      select us.seen from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_seen,
   coalesce(
     (
       select jsonb_object_agg(counts.emoji, counts.total)

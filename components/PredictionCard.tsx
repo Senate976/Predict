@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { Text } from './Text';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { fetchCommentCount } from '../lib/comments';
 import { formatCountdown } from '../lib/datetime';
@@ -53,10 +54,11 @@ export function PredictionCard({
   authorLabel,
   authorId,
   authorAvatarUrl,
-  mentionedUsernames,
+  mentionLabel,
   userId,
   onPress,
   hasVoted = false,
+  unseen = false,
   onDelete,
   onFavoriteChange,
   onHiddenChange,
@@ -66,15 +68,19 @@ export function PredictionCard({
   authorLabel?: string;
   authorId?: string;
   authorAvatarUrl?: string | null;
-  /** Pseudos des amis cités via « @pseudo » dans le teaser — affichés à côté
-   * de l'auteur, sur la même ligne, pour ne pas ajouter de hauteur à
-   * l'étiquette. */
-  mentionedUsernames?: string[];
+  /** Étiquette déjà résolue (« X cité, ainsi que d'autres personnes ») pour
+   * les amis cités via « @pseudo » dans le teaser — voir `buildMentionLabel`.
+   * Sur sa propre ligne, jamais accolée au pseudo de l'auteur : la liste
+   * complète des pseudos y empiétait. */
+  mentionLabel?: string | null;
   userId: string;
   onPress?: () => void;
   /** Le destinataire s'est déjà prononcé sur cette prédiction — masque le lien
    * « Donner mon avis », qui n'a plus lieu d'être une fois le vote posé. */
   hasVoted?: boolean;
+  /** Pas encore ouverte par ce destinataire — surlignage discret + compte
+   * dans le badge de l'onglet correspondant. */
+  unseen?: boolean;
   /** Réservé à l'auteur d'une prédiction révélée — affiche l'icône de
    * suppression, avec confirmation, en bas à droite de la carte. */
   onDelete?: () => void;
@@ -325,7 +331,7 @@ export function PredictionCard({
   ).current;
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, unseen && styles.cardUnseen]}>
       <Pressable onPress={() => onPress?.()} style={({ pressed }) => pressed && styles.cardPressed}>
         {/* Une seule ligne : [avatar][pseudo] ...espace flexible... [badge] [menu]. */}
         <View style={styles.cardHeader}>
@@ -339,11 +345,6 @@ export function PredictionCard({
               <Text style={styles.authorName} numberOfLines={1}>
                 {authorLabel}
               </Text>
-              {mentionedUsernames && mentionedUsernames.length > 0 && (
-                <Text style={styles.mentionTag} numberOfLines={1}>
-                  · a cité {mentionedUsernames.map((u) => `@${u}`).join(', ')}
-                </Text>
-              )}
             </Pressable>
           )}
 
@@ -355,10 +356,14 @@ export function PredictionCard({
             </Text>
           )}
           {verdict && (
-            <View style={styles.badge}>
-              {/* Liseré très discret plutôt qu'une pastille pleine — juste de
-                  quoi confirmer le sens du mot d'un coup d'œil. */}
-              <View style={[styles.badgeDot, verdict === 'realized' ? styles.badgeDotRealized : styles.badgeDotMissed]} />
+            // Liseré très discret sur le bord gauche plutôt qu'une pastille
+            // pleine — juste de quoi confirmer le sens du mot d'un coup d'œil.
+            <View
+              style={[
+                styles.badge,
+                verdict === 'realized' ? styles.badgeRealized : styles.badgeMissed,
+              ]}
+            >
               <Text style={styles.badgeText}>{verdict === 'realized' ? 'Réalisé' : 'Manqué'}</Text>
             </View>
           )}
@@ -367,6 +372,10 @@ export function PredictionCard({
             <MoreHorizontal size={18} color={colors.icon} strokeWidth={1.75} />
           </Pressable>
         </View>
+
+        {/* Sur sa propre ligne, jamais accolée au pseudo — la liste complète
+            des personnes citées y empiétait dès qu'il y en avait plusieurs. */}
+        {mentionLabel && <Text style={styles.mentionTag} numberOfLines={1}>{mentionLabel}</Text>}
 
         <Text style={styles.cardTeaser}>{item.teaser}</Text>
 
@@ -396,7 +405,16 @@ export function PredictionCard({
                   </Text>
                 </View>
                 <View style={styles.confidenceTrack}>
-                  <View style={styles.confidenceTrackLine} />
+                  {/* Même dégradé noir → ambre → jaune que le Prediscore du
+                      profil — pas une interpolation directe à deux couleurs,
+                      qui traverse un brun terne au milieu. */}
+                  <LinearGradient
+                    colors={[colors.text, colors.goldTransition, colors.gold]}
+                    locations={[0, 0.5, 1]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.confidenceTrackLine}
+                  />
                   <View
                     style={[
                       styles.confidenceCursor,
@@ -600,6 +618,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     backgroundColor: colors.surface,
   },
+  // Non lue : fine bordure lumineuse + fond très légèrement teinté, assez
+  // discret pour ne pas jurer avec le reste de la charte noir/blanc/jaune.
+  cardUnseen: {
+    borderColor: colors.gold,
+    backgroundColor: colors.goldSoft,
+  },
   // Tout sur une seule ligne :
   // [avatar 32][pseudo] ...espace flexible... [badge temps] [menu '...'].
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
@@ -608,16 +632,16 @@ const styles = StyleSheet.create({
   // tronque avec ellipse si la place manque, jamais le badge ni le menu.
   authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, minWidth: 0 },
   authorName: { fontSize: 14, fontWeight: '600', color: colors.text, flexShrink: 1, minWidth: 0 },
-  mentionTag: { fontSize: 12, fontWeight: '500', color: colors.textMuted, flexShrink: 1 },
+  // Sur sa propre ligne, sous l'en-tête — jamais accolée au pseudo.
+  mentionTag: { fontSize: 12, fontWeight: '500', color: colors.textMuted, marginTop: -4, marginBottom: 10 },
   menuButton: { padding: 2 },
   // Texte simple pour le délai (rien à signaler encore) ; pour le verdict,
-  // un point très discret devant le mot plutôt qu'une pastille pleine — le
+  // un fin liseré sur le bord gauche plutôt qu'une pastille pleine — le
   // jaune plein ne convenait pas ici, réservé aux éléments interactifs
   // majeurs. `flexShrink: 0` : jamais compressé par un long pseudo.
-  badge: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 0 },
-  badgeDot: { width: 6, height: 6, borderRadius: 3 },
-  badgeDotRealized: { backgroundColor: colors.verdictRealized },
-  badgeDotMissed: { backgroundColor: colors.verdictMissed },
+  badge: { flexShrink: 0, paddingLeft: 7 },
+  badgeRealized: { borderLeftWidth: 2, borderLeftColor: colors.verdictRealized },
+  badgeMissed: { borderLeftWidth: 2, borderLeftColor: colors.verdictMissed },
   badgeText: { fontSize: 12, fontWeight: '600', color: colors.textMuted, flexShrink: 0 },
   cardTeaser: {
     fontFamily: fonts.sansBold,
@@ -638,18 +662,18 @@ const styles = StyleSheet.create({
   confidenceTrackLine: {
     height: 3,
     borderRadius: radius.pill,
-    backgroundColor: '#E5E7EB',
+    overflow: 'hidden',
   },
+  // Même traitement que le curseur du Prediscore (blanc, bord noir) — la
+  // jauge de confiance suit désormais le même schéma visuel de bout en bout.
   confidenceCursor: {
     position: 'absolute',
     width: CONFIDENCE_CURSOR_SIZE,
     height: CONFIDENCE_CURSOR_SIZE,
     borderRadius: CONFIDENCE_CURSOR_SIZE / 2,
-    backgroundColor: colors.gold,
+    backgroundColor: colors.surface,
     borderWidth: 2,
-    borderColor: colors.surface,
-    // Ombre légère : le curseur doit se détacher de la ligne, jaune sur
-    // gris clair manque sinon de relief.
+    borderColor: colors.text,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.25,
