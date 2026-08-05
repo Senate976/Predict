@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import { Bell, CircleUserRound, Star, Users } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { useAuth } from '../../../lib/auth';
 import { fetchUnreadNotificationCount } from '../../../lib/notifications';
@@ -48,7 +48,9 @@ export default function TabsLayout() {
         options={{
           title: 'Fil',
           tabBarIcon: ({ color, size, focused }) => (
-            <Star size={size} color={color} strokeWidth={focused ? 2 : 1.5} />
+            <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
+              <Star size={size} color={color} strokeWidth={focused ? 2 : 1.5} />
+            </View>
           ),
         }}
       />
@@ -61,7 +63,9 @@ export default function TabsLayout() {
           tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
           tabBarBadgeStyle: styles.badge,
           tabBarIcon: ({ color, size, focused }) => (
-            <Bell size={size} color={color} strokeWidth={focused ? 2 : 1.5} />
+            <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
+              <Bell size={size} color={color} strokeWidth={focused ? 2 : 1.5} />
+            </View>
           ),
         }}
       />
@@ -70,7 +74,9 @@ export default function TabsLayout() {
         options={{
           title: 'Cercle',
           tabBarIcon: ({ color, size, focused }) => (
-            <Users size={size} color={color} strokeWidth={focused ? 2 : 1.5} />
+            <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
+              <Users size={size} color={color} strokeWidth={focused ? 2 : 1.5} />
+            </View>
           ),
         }}
       />
@@ -79,7 +85,9 @@ export default function TabsLayout() {
         options={{
           title: 'Profil',
           tabBarIcon: ({ color, size, focused }) => (
-            <CircleUserRound size={size} color={color} strokeWidth={focused ? 2 : 1.5} />
+            <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
+              <CircleUserRound size={size} color={color} strokeWidth={focused ? 2 : 1.5} />
+            </View>
           ),
         }}
       />
@@ -95,8 +103,16 @@ const styles = StyleSheet.create({
     height: 64,
     paddingTop: 12,
   },
+  // Petit fond pastel derrière l'icône active — discret repère visuel plutôt
+  // que la seule couleur, sans agrandir la barre.
+  iconWrap: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  iconWrapActive: { backgroundColor: colors.navBarActiveSoft },
   badge: {
-    backgroundColor: colors.danger,
+    backgroundColor: colors.notificationBadge,
     fontSize: 10,
     fontWeight: '700',
   },

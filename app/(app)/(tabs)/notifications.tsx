@@ -359,8 +359,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontFamily: fonts.display,
     fontSize: 22,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
     color: colors.text,
   },
   cancelSelection: { fontSize: 15, color: colors.gold, fontWeight: '600' },

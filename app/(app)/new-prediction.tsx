@@ -592,8 +592,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontFamily: fonts.display,
     fontSize: 17,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
     color: colors.text,
   },
   headerSpacer: { width: 56 },

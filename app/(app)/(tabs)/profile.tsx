@@ -310,8 +310,6 @@ const styles = StyleSheet.create({
   brand: {
     fontFamily: fonts.display,
     fontSize: 24,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
     color: colors.text,
   },
   identityCard: {

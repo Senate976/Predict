@@ -346,9 +346,7 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: fonts.display,
     fontSize: 30,
-    letterSpacing: 1,
     color: colors.text,
-    textTransform: 'uppercase',
     marginBottom: 28,
   },
   field: { marginBottom: spacing.md },
