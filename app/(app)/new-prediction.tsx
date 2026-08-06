@@ -1,4 +1,5 @@
 import { useNavigation, useRouter } from 'expo-router';
+import { Check } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -41,11 +42,11 @@ import {
 import { colors, fonts, radius, spacing } from '../../lib/theme';
 
 type ContentMode = 'text' | 'audio';
-/** `scheduled` : date fixée par l'auteur. `open_ended` : révélée quand
- * l'auteur le déclenche depuis son écran. `immediate` : révélée dès la
- * validation — le Cercle vote alors « j'y crois / j'y crois pas » plutôt que
- * « réalisée / manquée », faute de rien à constater encore. */
-type RevealTiming = 'scheduled' | 'open_ended' | 'immediate';
+/** `scheduled` (« À Date Fixe ») : date fixée par l'auteur. `open_ended`
+ * (« Libre ») : révélée quand l'auteur le déclenche depuis son écran — ou
+ * tout de suite si `revealNow` est cochée à la création (voir plus bas), au
+ * lieu d'attendre ce déclenchement manuel. */
+type RevealTiming = 'scheduled' | 'open_ended';
 
 /** Contenu écrit à la place du texte quand la prédiction est uniquement vocale. */
 const AUDIO_PLACEHOLDER = '🎙️ Message vocal';
@@ -81,6 +82,9 @@ export default function NewPredictionScreen() {
   const [hour, setHour] = useState<number | null>(12);
   const [minute, setMinute] = useState<number | null>(0);
   const [revealTiming, setRevealTiming] = useState<RevealTiming>('scheduled');
+  // Uniquement pertinent en mode « Libre » : coché, la prédiction est révélée
+  // dès sa création plutôt que d'attendre un déclenchement manuel ultérieur.
+  const [revealNow, setRevealNow] = useState(false);
 
   const [category, setCategory] = useState<PredictionCategory>('autre');
   const [scope, setScope] = useState<PredictionScope>('circle');
@@ -134,26 +138,26 @@ export default function NewPredictionScreen() {
 
   // Repère technique lointain quand aucune date n'est fixée — jamais affiché
   // tel quel (cf. `computeOpenEndedRevealAt`) : seule la révélation manuelle
-  // compte pour une prédiction « ouverte ». Pour « immédiatement », la valeur
-  // exacte n'a pas d'importance : la base pose son propre `now()` de toute
-  // façon (voir `create_prediction`) — celle-ci ne sert qu'à satisfaire la
-  // validation locale.
+  // (ou `revealNow` ci-dessous) compte pour une prédiction « Libre ». Avec
+  // `revealNow`, la valeur exacte n'a pas d'importance : la base pose son
+  // propre `now()` de toute façon (voir `create_prediction`, `isImmediate`) —
+  // celle-ci ne sert qu'à satisfaire la validation locale.
   const revealAt =
-    revealTiming === 'immediate'
-      ? new Date()
-      : revealTiming === 'open_ended'
-        ? computeOpenEndedRevealAt()
-        : selectedDate && hour !== null && minute !== null
-          ? new Date(
-              selectedDate.getFullYear(),
-              selectedDate.getMonth(),
-              selectedDate.getDate(),
-              hour,
-              minute,
-              0,
-              0
-            )
-          : null;
+    revealTiming === 'open_ended'
+      ? revealNow
+        ? new Date()
+        : computeOpenEndedRevealAt()
+      : selectedDate && hour !== null && minute !== null
+        ? new Date(
+            selectedDate.getFullYear(),
+            selectedDate.getMonth(),
+            selectedDate.getDate(),
+            hour,
+            minute,
+            0,
+            0
+          )
+        : null;
 
   function toggleFriend(id: string) {
     setSelectedFriendIds((prev) => {
@@ -232,7 +236,7 @@ export default function NewPredictionScreen() {
         groupId: selectedGroupId,
         mentionedFriendIds,
         openEnded: revealTiming === 'open_ended',
-        isImmediate: revealTiming === 'immediate',
+        isImmediate: revealTiming === 'open_ended' && revealNow,
         category,
       });
 
@@ -380,16 +384,7 @@ export default function NewPredictionScreen() {
               style={[styles.scopeOption, revealTiming === 'scheduled' && styles.scopeOptionActive]}
             >
               <Text style={[styles.scopeText, revealTiming === 'scheduled' && styles.scopeTextActive]}>
-                Date fixe
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setRevealTiming('immediate')}
-              disabled={submitting}
-              style={[styles.scopeOption, revealTiming === 'immediate' && styles.scopeOptionActive]}
-            >
-              <Text style={[styles.scopeText, revealTiming === 'immediate' && styles.scopeTextActive]}>
-                Immédiate
+                À Date Fixe
               </Text>
             </Pressable>
             <Pressable
@@ -398,20 +393,29 @@ export default function NewPredictionScreen() {
               style={[styles.scopeOption, revealTiming === 'open_ended' && styles.scopeOptionActive]}
             >
               <Text style={[styles.scopeText, revealTiming === 'open_ended' && styles.scopeTextActive]}>
-                En temps voulu
+                Libre
               </Text>
             </Pressable>
           </View>
 
           {revealTiming === 'open_ended' ? (
-            <Text style={[styles.sectionHint, styles.fieldSpacing]}>
-              Tu pourras révéler ce <PredictWord /> quand tu veux, depuis son écran.
-            </Text>
-          ) : revealTiming === 'immediate' ? (
-            <Text style={[styles.sectionHint, styles.fieldSpacing]}>
-              Ce <PredictWord /> sera révélé dès la validation : ton Cercle pourra tout de suite dire
-              s’il y croit ou pas.
-            </Text>
+            <>
+              <Text style={[styles.sectionHint, styles.fieldSpacing]}>
+                {revealNow
+                  ? <>Ce <PredictWord /> sera révélé dès la validation : ton Cercle pourra tout de suite donner son avis.</>
+                  : <>Tu pourras révéler ce <PredictWord /> quand tu veux, depuis son écran.</>}
+              </Text>
+              <Pressable
+                onPress={() => setRevealNow((prev) => !prev)}
+                disabled={submitting}
+                style={[styles.revealNowRow, styles.fieldSpacing]}
+              >
+                <View style={[styles.checkbox, revealNow && styles.checkboxChecked]}>
+                  {revealNow && <Check size={12} color={colors.background} strokeWidth={2.5} />}
+                </View>
+                <Text style={styles.revealNowText}>⚡ Révéler immédiatement au transfert</Text>
+              </Pressable>
+            </>
           ) : (
             <>
               <View style={styles.fieldSpacing}>
@@ -640,6 +644,18 @@ const styles = StyleSheet.create({
   scopeOptionActive: { borderBottomColor: colors.text },
   scopeText: { fontSize: 13, fontWeight: '600', color: colors.textMuted, textAlign: 'center' },
   scopeTextActive: { color: colors.text, fontWeight: '700' },
+  revealNowRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxChecked: { backgroundColor: colors.gold, borderColor: colors.gold },
+  revealNowText: { fontSize: 14, fontWeight: '600', color: colors.text },
   friendsBox: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: spacing.md },
   searchLoader: { marginTop: spacing.sm },
   // Étiquettes façon tags de presse : texte simple, trait noir sous le choix
