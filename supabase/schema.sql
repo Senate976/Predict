@@ -3133,7 +3133,6 @@ with (security_invoker = true) as
 select
   p.id as prediction_id,
   p.author_id,
-  p.group_id,
   p.reveal_at,
   p.created_at,
   case
@@ -3170,7 +3169,11 @@ select
       select count(*) from public.prediction_bad_faith_votes bfv
       where bfv.prediction_id = p.id and bfv.vote = 'no'
     )
-  ) as bad_faith_confirmed
+  ) as bad_faith_confirmed,
+  -- Ajoutée en fin de liste (jamais insérée au milieu) : `create or replace
+  -- view` interdit de renommer/réordonner une colonne déjà déployée, seul
+  -- l'ajout en dernière position est permis.
+  p.group_id
 from public.predictions p;
 
 grant select on public.prediction_resolutions to authenticated;
