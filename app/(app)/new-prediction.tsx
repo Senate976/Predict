@@ -42,7 +42,7 @@ import {
 import { colors, fonts, radius, spacing } from '../../lib/theme';
 
 type ContentMode = 'text' | 'audio';
-/** `scheduled` (« À Date Fixe ») : date fixée par l'auteur. `open_ended`
+/** `scheduled` (« Programmée ») : date fixée par l'auteur. `open_ended`
  * (« Libre ») : révélée quand l'auteur le déclenche depuis son écran — ou
  * tout de suite si `revealNow` est cochée à la création (voir plus bas), au
  * lieu d'attendre ce déclenchement manuel. */
@@ -384,7 +384,7 @@ export default function NewPredictionScreen() {
               style={[styles.scopeOption, revealTiming === 'scheduled' && styles.scopeOptionActive]}
             >
               <Text style={[styles.scopeText, revealTiming === 'scheduled' && styles.scopeTextActive]}>
-                À Date Fixe
+                Programmée
               </Text>
             </Pressable>
             <Pressable
@@ -413,7 +413,7 @@ export default function NewPredictionScreen() {
                 <View style={[styles.checkbox, revealNow && styles.checkboxChecked]}>
                   {revealNow && <Check size={12} color={colors.background} strokeWidth={2.5} />}
                 </View>
-                <Text style={styles.revealNowText}>⚡ Révéler immédiatement au transfert</Text>
+                <Text style={styles.revealNowText}>⚡ Révéler maintenant</Text>
               </Pressable>
             </>
           ) : (
