@@ -257,13 +257,6 @@ export default function HomeScreen() {
     .filter((item) => !favoritesOnly || item.is_favorite);
 
   const shown = [...filtered].sort((a, b) => {
-    // Une contestation « Mauvaise foi » concerne tout le Cercle et a une
-    // fenêtre de 24h à ne pas rater — elle prime sur n'importe quel autre
-    // critère de tri, même un tri manuel choisi par ailleurs.
-    const aBadFaith = a.resolution_status === 'mauvaise_foi';
-    const bBadFaith = b.resolution_status === 'mauvaise_foi';
-    if (aBadFaith !== bBadFaith) return aBadFaith ? -1 : 1;
-
     if (sortKey === 'seal') {
       const diff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       return sortOrder === 'recent' ? diff : -diff;

@@ -18,7 +18,6 @@ import { ConfidenceGauge } from '../../../components/ConfidenceGauge';
 import { CreateFab } from '../../../components/CreateFab';
 import { InlineComments } from '../../../components/InlineComments';
 import { PredictWord } from '../../../components/PredictWord';
-import { ResolutionPanel } from '../../../components/ResolutionPanel';
 import { useAuth } from '../../../lib/auth';
 import { formatAdvance, formatShortDateTime } from '../../../lib/datetime';
 import { fetchFriendships, otherProfile, type FriendProfile } from '../../../lib/friends';
@@ -384,16 +383,7 @@ export default function PredictionDetailScreen() {
               </>
             )}
 
-            {/* À expiration libre : l'auteur déclare lui-même le résultat
-                (Auto-Verdict) plutôt que d'attendre un vote qui, en
-                pratique, n'arrive presque jamais spontanément — voir
-                ResolutionPanel. Le vote du Cercle ci-dessous reste le seul
-                mécanisme pour une prédiction à date fixe. */}
-            {revealed && prediction.open_ended && !prediction.is_immediate && (
-              <ResolutionPanel item={prediction} isAuthor={!!isAuthor} onChange={load} />
-            )}
-
-            {revealed && outcome && !prediction.is_immediate && !prediction.open_ended && (
+            {revealed && outcome && !prediction.is_immediate && (
               <View
                 style={[
                   styles.verdictBox,

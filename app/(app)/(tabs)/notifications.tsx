@@ -32,7 +32,6 @@ import {
   notificationErrorMessage,
   type Notification,
 } from '../../../lib/notifications';
-import { castBadFaithVote, castValidation } from '../../../lib/predictions';
 import { supabase } from '../../../lib/supabase';
 import { colors, fonts, radius, spacing } from '../../../lib/theme';
 
@@ -61,15 +60,6 @@ function notificationLabel(notification: Notification) {
       return notification.group?.owner
         ? `${notification.group.owner.username} t’invite dans un groupe`
         : 'Invitation à rejoindre un groupe';
-    case 'auto_verdict_declared':
-      return (
-        <>
-          {notification.prediction?.author?.username ?? 'Quelqu’un'} affirme avoir réussi son{' '}
-          <PredictWord />. Tu valides ?
-        </>
-      );
-    case 'mauvaise_foi_triggered':
-      return '🚩 Mauvaise foi signalée : le Cercle est appelé à trancher';
     default:
       return (
         <>
@@ -223,31 +213,6 @@ export default function NotificationsScreen() {
     }
   }
 
-  /** Réponse à l'Auto-Verdict de l'auteur (Valider/Mauvaise foi) ou au vote
-   * du jury (Oui/Non) — même geste « répondre depuis la notification » que
-   * les invitations de groupe ci-dessus. */
-  async function handleResolutionResponse(notification: Notification, response: string) {
-    if (!notification.prediction_id) return;
-    setActionError(null);
-    setPendingId(notification.id);
-    try {
-      const { error: respondError } =
-        notification.type === 'auto_verdict_declared'
-          ? await castValidation(notification.prediction_id, response as 'validate' | 'contest')
-          : await castBadFaithVote(notification.prediction_id, response as 'yes' | 'no');
-      if (respondError) {
-        setActionError(`Action impossible : ${respondError.message}`);
-        return;
-      }
-      markNotificationRead(notification.id);
-      setNotifications((prev) =>
-        (prev ?? []).map((n) => (n.id === notification.id ? { ...n, is_read: true } : n))
-      );
-    } finally {
-      setPendingId(null);
-    }
-  }
-
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
@@ -279,14 +244,10 @@ export default function NotificationsScreen() {
         ) : (
           (notifications ?? []).map((notification) => {
             const isGroupInvite = notification.type === 'group_invite';
-            const isAutoVerdict = notification.type === 'auto_verdict_declared';
-            const isBadFaithJury = notification.type === 'mauvaise_foi_triggered';
-            const hasInlineActions = isGroupInvite || isAutoVerdict || isBadFaithJury;
-            // `is_read` n'est mis à jour, pour ces trois types, que par la
-            // réponse elle-même (jamais par un simple tap sur la ligne,
-            // désactivé plus bas) : sa valeur en base fait donc foi même après
-            // un rechargement, contrairement à un état local éphémère.
-            const responded = hasInlineActions && notification.is_read;
+            // `is_read` n'est mis à jour, pour une invitation de groupe, que par
+            // `handleGroupInviteResponse` : sa valeur en base fait donc foi même
+            // après un rechargement, contrairement à un état local éphémère.
+            const responded = isGroupInvite && notification.is_read;
             const accepted = isGroupInvite && notification.group_id
               ? membershipStatus[notification.group_id] === 'accepted'
               : false;
@@ -297,7 +258,7 @@ export default function NotificationsScreen() {
                 key={notification.id}
                 onPress={() => (selecting ? toggleSelected(notification.id) : handlePress(notification))}
                 onLongPress={() => toggleSelected(notification.id)}
-                disabled={hasInlineActions && !selecting}
+                disabled={isGroupInvite && !selecting}
                 style={({ pressed }) => [
                   styles.row,
                   !notification.is_read && styles.rowUnread,
@@ -357,50 +318,6 @@ export default function NotificationsScreen() {
                     <Text style={styles.respondedText}>
                       {accepted ? 'Invitation acceptée.' : 'Invitation refusée.'}
                     </Text>
-                  )}
-
-                  {isAutoVerdict && !responded && !selecting && (
-                    <View style={styles.inviteActions}>
-                      <Pressable
-                        onPress={() => handleResolutionResponse(notification, 'validate')}
-                        disabled={pendingId === notification.id}
-                        style={styles.pillGold}
-                      >
-                        <Text style={styles.pillGoldText}>🟢 Valider</Text>
-                      </Pressable>
-                      <Pressable
-                        onPress={() => handleResolutionResponse(notification, 'contest')}
-                        disabled={pendingId === notification.id}
-                        style={styles.pillOutline}
-                      >
-                        <Text style={styles.pillOutlineText}>🚩 Mauvaise foi</Text>
-                      </Pressable>
-                    </View>
-                  )}
-                  {isAutoVerdict && responded && (
-                    <Text style={styles.respondedText}>Tu as répondu.</Text>
-                  )}
-
-                  {isBadFaithJury && !responded && !selecting && (
-                    <View style={styles.inviteActions}>
-                      <Pressable
-                        onPress={() => handleResolutionResponse(notification, 'yes')}
-                        disabled={pendingId === notification.id}
-                        style={styles.pillGold}
-                      >
-                        <Text style={styles.pillGoldText}>Oui</Text>
-                      </Pressable>
-                      <Pressable
-                        onPress={() => handleResolutionResponse(notification, 'no')}
-                        disabled={pendingId === notification.id}
-                        style={styles.pillOutline}
-                      >
-                        <Text style={styles.pillOutlineText}>Non</Text>
-                      </Pressable>
-                    </View>
-                  )}
-                  {isBadFaithJury && responded && (
-                    <Text style={styles.respondedText}>Tu as voté.</Text>
                   )}
                 </View>
 

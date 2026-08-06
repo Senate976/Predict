@@ -331,15 +331,6 @@ export function PredictionCard({
   return (
     <View style={[styles.card, unseen && styles.cardUnseen]}>
       <Pressable onPress={() => onPress?.()} style={({ pressed }) => pressed && styles.cardPressed}>
-        {/* Contestation en cours sur cette prédiction à expiration libre —
-            bien plus visible que le reste de la carte : c'est justement le
-            but, ça concerne tout le monde. */}
-        {item.resolution_status === 'mauvaise_foi' && (
-          <View style={styles.badFaithBanner}>
-            <Text style={styles.badFaithBannerText}>🚩 MAUVAISE FOI — le Cercle tranche</Text>
-          </View>
-        )}
-
         {/* Une seule ligne : [avatar][pseudo] ...espace flexible... [badge] [menu]. */}
         <View style={styles.cardHeader}>
           {authorLabel && (
@@ -625,17 +616,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     backgroundColor: colors.surface,
   },
-  badFaithBanner: {
-    marginHorizontal: -18,
-    marginTop: -18,
-    marginBottom: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 18,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    backgroundColor: colors.dangerSoft,
-  },
-  badFaithBannerText: { fontSize: 12, fontWeight: '700', color: colors.danger },
   // Non lue : fine bordure lumineuse + fond très légèrement teinté, assez
   // discret pour ne pas jurer avec le reste de la charte noir/blanc/jaune.
   cardUnseen: {
