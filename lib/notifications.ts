@@ -7,9 +7,7 @@ export type NotificationType =
   | 'prediction_revealed'
   | 'prediction_approved'
   | 'group_invite'
-  | 'prediction_mentioned'
-  | 'auto_verdict_declared'
-  | 'mauvaise_foi_triggered';
+  | 'prediction_mentioned';
 
 /**
  * Une notification telle que renvoyée par `public.notifications`. Selon le

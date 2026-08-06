@@ -59,16 +59,13 @@ export type PredictionFeedItem = {
   category: PredictionCategory;
   created_at: string;
   is_revealed: boolean;
-  /** Dérivé de `resolution_status` (realized si resolved_success, missed si
-   * resolved_failed, sinon pending) — jamais d'une majorité de votes : voir
-   * l'Auto-Verdict de l'auteur (`declareAutoVerdict`). */
+  /** Nombre de votes, et verdict à la majorité des votants effectifs — voir prediction_outcomes. */
+  realized_votes: number;
+  missed_votes: number;
   final_status: PredictionOutcomeStatus;
-  /** Vote de confiance universel (0-100%), tous types confondus — moyenne,
-   * nombre de votants, et mon propre vote. `null`/`0` tant que personne n'a
-   * encore voté. */
-  avg_confidence: number | null;
-  confidence_vote_count: number;
-  my_confidence: number | null;
+  /** Uniquement pour une prédiction `is_immediate` — voir `beliefPercentage`. */
+  believe_votes: number;
+  disbelieve_votes: number;
   /** Préférences propres à l'appelant — jamais partagées avec les autres. */
   is_favorite: boolean;
   is_hidden: boolean;
@@ -80,23 +77,6 @@ export type PredictionFeedItem = {
   my_emoji_reaction: EmojiReaction | null;
   /** Ids des amis explicitement cités via « @pseudo » dans le teaser — voir `extractMentionedUsernames`. */
   mentioned_user_ids: string[];
-  /** Statut EFFECTIF (déjà recalculé côté vue selon les fenêtres de 24h
-   * écoulées) — voir `PredictionResolutionStatus`. Reste `pending` pour une
-   * prédiction à date fixe. */
-  resolution_status: PredictionResolutionStatus;
-  auto_verdict_declared_at: string | null;
-  bad_faith_vote_started_at: string | null;
-  /** Nombre de destinataires éligibles à la validation/au jury (tous les
-   * destinataires de la prédiction). */
-  validation_eligible_count: number;
-  validation_contest_count: number;
-  my_validation_response: 'validate' | 'contest' | null;
-  bad_faith_yes_count: number;
-  bad_faith_no_count: number;
-  my_bad_faith_vote: 'yes' | 'no' | null;
-  /** `resolved_failed` atteint via un jury qui confirme la mauvaise foi
-   * (malus sévère sur le Prediscore), plutôt qu'un Manqué auto-déclaré. */
-  bad_faith_confirmed: boolean;
 };
 
 /** Doivent rester alignés sur les contraintes `predictions_*_length` du SQL. */
@@ -169,10 +149,20 @@ export function predictionErrorMessage(error: PostgrestError): string {
  */
 const FEED_COLUMNS =
   'id, author_id, teaser, content, audio_path, reveal_at, scope, open_ended, is_immediate, category, created_at, ' +
-  'is_revealed, final_status, is_favorite, is_hidden, is_seen, emoji_counts, my_emoji_reaction, ' +
-  'mentioned_user_ids, avg_confidence, confidence_vote_count, my_confidence, resolution_status, auto_verdict_declared_at, bad_faith_vote_started_at, ' +
-  'validation_eligible_count, validation_contest_count, my_validation_response, bad_faith_yes_count, bad_faith_no_count, my_bad_faith_vote, ' +
-  'bad_faith_confirmed';
+  'is_revealed, realized_votes, missed_votes, final_status, is_favorite, is_hidden, is_seen, emoji_counts, my_emoji_reaction, ' +
+  'mentioned_user_ids, believe_votes, disbelieve_votes';
+
+/**
+ * Pourcentage de destinataires qui « y croient », pour une prédiction
+ * révélée immédiatement (`is_immediate`) — `null` tant que personne n'a
+ * encore voté, pour ne pas afficher un 0 % qui n'existe pas encore (même
+ * logique que le Prediscore vide).
+ */
+export function beliefPercentage(item: PredictionFeedItem): number | null {
+  const total = item.believe_votes + item.disbelieve_votes;
+  if (total === 0) return null;
+  return Math.round((100 * item.believe_votes) / total);
+}
 
 export async function fetchPredictionsFeed() {
   return supabase
@@ -299,38 +289,6 @@ export function buildMentionLabel(
  */
 export async function revealPredictionNow(predictionId: string) {
   return supabase.rpc('reveal_prediction_now', { p_prediction_id: predictionId });
-}
-
-/**
- * Auto-Verdict — pour toute prédiction révélée tant qu'aucun verdict n'a
- * encore été déclaré (le vote de confiance universel a remplacé le vote de
- * majorité qui tranchait jusqu'ici les prédictions à date fixe et
- * immédiates, donc plus rien d'autre ne détermine leur issue). `false`
- * (Manquée) clôture directement l'échec ; `true` (Réussie) ouvre la fenêtre
- * de validation tacite de 24h auprès des destinataires — voir
- * `PredictionResolutionStatus`.
- */
-export async function declareAutoVerdict(predictionId: string, success: boolean) {
-  return supabase.rpc('declare_auto_verdict', { p_prediction_id: predictionId, p_success: success });
-}
-
-/**
- * Réponse d'un destinataire à l'Auto-Verdict « Réussie » de l'auteur —
- * valider tacitement, ou contester (« Mauvaise foi »). Une contestation
- * franchissant 25% des destinataires éligibles fait basculer la prédiction
- * en `mauvaise_foi` immédiatement, côté base.
- */
-export async function castValidation(predictionId: string, response: 'validate' | 'contest') {
-  return supabase.rpc('cast_validation', { p_prediction_id: predictionId, p_response: response });
-}
-
-/**
- * Vote du jury (« Oui »/« Non » à « S'agit-il vraiment de mauvaise foi ? »),
- * une fois la contestation au-delà du seuil — jamais l'auteur, exclu côté
- * fonction.
- */
-export async function castBadFaithVote(predictionId: string, vote: 'yes' | 'no') {
-  return supabase.rpc('cast_bad_faith_vote', { p_prediction_id: predictionId, p_vote: vote });
 }
 
 /**
@@ -497,16 +455,7 @@ export async function addRecipient(predictionId: string, userId: string) {
     );
 }
 
-/**
- * Retire un destinataire, à tout moment (avant ou après révélation) — par
- * l'auteur (gestion des destinataires), ou par le destinataire lui-même
- * (bouton « Supprimer » sur sa propre carte, `userId` = son propre id). RLS
- * `prediction_access_delete` autorise les deux cas mais jamais l'auteur sur
- * quelqu'un d'autre que lui-même sans en être l'auteur. Contrairement à
- * « Masquer » (préférence réversible), ça retire l'accès lui-même — la
- * prédiction disparaît du fil sans retour possible, sauf si l'auteur l'y
- * réinvite.
- */
+/** Retire un destinataire, à tout moment (avant ou après révélation). */
 export async function removeRecipient(predictionId: string, userId: string) {
   return supabase
     .from('prediction_access')
@@ -515,37 +464,17 @@ export async function removeRecipient(predictionId: string, userId: string) {
     .eq('user_id', userId);
 }
 
+/**
+ * Supprime la prédiction elle-même — réservé à l'auteur (RLS
+ * `predictions_delete_own`), à tout moment. Entraîne en cascade la
+ * suppression de son contenu, de son audience, des votes et des
+ * commentaires (contraintes `on delete cascade`).
+ */
+export async function deletePrediction(predictionId: string) {
+  return supabase.from('predictions').delete().eq('id', predictionId);
+}
 
 export type PredictionOutcomeStatus = 'pending' | 'realized' | 'missed';
-
-/**
- * Statut de la validation sociale d'une prédiction, tous types confondus —
- * voir `declareAutoVerdict`/`castValidation`/`castBadFaithVote`. `pending` :
- * rien déclaré, l'auteur peut poser son Auto-Verdict. `pending_validation` :
- * l'auteur a déclaré « Réussie », les destinataires ont 24h pour contester
- * (silence = accord). `mauvaise_foi` : contestation ≥ 25%, jury en cours
- * (24h, Oui/Non). `resolved_success`/`resolved_failed` : issue définitive.
- */
-export type PredictionResolutionStatus =
-  | 'pending'
-  | 'pending_validation'
-  | 'mauvaise_foi'
-  | 'resolved_success'
-  | 'resolved_failed';
-
-export const RESOLUTION_STATUS_LABEL: Record<PredictionResolutionStatus, string> = {
-  pending: 'En attente',
-  pending_validation: 'En attente de validation',
-  mauvaise_foi: 'Mauvaise foi',
-  resolved_success: 'Réussie',
-  resolved_failed: 'Manquée',
-};
-
-/** Durée des deux fenêtres de contestation — doit rester alignée sur les
- * `interval '24 hours'` codés en dur côté SQL (`cast_validation`,
- * `cast_bad_faith_vote`, et le calcul de statut effectif dans
- * `predictions_feed`). */
-export const VALIDATION_WINDOW_HOURS = 24;
 
 /**
  * Une prédiction de l'auteur avec son statut final, tel que calculé par la

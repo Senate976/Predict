@@ -312,12 +312,14 @@ create policy "predictions_update_own_before_reveal"
   using (author_id = auth.uid() and reveal_at > now())
   with check (author_id = auth.uid() and reveal_at > now());
 
--- Retiré : un auteur ne peut plus supprimer sa propre prédiction (il
--- pourrait sinon effacer un Manqué ou une Mauvaise foi confirmée pour
--- échapper à son impact sur le Prediscore). Seul un destinataire peut s'en
--- retirer lui-même (voir `prediction_access_delete`, section 11) — jamais
--- l'auteur, jamais la prédiction elle-même pour tout le monde.
+-- Suppression autorisée à tout moment, y compris après révélation : c'est le
+-- seul recours de l'auteur sur un contenu qui parle de quelqu'un d'autre.
 drop policy if exists "predictions_delete_own" on public.predictions;
+create policy "predictions_delete_own"
+  on public.predictions
+  for delete
+  to authenticated
+  using (author_id = auth.uid());
 
 -- ---------------------------------------------------------------------------
 -- 9. Le Cercle — amis
@@ -688,18 +690,13 @@ create policy "prediction_access_insert"
 -- contrairement au contenu (figé, c'est un engagement passé), l'audience
 -- reste à la main de l'auteur — il doit pouvoir retirer quelqu'un même après
 -- coup.
--- Un destinataire peut aussi se retirer lui-même (« Supprimer » sur sa
--- propre carte, distinct de « Masquer » : masquer reste réversible et ne
--- touche qu'une préférence d'affichage, se retirer est définitif et retire
--- l'accès lui-même — voir la section sur la suppression par un destinataire).
 drop policy if exists "prediction_access_delete" on public.prediction_access;
 create policy "prediction_access_delete"
   on public.prediction_access
   for delete
   to authenticated
   using (
-    user_id = auth.uid()
-    or exists (
+    exists (
       select 1 from public.predictions p
       where p.id = prediction_access.prediction_id
         and p.author_id = auth.uid()
@@ -2341,132 +2338,6 @@ group by p.id, p.author_id, p.teaser, pc.content, pc.audio_path, p.reveal_at, p.
 grant select on public.predictions_feed to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 27a. Validation sociale des prédictions à expiration libre (1/2) — colonnes
--- et tables, posées ICI (avant le dernier bloc `predictions_feed`, plus bas)
--- pour que ses colonnes existent déjà quand la vue les lit. Voir la section
--- 33 pour la suite (fonctions, `prediction_resolutions`, `get_prediscore`) :
--- celle-ci doit au contraire rester après les sections 23/29 qu'elle
--- redéfinit, sans quoi elles l'écraseraient en s'exécutant après elle.
--- ---------------------------------------------------------------------------
---
--- Jusqu'ici, une prédiction « à expiration libre » (`open_ended`, révélée à
--- la discrétion de l'auteur) ne se résolvait, comme les autres, que si des
--- destinataires votaient Réalisée/Manquée (section 15) — en pratique ce vote
--- spontané n'arrive presque jamais, donc ces prédictions restent `pending`
--- indéfiniment et ne contribuent jamais au Prediscore. Ce système remplace le
--- vote pour ces prédictions-là seulement (les prédictions à date fixe
--- continuent de se résoudre par vote, section 15/16, sans changement) :
--- l'auteur déclare lui-même le résultat, les destinataires valident
--- tacitement (silence = accord) ou contestent, et une contestation massive
--- ouvre un jury à part.
---
--- Cinq statuts, stockés bruts sur `predictions.resolution_status` : `pending`
--- (rien déclaré), `pending_validation` (l'auteur a déclaré « Réussie », en
--- attente de la fenêtre de 24h), `mauvaise_foi` (contestation ≥ 25%, jury en
--- cours), `resolved_success`/`resolved_failed` (issue définitive, posée
--- directement par l'auteur pour un Manqué).
-alter table public.predictions add column if not exists resolution_status text not null default 'pending';
-alter table public.predictions drop constraint if exists predictions_resolution_status_check;
-alter table public.predictions add constraint predictions_resolution_status_check
-  check (resolution_status in ('pending', 'pending_validation', 'mauvaise_foi', 'resolved_success', 'resolved_failed'));
-
--- Horodatage de départ de chacune des deux fenêtres de 24h.
-alter table public.predictions add column if not exists auto_verdict_declared_at timestamptz;
-alter table public.predictions add column if not exists bad_faith_vote_started_at timestamptz;
-
-create index if not exists predictions_resolution_status_idx
-  on public.predictions (resolution_status) where resolution_status <> 'pending';
-
--- Stage 1 (validation tacite / contestation) et stage 2 (jury) : tous les
--- destinataires (`prediction_access`) sont éligibles aux deux — pas
--- seulement ceux qui auraient déjà voté Réalisée/Manquée, puisque ce vote-là
--- n'a justement plus lieu d'être sur une prédiction à expiration libre.
-create table if not exists public.prediction_validations (
-  prediction_id uuid not null references public.predictions (id) on delete cascade,
-  user_id uuid not null references public.profiles (id) on delete cascade,
-  response text not null check (response in ('validate', 'contest')),
-  created_at timestamptz not null default now(),
-  primary key (prediction_id, user_id)
-);
-
-alter table public.prediction_validations enable row level security;
-
-drop policy if exists "prediction_validations_select" on public.prediction_validations;
-create policy "prediction_validations_select"
-  on public.prediction_validations
-  for select
-  to authenticated
-  using (
-    exists (
-      select 1 from public.prediction_access pa
-      where pa.prediction_id = prediction_validations.prediction_id and pa.user_id = auth.uid()
-    )
-    or exists (
-      select 1 from public.predictions p
-      where p.id = prediction_validations.prediction_id and p.author_id = auth.uid()
-    )
-  );
-
--- Pas de policy insert/update pour `authenticated` : seule la fonction
--- `cast_validation` (`security definer`, section 33) écrit ici — elle doit
--- pouvoir, dans la même transaction, vérifier le seuil de 25% et faire
--- basculer la prédiction en `mauvaise_foi`, ce qu'une simple policy ne sait
--- pas faire.
-
--- Stage 2 : le jury, une fois la contestation au-delà du seuil.
-create table if not exists public.prediction_bad_faith_votes (
-  prediction_id uuid not null references public.predictions (id) on delete cascade,
-  user_id uuid not null references public.profiles (id) on delete cascade,
-  vote text not null check (vote in ('yes', 'no')),
-  created_at timestamptz not null default now(),
-  primary key (prediction_id, user_id)
-);
-
-alter table public.prediction_bad_faith_votes enable row level security;
-
-drop policy if exists "prediction_bad_faith_votes_select" on public.prediction_bad_faith_votes;
-create policy "prediction_bad_faith_votes_select"
-  on public.prediction_bad_faith_votes
-  for select
-  to authenticated
-  using (
-    exists (
-      select 1 from public.prediction_access pa
-      where pa.prediction_id = prediction_bad_faith_votes.prediction_id and pa.user_id = auth.uid()
-    )
-    or exists (
-      select 1 from public.predictions p
-      where p.id = prediction_bad_faith_votes.prediction_id and p.author_id = auth.uid()
-    )
-  );
-
--- Même chose : uniquement via `cast_bad_faith_vote` (section 33), pas de
--- policy insert.
-
--- ---------------------------------------------------------------------------
--- 27b. Vote de confiance universel (0-100%), posé ici pour la même raison
--- que la section 27a : la colonne doit exister avant le dernier bloc
--- `predictions_feed`, plus bas.
--- ---------------------------------------------------------------------------
---
--- `prediction_votes` portait jusqu'ici un choix binaire (« realized »/
--- « missed » pour une prédiction classique, « believe »/« disbelieve » pour
--- une immédiate) — deux échelles différentes selon le type, et un simple
--- comptage de majorité qui ne dit rien de la conviction de chacun.
--- Remplacé par un curseur unique de 0 à 100%, valable pour tous les types :
--- plus il est proche des extrêmes, plus le votant est confiant dans un sens
--- ou dans l'autre. Ce vote ne détermine plus lui-même le verdict (c'est
--- l'Auto-Verdict de l'auteur, section 33, qui en décide désormais pour tous
--- les types) — il sert à afficher la conviction du Cercle, et à noter
--- chaque votant une fois l'issue connue (voir `get_prediscore`).
-alter table public.prediction_votes drop constraint if exists prediction_votes_vote_value_check;
-alter table public.prediction_votes alter column vote_value drop not null;
-alter table public.prediction_votes add column if not exists confidence smallint;
-alter table public.prediction_votes drop constraint if exists prediction_votes_confidence_check;
-alter table public.prediction_votes add constraint prediction_votes_confidence_check
-  check (confidence between 0 and 100);
-
--- ---------------------------------------------------------------------------
 -- 28. Révélation immédiate — vote « j'y crois / j'y crois pas »
 -- ---------------------------------------------------------------------------
 --
@@ -2593,84 +2464,56 @@ $$;
 revoke all on function public.create_prediction(text, text, timestamptz, text, uuid[], uuid, uuid[], boolean, text, boolean) from public;
 grant execute on function public.create_prediction(text, text, timestamptz, text, uuid[], uuid, uuid[], boolean, text, boolean) to authenticated;
 
--- `predictions_feed` reprend sa définition de la section 27 et remplace les
--- anciens comptages de votes binaires (`realized_votes`/`missed_votes`/
--- `believe_votes`/`disbelieve_votes`) par le vote de confiance universel
--- (section 27b) : `avg_confidence`/`confidence_vote_count`/`my_confidence`.
--- `final_status` ne vient plus d'une majorité de votes, mais du statut de
--- résolution EFFECTIF (calculé une fois dans le CTE `resolved`, puis dérivé
--- pour `final_status`/`resolution_status`/`bad_faith_confirmed` — plus
--- simple et moins sujet à erreur que dupliquer le même `case` trois fois).
+-- `predictions_feed` reprend sa définition de la section 27 et ajoute
+-- `is_immediate` ainsi que `believe_votes`/`disbelieve_votes` (mêmes
+-- agrégations que `realized_votes`/`missed_votes`, sur les deux nouvelles
+-- valeurs de `vote_value`) — voir `beliefPercentage` côté client.
 drop view if exists public.predictions_feed;
 
 create view public.predictions_feed
 with (security_invoker = true) as
-with resolved as (
-  select
-    p.*,
-    -- Statut EFFECTIF, jamais le brut tel quel — au-delà de sa fenêtre de
-    -- 24h, `pending_validation`/`mauvaise_foi` se lisent déjà comme
-    -- résolus, sans attendre qu'une tâche planifiée (indisponible ici) ne
-    -- vienne l'écrire.
-    case
-      when p.resolution_status = 'pending_validation'
-           and p.auto_verdict_declared_at is not null
-           and now() >= p.auto_verdict_declared_at + interval '24 hours'
-        then 'resolved_success'
-      when p.resolution_status = 'mauvaise_foi'
-           and p.bad_faith_vote_started_at is not null
-           and now() >= p.bad_faith_vote_started_at + interval '24 hours'
-        then case
-          when (
-            select count(*) from public.prediction_bad_faith_votes bfv
-            where bfv.prediction_id = p.id and bfv.vote = 'yes'
-          ) > (
-            select count(*) from public.prediction_bad_faith_votes bfv
-            where bfv.prediction_id = p.id and bfv.vote = 'no'
-          ) then 'resolved_failed'
-          else 'resolved_success'
-        end
-      else p.resolution_status
-    end as effective_resolution_status
-  from public.predictions p
-)
 select
-  r.id,
-  r.author_id,
-  r.teaser,
+  p.id,
+  p.author_id,
+  p.teaser,
   pc.content,
   pc.audio_path,
-  r.reveal_at,
-  r.scope,
-  r.open_ended,
-  r.is_immediate,
-  r.category,
-  r.mentioned_user_ids,
-  r.created_at,
-  (r.reveal_at <= now()) as is_revealed,
+  p.reveal_at,
+  p.scope,
+  p.open_ended,
+  p.is_immediate,
+  p.category,
+  p.mentioned_user_ids,
+  p.created_at,
+  (p.reveal_at <= now()) as is_revealed,
+  coalesce(sum((v.vote_value = 'realized')::int), 0) as realized_votes,
+  coalesce(sum((v.vote_value = 'missed')::int), 0) as missed_votes,
   case
-    when r.effective_resolution_status = 'resolved_success' then 'realized'
-    when r.effective_resolution_status = 'resolved_failed' then 'missed'
+    when p.reveal_at > now() then 'pending'
+    when coalesce(sum((v.vote_value = 'realized')::int), 0)
+       > coalesce(sum((v.vote_value = 'missed')::int), 0) then 'realized'
+    when coalesce(sum((v.vote_value = 'missed')::int), 0)
+       > coalesce(sum((v.vote_value = 'realized')::int), 0) then 'missed'
     else 'pending'
   end as final_status,
   coalesce(
     (
       select us.favorite from public.prediction_user_state us
-      where us.prediction_id = r.id and us.user_id = auth.uid()
+      where us.prediction_id = p.id and us.user_id = auth.uid()
     ),
     false
   ) as is_favorite,
   coalesce(
     (
       select us.hidden from public.prediction_user_state us
-      where us.prediction_id = r.id and us.user_id = auth.uid()
+      where us.prediction_id = p.id and us.user_id = auth.uid()
     ),
     false
   ) as is_hidden,
   coalesce(
     (
       select us.seen from public.prediction_user_state us
-      where us.prediction_id = r.id and us.user_id = auth.uid()
+      where us.prediction_id = p.id and us.user_id = auth.uid()
     ),
     false
   ) as is_seen,
@@ -2680,7 +2523,7 @@ select
       from (
         select emoji, count(*) as total
         from public.prediction_emoji_reactions er
-        where er.prediction_id = r.id
+        where er.prediction_id = p.id
         group by emoji
       ) counts
     ),
@@ -2688,54 +2531,14 @@ select
   ) as emoji_counts,
   (
     select er2.emoji from public.prediction_emoji_reactions er2
-    where er2.prediction_id = r.id and er2.user_id = auth.uid()
+    where er2.prediction_id = p.id and er2.user_id = auth.uid()
   ) as my_emoji_reaction,
-  r.effective_resolution_status as resolution_status,
-  r.auto_verdict_declared_at,
-  r.bad_faith_vote_started_at,
-  (select count(*) from public.prediction_access pa2 where pa2.prediction_id = r.id) as validation_eligible_count,
-  (
-    select count(*) from public.prediction_validations pv
-    where pv.prediction_id = r.id and pv.response = 'contest'
-  ) as validation_contest_count,
-  (
-    select pv2.response from public.prediction_validations pv2
-    where pv2.prediction_id = r.id and pv2.user_id = auth.uid()
-  ) as my_validation_response,
-  (
-    select count(*) from public.prediction_bad_faith_votes bfv2
-    where bfv2.prediction_id = r.id and bfv2.vote = 'yes'
-  ) as bad_faith_yes_count,
-  (
-    select count(*) from public.prediction_bad_faith_votes bfv2
-    where bfv2.prediction_id = r.id and bfv2.vote = 'no'
-  ) as bad_faith_no_count,
-  (
-    select bfv3.vote from public.prediction_bad_faith_votes bfv3
-    where bfv3.prediction_id = r.id and bfv3.user_id = auth.uid()
-  ) as my_bad_faith_vote,
-  -- Distingue, une fois `resolved_failed` atteint, un Manqué auto-déclaré
-  -- (raw = déjà `resolved_failed`, jamais passé par `mauvaise_foi`) d'une
-  -- mauvaise foi confirmée par le jury (raw = `mauvaise_foi`, effectif =
-  -- `resolved_failed`).
-  (r.resolution_status = 'mauvaise_foi' and r.effective_resolution_status = 'resolved_failed')
-    as bad_faith_confirmed,
-  -- Vote de confiance universel (section 27b) : moyenne, nombre de votants,
-  -- et mon propre vote — remplace l'ancien comptage binaire par type.
-  (
-    select round(avg(v.confidence), 1) from public.prediction_votes v
-    where v.prediction_id = r.id and v.confidence is not null
-  ) as avg_confidence,
-  (
-    select count(*) from public.prediction_votes v
-    where v.prediction_id = r.id and v.confidence is not null
-  ) as confidence_vote_count,
-  (
-    select v2.confidence from public.prediction_votes v2
-    where v2.prediction_id = r.id and v2.voter_id = auth.uid()
-  ) as my_confidence
-from resolved r
-left join public.prediction_contents pc on pc.prediction_id = r.id;
+  coalesce(sum((v.vote_value = 'believe')::int), 0) as believe_votes,
+  coalesce(sum((v.vote_value = 'disbelieve')::int), 0) as disbelieve_votes
+from public.predictions p
+left join public.prediction_contents pc on pc.prediction_id = p.id
+left join public.prediction_votes v on v.prediction_id = p.id
+group by p.id, p.author_id, p.teaser, pc.content, pc.audio_path, p.reveal_at, p.scope, p.open_ended, p.is_immediate, p.category, p.mentioned_user_ids, p.created_at;
 
 grant select on public.predictions_feed to authenticated;
 
@@ -2949,419 +2752,7 @@ revoke all on function public.create_prediction(text, text, timestamptz, text, u
 grant execute on function public.create_prediction(text, text, timestamptz, text, uuid[], uuid, uuid[], boolean, text, boolean) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 33. Validation sociale des prédictions à expiration libre (2/2)
--- ---------------------------------------------------------------------------
---
--- Suite de la section 27a (colonnes de `predictions` et tables
--- `prediction_validations`/`prediction_bad_faith_votes`, posées plus haut
--- pour que le dernier bloc `predictions_feed`, section 28, puisse déjà les
--- lire). Ici : les fonctions qui écrivent ces statuts, la vue qui les
--- traduit en issue pour le Prediscore, et les redéfinitions de
--- `get_prediscore`/`get_group_prediscore` qui s'appuient dessus — celles-ci
--- doivent au contraire rester APRÈS les sections 23/29 qui les définissent,
--- sans quoi elles seraient écrasées par l'ancienne logique en s'exécutant
--- après elles.
---
--- Comme pour `is_revealed`/`final_status` ailleurs dans ce fichier,
--- l'écoulement d'une fenêtre de 24h n'est JAMAIS écrit par une tâche
--- planifiée (pg_cron n'est pas garanti disponible selon le plan Supabase) :
--- chaque lecture (`predictions_feed`, `get_prediscore`) recalcule le statut
--- EFFECTIF à partir de l'horodatage et des votes déjà enregistrés.
-
-alter table public.notifications drop constraint if exists notifications_type_check;
-alter table public.notifications add constraint notifications_type_check
-  check (type in (
-    'new_teaser', 'prediction_revealed', 'prediction_approved', 'group_invite', 'prediction_mentioned',
-    'auto_verdict_declared', 'mauvaise_foi_triggered'
-  ));
-
--- Déclenchement par l'auteur : « Réussie » ouvre la fenêtre de validation
--- tacite (silence = accord) et notifie chaque destinataire ; « Manquée »
--- clôture directement en échec, exactement comme un vote Manqué classique —
--- une contestation n'a pas de sens dans ce sens-là. Ouvert à tout type de
--- prédiction révélée (plus seulement les prédictions à expiration libre) :
--- le vote de confiance universel (section 27b) a remplacé le vote de
--- majorité qui tranchait jusqu'ici les prédictions à date fixe et
--- immédiates, donc plus rien d'autre ne détermine leur issue.
-create or replace function public.declare_auto_verdict(p_prediction_id uuid, p_success boolean)
-returns void
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_recipient uuid;
-begin
-  if not exists (
-    select 1 from public.predictions p
-    where p.id = p_prediction_id
-      and p.author_id = auth.uid()
-      and p.reveal_at <= now()
-      and p.resolution_status = 'pending'
-  ) then
-    raise exception 'Auto-Verdict impossible pour ce Predict.';
-  end if;
-
-  if p_success then
-    update public.predictions
-    set resolution_status = 'pending_validation', auto_verdict_declared_at = now()
-    where id = p_prediction_id;
-
-    for v_recipient in
-      select pa.user_id from public.prediction_access pa where pa.prediction_id = p_prediction_id
-    loop
-      insert into public.notifications (user_id, prediction_id, type)
-      values (v_recipient, p_prediction_id, 'auto_verdict_declared')
-      on conflict (user_id, prediction_id, type) do nothing;
-    end loop;
-  else
-    update public.predictions
-    set resolution_status = 'resolved_failed'
-    where id = p_prediction_id;
-  end if;
-end;
-$$;
-
-revoke all on function public.declare_auto_verdict(uuid, boolean) from public;
-grant execute on function public.declare_auto_verdict(uuid, boolean) to authenticated;
-
--- Validation tacite / contestation. Le seuil de 25% se vérifie ici même,
--- dans la même transaction que l'insertion du vote : dès qu'il est franchi,
--- la bascule en `mauvaise_foi` est donc immédiate, comme demandé, sans
--- attendre la fin des 24h de silence.
-create or replace function public.cast_validation(p_prediction_id uuid, p_response text)
-returns void
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_eligible int;
-  v_contest int;
-  v_author uuid;
-begin
-  if p_response not in ('validate', 'contest') then
-    raise exception 'Réponse invalide.';
-  end if;
-
-  if not exists (
-    select 1 from public.predictions p
-    join public.prediction_access pa on pa.prediction_id = p.id
-    where p.id = p_prediction_id
-      and pa.user_id = auth.uid()
-      and p.resolution_status = 'pending_validation'
-      and p.auto_verdict_declared_at is not null
-      and now() < p.auto_verdict_declared_at + interval '24 hours'
-  ) then
-    raise exception 'Validation impossible pour ce Predict.';
-  end if;
-
-  insert into public.prediction_validations (prediction_id, user_id, response)
-  values (p_prediction_id, auth.uid(), p_response)
-  on conflict (prediction_id, user_id) do update set response = excluded.response, created_at = now();
-
-  select count(*) into v_eligible from public.prediction_access pa where pa.prediction_id = p_prediction_id;
-  select count(*) into v_contest
-    from public.prediction_validations pv
-    where pv.prediction_id = p_prediction_id and pv.response = 'contest';
-
-  if v_eligible > 0 and v_contest::numeric / v_eligible >= 0.25 then
-    update public.predictions
-    set resolution_status = 'mauvaise_foi', bad_faith_vote_started_at = now()
-    where id = p_prediction_id and resolution_status = 'pending_validation';
-
-    select author_id into v_author from public.predictions where id = p_prediction_id;
-
-    insert into public.notifications (user_id, prediction_id, type)
-    select pa.user_id, p_prediction_id, 'mauvaise_foi_triggered'
-    from public.prediction_access pa
-    where pa.prediction_id = p_prediction_id and pa.user_id <> v_author
-    on conflict (user_id, prediction_id, type) do nothing;
-  end if;
-end;
-$$;
-
-revoke all on function public.cast_validation(uuid, text) from public;
-grant execute on function public.cast_validation(uuid, text) to authenticated;
-
--- Jury : l'auteur ne vote pas sur son propre cas.
-create or replace function public.cast_bad_faith_vote(p_prediction_id uuid, p_vote text)
-returns void
-language plpgsql
-security definer
-set search_path = ''
-as $$
-begin
-  if p_vote not in ('yes', 'no') then
-    raise exception 'Vote invalide.';
-  end if;
-
-  if not exists (
-    select 1 from public.predictions p
-    join public.prediction_access pa on pa.prediction_id = p.id
-    where p.id = p_prediction_id
-      and pa.user_id = auth.uid()
-      and p.author_id <> auth.uid()
-      and p.resolution_status = 'mauvaise_foi'
-      and p.bad_faith_vote_started_at is not null
-      and now() < p.bad_faith_vote_started_at + interval '24 hours'
-  ) then
-    raise exception 'Vote impossible pour ce Predict.';
-  end if;
-
-  insert into public.prediction_bad_faith_votes (prediction_id, user_id, vote)
-  values (p_prediction_id, auth.uid(), p_vote)
-  on conflict (prediction_id, user_id) do update set vote = excluded.vote, created_at = now();
-end;
-$$;
-
-revoke all on function public.cast_bad_faith_vote(uuid, text) from public;
-grant execute on function public.cast_bad_faith_vote(uuid, text) to authenticated;
-
--- `get_prediscore`/`get_group_prediscore` (sections 23/29) reprennent leur
--- pondération par ancienneté à l'identique, mais fusionnent désormais deux
--- rôles dans le même score : « auteur » (comme avant : réussie = plein
--- point, manquée = zéro) et « votant » (nouveau : la contribution suit la
--- distance entre le % de confiance déposé et l'issue réelle — un vote à 90%
--- sur une prédiction réussie rapporte presque autant qu'un vote d'auteur
--- réussi, un vote à 90% sur une prédiction manquée n'en rapporte presque
--- rien). Un seul et même Prediscore : bien prédire ET bien juger les autres
--- y comptent tous les deux. `bad_faith_confirmed` porte le malus anti-triche
--- sévère (poids ×3) sur les deux rôles à la fois.
-create or replace view public.prediction_resolutions
-with (security_invoker = true) as
-select
-  p.id as prediction_id,
-  p.author_id,
-  p.group_id,
-  p.reveal_at,
-  p.created_at,
-  case
-    when p.reveal_at > now() then 'pending'
-    when p.resolution_status = 'resolved_success' then 'realized'
-    when p.resolution_status = 'resolved_failed' then 'missed'
-    when p.resolution_status = 'pending_validation'
-         and p.auto_verdict_declared_at is not null
-         and now() >= p.auto_verdict_declared_at + interval '24 hours'
-      then 'realized'
-    when p.resolution_status = 'mauvaise_foi'
-         and p.bad_faith_vote_started_at is not null
-         and now() >= p.bad_faith_vote_started_at + interval '24 hours'
-      then case
-        when (
-          select count(*) from public.prediction_bad_faith_votes bfv
-          where bfv.prediction_id = p.id and bfv.vote = 'yes'
-        ) > (
-          select count(*) from public.prediction_bad_faith_votes bfv
-          where bfv.prediction_id = p.id and bfv.vote = 'no'
-        ) then 'missed'
-        else 'realized'
-      end
-    else 'pending'
-  end as outcome,
-  (
-    p.resolution_status = 'mauvaise_foi'
-    and p.bad_faith_vote_started_at is not null
-    and now() >= p.bad_faith_vote_started_at + interval '24 hours'
-    and (
-      select count(*) from public.prediction_bad_faith_votes bfv
-      where bfv.prediction_id = p.id and bfv.vote = 'yes'
-    ) > (
-      select count(*) from public.prediction_bad_faith_votes bfv
-      where bfv.prediction_id = p.id and bfv.vote = 'no'
-    )
-  ) as bad_faith_confirmed
-from public.predictions p;
-
-grant select on public.prediction_resolutions to authenticated;
-
-create or replace function public.get_prediscore(target_user uuid)
-returns table (score numeric, weighted_count numeric)
-language sql
-security definer
-stable
-set search_path = ''
-as $$
-  with contributions as (
-    -- Rôle auteur : réussie = 1, manquée = 0 (comme avant).
-    select
-      (
-        case
-          when extract(epoch from (r.reveal_at - r.created_at)) / 86400 < 7 then 1
-          when extract(epoch from (r.reveal_at - r.created_at)) / 86400 <= 30 then 3
-          else 5
-        end
-      ) * (case when r.bad_faith_confirmed then 3 else 1 end) as weight,
-      (case when r.outcome = 'realized' then 1.0 else 0.0 end) as success_fraction
-    from public.prediction_resolutions r
-    where r.author_id = target_user
-      and r.reveal_at <= now()
-      and r.outcome <> 'pending'
-      and (
-        target_user = auth.uid()
-        or exists (
-          select 1 from public.friendships f
-          where f.status = 'accepted'
-            and (
-              (f.requester_id = auth.uid() and f.addressee_id = target_user)
-              or (f.addressee_id = auth.uid() and f.requester_id = target_user)
-            )
-        )
-      )
-
-    union all
-
-    -- Rôle votant : plus le % de confiance colle à l'issue réelle (haut si
-    -- réussie, bas si manquée), meilleure la contribution.
-    select
-      (
-        case
-          when extract(epoch from (r.reveal_at - r.created_at)) / 86400 < 7 then 1
-          when extract(epoch from (r.reveal_at - r.created_at)) / 86400 <= 30 then 3
-          else 5
-        end
-      ) * (case when r.bad_faith_confirmed then 3 else 1 end) as weight,
-      (
-        case
-          when r.outcome = 'realized' then v.confidence / 100.0
-          else (100 - v.confidence) / 100.0
-        end
-      ) as success_fraction
-    from public.prediction_votes v
-    join public.prediction_resolutions r on r.prediction_id = v.prediction_id
-    where v.voter_id = target_user
-      and v.confidence is not null
-      and r.reveal_at <= now()
-      and r.outcome <> 'pending'
-      and (
-        target_user = auth.uid()
-        or exists (
-          select 1 from public.friendships f
-          where f.status = 'accepted'
-            and (
-              (f.requester_id = auth.uid() and f.addressee_id = target_user)
-              or (f.addressee_id = auth.uid() and f.requester_id = target_user)
-            )
-        )
-      )
-  )
-  select
-    case
-      when coalesce(sum(weight), 0) > 0
-        then round(100.0 * sum(weight * success_fraction) / sum(weight), 1)
-      else null
-    end as score,
-    coalesce(sum(weight), 0) as weighted_count
-  from contributions;
-$$;
-
-revoke all on function public.get_prediscore(uuid) from public;
-grant execute on function public.get_prediscore(uuid) to authenticated;
-
--- Restreint aux prédictions du groupe (auteur OU votant dans ce groupe) —
--- un même vote alimente donc à la fois ce score et le Prediscore général
--- ci-dessus, sans double calcul : ce sont deux agrégations indépendantes de
--- la même donnée brute (`prediction_votes`), pas une valeur dérivée l'une de
--- l'autre.
-create or replace function public.get_group_prediscore(p_group_id uuid, p_target_user uuid)
-returns table (score numeric, weighted_count numeric)
-language sql
-security definer
-stable
-set search_path = ''
-as $$
-  with contributions as (
-    select
-      (
-        case
-          when extract(epoch from (r.reveal_at - r.created_at)) / 86400 < 7 then 1
-          when extract(epoch from (r.reveal_at - r.created_at)) / 86400 <= 30 then 3
-          else 5
-        end
-      ) * (case when r.bad_faith_confirmed then 3 else 1 end) as weight,
-      (case when r.outcome = 'realized' then 1.0 else 0.0 end) as success_fraction
-    from public.prediction_resolutions r
-    where r.author_id = p_target_user
-      and r.group_id = p_group_id
-      and r.reveal_at <= now()
-      and r.outcome <> 'pending'
-      and (
-        public.is_group_owner(p_group_id, auth.uid())
-        or public.is_group_member(p_group_id, auth.uid())
-      )
-
-    union all
-
-    select
-      (
-        case
-          when extract(epoch from (r.reveal_at - r.created_at)) / 86400 < 7 then 1
-          when extract(epoch from (r.reveal_at - r.created_at)) / 86400 <= 30 then 3
-          else 5
-        end
-      ) * (case when r.bad_faith_confirmed then 3 else 1 end) as weight,
-      (
-        case
-          when r.outcome = 'realized' then v.confidence / 100.0
-          else (100 - v.confidence) / 100.0
-        end
-      ) as success_fraction
-    from public.prediction_votes v
-    join public.prediction_resolutions r on r.prediction_id = v.prediction_id
-    where v.voter_id = p_target_user
-      and v.confidence is not null
-      and r.group_id = p_group_id
-      and r.reveal_at <= now()
-      and r.outcome <> 'pending'
-      and (
-        public.is_group_owner(p_group_id, auth.uid())
-        or public.is_group_member(p_group_id, auth.uid())
-      )
-  )
-  select
-    case
-      when coalesce(sum(weight), 0) > 0
-        then round(100.0 * sum(weight * success_fraction) / sum(weight), 1)
-      else null
-    end as score,
-    coalesce(sum(weight), 0) as weighted_count
-  from contributions;
-$$;
-
-revoke all on function public.get_group_prediscore(uuid, uuid) from public;
-grant execute on function public.get_group_prediscore(uuid, uuid) to authenticated;
-
--- `prediction_outcomes` (section 16) reprend, elle aussi, l'issue depuis
--- `prediction_resolutions` plutôt qu'une majorité de votes — nouveau bloc
--- (pas d'édition en place possible : les colonnes `resolution_status` etc.
--- n'existent pas encore à la section 16). `realized_votes`/`missed_votes`
--- restent à 0 : plus personne ne vote « réalisée »/« manquée » à proprement
--- parler, seule l'Auto-Verdict de l'auteur tranche désormais.
-drop view if exists public.prediction_outcomes;
-
-create view public.prediction_outcomes
-with (security_invoker = true) as
-select
-  r.prediction_id,
-  p.author_id,
-  p.teaser,
-  p.reveal_at,
-  p.created_at,
-  (p.reveal_at <= now()) as is_revealed,
-  0 as realized_votes,
-  0 as missed_votes,
-  case
-    when r.outcome = 'realized' then 'realized'
-    when r.outcome = 'missed' then 'missed'
-    else 'pending'
-  end as final_status
-from public.prediction_resolutions r
-join public.predictions p on p.id = r.prediction_id;
-
-grant select on public.prediction_outcomes to authenticated;
-
--- ---------------------------------------------------------------------------
--- 34. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 32. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une
