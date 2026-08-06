@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: 'center',
   },
-  username: { fontFamily: fonts.serifItalic, fontSize: 22, color: colors.text, marginTop: 10 },
+  username: { fontFamily: fonts.sansBold, fontSize: 22, color: colors.text, marginTop: 10 },
   prediscoreCard: {
     paddingVertical: 24,
     borderRadius: radius.xl,

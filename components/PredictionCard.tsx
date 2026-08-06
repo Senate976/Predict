@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { MessageCircle, MoreHorizontal, ThumbsUp } from 'lucide-react-native';
+import { MessageCircle, MoreHorizontal, ThumbsUp, Trash2 } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,10 +15,10 @@ import {
 import { Text } from './Text';
 
 import { ConfidenceGauge } from './ConfidenceGauge';
+import { ConfidenceVotesModal } from './ConfidenceVotesModal';
 import { fetchCommentCount } from '../lib/comments';
 import { formatCountdown } from '../lib/datetime';
 import {
-  beliefPercentage,
   castEmojiReaction,
   EMOJI_REACTIONS,
   fetchEmojiReactors,
@@ -29,7 +29,6 @@ import {
   type EmojiReactor,
   type PredictionFeedItem,
 } from '../lib/predictions';
-import { castVote, voteErrorMessage } from '../lib/votes';
 import { colors, fonts, radius } from '../lib/theme';
 import { Avatar } from './Avatar';
 import { InlineComments } from './InlineComments';
@@ -42,9 +41,8 @@ const EMOJI_PANEL_WIDTH = 260;
  * Carte d'une prédiction, partagée entre les onglets À venir et Passées du
  * Fil. Toujours dépliée (teaser, puis contenu une fois révélé) ; un tap sur
  * la carte navigue vers l'écran détail (`onPress`), où l'auteur gère les
- * destinataires et chacun se prononce une fois révélée. Les commentaires,
- * eux, restent repliés derrière une icône dédiée — pas besoin de quitter le
- * Fil pour les consulter.
+ * destinataires. Les commentaires, eux, restent repliés derrière une icône
+ * dédiée — pas besoin de quitter le Fil pour les consulter.
  */
 export function PredictionCard({
   item,
@@ -55,7 +53,6 @@ export function PredictionCard({
   mentionLabel,
   userId,
   onPress,
-  hasVoted = false,
   unseen = false,
   onDelete,
   onFavoriteChange,
@@ -73,14 +70,12 @@ export function PredictionCard({
   mentionLabel?: string | null;
   userId: string;
   onPress?: () => void;
-  /** Le destinataire s'est déjà prononcé sur cette prédiction — masque le lien
-   * « Donner mon avis », qui n'a plus lieu d'être une fois le vote posé. */
-  hasVoted?: boolean;
   /** Pas encore ouverte par ce destinataire — surlignage discret + compte
    * dans le badge de l'onglet correspondant. */
   unseen?: boolean;
-  /** Réservé à l'auteur d'une prédiction révélée — affiche l'icône de
-   * suppression, avec confirmation, en bas à droite de la carte. */
+  /** Réservé à un destinataire (jamais l'auteur, qui ne peut plus supprimer
+   * sa propre prédiction) — retire son propre accès, en bas à droite de la
+   * carte. */
   onDelete?: () => void;
   /** Préviennent l'écran parent (Fil) du nouvel état, pour que ses propres
    * listes filtrées (favoris, masquées) restent à jour sans recharger tout
@@ -101,20 +96,16 @@ export function PredictionCard({
   const [reactors, setReactors] = useState<EmojiReactor[] | null>(null);
   const [reactorsLoading, setReactorsLoading] = useState(false);
   const [reactorsError, setReactorsError] = useState<string | null>(null);
-  const [believeVotes, setBelieveVotes] = useState(item.believe_votes);
-  const [disbelieveVotes, setDisbelieveVotes] = useState(item.disbelieve_votes);
-  const [localVote, setLocalVote] = useState<'believe' | 'disbelieve' | null>(null);
-  const [voting, setVoting] = useState(false);
-  const [voteError, setVoteError] = useState<string | null>(null);
+  const [confidenceOpen, setConfidenceOpen] = useState(false);
+  const [avgConfidence, setAvgConfidence] = useState(item.avg_confidence);
+  const [confidenceVoteCount, setConfidenceVoteCount] = useState(item.confidence_vote_count);
+  const [myConfidence, setMyConfidence] = useState(item.my_confidence);
   const revealAt = new Date(item.reveal_at);
   const revealed = isRevealed(item, now);
   const isAuthor = item.author_id === userId;
 
   const verdict = revealed && item.final_status !== 'pending' ? item.final_status : null;
-  const belief = item.is_immediate
-    ? beliefPercentage({ ...item, believe_votes: believeVotes, disbelieve_votes: disbelieveVotes })
-    : null;
-  const voted = hasVoted || localVote !== null;
+  const canVote = revealed && !isAuthor;
 
   useEffect(() => {
     let cancelled = false;
@@ -126,9 +117,20 @@ export function PredictionCard({
     };
   }, [item.id]);
 
+  function handleVoted(confidence: number) {
+    const hadVote = myConfidence !== null;
+    setMyConfidence(confidence);
+    setConfidenceVoteCount((prev) => (hadVote ? prev : prev + 1));
+    setAvgConfidence((prev) => {
+      const count = hadVote ? confidenceVoteCount : confidenceVoteCount + 1;
+      const previousTotal = (prev ?? 0) * confidenceVoteCount - (hadVote ? (myConfidence ?? 0) : 0);
+      return Math.round(((previousTotal + confidence) / count) * 10) / 10;
+    });
+  }
+
   function handleDeletePress() {
     const message =
-      'Cette action est définitive : le contenu, les votes et les commentaires seront perdus pour tout le Cercle.';
+      'Tu perdras l’accès à ce Predict : il disparaîtra de ton fil, sauf si l’auteur t’y réinvite.';
 
     // `Alert.alert` de React Native Web ne fait rien (implémentation vide) —
     // sans ce repli, le bouton semble ne pas répondre du tout sur le web.
@@ -165,22 +167,6 @@ export function PredictionCard({
       setIsHidden(!next);
       onHiddenChange?.(!next);
     }
-  }
-
-  /** Vote rapide « 🔥 confiant / ❌ pas confiant », posé sans quitter le Fil. */
-  async function handleQuickVote(value: 'believe' | 'disbelieve') {
-    if (voting) return;
-    setVoting(true);
-    setVoteError(null);
-    const { error } = await castVote(item.id, userId, value);
-    setVoting(false);
-    if (error) {
-      setVoteError(voteErrorMessage(error));
-      return;
-    }
-    setLocalVote(value);
-    if (value === 'believe') setBelieveVotes((v) => v + 1);
-    else setDisbelieveVotes((v) => v + 1);
   }
 
   /** Charge le détail « qui a réagi avec quoi », une seule fois par carte. */
@@ -331,9 +317,9 @@ export function PredictionCard({
   return (
     <View style={[styles.card, unseen && styles.cardUnseen]}>
       <Pressable onPress={() => onPress?.()} style={({ pressed }) => pressed && styles.cardPressed}>
-        {/* Contestation en cours sur cette prédiction à expiration libre —
-            bien plus visible que le reste de la carte : c'est justement le
-            but, ça concerne tout le monde. */}
+        {/* Contestation en cours sur cette prédiction — bien plus visible que
+            le reste de la carte : c'est justement le but, ça concerne tout
+            le monde. */}
         {item.resolution_status === 'mauvaise_foi' && (
           <View style={styles.badFaithBanner}>
             <Text style={styles.badFaithBannerText}>🚩 MAUVAISE FOI — le Cercle tranche</Text>
@@ -403,129 +389,131 @@ export function PredictionCard({
           <Text style={styles.cardContent}>{item.content}</Text>
         )}
 
-        {item.is_immediate && (
-          <View style={styles.confidenceBlock}>
-            {belief === null ? (
-              <Text style={styles.beliefScore}>Personne n’a encore donné son avis.</Text>
-            ) : (
-              <>
-                {/* Le chiffre flotte au-dessus du curseur plutôt que sur sa
-                    propre ligne pleine largeur — rien d'écrit sur la jauge
-                    elle-même, juste ce repère ponctuel. Positionné via
-                    `justifyContent` (gauche/centre/droite selon le tiers où
-                    tombe le curseur) plutôt qu'un pourcentage exact : robuste
-                    sans mesurer la largeur du texte. */}
-                <View
-                  style={[
-                    styles.confidenceLabelRow,
-                    {
-                      justifyContent: belief < 35 ? 'flex-start' : belief > 65 ? 'flex-end' : 'center',
-                    },
-                  ]}
-                >
-                  <Text style={styles.confidenceLabel}>
-                    {belief}% confiants ({believeVotes + disbelieveVotes} vote
-                    {believeVotes + disbelieveVotes > 1 ? 's' : ''})
-                  </Text>
-                </View>
-                <ConfidenceGauge belief={belief} />
-              </>
-            )}
-          </View>
-        )}
+        {/* Jauge de confiance universelle : moyenne de la communauté, quel
+            que soit le type de prédiction — remplace l'ancien affichage
+            réservé aux immédiates. Le tap ouvre le détail des votes (et,
+            pour un destinataire éligible, le slider pour poser le sien). */}
+        <Pressable
+          onPress={(e) => {
+            e.stopPropagation?.();
+            setConfidenceOpen(true);
+          }}
+          style={styles.confidenceBlock}
+        >
+          {avgConfidence === null ? (
+            <Text style={styles.beliefScore}>
+              {canVote ? 'Sois le premier à voter →' : 'Personne n’a encore voté.'}
+            </Text>
+          ) : (
+            <>
+              {/* Le chiffre flotte au-dessus du curseur plutôt que sur sa
+                  propre ligne pleine largeur — rien d'écrit sur la jauge
+                  elle-même, juste ce repère ponctuel. */}
+              <View
+                style={[
+                  styles.confidenceLabelRow,
+                  {
+                    justifyContent: avgConfidence < 35 ? 'flex-start' : avgConfidence > 65 ? 'flex-end' : 'center',
+                  },
+                ]}
+              >
+                <Text style={styles.confidenceLabel}>
+                  {avgConfidence}% de confiance · {confidenceVoteCount} vote
+                  {confidenceVoteCount > 1 ? 's' : ''}
+                </Text>
+              </View>
+              <ConfidenceGauge belief={avgConfidence} />
+            </>
+          )}
+        </Pressable>
       </Pressable>
 
-      {item.is_immediate && revealed && !isAuthor && !voted && (
-        <View style={styles.quickVoteRow}>
-          <Pressable
-            onPress={() => handleQuickVote('believe')}
-            disabled={voting}
-            style={styles.quickVotePill}
-            hitSlop={4}
-          >
-            <Text style={styles.quickVotePillText}>🔥 confiant</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => handleQuickVote('disbelieve')}
-            disabled={voting}
-            style={styles.quickVotePill}
-            hitSlop={4}
-          >
-            <Text style={styles.quickVotePillText}>❌ pas confiant</Text>
-          </Pressable>
-        </View>
-      )}
-      {voteError && <Text style={styles.voteError}>{voteError}</Text>}
-
-      {!item.is_immediate && revealed && !isAuthor && !hasVoted && (
-        <Pressable onPress={() => onPress?.()} style={styles.voteLink} hitSlop={4}>
-          <Text style={styles.voteLinkText}>Donner mon avis sur ce <PredictWord /> →</Text>
+      {canVote && myConfidence === null && (
+        <Pressable onPress={() => setConfidenceOpen(true)} style={styles.voteLink} hitSlop={4}>
+          <Text style={styles.voteLinkText}>Voter sur ce <PredictWord /> →</Text>
         </Pressable>
       )}
 
       <View style={styles.footerRow}>
         {/* Sobre quand il n'y a rien à voir ; icône plus marquée et chiffre
             en gras noir dès qu'il y a au moins un commentaire. */}
-        <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
-          <MessageCircle
-            size={17}
-            color={(commentCount ?? 0) > 0 ? colors.icon : colors.textFaint}
-            strokeWidth={1.75}
-            fill={commentsOpen ? colors.icon : 'none'}
-          />
-          {(commentCount ?? 0) > 0 && (
-            <Text style={styles.commentsToggleText}>{commentCount}</Text>
-          )}
-        </Pressable>
+        <View style={styles.footerSide}>
+          <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
+            <MessageCircle
+              size={17}
+              color={(commentCount ?? 0) > 0 ? colors.icon : colors.textFaint}
+              strokeWidth={1.75}
+              fill={commentsOpen ? colors.icon : 'none'}
+            />
+            {(commentCount ?? 0) > 0 && (
+              <Text style={styles.commentsToggleText}>{commentCount}</Text>
+            )}
+          </Pressable>
+        </View>
 
         {/* Discret, façon Facebook : un pouce en filigrane (ou l'emoji déjà
-            choisi) — maintenir le doigt fait apparaître la bulle de
-            réactions au-dessus, la faire glisser dessus en sélectionne une.
-            Le chiffre est un bouton à part : un tap dessus ouvre le détail
-            de qui a réagi avec quoi, sans interférer avec le geste du pouce. */}
-        <View style={styles.reactionTriggerWrap}>
-          <View style={styles.reactionTriggerRow}>
-            <View style={styles.reactionTrigger} hitSlop={8} {...panResponder.panHandlers}>
-              {myEmoji ? (
-                <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
-              ) : (
-                <ThumbsUp size={17} color={totalReactions > 0 ? colors.icon : colors.textFaint} strokeWidth={1.75} />
+            choisi), désormais au centre du pied de carte — la poubelle prend
+            sa place habituelle à droite. Maintenir le doigt fait apparaître
+            la bulle de réactions au-dessus, la faire glisser dessus en
+            sélectionne une. Le chiffre est un bouton à part : un tap dessus
+            ouvre le détail de qui a réagi avec quoi. */}
+        <View style={styles.footerCenter}>
+          <View style={styles.reactionTriggerWrap}>
+            <View style={styles.reactionTriggerRow}>
+              <View style={styles.reactionTrigger} hitSlop={8} {...panResponder.panHandlers}>
+                {myEmoji ? (
+                  <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
+                ) : (
+                  <ThumbsUp size={17} color={totalReactions > 0 ? colors.icon : colors.textFaint} strokeWidth={1.75} />
+                )}
+              </View>
+              {totalReactions > 0 && (
+                <Pressable onPress={openReactors} hitSlop={8}>
+                  <Text style={styles.reactionTriggerCount}>{totalReactions}</Text>
+                </Pressable>
               )}
             </View>
-            {totalReactions > 0 && (
-              <Pressable onPress={openReactors} hitSlop={8}>
-                <Text style={styles.reactionTriggerCount}>{totalReactions}</Text>
-              </Pressable>
+
+            {emojiPanelOpen && (
+              <View
+                ref={panelRef}
+                style={styles.emojiPanel}
+                onLayout={() => {
+                  panelRef.current?.measureInWindow((x, y, width, height) => {
+                    panelLayoutRef.current = { x, y, width, height };
+                  });
+                }}
+              >
+                {EMOJI_REACTIONS.map((emoji, i) => (
+                  <Animated.View key={emoji} style={{ transform: [{ scale: scaleAnims[i] }] }}>
+                    {/* Un tap direct sur un emoji le sélectionne toujours,
+                        indépendamment du glissé : sans ça, un utilisateur qui
+                        relâche le pouce puis tape un emoji comme un bouton
+                        normal (au lieu de glisser sans relâcher, à la
+                        Facebook) ne déclenchait jamais rien. */}
+                    <Pressable
+                      onPress={() => handleEmojiPress(emoji)}
+                      style={[styles.emojiBubbleItem, myEmoji === emoji && styles.emojiBubbleItemActive]}
+                      hitSlop={4}
+                    >
+                      <Text style={styles.emojiButtonText}>{emoji}</Text>
+                    </Pressable>
+                  </Animated.View>
+                ))}
+              </View>
             )}
           </View>
+        </View>
 
-          {emojiPanelOpen && (
-            <View
-              ref={panelRef}
-              style={styles.emojiPanel}
-              onLayout={() => {
-                panelRef.current?.measureInWindow((x, y, width, height) => {
-                  panelLayoutRef.current = { x, y, width, height };
-                });
-              }}
-            >
-              {EMOJI_REACTIONS.map((emoji, i) => (
-                <Animated.View key={emoji} style={{ transform: [{ scale: scaleAnims[i] }] }}>
-                  {/* Un tap direct sur un emoji le sélectionne toujours,
-                      indépendamment du glissé : sans ça, un utilisateur qui
-                      relâche le pouce puis tape un emoji comme un bouton
-                      normal (au lieu de glisser sans relâcher, à la
-                      Facebook) ne déclenchait jamais rien. */}
-                  <Pressable
-                    onPress={() => handleEmojiPress(emoji)}
-                    style={[styles.emojiBubbleItem, myEmoji === emoji && styles.emojiBubbleItemActive]}
-                    hitSlop={4}
-                  >
-                    <Text style={styles.emojiButtonText}>{emoji}</Text>
-                  </Pressable>
-                </Animated.View>
-              ))}
-            </View>
+        <View style={[styles.footerSide, styles.footerSideRight]}>
+          {/* Jamais pour l'auteur : il ne peut plus supprimer sa propre
+              prédiction (pour ne pas pouvoir effacer un Manqué ou une
+              Mauvaise foi confirmée). Un destinataire peut en revanche
+              toujours se retirer lui-même. */}
+          {!isAuthor && onDelete && (
+            <Pressable onPress={handleDeletePress} hitSlop={8}>
+              <Trash2 size={17} color={colors.textFaint} strokeWidth={1.75} />
+            </Pressable>
           )}
         </View>
       </View>
@@ -560,22 +548,10 @@ export function PredictionCard({
                 setMenuOpen(false);
                 handleToggleHidden();
               }}
-              style={revealed && isAuthor && onDelete ? styles.menuRow : styles.menuRowLast}
+              style={styles.menuRowLast}
             >
               <Text style={styles.menuRowText}>{isHidden ? 'Afficher à nouveau' : 'Masquer'}</Text>
             </Pressable>
-
-            {revealed && isAuthor && onDelete && (
-              <Pressable
-                onPress={() => {
-                  setMenuOpen(false);
-                  handleDeletePress();
-                }}
-                style={styles.menuRowLast}
-              >
-                <Text style={styles.menuRowTextDanger}>Supprimer</Text>
-              </Pressable>
-            )}
           </Pressable>
         </Pressable>
       </Modal>
@@ -609,6 +585,16 @@ export function PredictionCard({
           </Pressable>
         </Pressable>
       </Modal>
+
+      <ConfidenceVotesModal
+        visible={confidenceOpen}
+        predictionId={item.id}
+        userId={userId}
+        canVote={canVote}
+        myConfidence={myConfidence}
+        onVoted={handleVoted}
+        onClose={() => setConfidenceOpen(false)}
+      />
     </View>
   );
 }
@@ -676,25 +662,11 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   beliefScore: { fontSize: 13, color: colors.textMuted, marginTop: 10 },
-  // Jauge d'opinion : rien d'écrit sur la barre elle-même — juste un curseur
-  // à la position du pourcentage, et le chiffre qui flotte au-dessus.
+  // Jauge de confiance : rien d'écrit sur la barre elle-même — juste un
+  // curseur à la position de la moyenne, et le chiffre qui flotte au-dessus.
   confidenceBlock: { marginTop: 12 },
   confidenceLabelRow: { flexDirection: 'row', marginBottom: 4 },
   confidenceLabel: { fontSize: 12, fontWeight: '700', color: colors.text },
-  // Deux actions d'engagement immédiat, sans quitter le Fil. Contour fin +
-  // fond blanc : présentes sans écraser la carte.
-  quickVoteRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  quickVotePill: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.pill,
-    paddingVertical: 9,
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-  },
-  quickVotePillText: { fontSize: 13, fontWeight: '700', color: colors.text },
-  voteError: { fontSize: 12, color: colors.danger, marginTop: 8 },
   voteLink: { marginTop: 10 },
   voteLinkText: { fontSize: 13, fontWeight: '600', color: colors.text, textDecorationLine: 'underline' },
   modalOverlay: {
@@ -721,17 +693,15 @@ const styles = StyleSheet.create({
   },
   menuRowLast: { paddingHorizontal: 18, paddingVertical: 14 },
   menuRowText: { fontSize: 14, fontWeight: '600', color: colors.text },
-  menuRowTextDanger: { fontSize: 14, fontWeight: '600', color: colors.danger },
   // Une seule « grande bulle », façon Facebook — flottante au-dessus du
   // pouce (pas en dessous) pour ne pas être masquée par le doigt qui la
-  // fait glisser, et pas des puces séparées.
-  // Ancrée par son bord droit sur le pouce (plutôt que centrée) : le pouce
-  // est proche du bord droit de la carte, une bulle centrée débordait hors
-  // de l'écran.
+  // fait glisser, et pas des puces séparées. Centrée sur le déclencheur
+  // (désormais au milieu du pied de carte), plutôt qu'ancrée à droite.
   emojiPanel: {
     position: 'absolute',
     bottom: '100%',
-    right: 0,
+    left: '50%',
+    marginLeft: -EMOJI_PANEL_WIDTH / 2,
     marginBottom: 10,
     width: EMOJI_PANEL_WIDTH,
     zIndex: 20,
@@ -759,12 +729,17 @@ const styles = StyleSheet.create({
   },
   emojiBubbleItemActive: { backgroundColor: colors.goldSoft },
   emojiButtonText: { fontSize: 20 },
+  // Trois zones égales (gauche/centre/droite) : les commentaires restent à
+  // gauche, le pouce de réaction passe au centre, la poubelle (destinataire
+  // seulement) prend la place qu'occupait le pouce, à droite.
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     marginTop: 10,
   },
+  footerSide: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  footerSideRight: { justifyContent: 'flex-end' },
+  footerCenter: { flex: 1, alignItems: 'center' },
   commentsToggle: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   // Affiché seulement s'il y a au moins un commentaire — donc toujours en
   // gras noir : c'est une interaction réelle, pas un zéro décoratif.
