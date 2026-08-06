@@ -9,7 +9,7 @@ const BAR_HEIGHT = 10;
 const CURSOR_SIZE = 18;
 
 /**
- * Jauge horizontale du Prediscore — dégradé rouge (« Mytho ») à vert
+ * Jauge horizontale du Prediscore — dégradé noir (« Mauvaise foi ») à jaune
  * (« J'ai raison. Toujours. »), avec un curseur positionné au score actuel.
  * `score` est `null` tant qu'aucune prédiction révélée n'existe encore :
  * affiche alors un état vide plutôt qu'une jauge à 0%, pour ne pas laisser
@@ -66,7 +66,7 @@ export function PrediscoreGauge({
       </View>
 
       <View style={styles.labelsRow}>
-        <Text style={[styles.label, styles.labelLeft]}>Mytho</Text>
+        <Text style={[styles.label, styles.labelLeft]}>Mauvaise foi</Text>
         <View style={styles.labelRightBlock}>
           <Text style={[styles.label, styles.labelRight]}>J’ai raison.</Text>
           <Text style={[styles.label, styles.labelRight]}>Toujours.</Text>
