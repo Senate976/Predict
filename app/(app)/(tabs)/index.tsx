@@ -24,9 +24,9 @@ import { fetchFriendships } from '../../../lib/friends';
 import { fetchNotifications, markNotificationRead } from '../../../lib/notifications';
 import {
   buildMentionLabel,
+  deletePrediction,
   feedErrorMessage,
   fetchPredictionsFeed,
-  removeRecipient,
   setPredictionUserState,
   type PredictionFeedItem,
 } from '../../../lib/predictions';
@@ -55,6 +55,7 @@ export default function HomeScreen() {
 
   const [feed, setFeed] = useState<PredictionFeedItem[] | null>(null);
   const [authors, setAuthors] = useState<AuthorMap>({});
+  const [votedIds, setVotedIds] = useState<Set<string>>(new Set());
   // Amis acceptés du viewer — sert uniquement à choisir, parmi plusieurs
   // personnes citées dans un teaser, un nom que le viewer reconnaîtra.
   const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
@@ -138,6 +139,15 @@ export default function HomeScreen() {
     }
     setAuthors(map);
 
+    // Sert uniquement à masquer « Donner mon avis » une fois le vote posé —
+    // la RLS de `prediction_votes` ne renvoie de toute façon que ses propres
+    // votes, pas besoin de filtrer sur les ids de ce chargement.
+    const { data: myVotes } = await supabase
+      .from('prediction_votes')
+      .select('prediction_id')
+      .eq('voter_id', userId);
+    setVotedIds(new Set((myVotes ?? []).map((v) => v.prediction_id)));
+
     const { data: friendships } = await fetchFriendships(userId);
     const accepted = (friendships ?? []).filter((f) => f.status === 'accepted');
     setFriendIds(
@@ -195,11 +205,8 @@ export default function HomeScreen() {
     await markOnboarded();
   }
 
-  /** Un destinataire se retire lui-même — jamais l'auteur, qui ne peut plus
-   * supprimer sa propre prédiction (voir PredictionCard). */
   async function handleDeletePrediction(predictionId: string) {
-    if (!userId) return;
-    const { error: deleteError } = await removeRecipient(predictionId, userId);
+    const { error: deleteError } = await deletePrediction(predictionId);
     if (deleteError) {
       setError(`Suppression impossible : ${deleteError.message}`);
       return;
@@ -496,6 +503,7 @@ export default function HomeScreen() {
                 friendIds
               )}
               userId={userId!}
+              hasVoted={votedIds.has(item.id)}
               unseen={!item.is_seen}
               onPress={() => {
                 handleMarkSeen(item.id);

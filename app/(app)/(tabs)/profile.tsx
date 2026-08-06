@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
     marginTop: 8,
   },
-  username: { fontFamily: fonts.sansBold, fontSize: 22, color: colors.text, marginTop: 6 },
+  username: { fontFamily: fonts.serifItalic, fontSize: 22, color: colors.text, marginTop: 6 },
   email: { fontSize: 13, color: colors.textFaint, marginTop: 4 },
   loader: { marginTop: 24 },
   modalOverlay: {

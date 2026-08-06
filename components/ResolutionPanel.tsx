@@ -13,13 +13,12 @@ import {
 import { colors, fonts, radius, spacing } from '../lib/theme';
 
 /**
- * Validation sociale d'une prédiction révélée, tous types confondus :
- * l'auteur déclare lui-même le résultat (Auto-Verdict), les destinataires
- * valident tacitement ou contestent, et une contestation massive (≥ 25%)
- * ouvre un jury à part. A remplacé l'ancien vote de majorité (Réalisée/
- * Manquée, ou Je crois/Je n'y crois pas pour l'immédiat) — le vote de
- * confiance universel (0-100%) ne détermine plus lui-même l'issue, seule
- * cette Auto-Verdict le fait désormais.
+ * Validation sociale d'une prédiction à expiration libre (`open_ended`), une
+ * fois révélée : l'auteur déclare lui-même le résultat (Auto-Verdict), les
+ * destinataires valident tacitement ou contestent, et une contestation
+ * massive (≥ 25%) ouvre un jury à part. Remplace, pour ces prédictions
+ * seulement, l'ancien bloc Réalisée/Manquée basé sur le vote des
+ * destinataires (toujours en vigueur pour une prédiction à date fixe).
  *
  * Cinq statuts (`item.resolution_status`, déjà EFFECTIF — les fenêtres de
  * 24h écoulées sont recalculées côté vue) : voir `PredictionResolutionStatus`.
