@@ -16,7 +16,6 @@ import {
 import { Text } from './Text';
 
 import { ConfidenceGauge } from './ConfidenceGauge';
-import { PredictionStatusIndicator, resolveTimingStatus } from './PredictionStatusIndicator';
 import { fetchCommentCount } from '../lib/comments';
 import {
   beliefPercentage,
@@ -107,12 +106,10 @@ export function PredictionCard({
   const [localVote, setLocalVote] = useState<'believe' | 'disbelieve' | null>(null);
   const [voting, setVoting] = useState(false);
   const [voteError, setVoteError] = useState<string | null>(null);
-  const revealAt = new Date(item.reveal_at);
   const revealed = isRevealed(item, now);
   const isAuthor = item.author_id === userId;
 
   const verdict = revealed && item.final_status !== 'pending' ? item.final_status : null;
-  const timingStatus = resolveTimingStatus(item, revealed);
   const belief = item.is_immediate
     ? beliefPercentage({ ...item, believe_votes: believeVotes, disbelieve_votes: disbelieveVotes })
     : null;
@@ -331,7 +328,7 @@ export function PredictionCard({
   ).current;
 
   return (
-    <View style={[styles.card, unseen && styles.cardUnseen, item.is_immediate && styles.cardLive]}>
+    <View style={[styles.card, unseen && styles.cardUnseen]}>
       <Pressable onPress={() => onPress?.()} style={({ pressed }) => pressed && styles.cardPressed}>
         {/* Une seule ligne : [avatar][pseudo] ...espace flexible... [badge] [menu]. */}
         <View style={styles.cardHeader}>
@@ -350,12 +347,6 @@ export function PredictionCard({
 
           <View style={styles.headerSpacer} />
 
-          {/* Signalétique d'état abstraite (SVG + micro-typo monospace),
-              distincte du verdict Réalisé/Manqué ci-dessous : celle-ci ne
-              porte que sur le calendrier de révélation, jamais sur l'issue. */}
-          {!verdict && (
-            <PredictionStatusIndicator status={timingStatus} revealAt={revealAt} now={now} />
-          )}
           {verdict && (
             // Liseré très discret sur le bord gauche plutôt qu'une pastille
             // pleine — juste de quoi confirmer le sens du mot d'un coup d'œil.
@@ -628,10 +619,6 @@ const styles = StyleSheet.create({
     borderColor: colors.gold,
     backgroundColor: colors.goldSoft,
   },
-  // État « LIVE » (révélation immédiate) : liseré doré discret sur le bord
-  // droit — seul repère visuel distinctif de cette carte, tout le reste de
-  // la charte (fond blanc, bordure noire fine) reste identique.
-  cardLive: { borderRightWidth: 3, borderRightColor: colors.gold },
   // Tout sur une seule ligne :
   // [avatar 32][pseudo] ...espace flexible... [badge temps] [menu '...'].
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
