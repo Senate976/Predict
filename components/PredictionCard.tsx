@@ -16,8 +16,8 @@ import {
 import { Text } from './Text';
 
 import { ConfidenceGauge } from './ConfidenceGauge';
-import { PredictionStatusIndicator, resolveTimingStatus } from './PredictionStatusIndicator';
 import { fetchCommentCount } from '../lib/comments';
+import { formatCountdown } from '../lib/datetime';
 import {
   beliefPercentage,
   castEmojiReaction,
@@ -112,7 +112,6 @@ export function PredictionCard({
   const isAuthor = item.author_id === userId;
 
   const verdict = revealed && item.final_status !== 'pending' ? item.final_status : null;
-  const timingStatus = resolveTimingStatus(item, revealed);
   const belief = item.is_immediate
     ? beliefPercentage({ ...item, believe_votes: believeVotes, disbelieve_votes: disbelieveVotes })
     : null;
@@ -331,7 +330,7 @@ export function PredictionCard({
   ).current;
 
   return (
-    <View style={[styles.card, unseen && styles.cardUnseen, item.is_immediate && styles.cardLive]}>
+    <View style={[styles.card, unseen && styles.cardUnseen]}>
       <Pressable onPress={() => onPress?.()} style={({ pressed }) => pressed && styles.cardPressed}>
         {/* Une seule ligne : [avatar][pseudo] ...espace flexible... [badge] [menu]. */}
         <View style={styles.cardHeader}>
@@ -350,11 +349,18 @@ export function PredictionCard({
 
           <View style={styles.headerSpacer} />
 
-          {/* Signalétique d'état abstraite (SVG + micro-typo monospace),
-              distincte du verdict Réalisé/Manqué ci-dessous : celle-ci ne
-              porte que sur le calendrier de révélation, jamais sur l'issue. */}
-          {!verdict && (
-            <PredictionStatusIndicator status={timingStatus} revealAt={revealAt} now={now} />
+          {!verdict && !revealed && (
+            <Text style={styles.badgeText} numberOfLines={1}>
+              {item.open_ended ? 'En temps voulu' : formatCountdown(revealAt, now)}
+            </Text>
+          )}
+          {/* Révélée mais sans majorité encore formée (aucun vote, ou égalité)
+              — sans ça, l'en-tête restait vide sur l'onglet Predict alors que
+              la prédiction est bien révélée. */}
+          {!verdict && revealed && (
+            <Text style={styles.badgeText} numberOfLines={1}>
+              Révélée
+            </Text>
           )}
           {verdict && (
             // Liseré très discret sur le bord gauche plutôt qu'une pastille
@@ -628,10 +634,6 @@ const styles = StyleSheet.create({
     borderColor: colors.gold,
     backgroundColor: colors.goldSoft,
   },
-  // État « LIVE » (révélation immédiate) : liseré doré discret sur le bord
-  // droit — seul repère visuel distinctif de cette carte, tout le reste de
-  // la charte (fond blanc, bordure noire fine) reste identique.
-  cardLive: { borderRightWidth: 3, borderRightColor: colors.gold },
   // Tout sur une seule ligne :
   // [avatar 32][pseudo] ...espace flexible... [badge temps] [menu '...'].
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
