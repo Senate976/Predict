@@ -651,23 +651,31 @@ const styles = StyleSheet.create({
   badgeRealized: { borderLeftWidth: 2, borderLeftColor: colors.verdictRealized },
   badgeMissed: { borderLeftWidth: 2, borderLeftColor: colors.verdictMissed },
   badgeText: { fontSize: 12, fontWeight: '600', color: colors.textMuted, flexShrink: 0 },
+  // Secondaire : simple amorce au-dessus de la vraie prédiction, jamais
+  // l'élément qu'on retient de la carte — même registre mono/tracké que la
+  // signalétique d'état, pour rester discret. `letterSpacing` + majuscules
+  // plutôt que la graisse : c'est ce qui la distingue du corps, pas son poids.
   cardTeaser: {
-    fontFamily: fonts.sansBold,
-    fontSize: 16,
-    color: colors.text,
-    lineHeight: 22,
-  },
-  // Poids plus léger que le teaser : le teaser reste le titre de la carte,
-  // le contenu qui suit en est le corps.
-  cardContent: {
-    fontSize: 14,
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
     color: colors.textMuted,
-    lineHeight: 20,
-    marginTop: 6,
+    marginBottom: 4,
+  },
+  // La vraie prédiction est le cœur de la carte : plus grande, plus foncée,
+  // en serif éditorial — jamais grisée, y compris floutée avant révélation
+  // (le flou matérialise déjà le secret, un texte terne en plus serait
+  // redondant et affaiblirait l'impact au moment où elle devient lisible).
+  cardContent: {
+    fontFamily: fonts.serifItalic,
+    fontSize: 18,
+    color: colors.text,
+    lineHeight: 25,
   },
   // `overflow: hidden` : le flou (`BlurView`) ne doit jamais déborder sur le
   // teaser au-dessus ou le reste de la carte en dessous.
-  blurWrap: { marginTop: 6, overflow: 'hidden', borderRadius: radius.sm },
+  blurWrap: { overflow: 'hidden', borderRadius: radius.sm },
   beliefScore: { fontSize: 13, color: colors.textMuted, marginTop: 10 },
   // Jauge d'opinion : rien d'écrit sur la barre elle-même — juste un curseur
   // à la position du pourcentage, et le chiffre qui flotte au-dessus.
