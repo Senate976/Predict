@@ -392,5 +392,5 @@ const styles = StyleSheet.create({
   // Texte noir sur le bouton jaune — du blanc y serait peu lisible.
   submitText: { fontFamily: fonts.sansBold, color: colors.text, fontSize: 16, textTransform: 'uppercase', letterSpacing: 0.5 },
   switch: { marginTop: 18, alignItems: 'center' },
-  switchText: { color: colors.text, fontSize: 14, fontWeight: '600', textDecorationLine: 'underline' },
+  switchText: { fontFamily: fonts.bodyEmphasis, color: colors.text, fontSize: 14 },
 });

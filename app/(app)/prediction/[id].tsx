@@ -523,7 +523,7 @@ const styles = StyleSheet.create({
   eyebrow: { ...eyebrow },
   eyebrowSmall: { ...eyebrow, fontSize: 10 },
   authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginBottom: 12 },
-  authorName: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
+  authorName: { fontFamily: fonts.bodyEmphasis, fontSize: 14, color: colors.icon },
   // La catégorie n'apparaît plus sur la carte du Fil — seulement ici, une
   // fois le Predict ouvert. Jaune réservé aux éléments interactifs majeurs :
   // ici, simple étiquette au trait noir.

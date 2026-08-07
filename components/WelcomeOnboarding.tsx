@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   title: {
-    fontFamily: fonts.serifItalic,
+    fontFamily: fonts.bodyEmphasis,
     fontSize: 30,
     color: colors.text,
     marginBottom: 14,
@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   closing: {
-    fontFamily: fonts.serifItalic,
+    fontFamily: fonts.bodyEmphasis,
     fontSize: 20,
     color: colors.text,
     marginBottom: spacing.lg,
