@@ -1,3 +1,4 @@
+import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 import { MessageCircle, MoreHorizontal, ThumbsUp } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
@@ -15,8 +16,8 @@ import {
 import { Text } from './Text';
 
 import { ConfidenceGauge } from './ConfidenceGauge';
+import { PredictionStatusIndicator, resolveTimingStatus } from './PredictionStatusIndicator';
 import { fetchCommentCount } from '../lib/comments';
-import { formatCountdown } from '../lib/datetime';
 import {
   beliefPercentage,
   castEmojiReaction,
@@ -111,6 +112,7 @@ export function PredictionCard({
   const isAuthor = item.author_id === userId;
 
   const verdict = revealed && item.final_status !== 'pending' ? item.final_status : null;
+  const timingStatus = resolveTimingStatus(item, revealed);
   const belief = item.is_immediate
     ? beliefPercentage({ ...item, believe_votes: believeVotes, disbelieve_votes: disbelieveVotes })
     : null;
@@ -329,7 +331,7 @@ export function PredictionCard({
   ).current;
 
   return (
-    <View style={[styles.card, unseen && styles.cardUnseen]}>
+    <View style={[styles.card, unseen && styles.cardUnseen, item.is_immediate && styles.cardLive]}>
       <Pressable onPress={() => onPress?.()} style={({ pressed }) => pressed && styles.cardPressed}>
         {/* Une seule ligne : [avatar][pseudo] ...espace flexible... [badge] [menu]. */}
         <View style={styles.cardHeader}>
@@ -348,18 +350,11 @@ export function PredictionCard({
 
           <View style={styles.headerSpacer} />
 
-          {!verdict && !revealed && (
-            <Text style={styles.badgeText} numberOfLines={1}>
-              {item.open_ended ? 'En temps voulu' : formatCountdown(revealAt, now)}
-            </Text>
-          )}
-          {/* Révélée mais sans majorité encore formée (aucun vote, ou égalité)
-              — sans ça, l'en-tête restait vide sur l'onglet Predict alors que
-              la prédiction est bien révélée. */}
-          {!verdict && revealed && (
-            <Text style={styles.badgeText} numberOfLines={1}>
-              Révélée
-            </Text>
+          {/* Signalétique d'état abstraite (SVG + micro-typo monospace),
+              distincte du verdict Réalisé/Manqué ci-dessous : celle-ci ne
+              porte que sur le calendrier de révélation, jamais sur l'issue. */}
+          {!verdict && (
+            <PredictionStatusIndicator status={timingStatus} revealAt={revealAt} now={now} />
           )}
           {verdict && (
             // Liseré très discret sur le bord gauche plutôt qu'une pastille
@@ -389,9 +384,20 @@ export function PredictionCard({
             devient visible directement sur la carte une fois révélée — sans
             ça, l'onglet Predict n'avait rien de plus à montrer qu'un teaser
             déjà lu avant révélation. La RLS ne renvoie `content` que si
-            révélée ou si on en est l'auteur, donc ce test suffit. */}
+            révélée ou si on en est l'auteur, donc ce test suffit.
+            Avant révélation, seul l'auteur voit son propre texte (les autres
+            n'ont tout simplement rien à cet endroit) : flouté tant que
+            « scellé », net dès que « révélée » — le flou matérialise le
+            secret plutôt qu'un simple retrait du contenu. */}
         {(revealed || isAuthor) && item.content && (
-          <Text style={styles.cardContent}>{item.content}</Text>
+          revealed || item.is_immediate ? (
+            <Text style={styles.cardContent}>{item.content}</Text>
+          ) : (
+            <View style={styles.blurWrap}>
+              <Text style={styles.cardContent}>{item.content}</Text>
+              <BlurView intensity={35} tint="light" style={StyleSheet.absoluteFill} />
+            </View>
+          )
         )}
 
         {item.is_immediate && (
@@ -622,6 +628,10 @@ const styles = StyleSheet.create({
     borderColor: colors.gold,
     backgroundColor: colors.goldSoft,
   },
+  // État « LIVE » (révélation immédiate) : liseré doré discret sur le bord
+  // droit — seul repère visuel distinctif de cette carte, tout le reste de
+  // la charte (fond blanc, bordure noire fine) reste identique.
+  cardLive: { borderRightWidth: 3, borderRightColor: colors.gold },
   // Tout sur une seule ligne :
   // [avatar 32][pseudo] ...espace flexible... [badge temps] [menu '...'].
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
@@ -655,6 +665,9 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginTop: 6,
   },
+  // `overflow: hidden` : le flou (`BlurView`) ne doit jamais déborder sur le
+  // teaser au-dessus ou le reste de la carte en dessous.
+  blurWrap: { marginTop: 6, overflow: 'hidden', borderRadius: radius.sm },
   beliefScore: { fontSize: 13, color: colors.textMuted, marginTop: 10 },
   // Jauge d'opinion : rien d'écrit sur la barre elle-même — juste un curseur
   // à la position du pourcentage, et le chiffre qui flotte au-dessus.

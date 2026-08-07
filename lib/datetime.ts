@@ -138,3 +138,23 @@ export function formatCountdown(target: Date, from: Date): string {
   const days = Math.floor(hours / 24);
   return days === 1 ? 'dans 1 jour' : `dans ${days} jours`;
 }
+
+/**
+ * « T - 02D : 14H » (≥ 1 jour restant) ou « T - 05H : 30M » (< 1 jour) —
+ * signalétique compacte façon terminal pour la jauge d'état d'un Predict
+ * programmé non révélé. Toujours deux unités, jamais plus : l'objectif est
+ * un repère d'un coup d'œil, pas une précision à la seconde.
+ */
+export function formatMonoCountdown(target: Date, from: Date): string {
+  const totalMinutes = Math.max(0, Math.floor((target.getTime() - from.getTime()) / 60_000));
+  const days = Math.floor(totalMinutes / 1440);
+
+  if (days >= 1) {
+    const hours = Math.floor((totalMinutes % 1440) / 60);
+    return `T - ${pad(days)}D : ${pad(hours)}H`;
+  }
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `T - ${pad(hours)}H : ${pad(minutes)}M`;
+}
