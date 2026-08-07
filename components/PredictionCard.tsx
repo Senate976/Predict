@@ -1,6 +1,6 @@
 import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
-import { MessageCircle, MoreHorizontal, ThumbsUp } from 'lucide-react-native';
+import { MessageCircle, MoreHorizontal, ThumbsUp, Trash2 } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -452,68 +452,86 @@ export function PredictionCard({
       )}
 
       <View style={styles.footerRow}>
-        {/* Sobre quand il n'y a rien à voir ; icône plus marquée et chiffre
-            en gras noir dès qu'il y a au moins un commentaire. */}
-        <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
-          <MessageCircle
-            size={17}
-            color={(commentCount ?? 0) > 0 ? colors.icon : colors.textFaint}
-            strokeWidth={1.75}
-            fill={commentsOpen ? colors.icon : 'none'}
-          />
-          {(commentCount ?? 0) > 0 && (
-            <Text style={styles.commentsToggleText}>{commentCount}</Text>
-          )}
-        </Pressable>
+        {/* Trois colonnes de largeur égale — le pouce reste ainsi centré sur
+            la carte quel que soit l'espace pris par les commentaires à
+            gauche et la poubelle à droite, plutôt que plaqué au bord. */}
+        <View style={styles.footerCellLeft}>
+          {/* Sobre quand il n'y a rien à voir ; icône plus marquée et chiffre
+              en gras noir dès qu'il y a au moins un commentaire. */}
+          <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
+            <MessageCircle
+              size={17}
+              color={(commentCount ?? 0) > 0 ? colors.icon : colors.textFaint}
+              strokeWidth={1.75}
+              fill={commentsOpen ? colors.icon : 'none'}
+            />
+            {(commentCount ?? 0) > 0 && (
+              <Text style={styles.commentsToggleText}>{commentCount}</Text>
+            )}
+          </Pressable>
+        </View>
 
-        {/* Discret, façon Facebook : un pouce en filigrane (ou l'emoji déjà
-            choisi) — maintenir le doigt fait apparaître la bulle de
-            réactions au-dessus, la faire glisser dessus en sélectionne une.
-            Le chiffre est un bouton à part : un tap dessus ouvre le détail
-            de qui a réagi avec quoi, sans interférer avec le geste du pouce. */}
-        <View style={styles.reactionTriggerWrap}>
-          <View style={styles.reactionTriggerRow}>
-            <View style={styles.reactionTrigger} hitSlop={8} {...panResponder.panHandlers}>
-              {myEmoji ? (
-                <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
-              ) : (
-                <ThumbsUp size={17} color={totalReactions > 0 ? colors.icon : colors.textFaint} strokeWidth={1.75} />
+        <View style={styles.footerCellCenter}>
+          {/* Discret, façon Facebook : un pouce en filigrane (ou l'emoji déjà
+              choisi) — maintenir le doigt fait apparaître la bulle de
+              réactions au-dessus, la faire glisser dessus en sélectionne une.
+              Le chiffre est un bouton à part : un tap dessus ouvre le détail
+              de qui a réagi avec quoi, sans interférer avec le geste du pouce. */}
+          <View style={styles.reactionTriggerWrap}>
+            <View style={styles.reactionTriggerRow}>
+              <View style={styles.reactionTrigger} hitSlop={8} {...panResponder.panHandlers}>
+                {myEmoji ? (
+                  <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
+                ) : (
+                  <ThumbsUp size={17} color={totalReactions > 0 ? colors.icon : colors.textFaint} strokeWidth={1.75} />
+                )}
+              </View>
+              {totalReactions > 0 && (
+                <Pressable onPress={openReactors} hitSlop={8}>
+                  <Text style={styles.reactionTriggerCount}>{totalReactions}</Text>
+                </Pressable>
               )}
             </View>
-            {totalReactions > 0 && (
-              <Pressable onPress={openReactors} hitSlop={8}>
-                <Text style={styles.reactionTriggerCount}>{totalReactions}</Text>
-              </Pressable>
+
+            {emojiPanelOpen && (
+              <View
+                ref={panelRef}
+                style={styles.emojiPanel}
+                onLayout={() => {
+                  panelRef.current?.measureInWindow((x, y, width, height) => {
+                    panelLayoutRef.current = { x, y, width, height };
+                  });
+                }}
+              >
+                {EMOJI_REACTIONS.map((emoji, i) => (
+                  <Animated.View key={emoji} style={{ transform: [{ scale: scaleAnims[i] }] }}>
+                    {/* Un tap direct sur un emoji le sélectionne toujours,
+                        indépendamment du glissé : sans ça, un utilisateur qui
+                        relâche le pouce puis tape un emoji comme un bouton
+                        normal (au lieu de glisser sans relâcher, à la
+                        Facebook) ne déclenchait jamais rien. */}
+                    <Pressable
+                      onPress={() => handleEmojiPress(emoji)}
+                      style={[styles.emojiBubbleItem, myEmoji === emoji && styles.emojiBubbleItemActive]}
+                      hitSlop={4}
+                    >
+                      <Text style={styles.emojiButtonText}>{emoji}</Text>
+                    </Pressable>
+                  </Animated.View>
+                ))}
+              </View>
             )}
           </View>
+        </View>
 
-          {emojiPanelOpen && (
-            <View
-              ref={panelRef}
-              style={styles.emojiPanel}
-              onLayout={() => {
-                panelRef.current?.measureInWindow((x, y, width, height) => {
-                  panelLayoutRef.current = { x, y, width, height };
-                });
-              }}
-            >
-              {EMOJI_REACTIONS.map((emoji, i) => (
-                <Animated.View key={emoji} style={{ transform: [{ scale: scaleAnims[i] }] }}>
-                  {/* Un tap direct sur un emoji le sélectionne toujours,
-                      indépendamment du glissé : sans ça, un utilisateur qui
-                      relâche le pouce puis tape un emoji comme un bouton
-                      normal (au lieu de glisser sans relâcher, à la
-                      Facebook) ne déclenchait jamais rien. */}
-                  <Pressable
-                    onPress={() => handleEmojiPress(emoji)}
-                    style={[styles.emojiBubbleItem, myEmoji === emoji && styles.emojiBubbleItemActive]}
-                    hitSlop={4}
-                  >
-                    <Text style={styles.emojiButtonText}>{emoji}</Text>
-                  </Pressable>
-                </Animated.View>
-              ))}
-            </View>
+        <View style={styles.footerCellRight}>
+          {/* Suppression réservée à l'auteur — plus la peine de révéler
+              d'abord (la RLS `predictions_delete_own` ne l'a jamais exigé,
+              seule l'UI le faisait) : à tout moment sur son propre Predict. */}
+          {isAuthor && onDelete && (
+            <Pressable onPress={handleDeletePress} hitSlop={8}>
+              <Trash2 size={17} color={colors.icon} strokeWidth={1.75} />
+            </Pressable>
           )}
         </View>
       </View>
@@ -548,22 +566,10 @@ export function PredictionCard({
                 setMenuOpen(false);
                 handleToggleHidden();
               }}
-              style={revealed && isAuthor && onDelete ? styles.menuRow : styles.menuRowLast}
+              style={styles.menuRowLast}
             >
               <Text style={styles.menuRowText}>{isHidden ? 'Afficher à nouveau' : 'Masquer'}</Text>
             </Pressable>
-
-            {revealed && isAuthor && onDelete && (
-              <Pressable
-                onPress={() => {
-                  setMenuOpen(false);
-                  handleDeletePress();
-                }}
-                style={styles.menuRowLast}
-              >
-                <Text style={styles.menuRowTextDanger}>Supprimer</Text>
-              </Pressable>
-            )}
           </Pressable>
         </Pressable>
       </Modal>
@@ -709,7 +715,6 @@ const styles = StyleSheet.create({
   },
   menuRowLast: { paddingHorizontal: 18, paddingVertical: 14 },
   menuRowText: { fontSize: 14, fontWeight: '600', color: colors.text },
-  menuRowTextDanger: { fontSize: 14, fontWeight: '600', color: colors.danger },
   // Une seule « grande bulle », façon Facebook — flottante au-dessus du
   // pouce (pas en dessous) pour ne pas être masquée par le doigt qui la
   // fait glisser, et pas des puces séparées.
@@ -750,9 +755,14 @@ const styles = StyleSheet.create({
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     marginTop: 10,
   },
+  // Trois cellules de largeur égale : le pouce (cellule centrale) reste ainsi
+  // centré sur la carte quels que soient la largeur des commentaires à
+  // gauche et la présence ou non de la poubelle à droite.
+  footerCellLeft: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  footerCellCenter: { flex: 1, alignItems: 'center' },
+  footerCellRight: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' },
   commentsToggle: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   // Affiché seulement s'il y a au moins un commentaire — donc toujours en
   // gras noir : c'est une interaction réelle, pas un zéro décoratif.
