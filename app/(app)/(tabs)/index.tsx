@@ -43,7 +43,11 @@ const TICK_MS = 30_000;
 
 type AuthorInfo = { username: string; avatar_url: string | null };
 type AuthorMap = Record<string, AuthorInfo>;
-type Tab = 'upcoming' | 'past';
+/** `feed` : les Predicts des autres (amis, groupes — et de futures
+ * suggestions). `mine` : uniquement les siens. Révélés ou non des deux
+ * côtés désormais : ce qui distingue les deux onglets, c'est qui a écrit
+ * la prédiction, plus son statut de révélation. */
+type Tab = 'feed' | 'mine';
 type SortOrder = 'recent' | 'oldest';
 type SortKey = 'default' | 'seal' | 'reveal';
 type MenuView = 'main' | 'author';
@@ -66,9 +70,9 @@ export default function HomeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => new Date());
-  // « Révélées » par défaut, à gauche — c'est ce qu'on veut voir en premier
-  // en ouvrant l'app : ce qui vient de se passer, pas ce qui reste à venir.
-  const [tab, setTab] = useState<Tab>('past');
+  // Le Fil par défaut, à gauche — c'est ce qu'on veut voir en premier en
+  // ouvrant l'app : ce que prédit son Cercle, pas son propre journal.
+  const [tab, setTab] = useState<Tab>('feed');
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuView, setMenuView] = useState<MenuView>('main');
   const [authorFilter, setAuthorFilter] = useState<string | null>(null);
@@ -238,13 +242,15 @@ export default function HomeScreen() {
     if (userId) setPredictionUserState(predictionId, userId, { seen: true });
   }
 
-  const byTab = (feed ?? []).filter((item) => (tab === 'upcoming' ? !item.is_revealed : item.is_revealed));
+  const byTab = (feed ?? []).filter((item) =>
+    tab === 'mine' ? item.author_id === userId : item.author_id !== userId
+  );
   const hiddenCount = byTab.filter((item) => item.is_hidden).length;
 
-  // Comptés indépendamment de l'onglet actif : le badge de « À venir » doit
-  // rester juste même quand on regarde « Révélées », et inversement.
-  const unreadPast = (feed ?? []).filter((item) => item.is_revealed && !item.is_seen).length;
-  const unreadUpcoming = (feed ?? []).filter((item) => !item.is_revealed && !item.is_seen).length;
+  // Comptés indépendamment de l'onglet actif : le badge de « Mes Predicts »
+  // doit rester juste même quand on regarde « Fil », et inversement.
+  const unreadMine = (feed ?? []).filter((item) => item.author_id === userId && !item.is_seen).length;
+  const unreadFeed = (feed ?? []).filter((item) => item.author_id !== userId && !item.is_seen).length;
 
   const authorEntries = Array.from(new Set(byTab.map((item) => item.author_id))).map((id) => ({
     id,
@@ -265,11 +271,10 @@ export default function HomeScreen() {
       const diff = new Date(b.reveal_at).getTime() - new Date(a.reveal_at).getTime();
       return sortOrder === 'recent' ? -diff : diff;
     }
-    // Défaut inchangé : À venir par ordre de publication, Passées par date de
-    // révélation la plus récente.
-    return tab === 'past'
-      ? new Date(b.reveal_at).getTime() - new Date(a.reveal_at).getTime()
-      : new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    // Défaut : ordre de publication, le plus récent en tête — les deux
+    // onglets mêlent maintenant révélés et non révélés, l'ordre de scellé
+    // reste le seul repère chronologique valable pour les deux à la fois.
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
   return (
@@ -295,22 +300,19 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.tabs}>
-        <Pressable onPress={() => setTab('past')} style={[styles.tab, tab === 'past' && styles.tabActive]}>
-          <Text style={[styles.tabText, tab === 'past' && styles.tabTextActive]}>Predict</Text>
-          {unreadPast > 0 && (
+        <Pressable onPress={() => setTab('feed')} style={[styles.tab, tab === 'feed' && styles.tabActive]}>
+          <Text style={[styles.tabText, tab === 'feed' && styles.tabTextActive]}>Fil</Text>
+          {unreadFeed > 0 && (
             <View style={styles.tabBadge}>
-              <Text style={styles.tabBadgeText}>{unreadPast > 99 ? '99+' : unreadPast}</Text>
+              <Text style={styles.tabBadgeText}>{unreadFeed > 99 ? '99+' : unreadFeed}</Text>
             </View>
           )}
         </Pressable>
-        <Pressable
-          onPress={() => setTab('upcoming')}
-          style={[styles.tab, tab === 'upcoming' && styles.tabActive]}
-        >
-          <Text style={[styles.tabText, tab === 'upcoming' && styles.tabTextActive]}>À venir</Text>
-          {unreadUpcoming > 0 && (
+        <Pressable onPress={() => setTab('mine')} style={[styles.tab, tab === 'mine' && styles.tabActive]}>
+          <Text style={[styles.tabText, tab === 'mine' && styles.tabTextActive]}>Mes Predicts</Text>
+          {unreadMine > 0 && (
             <View style={styles.tabBadge}>
-              <Text style={styles.tabBadgeText}>{unreadUpcoming > 99 ? '99+' : unreadUpcoming}</Text>
+              <Text style={styles.tabBadgeText}>{unreadMine > 99 ? '99+' : unreadMine}</Text>
             </View>
           )}
         </Pressable>
@@ -464,18 +466,22 @@ export default function HomeScreen() {
         ) : shown.length === 0 ? (
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>
-              {tab === 'upcoming' ? (
+              {tab === 'mine' ? (
                 <>
-                  Aucun <PredictWord /> en cours.
+                  Aucun <PredictWord /> écrit pour l’instant.
                 </>
               ) : (
-                'Rien de révélé pour l’instant.'
+                'Rien de ton Cercle pour l’instant.'
               )}
             </Text>
-            {tab === 'upcoming' && (
+            {tab === 'mine' ? (
               <Text style={styles.emptyText}>
                 Écris ce que tu vois venir pour quelqu’un de ton cercle, et choisis
                 quand ça se dévoile.
+              </Text>
+            ) : (
+              <Text style={styles.emptyText}>
+                Les Predicts de tes amis et de tes groupes apparaîtront ici.
               </Text>
             )}
           </View>
