@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   message: {
-    fontFamily: fonts.serifItalic,
+    fontFamily: fonts.bodyEmphasis,
     fontSize: 22,
     color: colors.text,
     textAlign: 'center',

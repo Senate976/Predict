@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
   },
   navButton: { paddingHorizontal: 10, paddingVertical: 4 },
   nav: { fontSize: 20, color: colors.text, fontWeight: '700' },
-  monthLabel: { fontFamily: fonts.serifItalic, fontSize: 18, color: colors.text },
+  monthLabel: { fontFamily: fonts.bodyEmphasis, fontSize: 18, color: colors.text },
   weekdayRow: { flexDirection: 'row' },
   weekday: {
     width: CELL_SIZE,

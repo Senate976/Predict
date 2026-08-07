@@ -632,7 +632,7 @@ const styles = StyleSheet.create({
   // `flexShrink` sur le bloc auteur ET sur le pseudo : c'est le pseudo qui se
   // tronque avec ellipse si la place manque, jamais le badge ni le menu.
   authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, minWidth: 0 },
-  authorName: { fontSize: 14, fontWeight: '600', color: colors.text, flexShrink: 1, minWidth: 0 },
+  authorName: { fontFamily: fonts.bodyEmphasis, fontSize: 14, color: colors.icon, flexShrink: 1, minWidth: 0 },
   // Sur sa propre ligne, sous l'en-tête — jamais accolée au pseudo.
   mentionTag: { fontSize: 12, fontWeight: '500', color: colors.textMuted, marginTop: -4, marginBottom: 10 },
   menuButton: { padding: 2 },
@@ -649,19 +649,19 @@ const styles = StyleSheet.create({
   // signalétique d'état, pour rester discret. `letterSpacing` + majuscules
   // plutôt que la graisse : c'est ce qui la distingue du corps, pas son poids.
   cardTeaser: {
-    fontFamily: fonts.mono,
-    fontSize: 11,
-    letterSpacing: 1,
+    fontFamily: fonts.label,
+    fontSize: 12,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
-    color: colors.textMuted,
+    color: colors.textFaint,
     marginBottom: 4,
   },
   // La vraie prédiction est le cœur de la carte : plus grande, plus foncée,
-  // en serif éditorial — jamais grisée, y compris floutée avant révélation
-  // (le flou matérialise déjà le secret, un texte terne en plus serait
-  // redondant et affaiblirait l'impact au moment où elle devient lisible).
+  // en gras marqué — jamais grisée, y compris floutée avant révélation (le
+  // flou matérialise déjà le secret, un texte terne en plus serait redondant
+  // et affaiblirait l'impact au moment où elle devient lisible).
   cardContent: {
-    fontFamily: fonts.serifItalic,
+    fontFamily: fonts.bodyEmphasis,
     fontSize: 18,
     color: colors.text,
     lineHeight: 25,
@@ -690,7 +690,7 @@ const styles = StyleSheet.create({
   quickVotePillText: { fontSize: 13, fontWeight: '700', color: colors.text },
   voteError: { fontSize: 12, color: colors.danger, marginTop: 8 },
   voteLink: { marginTop: 10 },
-  voteLinkText: { fontSize: 13, fontWeight: '600', color: colors.text, textDecorationLine: 'underline' },
+  voteLinkText: { fontFamily: fonts.bodyEmphasis, fontSize: 13, color: colors.text },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',

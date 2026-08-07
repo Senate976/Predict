@@ -581,11 +581,9 @@ const styles = StyleSheet.create({
   },
   tabBadgeText: { fontSize: 10, fontWeight: '700', color: '#FFFFFF' },
   tabText: {
-    fontFamily: fonts.sansBold,
-    fontSize: 12,
-    letterSpacing: 0.5,
-    color: colors.textMuted,
-    textTransform: 'uppercase',
+    fontFamily: fonts.bodyEmphasis,
+    fontSize: 14,
+    color: colors.icon,
   },
   tabTextActive: { color: colors.text },
   filtersRow: {

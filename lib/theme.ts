@@ -75,40 +75,41 @@ export const spacing = {
 } as const;
 
 /**
- * `display` (Playfair Display, serif) : réservée au titre principal du Fil,
- * au mot-symbole « Predict » et aux grands en-têtes de page — jamais aux
- * boutons, onglets ou titres de carte. `serifItalic` (Playfair Display
- * italique) : gros texte éditorial (teaser/contenu à l'ouverture d'un
- * Predict, pull-quotes, verdict). `serif`/`serifSemiBold` (Plus Jakarta
- * Sans) : corps de texte courant. `sansBold` (Plus Jakarta Sans gras) :
- * titres de carte, boutons, onglets — tout ce qui doit rester très lisible.
- * Chaque nom doit correspondre exactement à la clé passée à `useFonts` dans
- * `app/_layout.tsx`, faute de quoi React Native retombe silencieusement sur
- * la police système.
+ * Une seule famille pour tout le site — Plus Jakarta Sans, en 5 graisses —
+ * jamais de serif ni de monospace : c'est la police, pas la graisse ou la
+ * taille, qui doit rester identique partout pour un rendu fluide façon
+ * éditorial moderne.
+ *
+ * `display` (ExtraBold) : logo, mot-symbole « Predict », grands en-têtes de
+ * page. `bodyEmphasis` (SemiBold) : gros texte éditorial mis en avant (corps
+ * de la prédiction, pseudo de profil, pull-quotes, verdict) — jamais grisé,
+ * c'est l'élément qu'on doit remarquer en premier. `sansBold` (Bold) : titres
+ * de carte, boutons, onglets. `body` (Regular) : texte courant, police par
+ * défaut de `<Text>`/`<TextInput>`. `label` (Medium) : métadonnées et
+ * étiquettes d'état — toujours petites, majuscules, trackées, jamais le
+ * texte courant. Chaque nom doit correspondre exactement à la clé passée à
+ * `useFonts` dans `app/_layout.tsx`, faute de quoi React Native retombe
+ * silencieusement sur la police système.
  */
 export const fonts = {
-  display: 'PlayfairDisplay_700Bold',
-  serifItalic: 'PlayfairDisplay_600SemiBold_Italic',
-  serif: 'PlusJakartaSans_400Regular',
-  serifSemiBold: 'PlusJakartaSans_600SemiBold',
+  display: 'PlusJakartaSans_800ExtraBold',
+  bodyEmphasis: 'PlusJakartaSans_600SemiBold',
   sansBold: 'PlusJakartaSans_700Bold',
-  // Réservée à la signalétique d'état des Predicts (compte à rebours,
-  // `[ RESOLVED ]`, `[ LIVE ]`...) — jamais au texte courant, c'est un
-  // registre volontairement « données/terminal », pas éditorial.
-  mono: 'JetBrainsMono_600SemiBold',
+  body: 'PlusJakartaSans_400Regular',
+  label: 'PlusJakartaSans_500Medium',
 } as const;
 
 /**
- * Style partagé pour les petits libellés de section (« TEASER »,
- * « VOS SCELLÉS »...) : majuscules, tracking marqué, épuré. Référence visuelle
- * globale — tous les écrans l'utilisent au lieu de coder leur propre variante.
- * Un objet exporté plutôt qu'un composant : il se glisse tel quel dans un
- * tableau de `style`, sans imposer de structure JSX.
+ * Style partagé pour les petites étiquettes de métadonnées (« TEASER »,
+ * « VOS SCELLÉS »...) : Medium, majuscules, tracking très marqué, toujours
+ * petit. Référence visuelle globale — tous les écrans l'utilisent au lieu de
+ * coder leur propre variante. Un objet exporté plutôt qu'un composant : il se
+ * glisse tel quel dans un tableau de `style`, sans imposer de structure JSX.
  */
 export const eyebrow = {
-  fontSize: 11,
-  fontWeight: '700' as const,
-  letterSpacing: 1.6,
+  fontFamily: fonts.label,
+  fontSize: 12,
+  letterSpacing: 2,
   textTransform: 'uppercase' as const,
   color: colors.textFaint,
 };

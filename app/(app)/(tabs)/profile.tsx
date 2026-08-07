@@ -325,15 +325,14 @@ const styles = StyleSheet.create({
   avatarWrap: { alignItems: 'center' },
   avatarEditLoader: { marginTop: 8 },
   avatarEditText: {
+    fontFamily: fonts.sansBold,
     color: colors.text,
     fontSize: 12,
-    fontWeight: '700',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
-    textDecorationLine: 'underline',
     marginTop: 8,
   },
-  username: { fontFamily: fonts.serifItalic, fontSize: 22, color: colors.text, marginTop: 6 },
+  username: { fontFamily: fonts.bodyEmphasis, fontSize: 22, color: colors.text, marginTop: 6 },
   email: { fontSize: 13, color: colors.textFaint, marginTop: 4 },
   loader: { marginTop: 24 },
   modalOverlay: {

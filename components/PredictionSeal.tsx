@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
   ornamentLeft: { left: 8, top: '48%' },
   ornamentRight: { right: 8, top: '48%' },
   emblem: {
-    fontFamily: fonts.serif,
+    fontFamily: fonts.body,
     fontSize: 34,
     color: '#C9A66B',
   },
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   label: {
-    fontFamily: fonts.serifItalic,
+    fontFamily: fonts.bodyEmphasis,
     fontSize: 17,
     color: '#D8C6A1',
     marginTop: 30,

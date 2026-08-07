@@ -14,7 +14,7 @@ import {
   type Comment,
 } from '../lib/comments';
 import { formatTimeAgo } from '../lib/datetime';
-import { colors, radius } from '../lib/theme';
+import { colors, fonts, radius } from '../lib/theme';
 import { Avatar } from './Avatar';
 
 /**
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
     borderLeftColor: colors.border,
   },
   showMore: { alignSelf: 'flex-start', marginBottom: 2 },
-  showMoreText: { fontSize: 12, fontWeight: '600', color: colors.text, textDecorationLine: 'underline' },
+  showMoreText: { fontFamily: fonts.bodyEmphasis, fontSize: 12, color: colors.text },
   commentTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   commentAuthorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', flexShrink: 1 },
   commentAuthor: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
   commentContent: { fontSize: 14, color: colors.text, marginTop: 4, lineHeight: 19 },
   replyMention: { fontWeight: '700', color: colors.text },
   replyLink: { alignSelf: 'flex-start', marginTop: 4 },
-  replyLinkText: { fontSize: 11, fontWeight: '600', color: colors.text, textDecorationLine: 'underline' },
+  replyLinkText: { fontFamily: fonts.bodyEmphasis, fontSize: 11, color: colors.text },
   replyingBox: {
     flexDirection: 'row',
     alignItems: 'center',
