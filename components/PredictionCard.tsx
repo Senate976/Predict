@@ -17,7 +17,6 @@ import { Text } from './Text';
 
 import { ConfidenceGauge } from './ConfidenceGauge';
 import { fetchCommentCount } from '../lib/comments';
-import { formatCountdown } from '../lib/datetime';
 import {
   beliefPercentage,
   castEmojiReaction,
@@ -107,7 +106,6 @@ export function PredictionCard({
   const [localVote, setLocalVote] = useState<'believe' | 'disbelieve' | null>(null);
   const [voting, setVoting] = useState(false);
   const [voteError, setVoteError] = useState<string | null>(null);
-  const revealAt = new Date(item.reveal_at);
   const revealed = isRevealed(item, now);
   const isAuthor = item.author_id === userId;
 
@@ -349,19 +347,6 @@ export function PredictionCard({
 
           <View style={styles.headerSpacer} />
 
-          {!verdict && !revealed && (
-            <Text style={styles.badgeText} numberOfLines={1}>
-              {item.open_ended ? 'En temps voulu' : formatCountdown(revealAt, now)}
-            </Text>
-          )}
-          {/* Révélée mais sans majorité encore formée (aucun vote, ou égalité)
-              — sans ça, l'en-tête restait vide sur l'onglet Predict alors que
-              la prédiction est bien révélée. */}
-          {!verdict && revealed && (
-            <Text style={styles.badgeText} numberOfLines={1}>
-              Révélée
-            </Text>
-          )}
           {verdict && (
             // Liseré très discret sur le bord gauche plutôt qu'une pastille
             // pleine — juste de quoi confirmer le sens du mot d'un coup d'œil.
