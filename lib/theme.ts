@@ -92,6 +92,10 @@ export const fonts = {
   serif: 'PlusJakartaSans_400Regular',
   serifSemiBold: 'PlusJakartaSans_600SemiBold',
   sansBold: 'PlusJakartaSans_700Bold',
+  // Réservée à la signalétique d'état des Predicts (compte à rebours,
+  // `[ RESOLVED ]`, `[ LIVE ]`...) — jamais au texte courant, c'est un
+  // registre volontairement « données/terminal », pas éditorial.
+  mono: 'JetBrainsMono_600SemiBold',
 } as const;
 
 /**

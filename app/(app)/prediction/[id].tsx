@@ -1,3 +1,4 @@
+import { BlurView } from 'expo-blur';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
@@ -18,6 +19,7 @@ import { ConfidenceGauge } from '../../../components/ConfidenceGauge';
 import { CreateFab } from '../../../components/CreateFab';
 import { InlineComments } from '../../../components/InlineComments';
 import { PredictWord } from '../../../components/PredictWord';
+import { PredictionStatusIndicator, resolveTimingStatus } from '../../../components/PredictionStatusIndicator';
 import { useAuth } from '../../../lib/auth';
 import { formatAdvance, formatShortDateTime } from '../../../lib/datetime';
 import { fetchFriendships, otherProfile, type FriendProfile } from '../../../lib/friends';
@@ -214,6 +216,12 @@ export default function PredictionDetailScreen() {
 
   const isAuthor = prediction && userId && prediction.author_id === userId;
   const revealed = prediction ? isRevealed(prediction, new Date()) : false;
+  const timingStatus = prediction ? resolveTimingStatus(prediction, revealed) : null;
+  // Même règle que sur la carte du Fil : le badge Réalisé/Manqué (affiché
+  // plus bas, dans le bloc verdict) remplace la signalétique d'état une fois
+  // qu'une majorité s'est formée — jamais les deux à la fois.
+  const hasVerdict =
+    !!prediction && !prediction.is_immediate && !!outcome && outcome.final_status !== 'pending';
   // Écart entre le scellé et la révélation — juste informatif, pour souligner
   // à quel point la prédiction a été anticipée. Sans objet pour une prédiction
   // « ouverte » : `reveal_at` n'y porte qu'un repère technique lointain.
@@ -244,16 +252,29 @@ export default function PredictionDetailScreen() {
           <ActivityIndicator color={colors.text} style={styles.loader} />
         ) : prediction ? (
           <>
-            {author && (
-              <Pressable
-                onPress={() => router.push(`/profile/${prediction.author_id}`)}
-                style={styles.authorBlock}
-                hitSlop={4}
-              >
-                <Avatar url={author.avatar_url} username={author.username} size={28} />
-                <Text style={styles.authorName}>{author.username}</Text>
-              </Pressable>
-            )}
+            <View style={styles.authorRow}>
+              {author && (
+                <Pressable
+                  onPress={() => router.push(`/profile/${prediction.author_id}`)}
+                  style={styles.authorBlock}
+                  hitSlop={4}
+                >
+                  <Avatar url={author.avatar_url} username={author.username} size={28} />
+                  <Text style={styles.authorName}>{author.username}</Text>
+                </Pressable>
+              )}
+              <View style={styles.authorRowSpacer} />
+              {/* Même signalétique d'état que dans le Fil (SVG + micro-typo
+                  monospace), pour que l'écran détail et les cartes parlent le
+                  même langage visuel. */}
+              {timingStatus && !hasVerdict && (
+                <PredictionStatusIndicator
+                  status={timingStatus}
+                  revealAt={new Date(prediction.reveal_at)}
+                  now={new Date()}
+                />
+              )}
+            </View>
 
             <View style={styles.categoryBadge}>
               <Text style={styles.categoryBadgeText}>{CATEGORY_LABEL[prediction.category]}</Text>
@@ -285,7 +306,17 @@ export default function PredictionDetailScreen() {
             <View style={styles.contentHero}>
               {(revealed || isAuthor) && prediction.content ? (
                 <>
-                  <Text style={styles.contentHeroText}>{prediction.content}</Text>
+                  {/* Flouté tant que non révélée : seul l'auteur voit son
+                      propre texte à ce stade (RLS), le flou rappelle que ce
+                      contenu reste scellé pour tout le monde d'autre. */}
+                  {revealed || prediction.is_immediate ? (
+                    <Text style={styles.contentHeroText}>{prediction.content}</Text>
+                  ) : (
+                    <View style={styles.blurWrap}>
+                      <Text style={styles.contentHeroText}>{prediction.content}</Text>
+                      <BlurView intensity={35} tint="light" style={StyleSheet.absoluteFill} />
+                    </View>
+                  )}
                   {prediction.audio_path && (
                     <View style={styles.audioRow}>
                       <AudioPlayerButton path={prediction.audio_path} />
@@ -511,7 +542,9 @@ const styles = StyleSheet.create({
   loader: { marginTop: 24 },
   eyebrow: { ...eyebrow },
   eyebrowSmall: { ...eyebrow, fontSize: 10 },
-  authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginBottom: 12 },
+  authorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  authorRowSpacer: { flex: 1, minWidth: 8 },
+  authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, minWidth: 0 },
   authorName: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
   // La catégorie n'apparaît plus sur la carte du Fil — seulement ici, une
   // fois le Predict ouvert. Jaune réservé aux éléments interactifs majeurs :
@@ -552,6 +585,7 @@ const styles = StyleSheet.create({
     lineHeight: 30,
     textAlign: 'center',
   },
+  blurWrap: { overflow: 'hidden', borderRadius: radius.sm, alignSelf: 'stretch' },
   audioRow: { marginTop: 16 },
   sealedHint: {
     fontSize: 14,

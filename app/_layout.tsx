@@ -1,3 +1,4 @@
+import { JetBrainsMono_600SemiBold } from '@expo-google-fonts/jetbrains-mono';
 import {
   PlayfairDisplay_600SemiBold_Italic,
   PlayfairDisplay_700Bold,
@@ -62,6 +63,7 @@ export default function RootLayout() {
     PlusJakartaSans_700Bold,
     PlayfairDisplay_700Bold,
     PlayfairDisplay_600SemiBold_Italic,
+    JetBrainsMono_600SemiBold,
   });
 
   if (!fontsLoaded) {
