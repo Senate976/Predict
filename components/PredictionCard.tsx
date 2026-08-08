@@ -315,9 +315,9 @@ export function PredictionCard({
           haut, en dehors de la zone tappable et à cheval sur le padding de la
           carte (marges négatives) pour occuper toute sa largeur et venir
           affleurer ses coins arrondis — `overflow: hidden` sur la carte fait
-          le reste. Trois cellules de largeur égale, comme le pied de carte
-          plus bas, pour que le libellé central reste centré même quand une
-          cellule (compte à rebours) est vide de l'autre côté. */}
+          le reste. Rien d'autre que le libellé (plus l'icône pour Scellé) :
+          le compte à rebours de révélation vit désormais dans sa propre bulle
+          plus bas, à droite de l'en-tête de carte. */}
       <View
         style={[
           styles.statusBanner,
@@ -327,35 +327,23 @@ export function PredictionCard({
           statusBanner.kind === 'missed' && styles.statusBannerMissed,
         ]}
       >
-        <View style={styles.statusBannerSide} />
-        <View style={styles.statusBannerCenter}>
-          {statusBanner.kind === 'sealed' && (
-            <Lock size={11} color={colors.gold} strokeWidth={2} style={styles.statusBannerIcon} />
-          )}
-          <Text
-            style={[
-              styles.statusBannerText,
-              statusBanner.kind === 'sealed' && styles.statusBannerTextSealed,
-              statusBanner.kind === 'missed' && styles.statusBannerTextMissed,
-            ]}
-            numberOfLines={1}
-          >
-            {statusBanner.label}
-          </Text>
-        </View>
-        <View style={[styles.statusBannerSide, styles.statusBannerSideRight]}>
-          {statusBanner.extra && (
-            <View style={styles.statusBannerBubble}>
-              <Text style={styles.statusBannerBubbleText} numberOfLines={1}>
-                {statusBanner.extra}
-              </Text>
-            </View>
-          )}
-        </View>
+        {statusBanner.kind === 'sealed' && (
+          <Lock size={11} color={colors.gold} strokeWidth={2} style={styles.statusBannerIcon} />
+        )}
+        <Text
+          style={[
+            styles.statusBannerText,
+            statusBanner.kind === 'sealed' && styles.statusBannerTextSealed,
+            statusBanner.kind === 'missed' && styles.statusBannerTextMissed,
+          ]}
+        >
+          {statusBanner.label}
+        </Text>
       </View>
 
       <Pressable onPress={() => onPress?.()} style={({ pressed }) => pressed && styles.cardPressed}>
-        {/* Une seule ligne : [avatar][pseudo] ...espace flexible... */}
+        {/* Une seule ligne : [avatar][pseudo] ...espace flexible... [bulle de
+            révélation, si programmée et pas encore révélée]. */}
         <View style={styles.cardHeader}>
           {authorLabel && (
             <Pressable
@@ -371,6 +359,14 @@ export function PredictionCard({
           )}
 
           <View style={styles.headerSpacer} />
+
+          {statusBanner.extra && (
+            <View style={styles.revealBubble}>
+              <Text style={styles.revealBubbleText} numberOfLines={1}>
+                {statusBanner.extra}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Sur sa propre ligne, jamais accolée au pseudo — la liste complète
@@ -398,14 +394,18 @@ export function PredictionCard({
             gauche et la poubelle à droite, plutôt que plaqué au bord. */}
         <View style={styles.footerCellLeft}>
           {/* Sobre quand il n'y a rien à voir ; icône plus marquée et chiffre
-              en gras noir dès qu'il y a au moins un commentaire. */}
+              en gras noir dès qu'il y a au moins un commentaire. Taille
+              d'icône et boîte (`iconSlot`) identiques partout dans le pied de
+              carte pour que les cinq icônes s'alignent sur la même ligne. */}
           <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
-            <MessageCircle
-              size={17}
-              color={(commentCount ?? 0) > 0 ? colors.icon : colors.textFaint}
-              strokeWidth={1.75}
-              fill={commentsOpen ? colors.icon : 'none'}
-            />
+            <View style={styles.iconSlot}>
+              <MessageCircle
+                size={17}
+                color={(commentCount ?? 0) > 0 ? colors.icon : colors.textFaint}
+                strokeWidth={1.75}
+                fill={commentsOpen ? colors.icon : 'none'}
+              />
+            </View>
             {(commentCount ?? 0) > 0 && (
               <Text style={styles.commentsToggleText}>{commentCount}</Text>
             )}
@@ -414,9 +414,9 @@ export function PredictionCard({
           {/* Favori : étoile pleine dès qu'activée, discrète sinon — remis en
               icône directe plutôt que caché dans un menu, pour un accès en un
               tap comme le commentaire et la réaction juste à côté. */}
-          <Pressable onPress={handleToggleFavorite} hitSlop={8}>
+          <Pressable onPress={handleToggleFavorite} hitSlop={8} style={styles.iconSlot}>
             <Star
-              size={16}
+              size={17}
               color={isFavorite ? colors.gold : colors.textFaint}
               fill={isFavorite ? colors.gold : 'none'}
               strokeWidth={1.75}
@@ -432,7 +432,7 @@ export function PredictionCard({
               de qui a réagi avec quoi, sans interférer avec le geste du pouce. */}
           <View style={styles.reactionTriggerRow}>
             <View style={styles.reactionTriggerWrap}>
-              <View style={styles.reactionTrigger} hitSlop={8} {...panResponder.panHandlers}>
+              <View style={[styles.reactionTrigger, styles.iconSlot]} hitSlop={8} {...panResponder.panHandlers}>
                 {myEmoji ? (
                   <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
                 ) : (
@@ -480,11 +480,11 @@ export function PredictionCard({
         <View style={styles.footerCellRight}>
           {/* Masquer : préférence personnelle (comme le favori), pas réservée
               à l'auteur — remis en icône directe pour le même accès rapide. */}
-          <Pressable onPress={handleToggleHidden} hitSlop={8}>
+          <Pressable onPress={handleToggleHidden} hitSlop={8} style={styles.iconSlot}>
             {isHidden ? (
-              <Eye size={16} color={colors.icon} strokeWidth={1.75} />
+              <Eye size={17} color={colors.icon} strokeWidth={1.75} />
             ) : (
-              <EyeOff size={16} color={colors.textFaint} strokeWidth={1.75} />
+              <EyeOff size={17} color={colors.textFaint} strokeWidth={1.75} />
             )}
           </Pressable>
 
@@ -492,7 +492,7 @@ export function PredictionCard({
               d'abord (la RLS `predictions_delete_own` ne l'a jamais exigé,
               seule l'UI le faisait) : à tout moment sur son propre Predict. */}
           {isAuthor && onDelete && (
-            <Pressable onPress={handleDeletePress} hitSlop={8}>
+            <Pressable onPress={handleDeletePress} hitSlop={8} style={styles.iconSlot}>
               <Trash2 size={17} color={colors.icon} strokeWidth={1.75} />
             </Pressable>
           )}
@@ -573,56 +573,50 @@ const styles = StyleSheet.create({
   // Bandeau d'état : toute la largeur de la carte, tout en haut — les marges
   // négatives annulent le padding de la carte sur les 3 côtés concernés,
   // `overflow: hidden` sur la carte fait le reste pour les coins arrondis.
-  // Trois cellules de largeur égale (comme le pied de carte plus bas) pour
-  // garder le libellé central vraiment centré, que la cellule de droite
-  // porte un compte à rebours ou reste vide.
+  // Rien qu'un libellé centré (plus l'icône pour Scellé) : plus de compte à
+  // rebours à partager la largeur, il vit désormais dans sa propre bulle.
   statusBanner: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: -18,
     marginHorizontal: -18,
     marginBottom: 12,
     paddingVertical: 6,
     paddingHorizontal: 10,
   },
-  statusBannerSide: { flex: 1 },
-  statusBannerSideRight: { alignItems: 'flex-end' },
-  statusBannerCenter: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   statusBannerIcon: { marginRight: 4 },
-  // Tous les fonds de bandeau à 75% d'opacité (charte) — Manqué garde sa
-  // teinte magenta de marque, seul le mot « Manqué » se grise, pas le fond.
-  statusBannerSealed: { backgroundColor: 'rgba(43, 43, 43, 0.75)' },
-  statusBannerActive: { backgroundColor: 'rgba(250, 204, 21, 0.75)' },
-  statusBannerRealized: { backgroundColor: 'rgba(54, 168, 160, 0.75)' },
-  statusBannerMissed: { backgroundColor: 'rgba(156, 29, 110, 0.75)' },
-  // `flexShrink` (et non 0) : quand la cellule de droite porte un compte à
-  // rebours, le libellé central doit pouvoir se tronquer plutôt que déborder
-  // dessus — la date de scellé reste lisible même sur un écran étroit. Noir
-  // par défaut (en cours / réalisé) ; le scellé, seul état sur fond sombre,
-  // s'éclaircit via `statusBannerTextSealed` ; le manqué grise via
-  // `statusBannerTextMissed` tout en gardant son fond magenta.
+  // Tous les fonds de bandeau à 65% d'opacité (charte) — Manqué garde sa
+  // teinte magenta de marque, seul le mot « Manqué » se blanchit, pas le fond.
+  statusBannerSealed: { backgroundColor: 'rgba(43, 43, 43, 0.65)' },
+  statusBannerActive: { backgroundColor: 'rgba(250, 204, 21, 0.65)' },
+  statusBannerRealized: { backgroundColor: 'rgba(54, 168, 160, 0.65)' },
+  statusBannerMissed: { backgroundColor: 'rgba(156, 29, 110, 0.65)' },
+  // Le libellé n'a plus de voisin à partager avec dans le bandeau : plus de
+  // troncature, la date complète reste toujours visible. Noir par défaut (en
+  // cours / réalisé) ; Scellé et Manqué, les deux fonds les plus soutenus,
+  // passent en blanc via `statusBannerTextSealed`/`statusBannerTextMissed`.
   statusBannerText: {
-    flexShrink: 1,
-    minWidth: 0,
     textAlign: 'center',
     fontFamily: fonts.label,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     color: colors.text,
   },
-  statusBannerTextSealed: { color: colors.bannerSealedText },
-  statusBannerTextMissed: { color: colors.textFaint },
-  // Toujours sur fond anthracite (seul état à porter cette cellule).
-  // Bulle distincte plutôt qu'un texte se fondant dans le bandeau — la date
-  // de révélation reste une information à part, pas une suite du libellé.
-  statusBannerBubble: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  statusBannerTextSealed: { color: colors.bannerTextOnDark },
+  statusBannerTextMissed: { color: colors.bannerTextOnDark },
+  // Bulle de révélation, désormais dans l'en-tête de carte (plus dans le
+  // bandeau) — fond clair assorti à la carte blanche, plus la teinte
+  // translucide pensée pour un fond sombre.
+  revealBubble: {
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: radius.pill,
     paddingHorizontal: 8,
-    paddingVertical: 2,
-    marginRight: 8,
+    paddingVertical: 3,
   },
-  statusBannerBubbleText: { fontSize: 11, fontWeight: '600', color: colors.bannerSealedText },
+  revealBubbleText: { fontSize: 11, fontFamily: fonts.label, color: colors.textMuted },
   // Tout sur une seule ligne : [avatar 32][pseudo] ...espace flexible...
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   headerSpacer: { flex: 1, minWidth: 8 },
@@ -708,6 +702,11 @@ const styles = StyleSheet.create({
   footerCellLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 16 },
   footerCellCenter: { flex: 1, alignItems: 'center' },
   footerCellRight: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 16 },
+  // Boîte identique (taille + centrage) pour chacune des cinq icônes du pied
+  // de carte (commentaire, favori, pouce, œil, poubelle) : sans elle, des
+  // icônes Lucide de tailles ou de fonds différents (le pouce porte parfois
+  // un emoji texte à la place) ne s'alignaient pas visuellement entre elles.
+  iconSlot: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
   commentsToggle: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   // Affiché seulement s'il y a au moins un commentaire — donc toujours en
   // gras noir : c'est une interaction réelle, pas un zéro décoratif.
