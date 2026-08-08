@@ -388,115 +388,110 @@ export function PredictionCard({
         )}
       </Pressable>
 
+      {/* Une seule rangée, espacement régulier (`space-between`) entre les
+          icônes elles-mêmes plutôt que trois blocs groupés à gauche/centre/
+          droite — ces blocs créaient des écarts très inégaux (serré entre
+          commentaire et favori, immense jusqu'au pouce). Taille d'icône et
+          boîte (`iconSlot`) identiques partout pour que les cinq icônes
+          restent alignées sur une même ligne. */}
       <View style={styles.footerRow}>
-        {/* Trois colonnes de largeur égale — le pouce reste ainsi centré sur
-            la carte quel que soit l'espace pris par les commentaires à
-            gauche et la poubelle à droite, plutôt que plaqué au bord. */}
-        <View style={styles.footerCellLeft}>
-          {/* Sobre quand il n'y a rien à voir ; icône plus marquée et chiffre
-              en gras noir dès qu'il y a au moins un commentaire. Taille
-              d'icône et boîte (`iconSlot`) identiques partout dans le pied de
-              carte pour que les cinq icônes s'alignent sur la même ligne. */}
-          <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
-            <View style={styles.iconSlot}>
-              <MessageCircle
-                size={17}
-                color={(commentCount ?? 0) > 0 ? colors.icon : colors.textFaint}
-                strokeWidth={1.75}
-                fill={commentsOpen ? colors.icon : 'none'}
-              />
-            </View>
-            {(commentCount ?? 0) > 0 && (
-              <Text style={styles.commentsToggleText}>{commentCount}</Text>
-            )}
-          </Pressable>
-
-          {/* Favori : étoile pleine dès qu'activée, discrète sinon — remis en
-              icône directe plutôt que caché dans un menu, pour un accès en un
-              tap comme le commentaire et la réaction juste à côté. */}
-          <Pressable onPress={handleToggleFavorite} hitSlop={8} style={styles.iconSlot}>
-            <Star
+        {/* Sobre quand il n'y a rien à voir ; icône plus marquée et chiffre
+            en gras noir dès qu'il y a au moins un commentaire. */}
+        <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
+          <View style={styles.iconSlot}>
+            <MessageCircle
               size={17}
-              color={isFavorite ? colors.gold : colors.textFaint}
-              fill={isFavorite ? colors.gold : 'none'}
+              color={(commentCount ?? 0) > 0 ? colors.icon : colors.textFaint}
               strokeWidth={1.75}
+              fill={commentsOpen ? colors.icon : 'none'}
             />
-          </Pressable>
-        </View>
+          </View>
+          {(commentCount ?? 0) > 0 && (
+            <Text style={styles.commentsToggleText}>{commentCount}</Text>
+          )}
+        </Pressable>
 
-        <View style={styles.footerCellCenter}>
-          {/* Discret, façon Facebook : un pouce en filigrane (ou l'emoji déjà
-              choisi) — maintenir le doigt fait apparaître la bulle de
-              réactions au-dessus, la faire glisser dessus en sélectionne une.
-              Le chiffre est un bouton à part : un tap dessus ouvre le détail
-              de qui a réagi avec quoi, sans interférer avec le geste du pouce. */}
-          <View style={styles.reactionTriggerRow}>
-            <View style={styles.reactionTriggerWrap}>
-              <View style={[styles.reactionTrigger, styles.iconSlot]} hitSlop={8} {...panResponder.panHandlers}>
-                {myEmoji ? (
-                  <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
-                ) : (
-                  <ThumbsUp size={17} color={totalReactions > 0 ? colors.icon : colors.textFaint} strokeWidth={1.75} />
-                )}
-              </View>
+        {/* Favori : étoile pleine dès qu'activée, discrète sinon — remis en
+            icône directe plutôt que caché dans un menu, pour un accès en un
+            tap comme le commentaire et la réaction juste à côté. */}
+        <Pressable onPress={handleToggleFavorite} hitSlop={8} style={styles.iconSlot}>
+          <Star
+            size={17}
+            color={isFavorite ? colors.gold : colors.textFaint}
+            fill={isFavorite ? colors.gold : 'none'}
+            strokeWidth={1.75}
+          />
+        </Pressable>
 
-              {emojiPanelOpen && (
-                <View
-                  ref={panelRef}
-                  style={styles.emojiPanel}
-                  onLayout={() => {
-                    panelRef.current?.measureInWindow((x, y, width, height) => {
-                      panelLayoutRef.current = { x, y, width, height };
-                    });
-                  }}
-                >
-                  {EMOJI_REACTIONS.map((emoji, i) => (
-                    <Animated.View key={emoji} style={{ transform: [{ scale: scaleAnims[i] }] }}>
-                      {/* Un tap direct sur un emoji le sélectionne toujours,
-                          indépendamment du glissé : sans ça, un utilisateur qui
-                          relâche le pouce puis tape un emoji comme un bouton
-                          normal (au lieu de glisser sans relâcher, à la
-                          Facebook) ne déclenchait jamais rien. */}
-                      <Pressable
-                        onPress={() => handleEmojiPress(emoji)}
-                        style={[styles.emojiBubbleItem, myEmoji === emoji && styles.emojiBubbleItemActive]}
-                        hitSlop={4}
-                      >
-                        <Text style={styles.emojiButtonText}>{emoji}</Text>
-                      </Pressable>
-                    </Animated.View>
-                  ))}
-                </View>
+        {/* Discret, façon Facebook : un pouce en filigrane (ou l'emoji déjà
+            choisi) — maintenir le doigt fait apparaître la bulle de
+            réactions au-dessus, la faire glisser dessus en sélectionne une.
+            Le chiffre est un bouton à part : un tap dessus ouvre le détail
+            de qui a réagi avec quoi, sans interférer avec le geste du pouce. */}
+        <View style={styles.reactionTriggerRow}>
+          <View style={styles.reactionTriggerWrap}>
+            <View style={[styles.reactionTrigger, styles.iconSlot]} hitSlop={8} {...panResponder.panHandlers}>
+              {myEmoji ? (
+                <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
+              ) : (
+                <ThumbsUp size={17} color={totalReactions > 0 ? colors.icon : colors.textFaint} strokeWidth={1.75} />
               )}
             </View>
-            {totalReactions > 0 && (
-              <Pressable onPress={openReactors} hitSlop={8}>
-                <Text style={styles.reactionTriggerCount}>{totalReactions}</Text>
-              </Pressable>
+
+            {emojiPanelOpen && (
+              <View
+                ref={panelRef}
+                style={styles.emojiPanel}
+                onLayout={() => {
+                  panelRef.current?.measureInWindow((x, y, width, height) => {
+                    panelLayoutRef.current = { x, y, width, height };
+                  });
+                }}
+              >
+                {EMOJI_REACTIONS.map((emoji, i) => (
+                  <Animated.View key={emoji} style={{ transform: [{ scale: scaleAnims[i] }] }}>
+                    {/* Un tap direct sur un emoji le sélectionne toujours,
+                        indépendamment du glissé : sans ça, un utilisateur qui
+                        relâche le pouce puis tape un emoji comme un bouton
+                        normal (au lieu de glisser sans relâcher, à la
+                        Facebook) ne déclenchait jamais rien. */}
+                    <Pressable
+                      onPress={() => handleEmojiPress(emoji)}
+                      style={[styles.emojiBubbleItem, myEmoji === emoji && styles.emojiBubbleItemActive]}
+                      hitSlop={4}
+                    >
+                      <Text style={styles.emojiButtonText}>{emoji}</Text>
+                    </Pressable>
+                  </Animated.View>
+                ))}
+              </View>
             )}
           </View>
-        </View>
-
-        <View style={styles.footerCellRight}>
-          {/* Masquer : préférence personnelle (comme le favori), pas réservée
-              à l'auteur — remis en icône directe pour le même accès rapide. */}
-          <Pressable onPress={handleToggleHidden} hitSlop={8} style={styles.iconSlot}>
-            {isHidden ? (
-              <Eye size={17} color={colors.icon} strokeWidth={1.75} />
-            ) : (
-              <EyeOff size={17} color={colors.textFaint} strokeWidth={1.75} />
-            )}
-          </Pressable>
-
-          {/* Suppression réservée à l'auteur — plus la peine de révéler
-              d'abord (la RLS `predictions_delete_own` ne l'a jamais exigé,
-              seule l'UI le faisait) : à tout moment sur son propre Predict. */}
-          {isAuthor && onDelete && (
-            <Pressable onPress={handleDeletePress} hitSlop={8} style={styles.iconSlot}>
-              <Trash2 size={17} color={colors.icon} strokeWidth={1.75} />
+          {totalReactions > 0 && (
+            <Pressable onPress={openReactors} hitSlop={8}>
+              <Text style={styles.reactionTriggerCount}>{totalReactions}</Text>
             </Pressable>
           )}
         </View>
+
+        {/* Masquer : préférence personnelle (comme le favori), pas réservée
+            à l'auteur — remis en icône directe pour le même accès rapide. */}
+        <Pressable onPress={handleToggleHidden} hitSlop={8} style={styles.iconSlot}>
+          {isHidden ? (
+            <Eye size={17} color={colors.icon} strokeWidth={1.75} />
+          ) : (
+            <EyeOff size={17} color={colors.textFaint} strokeWidth={1.75} />
+          )}
+        </Pressable>
+
+        {/* Suppression réservée à l'auteur — plus la peine de révéler
+            d'abord (la RLS `predictions_delete_own` ne l'a jamais exigé,
+            seule l'UI le faisait) : à tout moment sur son propre Predict. */}
+        {isAuthor && onDelete && (
+          <Pressable onPress={handleDeletePress} hitSlop={8} style={styles.iconSlot}>
+            <Trash2 size={17} color={colors.icon} strokeWidth={1.75} />
+          </Pressable>
+        )}
       </View>
 
       {commentsOpen && (
@@ -691,17 +686,15 @@ const styles = StyleSheet.create({
   },
   emojiBubbleItemActive: { backgroundColor: colors.goldSoft },
   emojiButtonText: { fontSize: 20 },
+  // `space-between` répartit l'espace disponible à parts égales entre les
+  // icônes elles-mêmes (et non entre des blocs groupés) — sinon les écarts
+  // entre commentaire/favori/pouce/œil/poubelle restent très inégaux.
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginTop: 10,
   },
-  // Trois cellules de largeur égale : le pouce (cellule centrale) reste ainsi
-  // centré sur la carte quels que soient la largeur des commentaires à
-  // gauche et la présence ou non de la poubelle à droite.
-  footerCellLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 16 },
-  footerCellCenter: { flex: 1, alignItems: 'center' },
-  footerCellRight: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 16 },
   // Boîte identique (taille + centrage) pour chacune des cinq icônes du pied
   // de carte (commentaire, favori, pouce, œil, poubelle) : sans elle, des
   // icônes Lucide de tailles ou de fonds différents (le pouce porte parfois
