@@ -301,7 +301,7 @@ export default function HomeScreen() {
 
       <View style={styles.tabs}>
         <Pressable onPress={() => setTab('feed')} style={[styles.tab, tab === 'feed' && styles.tabActive]}>
-          <Text style={[styles.tabText, tab === 'feed' && styles.tabTextActive]}>Fil</Text>
+          <Text style={[styles.tabText, tab === 'feed' && styles.tabTextActive]}>Mon Fil</Text>
           {unreadFeed > 0 && (
             <View style={styles.tabBadge}>
               <Text style={styles.tabBadgeText}>{unreadFeed > 99 ? '99+' : unreadFeed}</Text>
@@ -329,7 +329,7 @@ export default function HomeScreen() {
         >
           <SlidersHorizontal size={14} color={hasActiveFilters ? colors.text : colors.textFaint} strokeWidth={1.75} />
           <Text style={[styles.filtersToggleText, hasActiveFilters && styles.filtersToggleTextActive]}>
-            Filtres
+            Tri
           </Text>
         </Pressable>
 
@@ -581,8 +581,8 @@ const styles = StyleSheet.create({
   },
   tabBadgeText: { fontSize: 10, fontWeight: '700', color: '#FFFFFF' },
   tabText: {
-    fontFamily: fonts.bodyEmphasis,
-    fontSize: 14,
+    fontFamily: fonts.sansBold,
+    fontSize: 17,
     color: colors.icon,
   },
   tabTextActive: { color: colors.text },

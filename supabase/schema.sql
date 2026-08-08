@@ -577,7 +577,7 @@ alter table public.predictions add constraint predictions_teaser_length
 
 alter table public.prediction_contents drop constraint if exists prediction_contents_length;
 alter table public.prediction_contents add constraint prediction_contents_length
-  check (char_length(btrim(content)) between 1 and 560);
+  check (char_length(btrim(content)) between 1 and 240);
 
 -- Qui peut voir une prédiction — indépendamment de la révélation. Peuplée à la
 -- création par `create_prediction`, jamais éditée à la main ensuite.
