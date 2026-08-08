@@ -22,10 +22,8 @@ import {
   castEmojiReaction,
   EMOJI_REACTIONS,
   fetchEmojiReactors,
-  hypePercentage,
   isRevealed,
   removeEmojiReaction,
-  reputationPercentage,
   setPredictionUserState,
   type EmojiReaction,
   type EmojiReactor,
@@ -107,14 +105,6 @@ export function PredictionCard({
   const [localVote, setLocalVote] = useState<'believe' | 'disbelieve' | null>(null);
   const [voting, setVoting] = useState(false);
   const [voteError, setVoteError] = useState<string | null>(null);
-  const [chaudVotes, setChaudVotes] = useState(item.chaud_votes);
-  const [froidVotes, setFroidVotes] = useState(item.froid_votes);
-  const [localHypeVote, setLocalHypeVote] = useState<'chaud' | 'froid' | null>(null);
-  const [hypeVoting, setHypeVoting] = useState(false);
-  const [mythoVotes, setMythoVotes] = useState(item.mytho_votes);
-  const [confianceVotes, setConfianceVotes] = useState(item.confiance_votes);
-  const [localReputationVote, setLocalReputationVote] = useState<'mytho' | 'confiance' | null>(null);
-  const [reputationVoting, setReputationVoting] = useState(false);
   const revealed = isRevealed(item, now);
   const isAuthor = item.author_id === userId;
 
@@ -138,10 +128,6 @@ export function PredictionCard({
     ? beliefPercentage({ ...item, believe_votes: believeVotes, disbelieve_votes: disbelieveVotes })
     : null;
   const voted = hasVoted || localVote !== null;
-  const hype = hypePercentage({ ...item, chaud_votes: chaudVotes, froid_votes: froidVotes });
-  const reputation = reputationPercentage({ ...item, mytho_votes: mythoVotes, confiance_votes: confianceVotes });
-  const hypeVoted = localHypeVote !== null;
-  const reputationVoted = localReputationVote !== null;
 
   useEffect(() => {
     let cancelled = false;
@@ -208,30 +194,6 @@ export function PredictionCard({
     setLocalVote(value);
     if (value === 'believe') setBelieveVotes((v) => v + 1);
     else setDisbelieveVotes((v) => v + 1);
-  }
-
-  /** Jauge Hype (chaud/froid), tant que la prédiction reste scellée. */
-  async function handleHypeVote(value: 'chaud' | 'froid') {
-    if (hypeVoting) return;
-    setHypeVoting(true);
-    const { error } = await castVote(item.id, userId, value);
-    setHypeVoting(false);
-    if (error) return;
-    setLocalHypeVote(value);
-    if (value === 'chaud') setChaudVotes((v) => v + 1);
-    else setFroidVotes((v) => v + 1);
-  }
-
-  /** Jauge Réputation (mytho/confiance), une fois révélée. */
-  async function handleReputationVote(value: 'mytho' | 'confiance') {
-    if (reputationVoting) return;
-    setReputationVoting(true);
-    const { error } = await castVote(item.id, userId, value);
-    setReputationVoting(false);
-    if (error) return;
-    setLocalReputationVote(value);
-    if (value === 'mytho') setMythoVotes((v) => v + 1);
-    else setConfianceVotes((v) => v + 1);
   }
 
   /** Charge le détail « qui a réagi avec quoi », une seule fois par carte. */
@@ -412,9 +374,11 @@ export function PredictionCard({
         </View>
         <View style={[styles.statusBannerSide, styles.statusBannerSideRight]}>
           {statusBanner.extra && (
-            <Text style={styles.statusBannerExtra} numberOfLines={1}>
-              {statusBanner.extra}
-            </Text>
+            <View style={styles.statusBannerBubble}>
+              <Text style={styles.statusBannerBubbleText} numberOfLines={1}>
+                {statusBanner.extra}
+              </Text>
+            </View>
           )}
         </View>
       </View>
@@ -486,66 +450,7 @@ export function PredictionCard({
             )}
           </View>
         )}
-
-        {/* Jauges de gamification, indépendantes du verdict réalisé/manqué :
-            Hype tant que scellée (à quel point le Cercle attend la
-            révélation), Réputation une fois révélée (à quel point le Cercle
-            fait confiance à l'auteur pendant qu'il déclare l'issue). */}
-        {statusBanner.kind === 'sealed' && hype !== null && (
-          <View style={styles.gaugeBlock}>
-            <Text style={styles.gaugeLabel}>Hype</Text>
-            <ConfidenceGauge belief={hype} />
-          </View>
-        )}
-        {statusBanner.kind === 'active' && reputation !== null && (
-          <View style={styles.gaugeBlock}>
-            <Text style={styles.gaugeLabel}>Réputation</Text>
-            <ConfidenceGauge belief={reputation} />
-          </View>
-        )}
       </Pressable>
-
-      {statusBanner.kind === 'sealed' && !isAuthor && !hypeVoted && (
-        <View style={styles.quickVoteRow}>
-          <Pressable
-            onPress={() => handleHypeVote('chaud')}
-            disabled={hypeVoting}
-            style={styles.quickVotePill}
-            hitSlop={4}
-          >
-            <Text style={styles.quickVotePillText}>🔥 Chaud</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => handleHypeVote('froid')}
-            disabled={hypeVoting}
-            style={styles.quickVotePill}
-            hitSlop={4}
-          >
-            <Text style={styles.quickVotePillText}>🧊 Froid</Text>
-          </Pressable>
-        </View>
-      )}
-
-      {statusBanner.kind === 'active' && !isAuthor && !reputationVoted && (
-        <View style={styles.quickVoteRow}>
-          <Pressable
-            onPress={() => handleReputationVote('mytho')}
-            disabled={reputationVoting}
-            style={styles.quickVotePill}
-            hitSlop={4}
-          >
-            <Text style={styles.quickVotePillText}>🤥 Mytho</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => handleReputationVote('confiance')}
-            disabled={reputationVoting}
-            style={styles.quickVotePill}
-            hitSlop={4}
-          >
-            <Text style={styles.quickVotePillText}>🤝 Confiance</Text>
-          </Pressable>
-        </View>
-      )}
 
       {item.is_immediate && revealed && !isAuthor && !voted && (
         <View style={styles.quickVoteRow}>
@@ -779,7 +684,9 @@ const styles = StyleSheet.create({
   // qui la regarde, elle doit sortir du lot.
   statusBannerActive: { backgroundColor: colors.gold },
   statusBannerRealized: { backgroundColor: colors.verdictRealized },
-  statusBannerMissed: { backgroundColor: colors.verdictMissed },
+  // Manqué : gris plutôt que la teinte de marque du verdict — l'échec se lit
+  // comme une extinction, pas comme un troisième accent coloré.
+  statusBannerMissed: { backgroundColor: colors.textFaint },
   // `flexShrink` (et non 0) : quand la cellule de droite porte un compte à
   // rebours, le libellé central doit pouvoir se tronquer plutôt que déborder
   // dessus — la date de scellé reste lisible même sur un écran étroit. Noir
@@ -796,7 +703,16 @@ const styles = StyleSheet.create({
   },
   statusBannerTextSealed: { color: colors.bannerSealedText },
   // Toujours sur fond anthracite (seul état à porter cette cellule).
-  statusBannerExtra: { fontSize: 11, fontWeight: '600', color: colors.bannerSealedText, marginRight: 10 },
+  // Bulle distincte plutôt qu'un texte se fondant dans le bandeau — la date
+  // de révélation reste une information à part, pas une suite du libellé.
+  statusBannerBubble: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: radius.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginRight: 8,
+  },
+  statusBannerBubbleText: { fontSize: 11, fontWeight: '600', color: colors.bannerSealedText },
   // Tout sur une seule ligne : [avatar 32][pseudo] ...espace flexible...
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   headerSpacer: { flex: 1, minWidth: 8 },
@@ -827,11 +743,6 @@ const styles = StyleSheet.create({
     lineHeight: 25,
   },
   beliefScore: { fontSize: 13, color: colors.textMuted, marginTop: 10 },
-  // Hype / Réputation : même jauge que l'opinion des révélations immédiates,
-  // juste un titre au-dessus au lieu d'un pourcentage écrit — la charte de
-  // ces deux jauges se limite volontairement à leur nom.
-  gaugeBlock: { marginTop: 12 },
-  gaugeLabel: { fontSize: 12, fontWeight: '700', color: colors.text, marginBottom: 6 },
   // Jauge d'opinion : rien d'écrit sur la barre elle-même — juste un curseur
   // à la position du pourcentage, et le chiffre qui flotte au-dessus.
   confidenceBlock: { marginTop: 12 },

@@ -119,7 +119,7 @@ export default function PredictionDetailScreen() {
       setOutcome(outcomeData ?? null);
 
       if (!isAuthorNow) {
-        const { data: voteData } = await fetchMyVote(id, userId, item.is_immediate ? 'belief' : 'outcome');
+        const { data: voteData } = await fetchMyVote(id, userId);
         setMyVote(voteData ?? null);
       }
     }
