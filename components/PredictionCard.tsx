@@ -116,14 +116,14 @@ export function PredictionCard({
   const statusBanner: { kind: 'sealed' | 'active' | 'realized' | 'missed'; label: string; extra?: string } = !revealed
     ? {
         kind: 'sealed',
-        label: `[ Scellé le ${toDateInput(new Date(item.created_at))} ]`,
+        label: `Scellé le ${toDateInput(new Date(item.created_at))}`,
         extra: item.open_ended ? undefined : `Révélé ${formatCountdown(new Date(item.reveal_at), now)}`,
       }
     : verdict === 'realized'
       ? { kind: 'realized', label: 'Réalisé' }
       : verdict === 'missed'
         ? { kind: 'missed', label: 'Manqué' }
-        : { kind: 'active', label: '[ Active ]' };
+        : { kind: 'active', label: 'Active' };
   const belief = item.is_immediate
     ? beliefPercentage({ ...item, believe_votes: believeVotes, disbelieve_votes: disbelieveVotes })
     : null;
@@ -661,11 +661,12 @@ const styles = StyleSheet.create({
   },
   statusBannerSide: { flex: 1 },
   statusBannerSideRight: { alignItems: 'flex-end' },
-  // Sceller : neutre et discret, rien ne s'est encore passé.
-  statusBannerSealed: { backgroundColor: 'rgba(17, 24, 39, 0.05)' },
-  // Active : contraste fort et inversé — la seule carte qui attend une
-  // action de qui la regarde, elle doit sortir du lot.
-  statusBannerActive: { backgroundColor: colors.text },
+  // Sceller : jaune de la charte en fond, texte gris — le seul état où le
+  // jaune sert de simple repère de statut plutôt que d'action interactive.
+  statusBannerSealed: { backgroundColor: colors.gold },
+  // Active : fond gris, texte noir — sort du lot sans reprendre le jaune,
+  // réservé au scellé, ni le vert/rouge, réservés au verdict.
+  statusBannerActive: { backgroundColor: 'rgba(17, 24, 39, 0.10)' },
   statusBannerRealized: { backgroundColor: colors.verdictRealizedSoft },
   statusBannerMissed: { backgroundColor: colors.verdictMissedSoft },
   // `flexShrink` (et non 0) : quand la cellule de droite porte un compte à
@@ -680,10 +681,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textMuted,
   },
-  statusBannerTextActive: { color: '#FFFFFF' },
+  statusBannerTextActive: { color: colors.text },
   statusBannerTextRealized: { color: colors.verdictRealized },
   statusBannerTextMissed: { color: colors.verdictMissed },
-  statusBannerExtra: { fontSize: 11, fontWeight: '600', color: colors.textFaint, marginRight: 10 },
+  // Toujours sur le fond jaune du scellé (seul état à porter cette cellule) :
+  // un gris plus soutenu que `textFaint`, sous peine de se noyer dans le
+  // jaune.
+  statusBannerExtra: { fontSize: 11, fontWeight: '600', color: colors.icon, marginRight: 10 },
   // Tout sur une seule ligne : [avatar 32][pseudo] ...espace flexible...
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   headerSpacer: { flex: 1, minWidth: 8 },
