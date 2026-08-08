@@ -400,7 +400,7 @@ export function PredictionCard({
         <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
           <View style={styles.iconSlot}>
             <MessageCircle
-              size={17}
+              size={18}
               color={(commentCount ?? 0) > 0 ? colors.icon : colors.textFaint}
               strokeWidth={1.75}
               fill={commentsOpen ? colors.icon : 'none'}
@@ -416,7 +416,7 @@ export function PredictionCard({
             tap comme le commentaire et la réaction juste à côté. */}
         <Pressable onPress={handleToggleFavorite} hitSlop={8} style={styles.iconSlot}>
           <Star
-            size={17}
+            size={18}
             color={isFavorite ? colors.gold : colors.textFaint}
             fill={isFavorite ? colors.gold : 'none'}
             strokeWidth={1.75}
@@ -434,7 +434,7 @@ export function PredictionCard({
               {myEmoji ? (
                 <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
               ) : (
-                <ThumbsUp size={17} color={totalReactions > 0 ? colors.icon : colors.textFaint} strokeWidth={1.75} />
+                <ThumbsUp size={18} color={totalReactions > 0 ? colors.icon : colors.textFaint} strokeWidth={1.75} />
               )}
             </View>
 
@@ -478,9 +478,9 @@ export function PredictionCard({
             à l'auteur — remis en icône directe pour le même accès rapide. */}
         <Pressable onPress={handleToggleHidden} hitSlop={8} style={styles.iconSlot}>
           {isHidden ? (
-            <Eye size={17} color={colors.icon} strokeWidth={1.75} />
+            <Eye size={18} color={colors.icon} strokeWidth={1.75} />
           ) : (
-            <EyeOff size={17} color={colors.textFaint} strokeWidth={1.75} />
+            <EyeOff size={18} color={colors.textFaint} strokeWidth={1.75} />
           )}
         </Pressable>
 
@@ -489,7 +489,7 @@ export function PredictionCard({
             seule l'UI le faisait) : à tout moment sur son propre Predict. */}
         {isAuthor && onDelete && (
           <Pressable onPress={handleDeletePress} hitSlop={8} style={styles.iconSlot}>
-            <Trash2 size={17} color={colors.icon} strokeWidth={1.75} />
+            <Trash2 size={18} color={colors.icon} strokeWidth={1.75} />
           </Pressable>
         )}
       </View>
