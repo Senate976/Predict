@@ -16,6 +16,7 @@ import { Text } from './Text';
 
 import { ConfidenceGauge } from './ConfidenceGauge';
 import { fetchCommentCount } from '../lib/comments';
+import { formatCountdown, toDateInput } from '../lib/datetime';
 import {
   beliefPercentage,
   castEmojiReaction,
@@ -108,6 +109,21 @@ export function PredictionCard({
   const isAuthor = item.author_id === userId;
 
   const verdict = revealed && item.final_status !== 'pending' ? item.final_status : null;
+
+  /** Bandeau d'état en tête de carte : la nature de la prédiction d'un coup
+   * d'œil, avant même de lire le teaser. Remplace l'ancien liseré de verdict
+   * dans l'en-tête — ce bandeau couvre désormais les 4 états. */
+  const statusBanner: { kind: 'sealed' | 'active' | 'realized' | 'missed'; label: string; extra?: string } = !revealed
+    ? {
+        kind: 'sealed',
+        label: `[ Scellé le ${toDateInput(new Date(item.created_at))} ]`,
+        extra: item.open_ended ? undefined : `Révélé ${formatCountdown(new Date(item.reveal_at), now)}`,
+      }
+    : verdict === 'realized'
+      ? { kind: 'realized', label: 'Réalisé' }
+      : verdict === 'missed'
+        ? { kind: 'missed', label: 'Manqué' }
+        : { kind: 'active', label: '[ Active ]' };
   const belief = item.is_immediate
     ? beliefPercentage({ ...item, believe_votes: believeVotes, disbelieve_votes: disbelieveVotes })
     : null;
@@ -328,7 +344,42 @@ export function PredictionCard({
   return (
     <View style={[styles.card, unseen && styles.cardUnseen]}>
       <Pressable onPress={() => onPress?.()} style={({ pressed }) => pressed && styles.cardPressed}>
-        {/* Une seule ligne : [avatar][pseudo] ...espace flexible... [badge] [menu]. */}
+        {/* Bandeau d'état : la nature de la carte (scellée / active / réalisée
+            / manquée) d'un coup d'œil, avant même de lire le teaser. Trois
+            cellules de largeur égale, comme le pied de carte plus bas, pour
+            que le libellé principal reste centré même quand une cellule
+            (compte à rebours) est vide de l'autre côté. */}
+        <View
+          style={[
+            styles.statusBanner,
+            statusBanner.kind === 'sealed' && styles.statusBannerSealed,
+            statusBanner.kind === 'active' && styles.statusBannerActive,
+            statusBanner.kind === 'realized' && styles.statusBannerRealized,
+            statusBanner.kind === 'missed' && styles.statusBannerMissed,
+          ]}
+        >
+          <View style={styles.statusBannerSide} />
+          <Text
+            style={[
+              styles.statusBannerText,
+              statusBanner.kind === 'active' && styles.statusBannerTextActive,
+              statusBanner.kind === 'realized' && styles.statusBannerTextRealized,
+              statusBanner.kind === 'missed' && styles.statusBannerTextMissed,
+            ]}
+            numberOfLines={1}
+          >
+            {statusBanner.label}
+          </Text>
+          <View style={[styles.statusBannerSide, styles.statusBannerSideRight]}>
+            {statusBanner.extra && (
+              <Text style={styles.statusBannerExtra} numberOfLines={1}>
+                {statusBanner.extra}
+              </Text>
+            )}
+          </View>
+        </View>
+
+        {/* Une seule ligne : [avatar][pseudo] ...espace flexible... */}
         <View style={styles.cardHeader}>
           {authorLabel && (
             <Pressable
@@ -344,19 +395,6 @@ export function PredictionCard({
           )}
 
           <View style={styles.headerSpacer} />
-
-          {verdict && (
-            // Liseré très discret sur le bord gauche plutôt qu'une pastille
-            // pleine — juste de quoi confirmer le sens du mot d'un coup d'œil.
-            <View
-              style={[
-                styles.badge,
-                verdict === 'realized' ? styles.badgeRealized : styles.badgeMissed,
-              ]}
-            >
-              <Text style={styles.badgeText}>{verdict === 'realized' ? 'Réalisé' : 'Manqué'}</Text>
-            </View>
-          )}
         </View>
 
         {/* Sur sa propre ligne, jamais accolée au pseudo — la liste complète
@@ -610,24 +648,51 @@ const styles = StyleSheet.create({
     borderColor: colors.gold,
     backgroundColor: colors.goldSoft,
   },
-  // Tout sur une seule ligne :
-  // [avatar 32][pseudo] ...espace flexible... [badge temps] [menu '...'].
+  // Bandeau d'état : trois cellules de largeur égale (comme le pied de carte)
+  // pour garder le libellé central vraiment centré, que la cellule de droite
+  // porte un compte à rebours ou reste vide.
+  statusBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: radius.sm,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    marginBottom: 12,
+  },
+  statusBannerSide: { flex: 1 },
+  statusBannerSideRight: { alignItems: 'flex-end' },
+  // Sceller : neutre et discret, rien ne s'est encore passé.
+  statusBannerSealed: { backgroundColor: 'rgba(17, 24, 39, 0.05)' },
+  // Active : contraste fort et inversé — la seule carte qui attend une
+  // action de qui la regarde, elle doit sortir du lot.
+  statusBannerActive: { backgroundColor: colors.text },
+  statusBannerRealized: { backgroundColor: colors.verdictRealizedSoft },
+  statusBannerMissed: { backgroundColor: colors.verdictMissedSoft },
+  // `flexShrink` (et non 0) : quand la cellule de droite porte un compte à
+  // rebours, le libellé central doit pouvoir se tronquer plutôt que déborder
+  // dessus — la date de scellé reste lisible même sur un écran étroit.
+  statusBannerText: {
+    flex: 1,
+    minWidth: 0,
+    textAlign: 'center',
+    fontFamily: fonts.label,
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
+  statusBannerTextActive: { color: '#FFFFFF' },
+  statusBannerTextRealized: { color: colors.verdictRealized },
+  statusBannerTextMissed: { color: colors.verdictMissed },
+  statusBannerExtra: { fontSize: 11, fontWeight: '600', color: colors.textFaint, marginRight: 10 },
+  // Tout sur une seule ligne : [avatar 32][pseudo] ...espace flexible...
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   headerSpacer: { flex: 1, minWidth: 8 },
   // `flexShrink` sur le bloc auteur ET sur le pseudo : c'est le pseudo qui se
-  // tronque avec ellipse si la place manque, jamais le badge.
+  // tronque avec ellipse si la place manque.
   authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, minWidth: 0 },
   authorName: { fontFamily: fonts.bodyEmphasis, fontSize: 16, color: colors.icon, flexShrink: 1, minWidth: 0 },
   // Sur sa propre ligne, sous l'en-tête — jamais accolée au pseudo.
   mentionTag: { fontSize: 12, fontWeight: '500', color: colors.textMuted, marginTop: -4, marginBottom: 10 },
-  // Texte simple pour le délai (rien à signaler encore) ; pour le verdict,
-  // un fin liseré sur le bord gauche plutôt qu'une pastille pleine — le
-  // jaune plein ne convenait pas ici, réservé aux éléments interactifs
-  // majeurs. `flexShrink: 0` : jamais compressé par un long pseudo.
-  badge: { flexShrink: 0, paddingLeft: 7 },
-  badgeRealized: { borderLeftWidth: 2, borderLeftColor: colors.verdictRealized },
-  badgeMissed: { borderLeftWidth: 2, borderLeftColor: colors.verdictMissed },
-  badgeText: { fontSize: 12, fontWeight: '600', color: colors.textMuted, flexShrink: 0 },
   // Secondaire : simple amorce au-dessus de la vraie prédiction, jamais
   // l'élément qu'on retient de la carte — même registre mono/tracké que la
   // signalétique d'état, pour rester discret. `letterSpacing` + majuscules

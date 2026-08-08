@@ -34,12 +34,17 @@ export const colors = {
   dangerSoft: 'rgba(185, 28, 28, 0.08)',
   // Pastille de notification (badge de la cloche).
   notificationBadge: '#DC2626',
-  // Verdict d'une prédiction révélée : un liseré sur le bord gauche de la
-  // carte, jamais une pastille de couleur. Verts/rouges volontairement
+  // Verdict d'une prédiction révélée : couleur de texte du bandeau d'état de
+  // la carte une fois le résultat connu. Verts/rouges volontairement
   // désaturés — assez pour se lire d'un coup d'œil, pas assez pour jurer avec
   // le jaune de la charte.
   verdictRealized: '#3F7D5C',
   verdictMissed: '#A6544D',
+  // Fonds très légèrement teintés du même vert/rouge — le bandeau d'état
+  // « Réalisé »/« Manqué » de la carte, jamais un aplat plein qui jurerait
+  // avec le reste de la charte noir/blanc/jaune.
+  verdictRealizedSoft: 'rgba(63, 125, 92, 0.12)',
+  verdictMissedSoft: 'rgba(166, 84, 77, 0.12)',
   // Trait des icônes (Lucide) : noir adouci plutôt que gris clair, pour
   // qu'elles ressortent sans être aussi dures qu'un noir pur.
   icon: '#374151',
