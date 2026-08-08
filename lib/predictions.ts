@@ -66,6 +66,12 @@ export type PredictionFeedItem = {
   /** Uniquement pour une prédiction `is_immediate` — voir `beliefPercentage`. */
   believe_votes: number;
   disbelieve_votes: number;
+  /** Jauge Hype, tant que scellée — voir `hypePercentage`. */
+  chaud_votes: number;
+  froid_votes: number;
+  /** Jauge Réputation, une fois révélée — voir `reputationPercentage`. */
+  mytho_votes: number;
+  confiance_votes: number;
   /** Préférences propres à l'appelant — jamais partagées avec les autres. */
   is_favorite: boolean;
   is_hidden: boolean;
@@ -150,7 +156,7 @@ export function predictionErrorMessage(error: PostgrestError): string {
 const FEED_COLUMNS =
   'id, author_id, teaser, content, audio_path, reveal_at, scope, open_ended, is_immediate, category, created_at, ' +
   'is_revealed, realized_votes, missed_votes, final_status, is_favorite, is_hidden, is_seen, emoji_counts, my_emoji_reaction, ' +
-  'mentioned_user_ids, believe_votes, disbelieve_votes';
+  'mentioned_user_ids, believe_votes, disbelieve_votes, chaud_votes, froid_votes, mytho_votes, confiance_votes';
 
 /**
  * Pourcentage de destinataires qui « y croient », pour une prédiction
@@ -162,6 +168,22 @@ export function beliefPercentage(item: PredictionFeedItem): number | null {
   const total = item.believe_votes + item.disbelieve_votes;
   if (total === 0) return null;
   return Math.round((100 * item.believe_votes) / total);
+}
+
+/** Jauge Hype (chaud/froid), tant que la prédiction est scellée — `null`
+ * avant le premier vote. */
+export function hypePercentage(item: PredictionFeedItem): number | null {
+  const total = item.chaud_votes + item.froid_votes;
+  if (total === 0) return null;
+  return Math.round((100 * item.chaud_votes) / total);
+}
+
+/** Jauge Réputation (mytho/confiance), une fois révélée — `null` avant le
+ * premier vote. */
+export function reputationPercentage(item: PredictionFeedItem): number | null {
+  const total = item.mytho_votes + item.confiance_votes;
+  if (total === 0) return null;
+  return Math.round((100 * item.confiance_votes) / total);
 }
 
 export async function fetchPredictionsFeed() {
