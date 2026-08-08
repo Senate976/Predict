@@ -589,11 +589,9 @@ const styles = StyleSheet.create({
   statusBannerSideRight: { alignItems: 'flex-end' },
   statusBannerCenter: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   statusBannerIcon: { marginRight: 4 },
-  // Sceller : anthracite, seul état sans texte noir ni jaune en fond — le
-  // cadenas jaune reste le seul rappel de la charte sur ce bandeau-là.
-  statusBannerSealed: { backgroundColor: colors.bannerSealedBg },
-  // En cours / Réalisé / Manqué : fonds à 75% d'opacité (charte), Manqué garde
-  // sa teinte magenta de marque — seul le mot « Manqué » se grise, pas le fond.
+  // Tous les fonds de bandeau à 75% d'opacité (charte) — Manqué garde sa
+  // teinte magenta de marque, seul le mot « Manqué » se grise, pas le fond.
+  statusBannerSealed: { backgroundColor: 'rgba(43, 43, 43, 0.75)' },
   statusBannerActive: { backgroundColor: 'rgba(250, 204, 21, 0.75)' },
   statusBannerRealized: { backgroundColor: 'rgba(54, 168, 160, 0.75)' },
   statusBannerMissed: { backgroundColor: 'rgba(156, 29, 110, 0.75)' },
