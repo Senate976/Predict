@@ -68,5 +68,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.goldSoft,
   },
   text: { fontSize: 13, fontWeight: '600', color: colors.text },
-  errorText: { fontSize: 12, color: colors.textFaint, fontStyle: 'italic' },
+  errorText: { fontSize: 12, color: colors.textFaint },
 });

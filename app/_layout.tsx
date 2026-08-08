@@ -1,10 +1,9 @@
 import {
-  PlusJakartaSans_400Regular,
-  PlusJakartaSans_500Medium,
-  PlusJakartaSans_600SemiBold,
-  PlusJakartaSans_700Bold,
-  PlusJakartaSans_800ExtraBold,
-} from '@expo-google-fonts/plus-jakarta-sans';
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from '@expo-google-fonts/inter';
 import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -53,14 +52,13 @@ export default function RootLayout() {
   // Chargée ici, une fois : le nom de police passé à useFonts (la clé de cet
   // objet) doit correspondre exactement à `fonts.body` dans lib/theme.ts,
   // sinon React Native retombe silencieusement sur la police système sans
-  // avertir. Une seule famille (Plus Jakarta Sans) en 5 graisses — plus
-  // aucune serif ni monospace à charger.
+  // avertir. Une seule famille (Inter) en 4 graisses — plus aucune serif ni
+  // monospace à charger.
   const [fontsLoaded] = useFonts({
-    PlusJakartaSans_400Regular,
-    PlusJakartaSans_500Medium,
-    PlusJakartaSans_600SemiBold,
-    PlusJakartaSans_700Bold,
-    PlusJakartaSans_800ExtraBold,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
   });
 
   if (!fontsLoaded) {

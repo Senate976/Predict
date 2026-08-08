@@ -431,5 +431,5 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   pillOutlineText: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
-  respondedText: { fontSize: 12, color: colors.textFaint, marginTop: 8, fontStyle: 'italic' },
+  respondedText: { fontSize: 12, color: colors.textFaint, marginTop: 8 },
 });
