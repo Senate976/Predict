@@ -1,4 +1,3 @@
-import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 import { MessageCircle, MoreHorizontal, ThumbsUp, Trash2 } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
@@ -376,19 +375,11 @@ export function PredictionCard({
             ça, l'onglet Predict n'avait rien de plus à montrer qu'un teaser
             déjà lu avant révélation. La RLS ne renvoie `content` que si
             révélée ou si on en est l'auteur, donc ce test suffit.
-            Avant révélation, seul l'auteur voit son propre texte (les autres
-            n'ont tout simplement rien à cet endroit) : flouté tant que
-            « scellé », net dès que « révélée » — le flou matérialise le
-            secret plutôt qu'un simple retrait du contenu. */}
+            Le flou ne concerne que les destinataires (avant révélation, ils
+            n'ont de toute façon rien à cet endroit) : l'auteur voit toujours
+            son propre texte net, y compris avant révélation. */}
         {(revealed || isAuthor) && item.content && (
-          revealed || item.is_immediate ? (
-            <Text style={styles.cardContent}>{item.content}</Text>
-          ) : (
-            <View style={styles.blurWrap}>
-              <Text style={styles.cardContent}>{item.content}</Text>
-              <BlurView intensity={35} tint="light" style={StyleSheet.absoluteFill} />
-            </View>
-          )
+          <Text style={styles.cardContent}>{item.content}</Text>
         )}
 
         {item.is_immediate && (
@@ -477,8 +468,8 @@ export function PredictionCard({
               réactions au-dessus, la faire glisser dessus en sélectionne une.
               Le chiffre est un bouton à part : un tap dessus ouvre le détail
               de qui a réagi avec quoi, sans interférer avec le geste du pouce. */}
-          <View style={styles.reactionTriggerWrap}>
-            <View style={styles.reactionTriggerRow}>
+          <View style={styles.reactionTriggerRow}>
+            <View style={styles.reactionTriggerWrap}>
               <View style={styles.reactionTrigger} hitSlop={8} {...panResponder.panHandlers}>
                 {myEmoji ? (
                   <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
@@ -486,40 +477,40 @@ export function PredictionCard({
                   <ThumbsUp size={17} color={totalReactions > 0 ? colors.icon : colors.textFaint} strokeWidth={1.75} />
                 )}
               </View>
-              {totalReactions > 0 && (
-                <Pressable onPress={openReactors} hitSlop={8}>
-                  <Text style={styles.reactionTriggerCount}>{totalReactions}</Text>
-                </Pressable>
+
+              {emojiPanelOpen && (
+                <View
+                  ref={panelRef}
+                  style={styles.emojiPanel}
+                  onLayout={() => {
+                    panelRef.current?.measureInWindow((x, y, width, height) => {
+                      panelLayoutRef.current = { x, y, width, height };
+                    });
+                  }}
+                >
+                  {EMOJI_REACTIONS.map((emoji, i) => (
+                    <Animated.View key={emoji} style={{ transform: [{ scale: scaleAnims[i] }] }}>
+                      {/* Un tap direct sur un emoji le sélectionne toujours,
+                          indépendamment du glissé : sans ça, un utilisateur qui
+                          relâche le pouce puis tape un emoji comme un bouton
+                          normal (au lieu de glisser sans relâcher, à la
+                          Facebook) ne déclenchait jamais rien. */}
+                      <Pressable
+                        onPress={() => handleEmojiPress(emoji)}
+                        style={[styles.emojiBubbleItem, myEmoji === emoji && styles.emojiBubbleItemActive]}
+                        hitSlop={4}
+                      >
+                        <Text style={styles.emojiButtonText}>{emoji}</Text>
+                      </Pressable>
+                    </Animated.View>
+                  ))}
+                </View>
               )}
             </View>
-
-            {emojiPanelOpen && (
-              <View
-                ref={panelRef}
-                style={styles.emojiPanel}
-                onLayout={() => {
-                  panelRef.current?.measureInWindow((x, y, width, height) => {
-                    panelLayoutRef.current = { x, y, width, height };
-                  });
-                }}
-              >
-                {EMOJI_REACTIONS.map((emoji, i) => (
-                  <Animated.View key={emoji} style={{ transform: [{ scale: scaleAnims[i] }] }}>
-                    {/* Un tap direct sur un emoji le sélectionne toujours,
-                        indépendamment du glissé : sans ça, un utilisateur qui
-                        relâche le pouce puis tape un emoji comme un bouton
-                        normal (au lieu de glisser sans relâcher, à la
-                        Facebook) ne déclenchait jamais rien. */}
-                    <Pressable
-                      onPress={() => handleEmojiPress(emoji)}
-                      style={[styles.emojiBubbleItem, myEmoji === emoji && styles.emojiBubbleItemActive]}
-                      hitSlop={4}
-                    >
-                      <Text style={styles.emojiButtonText}>{emoji}</Text>
-                    </Pressable>
-                  </Animated.View>
-                ))}
-              </View>
+            {totalReactions > 0 && (
+              <Pressable onPress={openReactors} hitSlop={8}>
+                <Text style={styles.reactionTriggerCount}>{totalReactions}</Text>
+              </Pressable>
             )}
           </View>
         </View>
@@ -651,8 +642,6 @@ const styles = StyleSheet.create({
   cardTeaser: {
     fontFamily: fonts.label,
     fontSize: 12,
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
     color: colors.textFaint,
     marginBottom: 4,
   },
@@ -666,9 +655,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     lineHeight: 25,
   },
-  // `overflow: hidden` : le flou (`BlurView`) ne doit jamais déborder sur le
-  // teaser au-dessus ou le reste de la carte en dessous.
-  blurWrap: { overflow: 'hidden', borderRadius: radius.sm },
   beliefScore: { fontSize: 13, color: colors.textMuted, marginTop: 10 },
   // Jauge d'opinion : rien d'écrit sur la barre elle-même — juste un curseur
   // à la position du pourcentage, et le chiffre qui flotte au-dessus.
@@ -718,13 +704,14 @@ const styles = StyleSheet.create({
   // Une seule « grande bulle », façon Facebook — flottante au-dessus du
   // pouce (pas en dessous) pour ne pas être masquée par le doigt qui la
   // fait glisser, et pas des puces séparées.
-  // Ancrée par son bord droit sur le pouce (plutôt que centrée) : le pouce
-  // est proche du bord droit de la carte, une bulle centrée débordait hors
-  // de l'écran.
+  // Centrée sur le pouce lui-même (`reactionTriggerWrap` ne contient plus que
+  // l'icône, plus le compteur) : un ancrage par le bord droit débordait hors
+  // du cadre à gauche, le pouce étant au centre de la carte.
   emojiPanel: {
     position: 'absolute',
     bottom: '100%',
-    right: 0,
+    left: '50%',
+    marginLeft: -EMOJI_PANEL_WIDTH / 2,
     marginBottom: 10,
     width: EMOJI_PANEL_WIDTH,
     zIndex: 20,

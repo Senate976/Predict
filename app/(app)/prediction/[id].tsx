@@ -1,4 +1,3 @@
-import { BlurView } from 'expo-blur';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
@@ -286,17 +285,11 @@ export default function PredictionDetailScreen() {
             <View style={styles.contentHero}>
               {(revealed || isAuthor) && prediction.content ? (
                 <>
-                  {/* Flouté tant que non révélée : seul l'auteur voit son
-                      propre texte à ce stade (RLS), le flou rappelle que ce
-                      contenu reste scellé pour tout le monde d'autre. */}
-                  {revealed || prediction.is_immediate ? (
-                    <Text style={styles.contentHeroText}>{prediction.content}</Text>
-                  ) : (
-                    <View style={styles.blurWrap}>
-                      <Text style={styles.contentHeroText}>{prediction.content}</Text>
-                      <BlurView intensity={35} tint="light" style={StyleSheet.absoluteFill} />
-                    </View>
-                  )}
+                  {/* Le flou ne concerne que les destinataires (avant
+                      révélation, ils n'ont de toute façon rien à cet endroit
+                      via la RLS) : l'auteur voit toujours son propre texte
+                      net, y compris avant révélation. */}
+                  <Text style={styles.contentHeroText}>{prediction.content}</Text>
                   {prediction.audio_path && (
                     <View style={styles.audioRow}>
                       <AudioPlayerButton path={prediction.audio_path} />
@@ -563,7 +556,6 @@ const styles = StyleSheet.create({
     lineHeight: 30,
     textAlign: 'center',
   },
-  blurWrap: { overflow: 'hidden', borderRadius: radius.sm, alignSelf: 'stretch' },
   audioRow: { marginTop: 16 },
   sealedHint: {
     fontSize: 14,

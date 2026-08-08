@@ -191,7 +191,7 @@ export default function NewPredictionScreen() {
       }
     }
     if (scope === 'selected' && selectedFriendIds.size === 0) {
-      return 'Choisis au moins un ami, ou passe sur « Mon Cercle ».';
+      return 'Choisis au moins un ami, ou passe sur « Tous ».';
     }
     if (scope === 'group' && !selectedGroupId) {
       return 'Choisis un groupe.';
@@ -403,7 +403,7 @@ export default function NewPredictionScreen() {
               <Text style={[styles.sectionHint, styles.fieldSpacing]}>
                 {revealNow
                   ? <>Ce <PredictWord /> sera révélé dès la validation : ton Cercle pourra tout de suite donner son avis.</>
-                  : <>Tu pourras révéler ce <PredictWord /> quand tu veux, depuis son écran.</>}
+                  : <>Tu pourras révéler ce <PredictWord /> quand tu veux.</>}
               </Text>
               <Pressable
                 onPress={() => setRevealNow((prev) => !prev)}
@@ -467,7 +467,7 @@ export default function NewPredictionScreen() {
               <Text
                 style={[styles.scopeText, scope === 'circle' && styles.scopeTextActive]}
               >
-                Mon Cercle
+                Tous
               </Text>
             </Pressable>
             <Pressable
