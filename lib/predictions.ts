@@ -59,9 +59,8 @@ export type PredictionFeedItem = {
   category: PredictionCategory;
   created_at: string;
   is_revealed: boolean;
-  /** Nombre de votes, et verdict à la majorité des votants effectifs — voir prediction_outcomes. */
-  realized_votes: number;
-  missed_votes: number;
+  /** `pending` tant que l'auteur n'a pas affirmé le résultat (voir
+   * `setPredictionVerdict`) — jamais déduit d'un vote du Cercle. */
   final_status: PredictionOutcomeStatus;
   /** Préférences propres à l'appelant — jamais partagées avec les autres. */
   is_favorite: boolean;
@@ -146,7 +145,7 @@ export function predictionErrorMessage(error: PostgrestError): string {
  */
 const FEED_COLUMNS =
   'id, author_id, teaser, content, audio_path, reveal_at, scope, open_ended, is_immediate, category, created_at, ' +
-  'is_revealed, realized_votes, missed_votes, final_status, is_favorite, is_hidden, is_seen, emoji_counts, my_emoji_reaction, ' +
+  'is_revealed, final_status, is_favorite, is_hidden, is_seen, emoji_counts, my_emoji_reaction, ' +
   'mentioned_user_ids';
 
 export async function fetchPredictionsFeed() {
@@ -463,8 +462,8 @@ export type PredictionOutcomeStatus = 'pending' | 'realized' | 'missed';
 
 /**
  * Une prédiction de l'auteur avec son statut final, tel que calculé par la
- * vue `public.prediction_outcomes` (majorité des votes des destinataires).
- * Alimente les 4 compteurs et l'historique filtrable du Profil.
+ * vue `public.prediction_outcomes` — depuis `author_verdict`, jamais un vote
+ * du Cercle. Alimente les 4 compteurs et l'historique filtrable du Profil.
  */
 export type PredictionOutcome = {
   prediction_id: string;
@@ -473,8 +472,6 @@ export type PredictionOutcome = {
   reveal_at: string;
   created_at: string;
   is_revealed: boolean;
-  realized_votes: number;
-  missed_votes: number;
   final_status: PredictionOutcomeStatus;
 };
 
@@ -482,12 +479,22 @@ export type PredictionOutcome = {
 export async function fetchPredictionOutcomes(authorId: string) {
   return supabase
     .from('prediction_outcomes')
-    .select(
-      'prediction_id, author_id, teaser, reveal_at, created_at, is_revealed, realized_votes, missed_votes, final_status'
-    )
+    .select('prediction_id, author_id, teaser, reveal_at, created_at, is_revealed, final_status')
     .eq('author_id', authorId)
     .order('created_at', { ascending: false })
     .returns<PredictionOutcome[]>();
+}
+
+/**
+ * L'auteur affirme si sa prédiction s'est réalisée ou a été manquée — un
+ * geste unique et définitif (le « tampon » de l'UI, jamais révisable
+ * ensuite) : `set_prediction_verdict` (security definer) ne fait rien si le
+ * verdict est déjà posé, si la prédiction n'est pas encore révélée, ou si
+ * l'appelant n'en est pas l'auteur. Notifie chaque destinataire dans la
+ * foulée, côté base.
+ */
+export async function setPredictionVerdict(predictionId: string, verdict: 'realized' | 'missed') {
+  return supabase.rpc('set_prediction_verdict', { p_prediction_id: predictionId, p_verdict: verdict });
 }
 
 export type PredictionStats = { total: number; realized: number; missed: number; pending: number };
