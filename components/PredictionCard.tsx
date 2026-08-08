@@ -430,14 +430,34 @@ export function PredictionCard({
               </Text>
             </View>
           )}
+        </View>
 
-          {/* Le tampon certifie le verdict pour tout le monde (pas seulement
-              l'auteur) — sceau institutionnel (double filet noir, sans
-              couleur de verdict) plutôt qu'un badge coloré : posé « de
-              travers » (légère rotation) façon tampon encreur officiel, mais
-              toujours dans le fil normal de l'en-tête, jamais en position
-              absolue par-dessus le teaser ou le contenu, qui doivent rester
-              lisibles. */}
+        {/* Le tampon certifie le verdict en s'imposant sur la prédiction
+            elle-même (pas sur l'étiquette d'état, ni ailleurs dans l'en-tête)
+            — posé en position absolue, dans le coin de ce bloc, façon sceau
+            encreur officiel. Fond translucide plutôt qu'opaque : le texte
+            qu'il chevauche reste toujours lisible en dessous. */}
+        <View style={styles.predictionBody}>
+          {/* Sur sa propre ligne, jamais accolée au pseudo — la liste
+              complète des personnes citées y empiétait dès qu'il y en avait
+              plusieurs. */}
+          {mentionLabel && <Text style={styles.mentionTag} numberOfLines={1}>{mentionLabel}</Text>}
+
+          <Text style={styles.cardTeaser}>{item.teaser}</Text>
+
+          {/* Le contenu (la vraie prédiction, derrière la promesse du
+              teaser) devient visible directement sur la carte une fois
+              révélée — sans ça, l'onglet Predict n'avait rien de plus à
+              montrer qu'un teaser déjà lu avant révélation. La RLS ne
+              renvoie `content` que si révélée ou si on en est l'auteur, donc
+              ce test suffit. Le flou ne concerne que les destinataires
+              (avant révélation, ils n'ont de toute façon rien à cet
+              endroit) : l'auteur voit toujours son propre texte net, y
+              compris avant révélation. */}
+          {(revealed || isAuthor) && item.content && (
+            <Text style={styles.cardContent}>{item.content}</Text>
+          )}
+
           {verdict && (
             <View style={[styles.verdictStamp, verdict === 'missed' && styles.verdictStampTilted]}>
               <View style={styles.verdictStampInner}>
@@ -447,24 +467,6 @@ export function PredictionCard({
             </View>
           )}
         </View>
-
-        {/* Sur sa propre ligne, jamais accolée au pseudo — la liste complète
-            des personnes citées y empiétait dès qu'il y en avait plusieurs. */}
-        {mentionLabel && <Text style={styles.mentionTag} numberOfLines={1}>{mentionLabel}</Text>}
-
-        <Text style={styles.cardTeaser}>{item.teaser}</Text>
-
-        {/* Le contenu (la vraie prédiction, derrière la promesse du teaser)
-            devient visible directement sur la carte une fois révélée — sans
-            ça, l'onglet Predict n'avait rien de plus à montrer qu'un teaser
-            déjà lu avant révélation. La RLS ne renvoie `content` que si
-            révélée ou si on en est l'auteur, donc ce test suffit.
-            Le flou ne concerne que les destinataires (avant révélation, ils
-            n'ont de toute façon rien à cet endroit) : l'auteur voit toujours
-            son propre texte net, y compris avant révélation. */}
-        {(revealed || isAuthor) && item.content && (
-          <Text style={styles.cardContent}>{item.content}</Text>
-        )}
       </Pressable>
 
       {/* Une seule rangée, espacement régulier (`space-between`) entre les
@@ -714,49 +716,57 @@ const styles = StyleSheet.create({
   },
   verdictPromptButtonText: { fontFamily: fonts.label, fontSize: 12, fontWeight: '700', color: colors.text },
   verdictPromptError: { fontSize: 11, color: colors.danger, marginTop: 6, textAlign: 'right' },
-  // Le tampon de certification : un sceau institutionnel plutôt qu'un badge
-  // coloré — double filet noir sur fond blanc, texte capitales tracké, un
-  // seul trait or en soulignement pour tout rappel de couleur. Identique
-  // pour Réalisé et Manqué (seul le mot change) : jamais de rouge ni de
-  // vert, la charte reste noir/blanc/gris/or même pour trancher un verdict.
-  // Posé dans le fil normal de l'en-tête (comme la bulle de révélation qu'il
-  // remplace une fois la carte tranchée) : une légère rotation suffit à
-  // l'effet « tampon encreur officiel » sans jamais empiéter en position
-  // absolue sur le teaser ou le contenu.
+  // Ancre le tampon : `position: relative` pour que le sceau, en position
+  // absolue, se place par rapport à ce bloc précis (teaser + contenu) et
+  // non par rapport à toute la carte — il chevauche la prédiction elle-même,
+  // jamais l'étiquette d'état ni l'en-tête.
+  predictionBody: { position: 'relative' },
+  // Le tampon de certification : un sceau institutionnel — double filet noir
+  // sur fond translucide (pas opaque : le texte qu'il chevauche doit rester
+  // lisible dessous), texte capitales tracké, un seul trait or en
+  // soulignement pour tout rappel de couleur. Identique pour Réalisé et
+  // Manqué (seul le mot change) : jamais de rouge ni de vert, la charte
+  // reste noir/blanc/gris/or même pour trancher un verdict. Volontairement
+  // plus imposant que le reste de la carte — un sceau qui statue doit
+  // s'imposer — posé en position absolue dans le coin du bloc, légèrement
+  // de travers façon tampon encreur officiel.
   verdictStamp: {
-    borderWidth: 2,
+    position: 'absolute',
+    top: -10,
+    right: -8,
+    borderWidth: 2.5,
     borderColor: colors.text,
-    borderRadius: 5,
+    borderRadius: 6,
     padding: 3,
-    backgroundColor: colors.surface,
-    transform: [{ rotate: '-6deg' }],
+    backgroundColor: 'rgba(251, 251, 249, 0.72)',
+    transform: [{ rotate: '-9deg' }],
   },
-  verdictStampTilted: { transform: [{ rotate: '5deg' }] },
+  verdictStampTilted: { transform: [{ rotate: '7deg' }] },
   // Second filet, à l'intérieur du premier avec un fin espace entre les deux
   // (`padding` du parent) — la double bordure d'un sceau officiel plutôt
   // qu'un simple encadré.
   verdictStampInner: {
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: colors.text,
-    borderRadius: 3,
-    paddingHorizontal: 11,
-    paddingTop: 5,
-    paddingBottom: 4,
+    borderRadius: 4,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 6,
     alignItems: 'center',
   },
   verdictStampText: {
     fontFamily: fonts.sansBold,
-    fontSize: 14,
+    fontSize: 19,
     textTransform: 'uppercase',
-    letterSpacing: 1.2,
+    letterSpacing: 1.6,
     color: colors.text,
   },
   verdictStampRule: {
     width: '70%',
-    height: 2,
+    height: 3,
     backgroundColor: colors.gold,
-    borderRadius: 1,
-    marginTop: 4,
+    borderRadius: 1.5,
+    marginTop: 5,
   },
   // Tout sur une seule ligne : [avatar 32][pseudo] ...espace flexible...
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
