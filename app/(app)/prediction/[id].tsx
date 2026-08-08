@@ -568,7 +568,6 @@ const styles = StyleSheet.create({
   sealedHint: {
     fontSize: 14,
     color: colors.textFaint,
-    fontStyle: 'italic',
     textAlign: 'center',
   },
   revealNowBox: { alignItems: 'center', marginTop: spacing.md },

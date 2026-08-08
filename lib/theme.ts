@@ -75,16 +75,16 @@ export const spacing = {
 } as const;
 
 /**
- * Une seule famille pour tout le site — Plus Jakarta Sans, en 5 graisses —
- * jamais de serif ni de monospace : c'est la police, pas la graisse ou la
- * taille, qui doit rester identique partout pour un rendu fluide façon
- * éditorial moderne.
+ * Une seule famille pour tout le site — Inter, en 5 graisses — jamais de
+ * serif ni de monospace : c'est la police, pas la graisse ou la taille, qui
+ * doit rester identique partout pour un rendu fluide façon réseau social
+ * (Facebook).
  *
- * `display` (ExtraBold) : logo, mot-symbole « Predict », grands en-têtes de
- * page. `bodyEmphasis` (SemiBold) : gros texte éditorial mis en avant (corps
- * de la prédiction, pseudo de profil, pull-quotes, verdict) — jamais grisé,
- * c'est l'élément qu'on doit remarquer en premier. `sansBold` (Bold) : titres
- * de carte, boutons, onglets. `body` (Regular) : texte courant, police par
+ * `display` (Bold) : logo, mot-symbole « Predict », grands en-têtes de page.
+ * `bodyEmphasis` (SemiBold) : gros texte éditorial mis en avant (corps de la
+ * prédiction, pseudo de profil, pull-quotes, verdict) — jamais grisé, c'est
+ * l'élément qu'on doit remarquer en premier. `sansBold` (Bold) : titres de
+ * carte, boutons, onglets. `body` (Regular) : texte courant, police par
  * défaut de `<Text>`/`<TextInput>`. `label` (Medium) : métadonnées et
  * étiquettes d'état — toujours petites, majuscules, trackées, jamais le
  * texte courant. Chaque nom doit correspondre exactement à la clé passée à
@@ -92,11 +92,11 @@ export const spacing = {
  * silencieusement sur la police système.
  */
 export const fonts = {
-  display: 'PlusJakartaSans_800ExtraBold',
-  bodyEmphasis: 'PlusJakartaSans_600SemiBold',
-  sansBold: 'PlusJakartaSans_700Bold',
-  body: 'PlusJakartaSans_400Regular',
-  label: 'PlusJakartaSans_500Medium',
+  display: 'Inter_700Bold',
+  bodyEmphasis: 'Inter_600SemiBold',
+  sansBold: 'Inter_700Bold',
+  body: 'Inter_400Regular',
+  label: 'Inter_500Medium',
 } as const;
 
 /**
