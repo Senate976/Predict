@@ -59,7 +59,6 @@ export default function HomeScreen() {
 
   const [feed, setFeed] = useState<PredictionFeedItem[] | null>(null);
   const [authors, setAuthors] = useState<AuthorMap>({});
-  const [votedIds, setVotedIds] = useState<Set<string>>(new Set());
   // Amis acceptés du viewer — sert uniquement à choisir, parmi plusieurs
   // personnes citées dans un teaser, un nom que le viewer reconnaîtra.
   const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
@@ -142,15 +141,6 @@ export default function HomeScreen() {
       map[profile.id] = { username: profile.username, avatar_url: profile.avatar_url };
     }
     setAuthors(map);
-
-    // Sert uniquement à masquer « Donner mon avis » une fois le vote posé —
-    // la RLS de `prediction_votes` ne renvoie de toute façon que ses propres
-    // votes, pas besoin de filtrer sur les ids de ce chargement.
-    const { data: myVotes } = await supabase
-      .from('prediction_votes')
-      .select('prediction_id')
-      .eq('voter_id', userId);
-    setVotedIds(new Set((myVotes ?? []).map((v) => v.prediction_id)));
 
     const { data: friendships } = await fetchFriendships(userId);
     const accepted = (friendships ?? []).filter((f) => f.status === 'accepted');
@@ -502,7 +492,6 @@ export default function HomeScreen() {
                 friendIds
               )}
               userId={userId!}
-              hasVoted={votedIds.has(item.id)}
               unseen={!item.is_seen}
               onPress={() => {
                 handleMarkSeen(item.id);

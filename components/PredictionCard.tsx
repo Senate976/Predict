@@ -14,11 +14,9 @@ import {
 } from 'react-native';
 import { Text } from './Text';
 
-import { ConfidenceGauge } from './ConfidenceGauge';
 import { fetchCommentCount } from '../lib/comments';
 import { formatCountdown, toDateInput } from '../lib/datetime';
 import {
-  beliefPercentage,
   castEmojiReaction,
   EMOJI_REACTIONS,
   fetchEmojiReactors,
@@ -29,11 +27,9 @@ import {
   type EmojiReactor,
   type PredictionFeedItem,
 } from '../lib/predictions';
-import { castVote, voteErrorMessage } from '../lib/votes';
 import { colors, fonts, radius } from '../lib/theme';
 import { Avatar } from './Avatar';
 import { InlineComments } from './InlineComments';
-import { PredictWord } from './PredictWord';
 
 /** Largeur fixe de la bulle de réactions, ancrée par son bord droit sur le pouce. */
 const EMOJI_PANEL_WIDTH = 260;
@@ -55,7 +51,6 @@ export function PredictionCard({
   mentionLabel,
   userId,
   onPress,
-  hasVoted = false,
   unseen = false,
   onDelete,
   onFavoriteChange,
@@ -73,9 +68,6 @@ export function PredictionCard({
   mentionLabel?: string | null;
   userId: string;
   onPress?: () => void;
-  /** Le destinataire s'est déjà prononcé sur cette prédiction — masque le lien
-   * « Donner mon avis », qui n'a plus lieu d'être une fois le vote posé. */
-  hasVoted?: boolean;
   /** Pas encore ouverte par ce destinataire — surlignage discret + compte
    * dans le badge de l'onglet correspondant. */
   unseen?: boolean;
@@ -100,11 +92,6 @@ export function PredictionCard({
   const [reactors, setReactors] = useState<EmojiReactor[] | null>(null);
   const [reactorsLoading, setReactorsLoading] = useState(false);
   const [reactorsError, setReactorsError] = useState<string | null>(null);
-  const [believeVotes, setBelieveVotes] = useState(item.believe_votes);
-  const [disbelieveVotes, setDisbelieveVotes] = useState(item.disbelieve_votes);
-  const [localVote, setLocalVote] = useState<'believe' | 'disbelieve' | null>(null);
-  const [voting, setVoting] = useState(false);
-  const [voteError, setVoteError] = useState<string | null>(null);
   const revealed = isRevealed(item, now);
   const isAuthor = item.author_id === userId;
 
@@ -124,10 +111,6 @@ export function PredictionCard({
       : verdict === 'missed'
         ? { kind: 'missed', label: 'Manqué' }
         : { kind: 'active', label: 'En cours' };
-  const belief = item.is_immediate
-    ? beliefPercentage({ ...item, believe_votes: believeVotes, disbelieve_votes: disbelieveVotes })
-    : null;
-  const voted = hasVoted || localVote !== null;
 
   useEffect(() => {
     let cancelled = false;
@@ -178,22 +161,6 @@ export function PredictionCard({
       setIsHidden(!next);
       onHiddenChange?.(!next);
     }
-  }
-
-  /** Vote rapide « 🔥 confiant / ❌ pas confiant », posé sans quitter le Fil. */
-  async function handleQuickVote(value: 'believe' | 'disbelieve') {
-    if (voting) return;
-    setVoting(true);
-    setVoteError(null);
-    const { error } = await castVote(item.id, userId, value);
-    setVoting(false);
-    if (error) {
-      setVoteError(voteErrorMessage(error));
-      return;
-    }
-    setLocalVote(value);
-    if (value === 'believe') setBelieveVotes((v) => v + 1);
-    else setDisbelieveVotes((v) => v + 1);
   }
 
   /** Charge le détail « qui a réagi avec quoi », une seule fois par carte. */
@@ -366,7 +333,11 @@ export function PredictionCard({
             <Lock size={11} color={colors.gold} strokeWidth={2} style={styles.statusBannerIcon} />
           )}
           <Text
-            style={[styles.statusBannerText, statusBanner.kind === 'sealed' && styles.statusBannerTextSealed]}
+            style={[
+              styles.statusBannerText,
+              statusBanner.kind === 'sealed' && styles.statusBannerTextSealed,
+              statusBanner.kind === 'missed' && styles.statusBannerTextMissed,
+            ]}
             numberOfLines={1}
           >
             {statusBanner.label}
@@ -419,66 +390,7 @@ export function PredictionCard({
         {(revealed || isAuthor) && item.content && (
           <Text style={styles.cardContent}>{item.content}</Text>
         )}
-
-        {item.is_immediate && (
-          <View style={styles.confidenceBlock}>
-            {belief === null ? (
-              <Text style={styles.beliefScore}>Personne n’a encore donné son avis.</Text>
-            ) : (
-              <>
-                {/* Le chiffre flotte au-dessus du curseur plutôt que sur sa
-                    propre ligne pleine largeur — rien d'écrit sur la jauge
-                    elle-même, juste ce repère ponctuel. Positionné via
-                    `justifyContent` (gauche/centre/droite selon le tiers où
-                    tombe le curseur) plutôt qu'un pourcentage exact : robuste
-                    sans mesurer la largeur du texte. */}
-                <View
-                  style={[
-                    styles.confidenceLabelRow,
-                    {
-                      justifyContent: belief < 35 ? 'flex-start' : belief > 65 ? 'flex-end' : 'center',
-                    },
-                  ]}
-                >
-                  <Text style={styles.confidenceLabel}>
-                    {belief}% confiants ({believeVotes + disbelieveVotes} vote
-                    {believeVotes + disbelieveVotes > 1 ? 's' : ''})
-                  </Text>
-                </View>
-                <ConfidenceGauge belief={belief} />
-              </>
-            )}
-          </View>
-        )}
       </Pressable>
-
-      {item.is_immediate && revealed && !isAuthor && !voted && (
-        <View style={styles.quickVoteRow}>
-          <Pressable
-            onPress={() => handleQuickVote('believe')}
-            disabled={voting}
-            style={styles.quickVotePill}
-            hitSlop={4}
-          >
-            <Text style={styles.quickVotePillText}>🔥 confiant</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => handleQuickVote('disbelieve')}
-            disabled={voting}
-            style={styles.quickVotePill}
-            hitSlop={4}
-          >
-            <Text style={styles.quickVotePillText}>❌ pas confiant</Text>
-          </Pressable>
-        </View>
-      )}
-      {voteError && <Text style={styles.voteError}>{voteError}</Text>}
-
-      {!item.is_immediate && revealed && !isAuthor && !hasVoted && (
-        <Pressable onPress={() => onPress?.()} style={styles.voteLink} hitSlop={4}>
-          <Text style={styles.voteLinkText}>Donner mon avis sur ce <PredictWord /> →</Text>
-        </Pressable>
-      )}
 
       <View style={styles.footerRow}>
         {/* Trois colonnes de largeur égale — le pouce reste ainsi centré sur
@@ -680,18 +592,17 @@ const styles = StyleSheet.create({
   // Sceller : anthracite, seul état sans texte noir ni jaune en fond — le
   // cadenas jaune reste le seul rappel de la charte sur ce bandeau-là.
   statusBannerSealed: { backgroundColor: colors.bannerSealedBg },
-  // En cours : jaune de la charte — la seule carte qui attend une action de
-  // qui la regarde, elle doit sortir du lot.
-  statusBannerActive: { backgroundColor: colors.gold },
-  statusBannerRealized: { backgroundColor: colors.verdictRealized },
-  // Manqué : gris plutôt que la teinte de marque du verdict — l'échec se lit
-  // comme une extinction, pas comme un troisième accent coloré.
-  statusBannerMissed: { backgroundColor: colors.textFaint },
+  // En cours / Réalisé / Manqué : fonds à 75% d'opacité (charte), Manqué garde
+  // sa teinte magenta de marque — seul le mot « Manqué » se grise, pas le fond.
+  statusBannerActive: { backgroundColor: 'rgba(250, 204, 21, 0.75)' },
+  statusBannerRealized: { backgroundColor: 'rgba(54, 168, 160, 0.75)' },
+  statusBannerMissed: { backgroundColor: 'rgba(156, 29, 110, 0.75)' },
   // `flexShrink` (et non 0) : quand la cellule de droite porte un compte à
   // rebours, le libellé central doit pouvoir se tronquer plutôt que déborder
   // dessus — la date de scellé reste lisible même sur un écran étroit. Noir
-  // par défaut (en cours / réalisé / manqué) ; le scellé, seul état sur fond
-  // sombre, s'éclaircit via `statusBannerTextSealed`.
+  // par défaut (en cours / réalisé) ; le scellé, seul état sur fond sombre,
+  // s'éclaircit via `statusBannerTextSealed` ; le manqué grise via
+  // `statusBannerTextMissed` tout en gardant son fond magenta.
   statusBannerText: {
     flexShrink: 1,
     minWidth: 0,
@@ -702,6 +613,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   statusBannerTextSealed: { color: colors.bannerSealedText },
+  statusBannerTextMissed: { color: colors.textFaint },
   // Toujours sur fond anthracite (seul état à porter cette cellule).
   // Bulle distincte plutôt qu'un texte se fondant dans le bandeau — la date
   // de révélation reste une information à part, pas une suite du libellé.
@@ -742,28 +654,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     lineHeight: 25,
   },
-  beliefScore: { fontSize: 13, color: colors.textMuted, marginTop: 10 },
-  // Jauge d'opinion : rien d'écrit sur la barre elle-même — juste un curseur
-  // à la position du pourcentage, et le chiffre qui flotte au-dessus.
-  confidenceBlock: { marginTop: 12 },
-  confidenceLabelRow: { flexDirection: 'row', marginBottom: 4 },
-  confidenceLabel: { fontSize: 12, fontWeight: '700', color: colors.text },
-  // Deux actions d'engagement immédiat, sans quitter le Fil. Contour fin +
-  // fond blanc : présentes sans écraser la carte.
-  quickVoteRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  quickVotePill: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.pill,
-    paddingVertical: 9,
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-  },
-  quickVotePillText: { fontSize: 13, fontWeight: '700', color: colors.text },
-  voteError: { fontSize: 12, color: colors.danger, marginTop: 8 },
-  voteLink: { marginTop: 10 },
-  voteLinkText: { fontFamily: fonts.bodyEmphasis, fontSize: 13, color: colors.text },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',

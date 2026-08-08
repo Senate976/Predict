@@ -104,16 +104,14 @@ export const fonts = {
 } as const;
 
 /**
- * Style partagé pour les petites étiquettes de métadonnées (« TEASER »,
- * « VOS SCELLÉS »...) : Medium, majuscules, tracking très marqué, toujours
- * petit. Référence visuelle globale — tous les écrans l'utilisent au lieu de
- * coder leur propre variante. Un objet exporté plutôt qu'un composant : il se
+ * Style partagé pour les petites étiquettes de métadonnées (« Destinataires »,
+ * « Mes amis »...) : Medium, casse normale, sans tracking, toujours petit.
+ * Référence visuelle globale — tous les écrans l'utilisent au lieu de coder
+ * leur propre variante. Un objet exporté plutôt qu'un composant : il se
  * glisse tel quel dans un tableau de `style`, sans imposer de structure JSX.
  */
 export const eyebrow = {
   fontFamily: fonts.label,
   fontSize: 12,
-  letterSpacing: 2,
-  textTransform: 'uppercase' as const,
   color: colors.textFaint,
 };
