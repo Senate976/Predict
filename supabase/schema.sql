@@ -3334,7 +3334,225 @@ revoke all on function public.set_prediction_verdict(uuid, text) from public;
 grant execute on function public.set_prediction_verdict(uuid, text) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 36. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 36. Page Paramètres — préférences de compte, notifications, rappels
+-- ---------------------------------------------------------------------------
+--
+-- Remplit les stubs de l'écran Paramètres avec de vrais réglages, persistés
+-- sur `profiles` (colonnes lisibles/modifiables par leur propriétaire via la
+-- policy `profiles_update_own` déjà en place — pas de nouvelle policy à
+-- écrire). Pas de mode sombre : explicitement hors périmètre.
+alter table public.profiles add column if not exists notification_prefs jsonb not null
+  default '{"new_teaser":true,"prediction_revealed":true,"prediction_verdict":true,"prediction_mentioned":true,"group_invite":true}'::jsonb;
+alter table public.profiles add column if not exists reveal_reminder_enabled boolean not null default true;
+alter table public.profiles add column if not exists reveal_reminder_lead_minutes integer not null default 60;
+alter table public.profiles drop constraint if exists profiles_reveal_reminder_lead_minutes_check;
+alter table public.profiles add constraint profiles_reveal_reminder_lead_minutes_check
+  check (reveal_reminder_lead_minutes in (15, 60, 1440));
+-- Accessibilité : atténue les animations décoratives (la pluie d'or de
+-- CelebrationBurst). `null`/`false` par défaut, jamais de mode sombre ici.
+alter table public.profiles add column if not exists reduce_motion boolean not null default false;
+-- Confidentialité : portée pré-sélectionnée à la création d'un Predict.
+-- `null` = pas de préférence (l'écran garde son défaut actuel, « Cercle »).
+-- Volontairement restreint à circle/selected : « Un groupe » n'a pas de sens
+-- comme défaut global, il désigne un groupe précis à choisir à chaque fois.
+alter table public.profiles add column if not exists default_scope text;
+alter table public.profiles drop constraint if exists profiles_default_scope_check;
+alter table public.profiles add constraint profiles_default_scope_check
+  check (default_scope is null or default_scope in ('circle', 'selected'));
+
+-- Nouveau type de notification : rappel avant révélation (section suivante).
+alter table public.notifications drop constraint if exists notifications_type_check;
+alter table public.notifications add constraint notifications_type_check
+  check (type in (
+    'new_teaser', 'prediction_revealed', 'prediction_approved', 'group_invite',
+    'prediction_mentioned', 'prediction_realized', 'prediction_missed', 'reveal_reminder'
+  ));
+
+-- Chaque fonction qui insère une notification se revérifie désormais contre
+-- la préférence du destinataire (`notification_prefs`), `true` par défaut si
+-- la clé est absente (anciens profils avant l'ajout de la colonne). Reprises
+-- à l'identique sinon — même garde-fous, même logique métier.
+create or replace function public.notify_new_teaser()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.notifications (user_id, prediction_id, type)
+  select new.user_id, new.prediction_id, 'new_teaser'
+  from public.profiles p
+  where p.id = new.user_id
+    and coalesce((p.notification_prefs->>'new_teaser')::boolean, true)
+  on conflict (user_id, prediction_id, type) do nothing;
+  return new;
+end;
+$$;
+
+create or replace function public.generate_reveal_notifications()
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.notifications (user_id, prediction_id, type)
+  select pa.user_id, p.id, 'prediction_revealed'
+  from public.predictions p
+  join public.prediction_access pa on pa.prediction_id = p.id
+  join public.profiles pr on pr.id = pa.user_id
+  where p.reveal_at <= now()
+    and coalesce((pr.notification_prefs->>'prediction_revealed')::boolean, true)
+  on conflict (user_id, prediction_id, type) do nothing;
+end;
+$$;
+
+create or replace function public.notify_group_invite()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.status = 'pending' then
+    insert into public.notifications (user_id, group_id, type)
+    select new.friend_id, new.group_id, 'group_invite'
+    from public.profiles p
+    where p.id = new.friend_id
+      and coalesce((p.notification_prefs->>'group_invite')::boolean, true)
+    on conflict (user_id, group_id, type) where (type = 'group_invite') do nothing;
+  end if;
+  return new;
+end;
+$$;
+
+create or replace function public.notify_mention(p_prediction_id uuid, p_mentioned_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not exists (
+    select 1 from public.predictions p
+    where p.id = p_prediction_id and p.author_id = auth.uid()
+  ) then
+    return;
+  end if;
+
+  if not exists (
+    select 1 from public.friendships f
+    where f.status = 'accepted'
+      and (
+        (f.requester_id = auth.uid() and f.addressee_id = p_mentioned_id)
+        or (f.addressee_id = auth.uid() and f.requester_id = p_mentioned_id)
+      )
+  ) then
+    return;
+  end if;
+
+  insert into public.notifications (user_id, prediction_id, type)
+  select p_mentioned_id, p_prediction_id, 'prediction_mentioned'
+  from public.profiles p
+  where p.id = p_mentioned_id
+    and coalesce((p.notification_prefs->>'prediction_mentioned')::boolean, true)
+  on conflict (user_id, prediction_id, type) do nothing;
+end;
+$$;
+
+revoke all on function public.notify_mention(uuid, uuid) from public;
+grant execute on function public.notify_mention(uuid, uuid) to authenticated;
+
+-- Reprend `set_prediction_verdict` de la section 35 à l'identique, avec le
+-- même garde-fou de préférence sur la notification envoyée à chaque
+-- destinataire.
+create or replace function public.set_prediction_verdict(p_prediction_id uuid, p_verdict text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if p_verdict not in ('realized', 'missed') then
+    raise exception 'Verdict invalide : %', p_verdict;
+  end if;
+
+  update public.predictions
+  set author_verdict = p_verdict
+  where id = p_prediction_id
+    and author_id = auth.uid()
+    and reveal_at <= now();
+
+  insert into public.notifications (user_id, prediction_id, type)
+  select pa.user_id, p_prediction_id,
+    case p_verdict when 'realized' then 'prediction_realized' else 'prediction_missed' end
+  from public.predictions p
+  join public.prediction_access pa on pa.prediction_id = p.id
+  join public.profiles pr on pr.id = pa.user_id
+  where p.id = p_prediction_id
+    and p.author_verdict = p_verdict
+    and coalesce((pr.notification_prefs->>'prediction_verdict')::boolean, true)
+  on conflict (user_id, prediction_id, type) do nothing;
+end;
+$$;
+
+revoke all on function public.set_prediction_verdict(uuid, text) from public;
+grant execute on function public.set_prediction_verdict(uuid, text) to authenticated;
+
+-- Rappel avant révélation — pendant symétrique de `generate_reveal_notifications`
+-- pour les prédictions PAS ENCORE révélées : le client l'appelle au même
+-- endroit (chargement du Fil), et chaque destinataire n'est prévenu que si
+-- son propre délai (`reveal_reminder_lead_minutes`) est atteint et le
+-- réglage activé. Jamais pour une prédiction « ouverte » (`open_ended`) :
+-- sans date fixe, aucun délai n'a de sens.
+create or replace function public.generate_reveal_reminders()
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.notifications (user_id, prediction_id, type)
+  select pa.user_id, p.id, 'reveal_reminder'
+  from public.predictions p
+  join public.prediction_access pa on pa.prediction_id = p.id
+  join public.profiles pr on pr.id = pa.user_id
+  where not p.open_ended
+    and p.reveal_at > now()
+    and pr.reveal_reminder_enabled
+    and p.reveal_at - (pr.reveal_reminder_lead_minutes || ' minutes')::interval <= now()
+  on conflict (user_id, prediction_id, type) do nothing;
+end;
+$$;
+
+revoke all on function public.generate_reveal_reminders() from public;
+grant execute on function public.generate_reveal_reminders() to authenticated;
+
+-- Suppression de compte, en libre-service : la policy `profiles` n'a
+-- volontairement aucune règle `delete` (section 3) — plutôt que de
+-- supprimer seulement `profiles`, cette fonction supprime la ligne
+-- `auth.users`, ce qui cascade sur `profiles` puis sur toutes ses données
+-- (predictions, votes dormants, commentaires, notifications, etc. — chaque
+-- table a été créée avec `on delete cascade` vers `profiles` ou
+-- `predictions`). `security definer` : un utilisateur normal n'a pas accès
+-- en écriture à `auth.users`, seul le propriétaire de la fonction (le rôle
+-- ayant exécuté ce script) l'a.
+create or replace function public.delete_own_account()
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  delete from auth.users where id = auth.uid();
+end;
+$$;
+
+revoke all on function public.delete_own_account() from public;
+grant execute on function public.delete_own_account() to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 37. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une

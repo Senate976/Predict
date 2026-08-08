@@ -67,7 +67,7 @@ const MINUTE_OPTIONS: SelectOption<number>[] = [0, 15, 30, 45].map((m) => ({
 }));
 
 export default function NewPredictionScreen() {
-  const { session } = useAuth();
+  const { session, defaultScope } = useAuth();
   const router = useRouter();
   const navigation = useNavigation();
   const userId = session?.user.id;
@@ -88,6 +88,12 @@ export default function NewPredictionScreen() {
 
   const [category, setCategory] = useState<PredictionCategory>('autre');
   const [scope, setScope] = useState<PredictionScope>('circle');
+  // Réglage Confidentialité : pré-sélectionne la portée par défaut de
+  // l'auteur, une fois son profil chargé — un seul alignement, pas un
+  // verrou : l'auteur reste libre de choisir une autre portée ensuite.
+  useEffect(() => {
+    if (defaultScope) setScope(defaultScope);
+  }, [defaultScope]);
   const [friends, setFriends] = useState<FriendProfile[] | null>(null);
   const [selectedFriendIds, setSelectedFriendIds] = useState<Set<string>>(new Set());
   const [groups, setGroups] = useState<FriendGroup[] | null>(null);

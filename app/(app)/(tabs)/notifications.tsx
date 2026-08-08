@@ -70,6 +70,12 @@ function notificationLabel(notification: Notification) {
           <PredictWord /> a été manqué
         </>
       );
+    case 'reveal_reminder':
+      return (
+        <>
+          Un <PredictWord /> se révèle bientôt
+        </>
+      );
     case 'group_invite':
       return notification.group?.owner
         ? `${notification.group.owner.username} t’invite dans un groupe`
