@@ -441,7 +441,7 @@ export function PredictionCard({
           {verdict && (
             <View style={[styles.verdictStamp, verdict === 'missed' && styles.verdictStampTilted]}>
               <View style={styles.verdictStampInner}>
-                <Text style={styles.verdictStampText}>{verdict === 'realized' ? 'Réalisé' : 'Manqué'}</Text>
+                <Text style={styles.verdictStampText}>{verdict === 'realized' ? 'J’avais raison' : 'Flop'}</Text>
                 <View style={styles.verdictStampRule} />
               </View>
             </View>
@@ -724,10 +724,10 @@ const styles = StyleSheet.create({
   // l'effet « tampon encreur officiel » sans jamais empiéter en position
   // absolue sur le teaser ou le contenu.
   verdictStamp: {
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: colors.text,
-    borderRadius: 4,
-    padding: 2,
+    borderRadius: 5,
+    padding: 3,
     backgroundColor: colors.surface,
     transform: [{ rotate: '-6deg' }],
   },
@@ -736,17 +736,17 @@ const styles = StyleSheet.create({
   // (`padding` du parent) — la double bordure d'un sceau officiel plutôt
   // qu'un simple encadré.
   verdictStampInner: {
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.text,
-    borderRadius: 2,
-    paddingHorizontal: 8,
-    paddingTop: 3,
-    paddingBottom: 2,
+    borderRadius: 3,
+    paddingHorizontal: 11,
+    paddingTop: 5,
+    paddingBottom: 4,
     alignItems: 'center',
   },
   verdictStampText: {
     fontFamily: fonts.sansBold,
-    fontSize: 11,
+    fontSize: 14,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
     color: colors.text,
@@ -756,7 +756,7 @@ const styles = StyleSheet.create({
     height: 2,
     backgroundColor: colors.gold,
     borderRadius: 1,
-    marginTop: 3,
+    marginTop: 4,
   },
   // Tout sur une seule ligne : [avatar 32][pseudo] ...espace flexible...
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
