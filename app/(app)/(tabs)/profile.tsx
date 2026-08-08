@@ -383,10 +383,9 @@ const styles = StyleSheet.create({
   statCardActive: { borderBottomWidth: 3, borderBottomColor: colors.text },
   // Pas de code couleur réalisé/manqué : seul le libellé sous le nombre
   // porte le sens, conformément à la palette stricte noir/blanc/jaune.
-  statValue: { fontFamily: fonts.display, fontSize: 26, color: colors.text },
+  statValue: { fontFamily: fonts.body, fontSize: 26, color: colors.text },
   statLabel: {
     fontSize: 10,
-    fontWeight: '700',
     letterSpacing: 1,
     textTransform: 'uppercase',
     color: colors.textFaint,
@@ -407,7 +406,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  historyTeaser: { fontFamily: fonts.sansBold, fontSize: 17, color: colors.text },
+  historyTeaser: { fontFamily: fonts.body, fontSize: 17, color: colors.text },
   historyMeta: { fontSize: 12, color: colors.textFaint, marginTop: 4 },
   error: {
     color: colors.danger,

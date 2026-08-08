@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { MessageCircle, MoreHorizontal, ThumbsUp, Trash2 } from 'lucide-react-native';
+import { Eye, EyeOff, MessageCircle, Star, ThumbsUp, Trash2 } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -91,7 +91,6 @@ export function PredictionCard({
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentCount, setCommentCount] = useState<number | null>(null);
   const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [isFavorite, setIsFavorite] = useState(item.is_favorite);
   const [isHidden, setIsHidden] = useState(item.is_hidden);
   const [myEmoji, setMyEmoji] = useState<EmojiReaction | null>(item.my_emoji_reaction);
@@ -358,10 +357,6 @@ export function PredictionCard({
               <Text style={styles.badgeText}>{verdict === 'realized' ? 'Réalisé' : 'Manqué'}</Text>
             </View>
           )}
-
-          <Pressable onPress={() => setMenuOpen(true)} style={styles.menuButton} hitSlop={8}>
-            <MoreHorizontal size={18} color={colors.icon} strokeWidth={1.75} />
-          </Pressable>
         </View>
 
         {/* Sur sa propre ligne, jamais accolée au pseudo — la liste complète
@@ -460,6 +455,18 @@ export function PredictionCard({
               <Text style={styles.commentsToggleText}>{commentCount}</Text>
             )}
           </Pressable>
+
+          {/* Favori : étoile pleine dès qu'activée, discrète sinon — remis en
+              icône directe plutôt que caché dans un menu, pour un accès en un
+              tap comme le commentaire et la réaction juste à côté. */}
+          <Pressable onPress={handleToggleFavorite} hitSlop={8}>
+            <Star
+              size={16}
+              color={isFavorite ? colors.gold : colors.textFaint}
+              fill={isFavorite ? colors.gold : 'none'}
+              strokeWidth={1.75}
+            />
+          </Pressable>
         </View>
 
         <View style={styles.footerCellCenter}>
@@ -516,6 +523,16 @@ export function PredictionCard({
         </View>
 
         <View style={styles.footerCellRight}>
+          {/* Masquer : préférence personnelle (comme le favori), pas réservée
+              à l'auteur — remis en icône directe pour le même accès rapide. */}
+          <Pressable onPress={handleToggleHidden} hitSlop={8}>
+            {isHidden ? (
+              <Eye size={16} color={colors.icon} strokeWidth={1.75} />
+            ) : (
+              <EyeOff size={16} color={colors.textFaint} strokeWidth={1.75} />
+            )}
+          </Pressable>
+
           {/* Suppression réservée à l'auteur — plus la peine de révéler
               d'abord (la RLS `predictions_delete_own` ne l'a jamais exigé,
               seule l'UI le faisait) : à tout moment sur son propre Predict. */}
@@ -536,34 +553,6 @@ export function PredictionCard({
           isPredictionAuthor={isAuthor}
         />
       )}
-
-      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
-        <Pressable style={styles.modalOverlay} onPress={() => setMenuOpen(false)}>
-          <Pressable style={styles.menuBox} onPress={() => {}}>
-            <Pressable
-              onPress={() => {
-                setMenuOpen(false);
-                handleToggleFavorite();
-              }}
-              style={styles.menuRow}
-            >
-              <Text style={styles.menuRowText}>
-                {isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => {
-                setMenuOpen(false);
-                handleToggleHidden();
-              }}
-              style={styles.menuRowLast}
-            >
-              <Text style={styles.menuRowText}>{isHidden ? 'Afficher à nouveau' : 'Masquer'}</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
 
       <Modal
         visible={reactorsOpen}
@@ -609,6 +598,11 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 12,
     backgroundColor: colors.surface,
+    // Web uniquement : sans ça, glisser le pouce vers un emoji du panneau
+    // sélectionne le texte de la carte au passage, ce qui coupe le geste
+    // (`onPanResponderTerminate`) au lieu de faire glisser la sélection
+    // d'emoji comme sur Facebook.
+    ...(Platform.OS === 'web' ? { userSelect: 'none' } : null),
   },
   // Non lue : fine bordure lumineuse + fond très légèrement teinté, assez
   // discret pour ne pas jurer avec le reste de la charte noir/blanc/jaune.
@@ -621,12 +615,11 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   headerSpacer: { flex: 1, minWidth: 8 },
   // `flexShrink` sur le bloc auteur ET sur le pseudo : c'est le pseudo qui se
-  // tronque avec ellipse si la place manque, jamais le badge ni le menu.
+  // tronque avec ellipse si la place manque, jamais le badge.
   authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, minWidth: 0 },
-  authorName: { fontFamily: fonts.bodyEmphasis, fontSize: 14, color: colors.icon, flexShrink: 1, minWidth: 0 },
+  authorName: { fontFamily: fonts.bodyEmphasis, fontSize: 16, color: colors.icon, flexShrink: 1, minWidth: 0 },
   // Sur sa propre ligne, sous l'en-tête — jamais accolée au pseudo.
   mentionTag: { fontSize: 12, fontWeight: '500', color: colors.textMuted, marginTop: -4, marginBottom: 10 },
-  menuButton: { padding: 2 },
   // Texte simple pour le délai (rien à signaler encore) ; pour le verdict,
   // un fin liseré sur le bord gauche plutôt qu'une pastille pleine — le
   // jaune plein ne convenait pas ici, réservé aux éléments interactifs
@@ -641,7 +634,7 @@ const styles = StyleSheet.create({
   // plutôt que la graisse : c'est ce qui la distingue du corps, pas son poids.
   cardTeaser: {
     fontFamily: fonts.label,
-    fontSize: 12,
+    fontSize: 14,
     color: colors.textFaint,
     marginBottom: 4,
   },
@@ -684,23 +677,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
   },
-  menuBox: {
-    width: '100%',
-    maxWidth: 320,
-    borderRadius: 16,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-  },
-  menuRow: {
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  menuRowLast: { paddingHorizontal: 18, paddingVertical: 14 },
-  menuRowText: { fontSize: 14, fontWeight: '600', color: colors.text },
   // Une seule « grande bulle », façon Facebook — flottante au-dessus du
   // pouce (pas en dessous) pour ne pas être masquée par le doigt qui la
   // fait glisser, et pas des puces séparées.
@@ -747,9 +723,9 @@ const styles = StyleSheet.create({
   // Trois cellules de largeur égale : le pouce (cellule centrale) reste ainsi
   // centré sur la carte quels que soient la largeur des commentaires à
   // gauche et la présence ou non de la poubelle à droite.
-  footerCellLeft: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  footerCellLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 16 },
   footerCellCenter: { flex: 1, alignItems: 'center' },
-  footerCellRight: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' },
+  footerCellRight: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 16 },
   commentsToggle: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   // Affiché seulement s'il y a au moins un commentaire — donc toujours en
   // gras noir : c'est une interaction réelle, pas un zéro décoratif.
