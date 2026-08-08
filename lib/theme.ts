@@ -43,7 +43,9 @@ export const colors = {
   // Bandeau d'état « Scellé » de la carte : anthracite plutôt que noir pur,
   // pour se distinguer du fond jaune de l'état « En cours ».
   bannerSealedBg: '#2B2B2B',
-  bannerSealedText: '#B8B8B8',
+  // Texte des bandeaux à fond soutenu (Scellé, Manqué) : blanc, pour un
+  // contraste maximal aussi bien sur l'anthracite que sur le magenta.
+  bannerTextOnDark: '#FFFFFF',
   // Trait des icônes (Lucide) : noir adouci plutôt que gris clair, pour
   // qu'elles ressortent sans être aussi dures qu'un noir pur.
   icon: '#374151',
