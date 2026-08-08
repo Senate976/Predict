@@ -28,6 +28,7 @@ import {
   isRevealed,
   removeRecipient,
   revealPredictionNow,
+  setPredictionVerdict,
   type PredictionFeedItem,
   type PredictionRecipient,
 } from '../../../lib/predictions';
@@ -52,6 +53,8 @@ export default function PredictionDetailScreen() {
   const [recipientsOpen, setRecipientsOpen] = useState(false);
   const [revealing, setRevealing] = useState(false);
   const [revealError, setRevealError] = useState<string | null>(null);
+  const [verdictPending, setVerdictPending] = useState(false);
+  const [verdictError, setVerdictError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id || !userId) return;
@@ -171,6 +174,23 @@ export default function PredictionDetailScreen() {
     ]);
   }
 
+  /** Contrairement au Fil (une seule affirmation possible), l'écran détail
+   * permet de revenir sur le verdict à tout moment — la RPC elle-même ne
+   * l'interdit pas (voir `set_prediction_verdict`, section 35), seule
+   * `components/PredictionCard.tsx` s'auto-restreint à un geste unique. */
+  async function handleSetVerdict(next: 'realized' | 'missed') {
+    if (!id) return;
+    setVerdictPending(true);
+    setVerdictError(null);
+    const { error: verdictErr } = await setPredictionVerdict(id, next);
+    setVerdictPending(false);
+    if (verdictErr) {
+      setVerdictError(`Action impossible : ${verdictErr.message}`);
+      return;
+    }
+    setPrediction((prev) => (prev ? { ...prev, final_status: next } : prev));
+  }
+
   const isAuthor = prediction && userId && prediction.author_id === userId;
   const revealed = prediction ? isRevealed(prediction, new Date()) : false;
   // Écart entre le scellé et la révélation — juste informatif, pour souligner
@@ -276,6 +296,58 @@ export default function PredictionDetailScreen() {
                     {revealing ? 'Révélation…' : 'Révéler maintenant'}
                   </Text>
                 </Pressable>
+              </View>
+            )}
+
+            {/* Seul endroit où revenir sur un verdict déjà posé est possible
+                (le Fil, lui, ne propose Réalisé/Manqué qu'une fois, tant que
+                rien n'est encore affirmé) — réservé à l'auteur, une fois la
+                prédiction révélée. */}
+            {isAuthor && revealed && (
+              <View style={styles.sectionSpacing}>
+                <Text style={styles.eyebrow}>Verdict</Text>
+                <View style={styles.verdictChoiceRow}>
+                  <Pressable
+                    onPress={() => handleSetVerdict('realized')}
+                    disabled={verdictPending}
+                    style={[
+                      styles.verdictChoice,
+                      prediction.final_status === 'realized' && styles.verdictChoiceActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.verdictChoiceText,
+                        prediction.final_status === 'realized' && styles.verdictChoiceTextActive,
+                      ]}
+                    >
+                      Réalisé
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleSetVerdict('missed')}
+                    disabled={verdictPending}
+                    style={[
+                      styles.verdictChoice,
+                      prediction.final_status === 'missed' && styles.verdictChoiceActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.verdictChoiceText,
+                        prediction.final_status === 'missed' && styles.verdictChoiceTextActive,
+                      ]}
+                    >
+                      Manqué
+                    </Text>
+                  </Pressable>
+                </View>
+                <Text style={styles.hint}>
+                  {prediction.final_status === 'pending'
+                    ? 'Affirme si cette prédiction s’est réalisée ou a été manquée.'
+                    : 'Tu peux revenir sur ce choix à tout moment.'}
+                </Text>
+                {verdictError && <Text style={styles.error}>{verdictError}</Text>}
               </View>
             )}
 
@@ -444,6 +516,23 @@ const styles = StyleSheet.create({
   revealNowButtonText: { fontSize: 13, fontWeight: '700', color: colors.text },
   sectionSpacing: { marginTop: spacing.lg, marginBottom: 8 },
   sectionToggle: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start' },
+  verdictChoiceRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
+  // Contour noir sur blanc par défaut (même registre que « Révéler
+  // maintenant », « Ajouter » plus bas) ; le choix retenu bascule en plein
+  // noir — jamais de rouge/vert, un verdict tranché « s'impose » par le
+  // contraste plutôt que par une couleur de statut.
+  verdictChoice: {
+    flex: 1,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.text,
+    borderRadius: radius.pill,
+    paddingVertical: 11,
+    backgroundColor: colors.surface,
+  },
+  verdictChoiceActive: { backgroundColor: colors.text },
+  verdictChoiceText: { fontSize: 14, fontWeight: '700', color: colors.text },
+  verdictChoiceTextActive: { color: colors.surface },
   chevron: { fontSize: 11, color: colors.textFaint },
   hint: { fontSize: 14, color: colors.textFaint, lineHeight: 20 },
   row: {

@@ -486,12 +486,15 @@ export async function fetchPredictionOutcomes(authorId: string) {
 }
 
 /**
- * L'auteur affirme si sa prédiction s'est réalisée ou a été manquée — un
- * geste unique et définitif (le « tampon » de l'UI, jamais révisable
- * ensuite) : `set_prediction_verdict` (security definer) ne fait rien si le
- * verdict est déjà posé, si la prédiction n'est pas encore révélée, ou si
- * l'appelant n'en est pas l'auteur. Notifie chaque destinataire dans la
- * foulée, côté base.
+ * L'auteur affirme (ou corrige) si sa prédiction s'est réalisée ou a été
+ * manquée. Ne fait rien si la prédiction n'est pas encore révélée ou si
+ * l'appelant n'en est pas l'auteur — `set_prediction_verdict` (security
+ * definer) porte elle-même ce garde-fou. Notifie chaque destinataire dans la
+ * foulée, côté base, la première fois que ce verdict précis est posé.
+ *
+ * La fonction accepte un appel répété (correction) sans restriction : c'est
+ * le client qui décide où proposer quoi — le Fil (PredictionCard) tant
+ * qu'aucun verdict n'est posé, l'écran détail pour revenir dessus ensuite.
  */
 export async function setPredictionVerdict(predictionId: string, verdict: 'realized' | 'missed') {
   return supabase.rpc('set_prediction_verdict', { p_prediction_id: predictionId, p_verdict: verdict });

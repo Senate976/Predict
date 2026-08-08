@@ -376,27 +376,27 @@ export function PredictionCard({
       {/* Invite l'auteur à trancher dès que sa prédiction est révélée mais
           encore « En cours » — nulle part ailleurs que sur sa propre carte,
           en dehors de la zone tappable (`onPress` navigue vers le détail) :
-          un tap sur un bouton ne doit jamais aussi ouvrir l'écran détail. */}
+          un tap sur un bouton ne doit jamais aussi ouvrir l'écran détail.
+          Rien que les deux boutons, aucun texte d'accompagnement — une fois
+          posé, revenir dessus n'est plus possible ici, seulement depuis
+          l'écran détail (voir `set_prediction_verdict`, section 35). */}
       {isAuthor && revealed && verdict === null && (
         <View style={styles.verdictPrompt}>
-          <View style={styles.verdictPromptRow}>
-            <Text style={styles.verdictPromptLabel}>Alors, ça s’est confirmé ?</Text>
-            <View style={styles.verdictPromptButtons}>
-              <Pressable
-                onPress={() => handleSetVerdict('realized')}
-                disabled={verdictPending}
-                style={[styles.verdictPromptButton, styles.verdictPromptButtonRealized]}
-              >
-                <Text style={styles.verdictPromptButtonText}>Réalisé</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => handleSetVerdict('missed')}
-                disabled={verdictPending}
-                style={[styles.verdictPromptButton, styles.verdictPromptButtonMissed]}
-              >
-                <Text style={styles.verdictPromptButtonText}>Manqué</Text>
-              </Pressable>
-            </View>
+          <View style={styles.verdictPromptButtons}>
+            <Pressable
+              onPress={() => handleSetVerdict('realized')}
+              disabled={verdictPending}
+              style={[styles.verdictPromptButton, styles.verdictPromptButtonRealized]}
+            >
+              <Text style={styles.verdictPromptButtonText}>Réalisé</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => handleSetVerdict('missed')}
+              disabled={verdictPending}
+              style={[styles.verdictPromptButton, styles.verdictPromptButtonMissed]}
+            >
+              <Text style={styles.verdictPromptButtonText}>Manqué</Text>
+            </Pressable>
           </View>
           {verdictError && <Text style={styles.verdictPromptError}>{verdictError}</Text>}
         </View>
@@ -432,25 +432,18 @@ export function PredictionCard({
           )}
 
           {/* Le tampon certifie le verdict pour tout le monde (pas seulement
-              l'auteur) — posé « de travers » (légère rotation) façon tampon
-              encreur, mais toujours dans le fil normal de l'en-tête : jamais
-              en position absolue par-dessus le teaser ou le contenu, qui
-              doivent rester lisibles. */}
+              l'auteur) — sceau institutionnel (double filet noir, sans
+              couleur de verdict) plutôt qu'un badge coloré : posé « de
+              travers » (légère rotation) façon tampon encreur officiel, mais
+              toujours dans le fil normal de l'en-tête, jamais en position
+              absolue par-dessus le teaser ou le contenu, qui doivent rester
+              lisibles. */}
           {verdict && (
-            <View
-              style={[
-                styles.verdictStamp,
-                verdict === 'realized' ? styles.verdictStampRealized : styles.verdictStampMissed,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.verdictStampText,
-                  verdict === 'realized' ? styles.verdictStampTextRealized : styles.verdictStampTextMissed,
-                ]}
-              >
-                {verdict === 'realized' ? 'J’avais raison' : 'Flop'}
-              </Text>
+            <View style={[styles.verdictStamp, verdict === 'missed' && styles.verdictStampTilted]}>
+              <View style={styles.verdictStampInner}>
+                <Text style={styles.verdictStampText}>{verdict === 'realized' ? 'Réalisé' : 'Manqué'}</Text>
+                <View style={styles.verdictStampRule} />
+              </View>
             </View>
           )}
         </View>
@@ -700,11 +693,11 @@ const styles = StyleSheet.create({
   revealBubbleText: { fontSize: 11, fontFamily: fonts.label, color: colors.textMuted },
   // Invite l'auteur à trancher — au-dessus de la carte tappable, jamais
   // dedans, pour qu'un tap sur un bouton ne navigue jamais aussi vers le
-  // détail (`onPress` de la `Pressable` qui suit).
+  // détail (`onPress` de la `Pressable` qui suit). Rien que les deux
+  // boutons, alignés à droite comme le reste des compléments de carte
+  // (bulle de révélation, tampon) — aucun texte d'accompagnement.
   verdictPrompt: { marginBottom: 12 },
-  verdictPromptRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  verdictPromptLabel: { flexShrink: 1, fontFamily: fonts.body, fontSize: 13, color: colors.textMuted },
-  verdictPromptButtons: { flexDirection: 'row', gap: 8 },
+  verdictPromptButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
   verdictPromptButton: {
     borderWidth: 1,
     borderRadius: radius.pill,
@@ -720,32 +713,51 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(156, 29, 110, 0.12)',
   },
   verdictPromptButtonText: { fontFamily: fonts.label, fontSize: 12, fontWeight: '700', color: colors.text },
-  verdictPromptError: { fontSize: 11, color: colors.danger, marginTop: 6 },
-  // Le tampon de certification : posé dans le fil normal de l'en-tête (comme
-  // la bulle de révélation qu'il remplace une fois la carte tranchée), une
-  // légère rotation suffit à l'effet « tampon encreur » sans jamais empiéter
-  // en position absolue sur le teaser ou le contenu.
+  verdictPromptError: { fontSize: 11, color: colors.danger, marginTop: 6, textAlign: 'right' },
+  // Le tampon de certification : un sceau institutionnel plutôt qu'un badge
+  // coloré — double filet noir sur fond blanc, texte capitales tracké, un
+  // seul trait or en soulignement pour tout rappel de couleur. Identique
+  // pour Réalisé et Manqué (seul le mot change) : jamais de rouge ni de
+  // vert, la charte reste noir/blanc/gris/or même pour trancher un verdict.
+  // Posé dans le fil normal de l'en-tête (comme la bulle de révélation qu'il
+  // remplace une fois la carte tranchée) : une légère rotation suffit à
+  // l'effet « tampon encreur officiel » sans jamais empiéter en position
+  // absolue sur le teaser ou le contenu.
   verdictStamp: {
-    borderWidth: 2,
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    transform: [{ rotate: '-8deg' }],
+    borderWidth: 1.5,
+    borderColor: colors.text,
+    borderRadius: 4,
+    padding: 2,
+    backgroundColor: colors.surface,
+    transform: [{ rotate: '-6deg' }],
   },
-  verdictStampRealized: { borderColor: colors.verdictRealized, backgroundColor: 'rgba(54, 168, 160, 0.14)' },
-  verdictStampMissed: {
-    borderColor: colors.verdictMissed,
-    backgroundColor: 'rgba(156, 29, 110, 0.14)',
-    transform: [{ rotate: '7deg' }],
+  verdictStampTilted: { transform: [{ rotate: '5deg' }] },
+  // Second filet, à l'intérieur du premier avec un fin espace entre les deux
+  // (`padding` du parent) — la double bordure d'un sceau officiel plutôt
+  // qu'un simple encadré.
+  verdictStampInner: {
+    borderWidth: 1,
+    borderColor: colors.text,
+    borderRadius: 2,
+    paddingHorizontal: 8,
+    paddingTop: 3,
+    paddingBottom: 2,
+    alignItems: 'center',
   },
   verdictStampText: {
     fontFamily: fonts.sansBold,
-    fontSize: 12,
+    fontSize: 11,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1.2,
+    color: colors.text,
   },
-  verdictStampTextRealized: { color: colors.verdictRealized },
-  verdictStampTextMissed: { color: colors.verdictMissed },
+  verdictStampRule: {
+    width: '70%',
+    height: 2,
+    backgroundColor: colors.gold,
+    borderRadius: 1,
+    marginTop: 3,
+  },
   // Tout sur une seule ligne : [avatar 32][pseudo] ...espace flexible...
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   headerSpacer: { flex: 1, minWidth: 8 },

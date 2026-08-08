@@ -3290,7 +3290,51 @@ revoke all on function public.get_group_prediscore(uuid, uuid) from public;
 grant execute on function public.get_group_prediscore(uuid, uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 35. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 35. Le verdict de l'auteur redevient modifiable depuis l'écran détail
+-- ---------------------------------------------------------------------------
+--
+-- Retire le garde-fou « une seule fois » de la section précédente : l'auteur
+-- peut se tromper, ou la situation peut changer après coup — la correction
+-- doit rester possible. La restriction reste posée côté client uniquement
+-- (components/PredictionCard.tsx) : le Fil ne propose Réalisé/Manqué que
+-- tant qu'aucun verdict n'est affirmé, et revenir dessus une fois posé n'est
+-- offert que depuis l'écran détail de la prédiction. Cette fonction, elle,
+-- reste ouverte à tout appel de l'auteur sur une prédiction révélée, quel
+-- que soit l'état actuel — sans ça, l'écran détail n'aurait aucun moyen de
+-- corriger un verdict déjà posé.
+create or replace function public.set_prediction_verdict(p_prediction_id uuid, p_verdict text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if p_verdict not in ('realized', 'missed') then
+    raise exception 'Verdict invalide : %', p_verdict;
+  end if;
+
+  update public.predictions
+  set author_verdict = p_verdict
+  where id = p_prediction_id
+    and author_id = auth.uid()
+    and reveal_at <= now();
+
+  insert into public.notifications (user_id, prediction_id, type)
+  select pa.user_id, p_prediction_id,
+    case p_verdict when 'realized' then 'prediction_realized' else 'prediction_missed' end
+  from public.predictions p
+  join public.prediction_access pa on pa.prediction_id = p.id
+  where p.id = p_prediction_id
+    and p.author_verdict = p_verdict
+  on conflict (user_id, prediction_id, type) do nothing;
+end;
+$$;
+
+revoke all on function public.set_prediction_verdict(uuid, text) from public;
+grant execute on function public.set_prediction_verdict(uuid, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 36. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une
