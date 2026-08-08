@@ -54,7 +54,7 @@ type MenuView = 'main' | 'author';
 
 /** Fil d'actualité — Archives a été fusionné ici, sous forme de deux onglets. */
 export default function HomeScreen() {
-  const { username, session, onboarded, markOnboarded } = useAuth();
+  const { username, session, onboarded, markOnboarded, reduceMotion } = useAuth();
   const router = useRouter();
 
   const [feed, setFeed] = useState<PredictionFeedItem[] | null>(null);
@@ -111,8 +111,14 @@ export default function HomeScreen() {
 
     // Rattrape les notifications de révélation en retard avant de lire le
     // fil — sans ça, une prédiction tout juste révélée pourrait ne pas
-    // encore avoir sa notification au premier chargement.
-    await supabase.rpc('generate_reveal_notifications');
+    // encore avoir sa notification au premier chargement. Même principe pour
+    // les rappels avant révélation (réglage Gestion du temps) : aucun
+    // déclencheur ne se lève seul quand l'échéance approche, il faut qu'une
+    // requête vienne le constater.
+    await Promise.all([
+      supabase.rpc('generate_reveal_notifications'),
+      supabase.rpc('generate_reveal_reminders'),
+    ]);
 
     const { data, error: fetchError } = await fetchPredictionsFeed();
 
@@ -280,8 +286,11 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.safe}>
       <WelcomeOnboarding visible={onboarded === false} onStart={handleStartFirstPrediction} />
 
+      {/* Réglage Accessibilité « Réduire les animations » : la pluie d'or
+          est purement décorative, jamais porteuse d'une information qu'on
+          perdrait à la sauter. */}
       <CelebrationBurst
-        visible={celebration.visible}
+        visible={celebration.visible && !reduceMotion}
         message={celebration.message}
         onFinish={() => setCelebration((c) => ({ ...c, visible: false }))}
       />

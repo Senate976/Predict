@@ -8,6 +8,7 @@ import {
 } from 'react';
 import { Platform } from 'react-native';
 
+import type { PredictionScope } from './predictions';
 import { supabase } from './supabase';
 
 const VALID_OTP_TYPES = new Set([
@@ -81,6 +82,16 @@ type AuthContextValue = {
   /** true pendant la restauration de la session au démarrage. */
   loading: boolean;
   signOut: () => Promise<void>;
+  /** Réglage Accessibilité : atténue les animations décoratives (la pluie
+   * d'or de `CelebrationBurst`). `false` tant que le profil n'est pas
+   * encore chargé. */
+  reduceMotion: boolean;
+  setReduceMotion: (value: boolean) => Promise<void>;
+  /** Réglage Confidentialité : portée pré-sélectionnée à l'ouverture de
+   * l'écran de création. `null` = pas de préférence, l'écran garde son
+   * propre défaut (« Cercle »). */
+  defaultScope: PredictionScope | null;
+  setDefaultScope: (value: PredictionScope | null) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -98,6 +109,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [username, setUsername] = useState<string | null>(null);
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reduceMotion, setReduceMotionState] = useState(false);
+  const [defaultScope, setDefaultScopeState] = useState<PredictionScope | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -131,6 +144,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
     if (!userId) {
       setUsername(null);
       setOnboarded(null);
+      setReduceMotionState(false);
+      setDefaultScopeState(null);
       return;
     }
 
@@ -138,7 +153,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     supabase
       .from('profiles')
-      .select('username, onboarded')
+      .select('username, onboarded, reduce_motion, default_scope')
       .eq('id', userId)
       .maybeSingle()
       .then(({ data, error }) => {
@@ -155,6 +170,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
         const metadataUsername = session?.user.user_metadata?.username;
         setUsername(data?.username ?? metadataUsername ?? null);
         setOnboarded(data?.onboarded ?? false);
+        setReduceMotionState(data?.reduce_motion ?? false);
+        setDefaultScopeState((data?.default_scope as PredictionScope | null) ?? null);
       });
 
     return () => {
@@ -174,9 +191,34 @@ export function AuthProvider({ children }: PropsWithChildren) {
     if (error) console.warn('Marquage de l’accueil impossible :', error.message);
   };
 
+  const setReduceMotion = async (value: boolean) => {
+    setReduceMotionState(value);
+    if (!userId) return;
+    const { error } = await supabase.from('profiles').update({ reduce_motion: value }).eq('id', userId);
+    if (error) console.warn('Mise à jour de reduce_motion impossible :', error.message);
+  };
+
+  const setDefaultScope = async (value: PredictionScope | null) => {
+    setDefaultScopeState(value);
+    if (!userId) return;
+    const { error } = await supabase.from('profiles').update({ default_scope: value }).eq('id', userId);
+    if (error) console.warn('Mise à jour de default_scope impossible :', error.message);
+  };
+
   return (
     <AuthContext.Provider
-      value={{ session, username, onboarded, markOnboarded, loading, signOut }}
+      value={{
+        session,
+        username,
+        onboarded,
+        markOnboarded,
+        loading,
+        signOut,
+        reduceMotion,
+        setReduceMotion,
+        defaultScope,
+        setDefaultScope,
+      }}
     >
       {children}
     </AuthContext.Provider>

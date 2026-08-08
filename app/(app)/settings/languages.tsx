@@ -1,16 +1,15 @@
 import { useRouter } from 'expo-router';
-import { ChevronRight } from 'lucide-react-native';
+import { Check } from 'lucide-react-native';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '../../../components/Text';
 
-import { LEGAL_DOCS, SETTINGS_SECTIONS } from '../../../lib/settingsSections';
 import { colors, fonts, spacing } from '../../../lib/theme';
 
-/** Liste des sections de Paramètres — chacune ouvre son propre écran sous
- * `app/(app)/settings/<id>.tsx` ; « Informations légales » ouvre sa propre
- * sous-liste (Mentions légales, CGU, Confidentialité), restée en stub. */
-export default function SettingsScreen() {
+/** Informatif uniquement : l'app est entièrement en français, sans
+ * infrastructure de traduction — pas de faux sélecteur proposant des langues
+ * qui ne changeraient rien à l'affichage. */
+export default function LanguagesSettingsScreen() {
   const router = useRouter();
 
   return (
@@ -19,38 +18,18 @@ export default function SettingsScreen() {
         <Pressable onPress={() => router.back()} hitSlop={8}>
           <Text style={styles.back}>Retour</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>Paramètres</Text>
+        <Text style={styles.headerTitle}>Langues</Text>
         <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.group}>
-          {SETTINGS_SECTIONS.map((section, i) => (
-            <Pressable
-              key={section.id}
-              onPress={() => router.push(`/settings/${section.id}`)}
-              style={[styles.row, i === SETTINGS_SECTIONS.length - 1 && styles.rowLast]}
-            >
-              <Text style={styles.rowText}>{section.label}</Text>
-              <ChevronRight size={16} color={colors.icon} strokeWidth={1.75} />
-            </Pressable>
-          ))}
+          <View style={[styles.row, styles.rowLast]}>
+            <Text style={styles.rowLabel}>Français</Text>
+            <Check size={18} color={colors.text} strokeWidth={2} />
+          </View>
         </View>
-
-        <View style={[styles.group, styles.sectionSpacing]}>
-          <Pressable
-            onPress={() => router.push('/settings/legal')}
-            style={[styles.row, styles.rowLast]}
-          >
-            <View>
-              <Text style={styles.rowText}>Informations légales</Text>
-              <Text style={styles.rowHint}>
-                {LEGAL_DOCS.map((d) => d.label).join(' · ')}
-              </Text>
-            </View>
-            <ChevronRight size={16} color={colors.icon} strokeWidth={1.75} />
-          </Pressable>
-        </View>
+        <Text style={styles.hint}>Predict n’est disponible qu’en français pour le moment.</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -71,7 +50,6 @@ const styles = StyleSheet.create({
   back: { fontSize: 15, color: colors.text, width: 56 },
   headerSpacer: { width: 56 },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
-  sectionSpacing: { marginTop: spacing.lg },
   group: {
     borderRadius: 16,
     backgroundColor: colors.surface,
@@ -87,9 +65,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    gap: 10,
   },
   rowLast: { borderBottomWidth: 0 },
-  rowText: { fontSize: 15, fontWeight: '600', color: colors.text },
-  rowHint: { fontSize: 12, color: colors.textFaint, marginTop: 2 },
+  rowLabel: { fontSize: 15, fontWeight: '600', color: colors.text },
+  hint: { fontSize: 12, color: colors.textFaint, marginTop: 10 },
 });

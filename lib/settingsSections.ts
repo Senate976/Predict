@@ -1,22 +1,22 @@
-/** Sections du squelette de l'écran Paramètres — pour l'instant des stubs
- * vides, chacune ouvrant un écran générique réutilisable (`[section].tsx`). */
+/** Sections de l'écran Paramètres — chacune a son propre écran sous
+ * `app/(app)/settings/<id>.tsx`. Pas de mode sombre : hors périmètre. */
 export type SettingsSectionId =
-  | 'preferences'
-  | 'security'
+  | 'account'
+  | 'privacy'
   | 'notifications'
+  | 'security'
+  | 'reminders'
   | 'accessibility'
-  | 'languages'
-  | 'time-management'
-  | 'dark-mode';
+  | 'languages';
 
 export const SETTINGS_SECTIONS: { id: SettingsSectionId; label: string }[] = [
-  { id: 'preferences', label: 'Préférences' },
-  { id: 'security', label: 'Sécurité' },
+  { id: 'account', label: 'Compte' },
+  { id: 'privacy', label: 'Confidentialité' },
   { id: 'notifications', label: 'Notifications' },
+  { id: 'security', label: 'Sécurité' },
+  { id: 'reminders', label: 'Gestion du temps' },
   { id: 'accessibility', label: 'Accessibilité' },
   { id: 'languages', label: 'Langues' },
-  { id: 'time-management', label: 'Gestion du temps' },
-  { id: 'dark-mode', label: 'Mode sombre' },
 ];
 
 export type LegalDocId = 'mentions' | 'terms' | 'privacy';
