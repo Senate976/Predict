@@ -2,7 +2,7 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 
-import { colors, fonts } from '../lib/theme';
+import { colors, eyebrow, fonts } from '../lib/theme';
 
 const BAR_WIDTH = 260;
 const BAR_HEIGHT = 10;
@@ -85,16 +85,9 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     paddingVertical: 8,
   },
-  scoreLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    color: colors.textFaint,
-    marginBottom: 2,
-  },
+  scoreLabel: { ...eyebrow, marginBottom: 2 },
   scoreValue: {
-    fontFamily: fonts.display,
+    fontFamily: fonts.body,
     fontSize: 34,
     color: colors.text,
     marginBottom: 10,

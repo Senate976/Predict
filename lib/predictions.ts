@@ -63,15 +63,6 @@ export type PredictionFeedItem = {
   realized_votes: number;
   missed_votes: number;
   final_status: PredictionOutcomeStatus;
-  /** Uniquement pour une prédiction `is_immediate` — voir `beliefPercentage`. */
-  believe_votes: number;
-  disbelieve_votes: number;
-  /** Jauge Hype, tant que scellée — voir `hypePercentage`. */
-  chaud_votes: number;
-  froid_votes: number;
-  /** Jauge Réputation, une fois révélée — voir `reputationPercentage`. */
-  mytho_votes: number;
-  confiance_votes: number;
   /** Préférences propres à l'appelant — jamais partagées avec les autres. */
   is_favorite: boolean;
   is_hidden: boolean;
@@ -156,35 +147,7 @@ export function predictionErrorMessage(error: PostgrestError): string {
 const FEED_COLUMNS =
   'id, author_id, teaser, content, audio_path, reveal_at, scope, open_ended, is_immediate, category, created_at, ' +
   'is_revealed, realized_votes, missed_votes, final_status, is_favorite, is_hidden, is_seen, emoji_counts, my_emoji_reaction, ' +
-  'mentioned_user_ids, believe_votes, disbelieve_votes, chaud_votes, froid_votes, mytho_votes, confiance_votes';
-
-/**
- * Pourcentage de destinataires qui « y croient », pour une prédiction
- * révélée immédiatement (`is_immediate`) — `null` tant que personne n'a
- * encore voté, pour ne pas afficher un 0 % qui n'existe pas encore (même
- * logique que le Prediscore vide).
- */
-export function beliefPercentage(item: PredictionFeedItem): number | null {
-  const total = item.believe_votes + item.disbelieve_votes;
-  if (total === 0) return null;
-  return Math.round((100 * item.believe_votes) / total);
-}
-
-/** Jauge Hype (chaud/froid), tant que la prédiction est scellée — `null`
- * avant le premier vote. */
-export function hypePercentage(item: PredictionFeedItem): number | null {
-  const total = item.chaud_votes + item.froid_votes;
-  if (total === 0) return null;
-  return Math.round((100 * item.chaud_votes) / total);
-}
-
-/** Jauge Réputation (mytho/confiance), une fois révélée — `null` avant le
- * premier vote. */
-export function reputationPercentage(item: PredictionFeedItem): number | null {
-  const total = item.mytho_votes + item.confiance_votes;
-  if (total === 0) return null;
-  return Math.round((100 * item.confiance_votes) / total);
-}
+  'mentioned_user_ids';
 
 export async function fetchPredictionsFeed() {
   return supabase
@@ -514,18 +477,6 @@ export type PredictionOutcome = {
   missed_votes: number;
   final_status: PredictionOutcomeStatus;
 };
-
-/** Le statut d'une prédiction précise — auteur ou destinataire, peu importe. */
-export async function fetchPredictionOutcome(predictionId: string) {
-  return supabase
-    .from('prediction_outcomes')
-    .select(
-      'prediction_id, author_id, teaser, reveal_at, created_at, is_revealed, realized_votes, missed_votes, final_status'
-    )
-    .eq('prediction_id', predictionId)
-    .maybeSingle()
-    .returns<PredictionOutcome>();
-}
 
 /** Réservé à la lecture de ses propres prédictions (RLS de `predictions`). */
 export async function fetchPredictionOutcomes(authorId: string) {

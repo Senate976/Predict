@@ -2898,7 +2898,122 @@ group by p.id, p.author_id, p.teaser, pc.content, pc.audio_path, p.reveal_at, p.
 grant select on public.predictions_feed to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 33. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 33. Retrait des votes Hype (scellé) et Réputation (en cours)
+-- ---------------------------------------------------------------------------
+--
+-- Retour en arrière complet sur la section 32 : les deux jauges de
+-- gamification sont retirées de l'app, donc plus besoin de la distinction
+-- `vote_type` qu'elles avaient rendue nécessaire — un vote par destinataire
+-- suffit à nouveau (realized/missed OU believe/disbelieve selon le type de
+-- prédiction, jamais les deux à la fois).
+delete from public.prediction_votes where vote_value in ('chaud', 'froid', 'mytho', 'confiance');
+
+drop index if exists prediction_votes_unique_voter;
+alter table public.prediction_votes drop constraint if exists prediction_votes_vote_value_check;
+alter table public.prediction_votes drop column if exists vote_type;
+
+create unique index if not exists prediction_votes_unique_voter
+  on public.prediction_votes (prediction_id, voter_id);
+
+alter table public.prediction_votes add constraint prediction_votes_vote_value_check
+  check (vote_value in ('realized', 'missed', 'believe', 'disbelieve'));
+
+-- Revient à la policy de la section 31 (avant l'exception Hype).
+drop policy if exists "prediction_votes_insert" on public.prediction_votes;
+create policy "prediction_votes_insert"
+  on public.prediction_votes
+  for insert
+  to authenticated
+  with check (
+    voter_id = auth.uid()
+    and exists (
+      select 1 from public.prediction_access pa
+      where pa.prediction_id = prediction_votes.prediction_id and pa.user_id = auth.uid()
+    )
+    and exists (
+      select 1 from public.predictions p
+      where p.id = prediction_votes.prediction_id and p.reveal_at <= now()
+    )
+  );
+
+-- `predictions_feed` reprend sa définition de la section 28, sans les
+-- compteurs Hype/Réputation de la section 32.
+drop view if exists public.predictions_feed;
+
+create view public.predictions_feed
+with (security_invoker = true) as
+select
+  p.id,
+  p.author_id,
+  p.teaser,
+  pc.content,
+  pc.audio_path,
+  p.reveal_at,
+  p.scope,
+  p.open_ended,
+  p.is_immediate,
+  p.category,
+  p.mentioned_user_ids,
+  p.created_at,
+  (p.reveal_at <= now()) as is_revealed,
+  coalesce(sum((v.vote_value = 'realized')::int), 0) as realized_votes,
+  coalesce(sum((v.vote_value = 'missed')::int), 0) as missed_votes,
+  case
+    when p.reveal_at > now() then 'pending'
+    when coalesce(sum((v.vote_value = 'realized')::int), 0)
+       > coalesce(sum((v.vote_value = 'missed')::int), 0) then 'realized'
+    when coalesce(sum((v.vote_value = 'missed')::int), 0)
+       > coalesce(sum((v.vote_value = 'realized')::int), 0) then 'missed'
+    else 'pending'
+  end as final_status,
+  coalesce(
+    (
+      select us.favorite from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_favorite,
+  coalesce(
+    (
+      select us.hidden from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_hidden,
+  coalesce(
+    (
+      select us.seen from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_seen,
+  coalesce(
+    (
+      select jsonb_object_agg(counts.emoji, counts.total)
+      from (
+        select emoji, count(*) as total
+        from public.prediction_emoji_reactions er
+        where er.prediction_id = p.id
+        group by emoji
+      ) counts
+    ),
+    '{}'::jsonb
+  ) as emoji_counts,
+  (
+    select er2.emoji from public.prediction_emoji_reactions er2
+    where er2.prediction_id = p.id and er2.user_id = auth.uid()
+  ) as my_emoji_reaction,
+  coalesce(sum((v.vote_value = 'believe')::int), 0) as believe_votes,
+  coalesce(sum((v.vote_value = 'disbelieve')::int), 0) as disbelieve_votes
+from public.predictions p
+left join public.prediction_contents pc on pc.prediction_id = p.id
+left join public.prediction_votes v on v.prediction_id = p.id
+group by p.id, p.author_id, p.teaser, pc.content, pc.audio_path, p.reveal_at, p.scope, p.open_ended, p.is_immediate, p.category, p.mentioned_user_ids, p.created_at;
+
+grant select on public.predictions_feed to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 34. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une

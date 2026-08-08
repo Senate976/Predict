@@ -14,7 +14,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AudioPlayerButton } from '../../../components/AudioPlayerButton';
 import { Avatar } from '../../../components/Avatar';
-import { ConfidenceGauge } from '../../../components/ConfidenceGauge';
 import { CreateFab } from '../../../components/CreateFab';
 import { InlineComments } from '../../../components/InlineComments';
 import { PredictWord } from '../../../components/PredictWord';
@@ -23,27 +22,17 @@ import { formatAdvance, formatShortDateTime } from '../../../lib/datetime';
 import { fetchFriendships, otherProfile, type FriendProfile } from '../../../lib/friends';
 import {
   addRecipient,
-  beliefPercentage,
   CATEGORY_LABEL,
   fetchPrediction,
-  fetchPredictionOutcome,
   fetchPredictionRecipients,
   isRevealed,
   removeRecipient,
   revealPredictionNow,
   type PredictionFeedItem,
-  type PredictionOutcome,
   type PredictionRecipient,
 } from '../../../lib/predictions';
 import { supabase } from '../../../lib/supabase';
 import { colors, eyebrow, fonts, radius, spacing } from '../../../lib/theme';
-import { castVote, fetchMyVote, voteErrorMessage, type Vote, type VoteValue } from '../../../lib/votes';
-
-const STATUS_LABEL: Record<string, string> = {
-  pending: 'En attente du verdict',
-  realized: 'Réalisée',
-  missed: 'Manquée',
-};
 
 export default function PredictionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -55,15 +44,11 @@ export default function PredictionDetailScreen() {
   const [author, setAuthor] = useState<{ username: string; avatar_url: string | null } | null>(null);
   const [recipients, setRecipients] = useState<PredictionRecipient[] | null>(null);
   const [friends, setFriends] = useState<FriendProfile[] | null>(null);
-  const [outcome, setOutcome] = useState<PredictionOutcome | null>(null);
-  const [myVote, setMyVote] = useState<Vote | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [recipientsError, setRecipientsError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [voteError, setVoteError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
-  const [voting, setVoting] = useState(false);
   const [recipientsOpen, setRecipientsOpen] = useState(false);
   const [revealing, setRevealing] = useState(false);
   const [revealError, setRevealError] = useState<string | null>(null);
@@ -112,16 +97,6 @@ export default function PredictionDetailScreen() {
     if (isAuthorNow) {
       const accepted = (friendshipsResult.data ?? []).filter((f) => f.status === 'accepted');
       setFriends(accepted.map((f) => otherProfile(f, userId)));
-    }
-
-    if (isRevealed(item, new Date())) {
-      const { data: outcomeData } = await fetchPredictionOutcome(id);
-      setOutcome(outcomeData ?? null);
-
-      if (!isAuthorNow) {
-        const { data: voteData } = await fetchMyVote(id, userId, item.is_immediate ? 'belief' : 'outcome');
-        setMyVote(voteData ?? null);
-      }
     }
   }, [id, userId]);
 
@@ -194,22 +169,6 @@ export default function PredictionDetailScreen() {
       { text: 'Annuler', style: 'cancel' },
       { text: 'Révéler', style: 'destructive', onPress: run },
     ]);
-  }
-
-  async function handleVote(value: VoteValue) {
-    if (!id || !userId) return;
-    setVoteError(null);
-    setVoting(true);
-    try {
-      const { error: castError } = await castVote(id, userId, value);
-      if (castError) {
-        setVoteError(voteErrorMessage(castError));
-        return;
-      }
-      await load();
-    } finally {
-      setVoting(false);
-    }
   }
 
   const isAuthor = prediction && userId && prediction.author_id === userId;
@@ -387,96 +346,6 @@ export default function PredictionDetailScreen() {
               </>
             )}
 
-            {revealed && outcome && !prediction.is_immediate && (
-              <View
-                style={[
-                  styles.verdictBox,
-                  outcome.final_status === 'realized' && styles.verdictBoxRealized,
-                  outcome.final_status === 'missed' && styles.verdictBoxMissed,
-                ]}
-              >
-                <Text style={styles.eyebrowSmall}>Verdict du Cercle</Text>
-                <Text style={styles.verdict}>{STATUS_LABEL[outcome.final_status]}</Text>
-
-                {!isAuthor && (
-                  <>
-                    {voteError && <Text style={styles.error}>{voteError}</Text>}
-                    {myVote ? (
-                      // Choix définitif une fois posé : jamais de bouton pour en
-                      // reprendre un autre, seulement un rappel de ce qui a été dit.
-                      <Text style={styles.voteLockedText}>
-                        Tu as indiqué : {myVote.vote_value === 'realized' ? 'Réalisée' : 'Manquée'}
-                      </Text>
-                    ) : (
-                      <View style={styles.voteRow}>
-                        <Pressable
-                          onPress={() => handleVote('realized')}
-                          disabled={voting}
-                          style={styles.voteButton}
-                        >
-                          <Text style={styles.voteButtonText}>Réalisée</Text>
-                        </Pressable>
-                        <Pressable
-                          onPress={() => handleVote('missed')}
-                          disabled={voting}
-                          style={styles.voteButton}
-                        >
-                          <Text style={styles.voteButtonText}>Manquée</Text>
-                        </Pressable>
-                      </View>
-                    )}
-                  </>
-                )}
-              </View>
-            )}
-
-            {/* Une prédiction révélée immédiatement n'a rien à constater —
-                pas de « réalisée / manquée », seulement une opinion à donner
-                sur ce qui vient d'être révélé. */}
-            {revealed && prediction.is_immediate && (
-              <View style={styles.verdictBox}>
-                <Text style={styles.eyebrowSmall}>Avis du Cercle</Text>
-                <Text style={styles.verdict}>
-                  {beliefPercentage(prediction) === null
-                    ? 'Personne n’a encore donné son avis.'
-                    : `${beliefPercentage(prediction)}% confiants et ${100 - beliefPercentage(prediction)!}% pas confiants`}
-                </Text>
-                {beliefPercentage(prediction) !== null && (
-                  <View style={styles.confidenceGaugeWrap}>
-                    <ConfidenceGauge belief={beliefPercentage(prediction)!} />
-                  </View>
-                )}
-
-                {!isAuthor && (
-                  <>
-                    {voteError && <Text style={styles.error}>{voteError}</Text>}
-                    {myVote ? (
-                      <Text style={styles.voteLockedText}>
-                        Tu as indiqué : {myVote.vote_value === 'believe' ? 'J’y crois' : 'Je n’y crois pas'}
-                      </Text>
-                    ) : (
-                      <View style={styles.voteRow}>
-                        <Pressable
-                          onPress={() => handleVote('believe')}
-                          disabled={voting}
-                          style={styles.voteButton}
-                        >
-                          <Text style={styles.voteButtonText}>J’y crois</Text>
-                        </Pressable>
-                        <Pressable
-                          onPress={() => handleVote('disbelieve')}
-                          disabled={voting}
-                          style={styles.voteButton}
-                        >
-                          <Text style={styles.voteButtonText}>Je n’y crois pas</Text>
-                        </Pressable>
-                      </View>
-                    )}
-                  </>
-                )}
-              </View>
-            )}
-
             <Text style={[styles.eyebrow, styles.sectionSpacing]}>Discussion</Text>
             <InlineComments
               predictionId={id}
@@ -514,7 +383,6 @@ const styles = StyleSheet.create({
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   loader: { marginTop: 24 },
   eyebrow: { ...eyebrow },
-  eyebrowSmall: { ...eyebrow, fontSize: 10 },
   authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginBottom: 12 },
   authorName: { fontFamily: fonts.bodyEmphasis, fontSize: 16, color: colors.icon },
   // La catégorie n'apparaît plus sur la carte du Fil — seulement ici, une
@@ -574,33 +442,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   revealNowButtonText: { fontSize: 13, fontWeight: '700', color: colors.text },
-  verdictBox: {
-    marginTop: spacing.xl,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  // Pas de code couleur réalisé/manqué : seul le libellé porte le sens ;
-  // « réalisée » reçoit simplement la mise en avant jaune.
-  verdictBoxRealized: { borderLeftWidth: 4, borderLeftColor: colors.gold },
-  verdictBoxMissed: { borderLeftWidth: 4, borderLeftColor: colors.border },
-  verdict: { fontFamily: fonts.sansBold, fontSize: 18, color: colors.text, marginTop: 4 },
-  confidenceGaugeWrap: { marginTop: 10 },
-  voteRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  voteButton: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.pill,
-    paddingVertical: 8,
-    alignItems: 'center',
-    backgroundColor: colors.background,
-  },
-  voteButtonText: { fontSize: 12, fontWeight: '600', color: colors.textMuted },
-  voteLockedText: { fontSize: 14, fontWeight: '700', color: colors.text, marginTop: 10 },
   sectionSpacing: { marginTop: spacing.lg, marginBottom: 8 },
   sectionToggle: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start' },
   chevron: { fontSize: 11, color: colors.textFaint },
