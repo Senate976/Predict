@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { Eye, EyeOff, MessageCircle, Star, ThumbsUp, Trash2 } from 'lucide-react-native';
+import { Eye, EyeOff, Lock, MessageCircle, Star, ThumbsUp, Trash2 } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -123,7 +123,7 @@ export function PredictionCard({
       ? { kind: 'realized', label: 'Réalisé' }
       : verdict === 'missed'
         ? { kind: 'missed', label: 'Manqué' }
-        : { kind: 'active', label: 'Active' };
+        : { kind: 'active', label: 'En cours' };
   const belief = item.is_immediate
     ? beliefPercentage({ ...item, believe_votes: believeVotes, disbelieve_votes: disbelieveVotes })
     : null;
@@ -343,42 +343,45 @@ export function PredictionCard({
 
   return (
     <View style={[styles.card, unseen && styles.cardUnseen]}>
-      <Pressable onPress={() => onPress?.()} style={({ pressed }) => pressed && styles.cardPressed}>
-        {/* Bandeau d'état : la nature de la carte (scellée / active / réalisée
-            / manquée) d'un coup d'œil, avant même de lire le teaser. Trois
-            cellules de largeur égale, comme le pied de carte plus bas, pour
-            que le libellé principal reste centré même quand une cellule
-            (compte à rebours) est vide de l'autre côté. */}
-        <View
-          style={[
-            styles.statusBanner,
-            statusBanner.kind === 'sealed' && styles.statusBannerSealed,
-            statusBanner.kind === 'active' && styles.statusBannerActive,
-            statusBanner.kind === 'realized' && styles.statusBannerRealized,
-            statusBanner.kind === 'missed' && styles.statusBannerMissed,
-          ]}
-        >
-          <View style={styles.statusBannerSide} />
+      {/* Bandeau d'état : la nature de la carte (scellée / en cours / réalisée
+          / manquée) d'un coup d'œil, avant même de lire le teaser. Tout en
+          haut, en dehors de la zone tappable et à cheval sur le padding de la
+          carte (marges négatives) pour occuper toute sa largeur et venir
+          affleurer ses coins arrondis — `overflow: hidden` sur la carte fait
+          le reste. Trois cellules de largeur égale, comme le pied de carte
+          plus bas, pour que le libellé central reste centré même quand une
+          cellule (compte à rebours) est vide de l'autre côté. */}
+      <View
+        style={[
+          styles.statusBanner,
+          statusBanner.kind === 'sealed' && styles.statusBannerSealed,
+          statusBanner.kind === 'active' && styles.statusBannerActive,
+          statusBanner.kind === 'realized' && styles.statusBannerRealized,
+          statusBanner.kind === 'missed' && styles.statusBannerMissed,
+        ]}
+      >
+        <View style={styles.statusBannerSide} />
+        <View style={styles.statusBannerCenter}>
+          {statusBanner.kind === 'sealed' && (
+            <Lock size={11} color={colors.gold} strokeWidth={2} style={styles.statusBannerIcon} />
+          )}
           <Text
-            style={[
-              styles.statusBannerText,
-              statusBanner.kind === 'active' && styles.statusBannerTextActive,
-              statusBanner.kind === 'realized' && styles.statusBannerTextRealized,
-              statusBanner.kind === 'missed' && styles.statusBannerTextMissed,
-            ]}
+            style={[styles.statusBannerText, statusBanner.kind === 'sealed' && styles.statusBannerTextSealed]}
             numberOfLines={1}
           >
             {statusBanner.label}
           </Text>
-          <View style={[styles.statusBannerSide, styles.statusBannerSideRight]}>
-            {statusBanner.extra && (
-              <Text style={styles.statusBannerExtra} numberOfLines={1}>
-                {statusBanner.extra}
-              </Text>
-            )}
-          </View>
         </View>
+        <View style={[styles.statusBannerSide, styles.statusBannerSideRight]}>
+          {statusBanner.extra && (
+            <Text style={styles.statusBannerExtra} numberOfLines={1}>
+              {statusBanner.extra}
+            </Text>
+          )}
+        </View>
+      </View>
 
+      <Pressable onPress={() => onPress?.()} style={({ pressed }) => pressed && styles.cardPressed}>
         {/* Une seule ligne : [avatar][pseudo] ...espace flexible... */}
         <View style={styles.cardHeader}>
           {authorLabel && (
@@ -636,6 +639,11 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 12,
     backgroundColor: colors.surface,
+    // Le bandeau d'état (juste en dessous) déborde volontairement du padding
+    // via des marges négatives pour occuper toute la largeur de la carte —
+    // `overflow: hidden` le clippe proprement aux coins arrondis plutôt que
+    // de les déborder en carré.
+    overflow: 'hidden',
     // Web uniquement : sans ça, glisser le pouce vers un emoji du panneau
     // sélectionne le texte de la carte au passage, ce qui coupe le geste
     // (`onPanResponderTerminate`) au lieu de faire glisser la sélection
@@ -648,46 +656,50 @@ const styles = StyleSheet.create({
     borderColor: colors.gold,
     backgroundColor: colors.goldSoft,
   },
-  // Bandeau d'état : trois cellules de largeur égale (comme le pied de carte)
-  // pour garder le libellé central vraiment centré, que la cellule de droite
+  // Bandeau d'état : toute la largeur de la carte, tout en haut — les marges
+  // négatives annulent le padding de la carte sur les 3 côtés concernés,
+  // `overflow: hidden` sur la carte fait le reste pour les coins arrondis.
+  // Trois cellules de largeur égale (comme le pied de carte plus bas) pour
+  // garder le libellé central vraiment centré, que la cellule de droite
   // porte un compte à rebours ou reste vide.
   statusBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: radius.sm,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
+    marginTop: -18,
+    marginHorizontal: -18,
     marginBottom: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
   },
   statusBannerSide: { flex: 1 },
   statusBannerSideRight: { alignItems: 'flex-end' },
-  // Sceller : jaune de la charte en fond, texte gris — le seul état où le
-  // jaune sert de simple repère de statut plutôt que d'action interactive.
-  statusBannerSealed: { backgroundColor: colors.gold },
-  // Active : fond gris, texte noir — sort du lot sans reprendre le jaune,
-  // réservé au scellé, ni le vert/rouge, réservés au verdict.
-  statusBannerActive: { backgroundColor: 'rgba(17, 24, 39, 0.10)' },
-  statusBannerRealized: { backgroundColor: colors.verdictRealizedSoft },
-  statusBannerMissed: { backgroundColor: colors.verdictMissedSoft },
+  statusBannerCenter: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  statusBannerIcon: { marginRight: 4 },
+  // Sceller : anthracite, seul état sans texte noir ni jaune en fond — le
+  // cadenas jaune reste le seul rappel de la charte sur ce bandeau-là.
+  statusBannerSealed: { backgroundColor: colors.bannerSealedBg },
+  // En cours : jaune de la charte — la seule carte qui attend une action de
+  // qui la regarde, elle doit sortir du lot.
+  statusBannerActive: { backgroundColor: colors.gold },
+  statusBannerRealized: { backgroundColor: colors.verdictRealized },
+  statusBannerMissed: { backgroundColor: colors.verdictMissed },
   // `flexShrink` (et non 0) : quand la cellule de droite porte un compte à
   // rebours, le libellé central doit pouvoir se tronquer plutôt que déborder
-  // dessus — la date de scellé reste lisible même sur un écran étroit.
+  // dessus — la date de scellé reste lisible même sur un écran étroit. Noir
+  // par défaut (en cours / réalisé / manqué) ; le scellé, seul état sur fond
+  // sombre, s'éclaircit via `statusBannerTextSealed`.
   statusBannerText: {
-    flex: 1,
+    flexShrink: 1,
     minWidth: 0,
     textAlign: 'center',
     fontFamily: fonts.label,
     fontSize: 12,
     fontWeight: '600',
-    color: colors.textMuted,
+    color: colors.text,
   },
-  statusBannerTextActive: { color: colors.text },
-  statusBannerTextRealized: { color: colors.verdictRealized },
-  statusBannerTextMissed: { color: colors.verdictMissed },
-  // Toujours sur le fond jaune du scellé (seul état à porter cette cellule) :
-  // un gris plus soutenu que `textFaint`, sous peine de se noyer dans le
-  // jaune.
-  statusBannerExtra: { fontSize: 11, fontWeight: '600', color: colors.icon, marginRight: 10 },
+  statusBannerTextSealed: { color: colors.bannerSealedText },
+  // Toujours sur fond anthracite (seul état à porter cette cellule).
+  statusBannerExtra: { fontSize: 11, fontWeight: '600', color: colors.bannerSealedText, marginRight: 10 },
   // Tout sur une seule ligne : [avatar 32][pseudo] ...espace flexible...
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   headerSpacer: { flex: 1, minWidth: 8 },
