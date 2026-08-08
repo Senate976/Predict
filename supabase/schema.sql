@@ -3013,7 +3013,328 @@ group by p.id, p.author_id, p.teaser, pc.content, pc.audio_path, p.reveal_at, p.
 grant select on public.predictions_feed to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 34. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 34. Verdict affirmé par l'auteur (remplace le vote de verdict retiré)
+-- ---------------------------------------------------------------------------
+--
+-- Le vote de verdict du Cercle a été retiré côté client (section 33 et la
+-- suppression de lib/votes.ts) : `final_status` restait donc figé sur
+-- 'pending' pour toujours, faute de votes à compter. Désormais, c'est
+-- l'auteur seul qui affirme si sa prédiction s'est réalisée ou a été
+-- manquée — un geste unique et définitif (le « tampon » de l'UI), jamais
+-- révisable ensuite. `null` tant que rien n'est affirmé.
+alter table public.predictions add column if not exists author_verdict text;
+alter table public.predictions drop constraint if exists predictions_author_verdict_check;
+alter table public.predictions add constraint predictions_author_verdict_check
+  check (author_verdict in ('realized', 'missed'));
+
+-- Deux nouveaux types de notification : chaque destinataire est prévenu dès
+-- que l'auteur tranche. (La contrainte n'est reposée qu'une fois, avec la
+-- liste complète à jour, comme à chaque ajout précédent.)
+alter table public.notifications drop constraint if exists notifications_type_check;
+alter table public.notifications add constraint notifications_type_check
+  check (type in (
+    'new_teaser', 'prediction_revealed', 'prediction_approved', 'group_invite',
+    'prediction_mentioned', 'prediction_realized', 'prediction_missed'
+  ));
+
+-- `security definer` : seul l'auteur peut affirmer le verdict de sa propre
+-- prédiction, une fois révélée, et une seule fois — `author_verdict is null`
+-- dans le `where` rend tout appel suivant un no-op silencieux, comme
+-- `reveal_prediction_now`. La notification de chaque destinataire est
+-- insérée dans la foulée, dans la même fonction plutôt que via un
+-- déclencheur séparé : `p.author_verdict = p_verdict` dans le `where` de
+-- l'insert ne matche que si la mise à jour au-dessus a réellement pris
+-- effet (jamais sur un second appel, silencieusement ignoré) — et la
+-- contrainte unique de la table absorbe de toute façon un double appel.
+create or replace function public.set_prediction_verdict(p_prediction_id uuid, p_verdict text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if p_verdict not in ('realized', 'missed') then
+    raise exception 'Verdict invalide : %', p_verdict;
+  end if;
+
+  update public.predictions
+  set author_verdict = p_verdict
+  where id = p_prediction_id
+    and author_id = auth.uid()
+    and reveal_at <= now()
+    and author_verdict is null;
+
+  insert into public.notifications (user_id, prediction_id, type)
+  select pa.user_id, p_prediction_id,
+    case p_verdict when 'realized' then 'prediction_realized' else 'prediction_missed' end
+  from public.predictions p
+  join public.prediction_access pa on pa.prediction_id = p.id
+  where p.id = p_prediction_id
+    and p.author_verdict = p_verdict
+  on conflict (user_id, prediction_id, type) do nothing;
+end;
+$$;
+
+revoke all on function public.set_prediction_verdict(uuid, text) from public;
+grant execute on function public.set_prediction_verdict(uuid, text) to authenticated;
+
+-- `predictions_feed`, `prediction_outcomes`, `get_prediction_stats`,
+-- `get_prediscore` et `get_group_prediscore` calculaient toutes `final_status`
+-- à partir d'un décompte de `prediction_votes` — mort depuis que plus rien ne
+-- vote. Elles reprennent leur définition précédente à l'identique (mêmes
+-- colonnes, moins les compteurs de votes qui n'ont plus de sens), seul le
+-- calcul de `final_status` change pour lire `author_verdict`. Plus de
+-- `left join`/`group by` sur `prediction_votes` : plus aucune des colonnes
+-- restantes n'est un agrégat de vote.
+drop view if exists public.predictions_feed;
+
+create view public.predictions_feed
+with (security_invoker = true) as
+select
+  p.id,
+  p.author_id,
+  p.teaser,
+  pc.content,
+  pc.audio_path,
+  p.reveal_at,
+  p.scope,
+  p.open_ended,
+  p.is_immediate,
+  p.category,
+  p.mentioned_user_ids,
+  p.created_at,
+  (p.reveal_at <= now()) as is_revealed,
+  case
+    when p.reveal_at > now() then 'pending'
+    when p.author_verdict is not null then p.author_verdict
+    else 'pending'
+  end as final_status,
+  coalesce(
+    (
+      select us.favorite from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_favorite,
+  coalesce(
+    (
+      select us.hidden from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_hidden,
+  coalesce(
+    (
+      select us.seen from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_seen,
+  coalesce(
+    (
+      select jsonb_object_agg(counts.emoji, counts.total)
+      from (
+        select emoji, count(*) as total
+        from public.prediction_emoji_reactions er
+        where er.prediction_id = p.id
+        group by emoji
+      ) counts
+    ),
+    '{}'::jsonb
+  ) as emoji_counts,
+  (
+    select er2.emoji from public.prediction_emoji_reactions er2
+    where er2.prediction_id = p.id and er2.user_id = auth.uid()
+  ) as my_emoji_reaction
+from public.predictions p
+left join public.prediction_contents pc on pc.prediction_id = p.id;
+
+grant select on public.predictions_feed to authenticated;
+
+drop view if exists public.prediction_outcomes;
+
+create view public.prediction_outcomes
+with (security_invoker = true) as
+select
+  p.id as prediction_id,
+  p.author_id,
+  p.teaser,
+  p.reveal_at,
+  p.created_at,
+  (p.reveal_at <= now()) as is_revealed,
+  case
+    when p.reveal_at > now() then 'pending'
+    when p.author_verdict is not null then p.author_verdict
+    else 'pending'
+  end as final_status
+from public.predictions p;
+
+grant select on public.prediction_outcomes to authenticated;
+
+create or replace function public.get_prediction_stats(target_user uuid)
+returns table (total bigint, realized bigint, missed bigint, pending bigint)
+language sql
+security definer
+stable
+set search_path = ''
+as $$
+  select
+    count(*) as total,
+    count(*) filter (where p.reveal_at <= now() and p.author_verdict = 'realized') as realized,
+    count(*) filter (where p.reveal_at <= now() and p.author_verdict = 'missed') as missed,
+    count(*) filter (where p.reveal_at > now() or p.author_verdict is null) as pending
+  from public.predictions p
+  where p.author_id = target_user
+    and (
+      target_user = auth.uid()
+      or exists (
+        select 1 from public.friendships f
+        where f.status = 'accepted'
+          and (
+            (f.requester_id = auth.uid() and f.addressee_id = target_user)
+            or (f.addressee_id = auth.uid() and f.requester_id = target_user)
+          )
+      )
+    );
+$$;
+
+revoke all on function public.get_prediction_stats(uuid) from public;
+grant execute on function public.get_prediction_stats(uuid) to authenticated;
+
+create or replace function public.get_prediscore(target_user uuid)
+returns table (score numeric, weighted_count numeric)
+language sql
+security definer
+stable
+set search_path = ''
+as $$
+  with weighted as (
+    select
+      case
+        when extract(epoch from (p.reveal_at - p.created_at)) / 86400 < 7 then 1
+        when extract(epoch from (p.reveal_at - p.created_at)) / 86400 <= 30 then 3
+        else 5
+      end as weight,
+      coalesce(p.author_verdict, 'pending') as final_status
+    from public.predictions p
+    where p.author_id = target_user
+      and p.reveal_at <= now()
+      and (
+        target_user = auth.uid()
+        or exists (
+          select 1 from public.friendships f
+          where f.status = 'accepted'
+            and (
+              (f.requester_id = auth.uid() and f.addressee_id = target_user)
+              or (f.addressee_id = auth.uid() and f.requester_id = target_user)
+            )
+        )
+      )
+  )
+  select
+    case
+      when coalesce(sum(weight) filter (where final_status <> 'pending'), 0) > 0
+        then round(
+          100.0 * sum(weight) filter (where final_status = 'realized')
+            / sum(weight) filter (where final_status <> 'pending'),
+          1
+        )
+      else null
+    end as score,
+    coalesce(sum(weight) filter (where final_status <> 'pending'), 0) as weighted_count
+  from weighted;
+$$;
+
+revoke all on function public.get_prediscore(uuid) from public;
+grant execute on function public.get_prediscore(uuid) to authenticated;
+
+create or replace function public.get_group_prediscore(p_group_id uuid, p_target_user uuid)
+returns table (score numeric, weighted_count numeric)
+language sql
+security definer
+stable
+set search_path = ''
+as $$
+  with weighted as (
+    select
+      case
+        when extract(epoch from (p.reveal_at - p.created_at)) / 86400 < 7 then 1
+        when extract(epoch from (p.reveal_at - p.created_at)) / 86400 <= 30 then 3
+        else 5
+      end as weight,
+      coalesce(p.author_verdict, 'pending') as final_status
+    from public.predictions p
+    where p.author_id = p_target_user
+      and p.group_id = p_group_id
+      and p.reveal_at <= now()
+      and (
+        public.is_group_owner(p_group_id, auth.uid())
+        or public.is_group_member(p_group_id, auth.uid())
+      )
+  )
+  select
+    case
+      when coalesce(sum(weight) filter (where final_status <> 'pending'), 0) > 0
+        then round(
+          100.0 * sum(weight) filter (where final_status = 'realized')
+            / sum(weight) filter (where final_status <> 'pending'),
+          1
+        )
+      else null
+    end as score,
+    coalesce(sum(weight) filter (where final_status <> 'pending'), 0) as weighted_count
+  from weighted;
+$$;
+
+revoke all on function public.get_group_prediscore(uuid, uuid) from public;
+grant execute on function public.get_group_prediscore(uuid, uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 35. Le verdict de l'auteur redevient modifiable depuis l'écran détail
+-- ---------------------------------------------------------------------------
+--
+-- Retire le garde-fou « une seule fois » de la section précédente : l'auteur
+-- peut se tromper, ou la situation peut changer après coup — la correction
+-- doit rester possible. La restriction reste posée côté client uniquement
+-- (components/PredictionCard.tsx) : le Fil ne propose Réalisé/Manqué que
+-- tant qu'aucun verdict n'est affirmé, et revenir dessus une fois posé n'est
+-- offert que depuis l'écran détail de la prédiction. Cette fonction, elle,
+-- reste ouverte à tout appel de l'auteur sur une prédiction révélée, quel
+-- que soit l'état actuel — sans ça, l'écran détail n'aurait aucun moyen de
+-- corriger un verdict déjà posé.
+create or replace function public.set_prediction_verdict(p_prediction_id uuid, p_verdict text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if p_verdict not in ('realized', 'missed') then
+    raise exception 'Verdict invalide : %', p_verdict;
+  end if;
+
+  update public.predictions
+  set author_verdict = p_verdict
+  where id = p_prediction_id
+    and author_id = auth.uid()
+    and reveal_at <= now();
+
+  insert into public.notifications (user_id, prediction_id, type)
+  select pa.user_id, p_prediction_id,
+    case p_verdict when 'realized' then 'prediction_realized' else 'prediction_missed' end
+  from public.predictions p
+  join public.prediction_access pa on pa.prediction_id = p.id
+  where p.id = p_prediction_id
+    and p.author_verdict = p_verdict
+  on conflict (user_id, prediction_id, type) do nothing;
+end;
+$$;
+
+revoke all on function public.set_prediction_verdict(uuid, text) from public;
+grant execute on function public.set_prediction_verdict(uuid, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 36. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une

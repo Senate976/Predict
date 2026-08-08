@@ -23,6 +23,7 @@ import {
   isRevealed,
   removeEmojiReaction,
   setPredictionUserState,
+  setPredictionVerdict,
   type EmojiReaction,
   type EmojiReactor,
   type PredictionFeedItem,
@@ -55,6 +56,7 @@ export function PredictionCard({
   onDelete,
   onFavoriteChange,
   onHiddenChange,
+  onVerdictChange,
 }: {
   item: PredictionFeedItem;
   now: Date;
@@ -79,6 +81,10 @@ export function PredictionCard({
    * le fil à chaque bascule. */
   onFavoriteChange?: (isFavorite: boolean) => void;
   onHiddenChange?: (isHidden: boolean) => void;
+  /** Prévient l'écran parent une fois le verdict affirmé par l'auteur, pour
+   * que son onglet « Mes Predicts » reflète le nouveau statut sans recharger
+   * tout le fil. */
+  onVerdictChange?: (verdict: 'realized' | 'missed') => void;
 }) {
   const router = useRouter();
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -92,10 +98,18 @@ export function PredictionCard({
   const [reactors, setReactors] = useState<EmojiReactor[] | null>(null);
   const [reactorsLoading, setReactorsLoading] = useState(false);
   const [reactorsError, setReactorsError] = useState<string | null>(null);
+  // Écho optimiste de `setPredictionVerdict` : le statut canonique vient de
+  // `item.final_status` (props), mais attendre le prochain chargement du fil
+  // pour voir le tampon apparaître, après un tap sur Réalisé/Manqué, serait
+  // trop lent. `null` tant que l'auteur n'a rien affirmé pendant cette
+  // session — la valeur posée en base fait foi dès le rechargement suivant.
+  const [localVerdict, setLocalVerdict] = useState<'realized' | 'missed' | null>(null);
+  const [verdictPending, setVerdictPending] = useState(false);
+  const [verdictError, setVerdictError] = useState<string | null>(null);
   const revealed = isRevealed(item, now);
   const isAuthor = item.author_id === userId;
 
-  const verdict = revealed && item.final_status !== 'pending' ? item.final_status : null;
+  const verdict = localVerdict ?? (revealed && item.final_status !== 'pending' ? item.final_status : null);
 
   /** Bandeau d'état en tête de carte : la nature de la prédiction d'un coup
    * d'œil, avant même de lire le teaser. Remplace l'ancien liseré de verdict
@@ -161,6 +175,24 @@ export function PredictionCard({
       setIsHidden(!next);
       onHiddenChange?.(!next);
     }
+  }
+
+  /** Geste unique et définitif — la RPC elle-même refuse un second appel une
+   * fois le verdict posé (voir `set_prediction_verdict`), donc pas de retour
+   * en arrière possible ici non plus si l'appel échoue en cours de route :
+   * on efface simplement l'écho optimiste pour retenter. */
+  async function handleSetVerdict(next: 'realized' | 'missed') {
+    setVerdictPending(true);
+    setVerdictError(null);
+    setLocalVerdict(next);
+    const { error } = await setPredictionVerdict(item.id, next);
+    setVerdictPending(false);
+    if (error) {
+      setLocalVerdict(null);
+      setVerdictError('Action impossible.');
+      return;
+    }
+    onVerdictChange?.(next);
   }
 
   /** Charge le détail « qui a réagi avec quoi », une seule fois par carte. */
@@ -341,9 +373,40 @@ export function PredictionCard({
         </Text>
       </View>
 
+      {/* Invite l'auteur à trancher dès que sa prédiction est révélée mais
+          encore « En cours » — nulle part ailleurs que sur sa propre carte,
+          en dehors de la zone tappable (`onPress` navigue vers le détail) :
+          un tap sur un bouton ne doit jamais aussi ouvrir l'écran détail.
+          Rien que les deux boutons, aucun texte d'accompagnement — une fois
+          posé, revenir dessus n'est plus possible ici, seulement depuis
+          l'écran détail (voir `set_prediction_verdict`, section 35). */}
+      {isAuthor && revealed && verdict === null && (
+        <View style={styles.verdictPrompt}>
+          <View style={styles.verdictPromptButtons}>
+            <Pressable
+              onPress={() => handleSetVerdict('realized')}
+              disabled={verdictPending}
+              style={[styles.verdictPromptButton, styles.verdictPromptButtonRealized]}
+            >
+              <Text style={styles.verdictPromptButtonText}>Réalisé</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => handleSetVerdict('missed')}
+              disabled={verdictPending}
+              style={[styles.verdictPromptButton, styles.verdictPromptButtonMissed]}
+            >
+              <Text style={styles.verdictPromptButtonText}>Manqué</Text>
+            </Pressable>
+          </View>
+          {verdictError && <Text style={styles.verdictPromptError}>{verdictError}</Text>}
+        </View>
+      )}
+
       <Pressable onPress={() => onPress?.()} style={({ pressed }) => pressed && styles.cardPressed}>
         {/* Une seule ligne : [avatar][pseudo] ...espace flexible... [bulle de
-            révélation, si programmée et pas encore révélée]. */}
+            révélation (si programmée et pas encore révélée) ou tampon de
+            verdict (une fois affirmé par l'auteur) — jamais les deux à la
+            fois, les deux conditions s'excluent]. */}
         <View style={styles.cardHeader}>
           {authorLabel && (
             <Pressable
@@ -365,6 +428,22 @@ export function PredictionCard({
               <Text style={styles.revealBubbleText} numberOfLines={1}>
                 {statusBanner.extra}
               </Text>
+            </View>
+          )}
+
+          {/* Le tampon certifie le verdict pour tout le monde (pas seulement
+              l'auteur) — sceau institutionnel (double filet noir, sans
+              couleur de verdict) plutôt qu'un badge coloré : posé « de
+              travers » (légère rotation) façon tampon encreur officiel, mais
+              toujours dans le fil normal de l'en-tête, jamais en position
+              absolue par-dessus le teaser ou le contenu, qui doivent rester
+              lisibles. */}
+          {verdict && (
+            <View style={[styles.verdictStamp, verdict === 'missed' && styles.verdictStampTilted]}>
+              <View style={styles.verdictStampInner}>
+                <Text style={styles.verdictStampText}>{verdict === 'realized' ? 'Réalisé' : 'Manqué'}</Text>
+                <View style={styles.verdictStampRule} />
+              </View>
             </View>
           )}
         </View>
@@ -612,6 +691,73 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   revealBubbleText: { fontSize: 11, fontFamily: fonts.label, color: colors.textMuted },
+  // Invite l'auteur à trancher — au-dessus de la carte tappable, jamais
+  // dedans, pour qu'un tap sur un bouton ne navigue jamais aussi vers le
+  // détail (`onPress` de la `Pressable` qui suit). Rien que les deux
+  // boutons, alignés à droite comme le reste des compléments de carte
+  // (bulle de révélation, tampon) — aucun texte d'accompagnement.
+  verdictPrompt: { marginBottom: 12 },
+  verdictPromptButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
+  verdictPromptButton: {
+    borderWidth: 1,
+    borderRadius: radius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  verdictPromptButtonRealized: {
+    borderColor: colors.verdictRealized,
+    backgroundColor: 'rgba(54, 168, 160, 0.12)',
+  },
+  verdictPromptButtonMissed: {
+    borderColor: colors.verdictMissed,
+    backgroundColor: 'rgba(156, 29, 110, 0.12)',
+  },
+  verdictPromptButtonText: { fontFamily: fonts.label, fontSize: 12, fontWeight: '700', color: colors.text },
+  verdictPromptError: { fontSize: 11, color: colors.danger, marginTop: 6, textAlign: 'right' },
+  // Le tampon de certification : un sceau institutionnel plutôt qu'un badge
+  // coloré — double filet noir sur fond blanc, texte capitales tracké, un
+  // seul trait or en soulignement pour tout rappel de couleur. Identique
+  // pour Réalisé et Manqué (seul le mot change) : jamais de rouge ni de
+  // vert, la charte reste noir/blanc/gris/or même pour trancher un verdict.
+  // Posé dans le fil normal de l'en-tête (comme la bulle de révélation qu'il
+  // remplace une fois la carte tranchée) : une légère rotation suffit à
+  // l'effet « tampon encreur officiel » sans jamais empiéter en position
+  // absolue sur le teaser ou le contenu.
+  verdictStamp: {
+    borderWidth: 1.5,
+    borderColor: colors.text,
+    borderRadius: 4,
+    padding: 2,
+    backgroundColor: colors.surface,
+    transform: [{ rotate: '-6deg' }],
+  },
+  verdictStampTilted: { transform: [{ rotate: '5deg' }] },
+  // Second filet, à l'intérieur du premier avec un fin espace entre les deux
+  // (`padding` du parent) — la double bordure d'un sceau officiel plutôt
+  // qu'un simple encadré.
+  verdictStampInner: {
+    borderWidth: 1,
+    borderColor: colors.text,
+    borderRadius: 2,
+    paddingHorizontal: 8,
+    paddingTop: 3,
+    paddingBottom: 2,
+    alignItems: 'center',
+  },
+  verdictStampText: {
+    fontFamily: fonts.sansBold,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    color: colors.text,
+  },
+  verdictStampRule: {
+    width: '70%',
+    height: 2,
+    backgroundColor: colors.gold,
+    borderRadius: 1,
+    marginTop: 3,
+  },
   // Tout sur une seule ligne : [avatar 32][pseudo] ...espace flexible...
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   headerSpacer: { flex: 1, minWidth: 8 },

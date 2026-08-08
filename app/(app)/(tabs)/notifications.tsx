@@ -56,6 +56,20 @@ function notificationLabel(notification: Notification) {
           <PredictWord />
         </>
       );
+    case 'prediction_realized':
+      return (
+        <>
+          {notification.prediction?.author?.username ?? 'Quelqu’un'} confirme que son{' '}
+          <PredictWord /> s’est réalisé
+        </>
+      );
+    case 'prediction_missed':
+      return (
+        <>
+          {notification.prediction?.author?.username ?? 'Quelqu’un'} confirme que son{' '}
+          <PredictWord /> a été manqué
+        </>
+      );
     case 'group_invite':
       return notification.group?.owner
         ? `${notification.group.owner.username} t’invite dans un groupe`

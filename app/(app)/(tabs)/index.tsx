@@ -223,6 +223,15 @@ export default function HomeScreen() {
     );
   }
 
+  // Une fois l'auteur affirme le verdict de l'une de ses cartes : même
+  // synchronisation immédiate que favori/masqué, pour que l'onglet « Mes
+  // Predicts » reflète tout de suite le nouveau statut.
+  function handleVerdictChange(predictionId: string, verdict: 'realized' | 'missed') {
+    setFeed((prev) =>
+      (prev ?? []).map((item) => (item.id === predictionId ? { ...item, final_status: verdict } : item))
+    );
+  }
+
   // Posé à l'ouverture de la carte — c'est ce qui fait baisser le compteur du
   // badge d'onglet et retire le surlignage « non lue ».
   function handleMarkSeen(predictionId: string) {
@@ -500,6 +509,7 @@ export default function HomeScreen() {
               onDelete={() => handleDeletePrediction(item.id)}
               onFavoriteChange={(isFavorite) => handleFavoriteChange(item.id, isFavorite)}
               onHiddenChange={(isHidden) => handleHiddenChange(item.id, isHidden)}
+              onVerdictChange={(verdict) => handleVerdictChange(item.id, verdict)}
             />
           ))
         )}
