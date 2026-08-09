@@ -33,7 +33,10 @@ import { Avatar } from './Avatar';
 import { InlineComments } from './InlineComments';
 
 /** Largeur fixe de la bulle de réactions, ancrée par son bord droit sur le pouce. */
-const EMOJI_PANEL_WIDTH = 260;
+const EMOJI_PANEL_WIDTH = 272;
+/** 12 réactions sur 2 rangées de 6 plutôt qu'une seule rangée trop dense. */
+const EMOJI_COLUMNS = 6;
+const EMOJI_ROWS = Math.ceil(EMOJI_REACTIONS.length / EMOJI_COLUMNS);
 
 /**
  * Carte d'une prédiction, partagée entre les onglets À venir et Passées du
@@ -282,7 +285,7 @@ export function PredictionCard({
       Animated.spring(scaleAnims[previous], { toValue: 1, useNativeDriver: false, speed: 20 }).start();
     }
     if (index !== null) {
-      Animated.spring(scaleAnims[index], { toValue: 1.7, useNativeDriver: false, speed: 20 }).start();
+      Animated.spring(scaleAnims[index], { toValue: 1.9, useNativeDriver: false, speed: 20 }).start();
     }
   }
 
@@ -303,11 +306,14 @@ export function PredictionCard({
           setHovered(null);
           return;
         }
-        const relative = gesture.moveX - layout.x;
-        const index = Math.min(
-          EMOJI_REACTIONS.length - 1,
-          Math.max(0, Math.floor((relative / layout.width) * EMOJI_REACTIONS.length))
-        );
+        // Grille 2D (6 colonnes × 2 rangées) : la position du doigt se lit
+        // séparément sur chaque axe, puis se combine en index de tableau
+        // (ordre ligne par ligne, identique à l'ordre d'affichage du `.map`).
+        const relativeX = gesture.moveX - layout.x;
+        const relativeY = gesture.moveY - layout.y;
+        const col = Math.min(EMOJI_COLUMNS - 1, Math.max(0, Math.floor((relativeX / layout.width) * EMOJI_COLUMNS)));
+        const row = Math.min(EMOJI_ROWS - 1, Math.max(0, Math.floor((relativeY / layout.height) * EMOJI_ROWS)));
+        const index = Math.min(EMOJI_REACTIONS.length - 1, row * EMOJI_COLUMNS + col);
         setHovered(index);
       },
       onPanResponderRelease: (_evt, gesture) => {
@@ -658,7 +664,7 @@ const styles = StyleSheet.create({
     marginTop: -18,
     marginHorizontal: -18,
     marginBottom: 12,
-    paddingVertical: 6,
+    paddingVertical: 5,
     paddingHorizontal: 10,
   },
   statusBannerIcon: { marginRight: 4 },
@@ -810,6 +816,9 @@ const styles = StyleSheet.create({
   // Centrée sur le pouce lui-même (`reactionTriggerWrap` ne contient plus que
   // l'icône, plus le compteur) : un ancrage par le bord droit débordait hors
   // du cadre à gauche, le pouce étant au centre de la carte.
+  // 12 réactions ne tiennent plus sur une seule rangée : `flexWrap` bascule
+  // sur 2 rangées de `EMOJI_COLUMNS`, un rectangle arrondi plutôt qu'une
+  // pilule (qui n'a de sens que sur une seule ligne).
   emojiPanel: {
     position: 'absolute',
     bottom: '100%',
@@ -819,10 +828,12 @@ const styles = StyleSheet.create({
     width: EMOJI_PANEL_WIDTH,
     zIndex: 20,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
+    rowGap: 6,
     backgroundColor: colors.surface,
-    borderRadius: radius.pill,
+    borderRadius: radius.xl,
     borderWidth: 1,
     borderColor: colors.border,
     paddingHorizontal: 10,

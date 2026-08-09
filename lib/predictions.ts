@@ -27,9 +27,36 @@ export const CATEGORY_LABEL: Record<PredictionCategory, string> = {
 
 export const CATEGORIES = Object.keys(CATEGORY_LABEL) as PredictionCategory[];
 
-export type EmojiReaction = '👍' | '🖕' | '❤️' | '👎' | '😊' | '😮' | '😢';
+export type EmojiReaction =
+  | '👍'
+  | '🖕'
+  | '❤️'
+  | '👎'
+  | '😊'
+  | '😮'
+  | '😢'
+  | '🫣'
+  | '😬'
+  | '🤣'
+  | '💀'
+  | '🔮';
 
-export const EMOJI_REACTIONS: EmojiReaction[] = ['👍', '❤️', '😊', '😮', '😢', '👎', '🖕'];
+/** 12 réactions, un multiple de 6 : la bulle de sélection s'affiche en 2
+ * rangées de 6 (voir `EMOJI_COLUMNS` dans PredictionCard.tsx). */
+export const EMOJI_REACTIONS: EmojiReaction[] = [
+  '👍',
+  '❤️',
+  '😊',
+  '😮',
+  '😢',
+  '👎',
+  '🖕',
+  '🫣',
+  '😬',
+  '🤣',
+  '💀',
+  '🔮',
+];
 
 /**
  * Une prédiction telle que renvoyée par la vue `public.predictions_feed`.
