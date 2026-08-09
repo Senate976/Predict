@@ -3552,7 +3552,16 @@ revoke all on function public.delete_own_account() from public;
 grant execute on function public.delete_own_account() to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 37. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 37. Cinq nouvelles réactions emoji
+-- ---------------------------------------------------------------------------
+--
+-- Doit rester alignée sur `EMOJI_REACTIONS` (lib/predictions.ts).
+alter table public.prediction_emoji_reactions drop constraint if exists prediction_emoji_reactions_emoji_check;
+alter table public.prediction_emoji_reactions add constraint prediction_emoji_reactions_emoji_check
+  check (emoji in ('👍', '🖕', '❤️', '👎', '😊', '😮', '😢', '🫣', '😬', '🤣', '💀', '🔮'));
+
+-- ---------------------------------------------------------------------------
+-- 38. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une
