@@ -438,12 +438,7 @@ export function PredictionCard({
           )}
         </View>
 
-        {/* Le tampon certifie le verdict en s'imposant sur la prédiction
-            elle-même (pas sur l'étiquette d'état, ni ailleurs dans l'en-tête)
-            — posé en position absolue, dans le coin de ce bloc, façon sceau
-            encreur officiel. Fond translucide plutôt qu'opaque : le texte
-            qu'il chevauche reste toujours lisible en dessous. */}
-        <View style={styles.predictionBody}>
+        <View>
           {/* Sur sa propre ligne, jamais accolée au pseudo — la liste
               complète des personnes citées y empiétait dès qu'il y en avait
               plusieurs. */}
@@ -464,8 +459,12 @@ export function PredictionCard({
             <Text style={styles.cardContent}>{item.content}</Text>
           )}
 
+          {/* Le tampon certifie le verdict sous la prédiction, dans le flux
+              normal (plus en position absolue par-dessus le texte) — droit,
+              sans rotation, pour ne jamais chevaucher ni gêner la lecture du
+              contenu au-dessus. */}
           {verdict && (
-            <View style={[styles.verdictStamp, verdict === 'missed' && styles.verdictStampTilted]}>
+            <View style={styles.verdictStamp}>
               <View style={styles.verdictStampInner}>
                 <Text style={styles.verdictStampText}>{verdict === 'realized' ? 'J’avais raison' : 'Flop'}</Text>
                 <View style={styles.verdictStampRule} />
@@ -722,57 +721,45 @@ const styles = StyleSheet.create({
   },
   verdictPromptButtonText: { fontFamily: fonts.label, fontSize: 12, fontWeight: '700', color: colors.text },
   verdictPromptError: { fontSize: 11, color: colors.danger, marginTop: 6, textAlign: 'right' },
-  // Ancre le tampon : `position: relative` pour que le sceau, en position
-  // absolue, se place par rapport à ce bloc précis (teaser + contenu) et
-  // non par rapport à toute la carte — il chevauche la prédiction elle-même,
-  // jamais l'étiquette d'état ni l'en-tête.
-  predictionBody: { position: 'relative' },
-  // Le tampon de certification : un sceau institutionnel — double filet noir
-  // sur fond translucide (pas opaque : le texte qu'il chevauche doit rester
-  // lisible dessous), texte capitales tracké, un seul trait or en
-  // soulignement pour tout rappel de couleur. Identique pour Réalisé et
-  // Manqué (seul le mot change) : jamais de rouge ni de vert, la charte
-  // reste noir/blanc/gris/or même pour trancher un verdict. Volontairement
-  // plus imposant que le reste de la carte — un sceau qui statue doit
-  // s'imposer — posé en position absolue dans le coin du bloc, légèrement
-  // de travers façon tampon encreur officiel.
+  // Le tampon de certification : un sceau institutionnel — double filet noir,
+  // texte capitales tracké, un seul trait or en soulignement pour tout rappel
+  // de couleur. Identique pour Réalisé et Manqué (seul le mot change) :
+  // jamais de rouge ni de vert, la charte reste noir/blanc/gris/or même pour
+  // trancher un verdict. Posé droit, sous le contenu, dans le flux normal —
+  // jamais en surimpression du texte de la prédiction.
   verdictStamp: {
-    position: 'absolute',
-    top: -10,
-    right: -8,
-    borderWidth: 2.5,
+    alignSelf: 'flex-end',
+    marginTop: 8,
+    borderWidth: 1.75,
     borderColor: colors.text,
-    borderRadius: 6,
-    padding: 3,
-    backgroundColor: 'rgba(251, 251, 249, 0.72)',
-    transform: [{ rotate: '-9deg' }],
+    borderRadius: 4.2,
+    padding: 2.1,
   },
-  verdictStampTilted: { transform: [{ rotate: '7deg' }] },
   // Second filet, à l'intérieur du premier avec un fin espace entre les deux
   // (`padding` du parent) — la double bordure d'un sceau officiel plutôt
   // qu'un simple encadré.
   verdictStampInner: {
-    borderWidth: 2,
+    borderWidth: 1.4,
     borderColor: colors.text,
-    borderRadius: 4,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 6,
+    borderRadius: 2.8,
+    paddingHorizontal: 11.2,
+    paddingTop: 5.6,
+    paddingBottom: 4.2,
     alignItems: 'center',
   },
   verdictStampText: {
     fontFamily: fonts.sansBold,
-    fontSize: 19,
+    fontSize: 13.3,
     textTransform: 'uppercase',
-    letterSpacing: 1.6,
+    letterSpacing: 1.1,
     color: colors.text,
   },
   verdictStampRule: {
     width: '70%',
-    height: 3,
+    height: 2.1,
     backgroundColor: colors.gold,
-    borderRadius: 1.5,
-    marginTop: 5,
+    borderRadius: 1.05,
+    marginTop: 3.5,
   },
   // Tout sur une seule ligne : [avatar 32][pseudo] ...espace flexible...
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
