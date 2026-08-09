@@ -789,7 +789,7 @@ const styles = StyleSheet.create({
   // plutôt que la graisse : c'est ce qui la distingue du corps, pas son poids.
   cardTeaser: {
     fontFamily: fonts.label,
-    fontSize: 14,
+    fontSize: 15,
     color: colors.textFaint,
     marginBottom: 4,
   },
