@@ -38,18 +38,20 @@ const EMOJI_PANEL_WIDTH = 272;
 /** 12 réactions sur 2 rangées de 6 plutôt qu'une seule rangée trop dense. */
 const EMOJI_COLUMNS = 6;
 const EMOJI_ROWS = Math.ceil(EMOJI_REACTIONS.length / EMOJI_COLUMNS);
-/** Artwork statique du Sceau d'Orgueil (généré par scripts/generate_stamp.py)
- * — anneaux et texte « ENCORE RAISON » gravés dans l'image ; seule la date,
- * qui change à chaque prédiction, est superposée dynamiquement par-dessus. */
+/** Artwork du Sceau d'Orgueil — dérivé de la vraie photo de référence
+ * (assets/images/stamp-encore-raison-source.png) par scripts/erase_stamp_date.py,
+ * qui efface uniquement la date d'exemple gravée dans la source. Anneaux et
+ * texte « ENCORE RAISON » restent la photo telle quelle ; seule la date, qui
+ * change à chaque prédiction, est superposée dynamiquement par-dessus. */
 const STAMP_IMAGE = require('../assets/images/stamp-encore-raison.png');
 /** Diamètre d'affichage du tampon — largeur et hauteur identiques pour rester
  * un cercle parfait. */
 const STAMP_DIAMETER = 120;
 /** Position de la date et de son soulignement, en fraction du diamètre —
- * doit rester cohérente avec l'espace laissé vide sous « ENCORE RAISON »
- * dans l'artwork généré par scripts/generate_stamp.py. */
-const STAMP_DATE_TOP_FRACTION = 0.58;
-const STAMP_DATE_RULE_TOP_FRACTION = 0.67;
+ * doit rester cohérente avec la zone effacée par scripts/erase_stamp_date.py
+ * (dont ce script imprime les fractions exactes à chaque exécution). */
+const STAMP_DATE_TOP_FRACTION = 0.6;
+const STAMP_DATE_RULE_TOP_FRACTION = 0.696;
 
 /**
  * Carte d'une prédiction, partagée entre les onglets À venir et Passées du
