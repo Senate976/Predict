@@ -48,8 +48,8 @@ const STAMP_DIAMETER = 120;
 /** Position de la date et de son soulignement, en fraction du diamètre —
  * doit rester cohérente avec l'espace laissé vide sous « ENCORE RAISON »
  * dans l'artwork généré par scripts/generate_stamp.py. */
-const STAMP_DATE_TOP_FRACTION = 0.53;
-const STAMP_DATE_RULE_TOP_FRACTION = 0.62;
+const STAMP_DATE_TOP_FRACTION = 0.58;
+const STAMP_DATE_RULE_TOP_FRACTION = 0.67;
 
 /**
  * Carte d'une prédiction, partagée entre les onglets À venir et Passées du

@@ -37,11 +37,22 @@ GAP1_FRAC = 0.02
 MIDDLE_WIDTH_FRAC = 0.017
 GAP2_FRAC = 0.018
 GOLD_WIDTH_FRAC = 0.013
+# L'anneau or/ocre n'est pas un cercle complet : deux arcs (haut et bas) qui
+# s'arrêtent chacun avant d'atteindre la ligne horizontale du texte, laissant
+# un petit vide de chaque côté plutôt que de passer derrière les lettres.
+GOLD_GAP_HALF_ANGLE_DEG = 24
 
 
 def ring(draw, radius, width, color):
     bbox = [CENTER - radius, CENTER - radius, CENTER + radius, CENTER + radius]
     draw.ellipse(bbox, outline=color + (255,), width=width)
+
+
+def ring_two_arcs(draw, radius, width, color, gap_half_angle_deg):
+    bbox = [CENTER - radius, CENTER - radius, CENTER + radius, CENTER + radius]
+    g = gap_half_angle_deg
+    draw.arc(bbox, start=g, end=180 - g, fill=color + (255,), width=width)
+    draw.arc(bbox, start=180 + g, end=360 - g, fill=color + (255,), width=width)
 
 
 def add_grain(layer, amount=14, seed=7):
@@ -75,14 +86,19 @@ def main():
     gold_outer_edge = middle_outer_edge - HALF * MIDDLE_WIDTH_FRAC - HALF * GAP2_FRAC
     gold_width = HALF * GOLD_WIDTH_FRAC
     gold_centerline = gold_outer_edge - gold_width / 2
-    ring(draw, radius=gold_centerline, width=round(gold_width), color=GOLD)
+
+    # Deux arcs (haut et bas) plutôt qu'un cercle complet : chacun s'arrête
+    # avant la ligne horizontale du texte, laissant un vide de chaque côté
+    # au lieu de passer derrière les lettres.
+    ring_two_arcs(draw, radius=gold_centerline, width=round(gold_width), color=GOLD,
+                  gap_half_angle_deg=GOLD_GAP_HALF_ANGLE_DEG)
 
     inner_content_radius = gold_outer_edge - HALF * GOLD_WIDTH_FRAC
 
-    # « ENCORE RAISON » sur une seule ligne, dimensionné pour déborder
-    # légèrement sur l'anneau intérieur à ses deux extrémités.
+    # « ENCORE RAISON » centré au milieu exact du tampon (plus au-dessus du
+    # centre) — la date, plus bas, n'a besoin d'aucune place réservée ici.
     text = "ENCORE RAISON"
-    target_width = inner_content_radius * 2.08
+    target_width = inner_content_radius * 1.86
     font_size = 260
     font = ImageFont.truetype(FONT_PATH, font_size)
     bbox = draw.textbbox((0, 0), text, font=font)
@@ -93,13 +109,14 @@ def main():
         bbox = draw.textbbox((0, 0), text, font=font)
         text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
-    text_y = CENTER - text_h * 1.35  # au-dessus du centre : laisse la place à la date
+    text_y = CENTER - text_h / 2
     draw.text(
         (CENTER - text_w / 2 - bbox[0], text_y - bbox[1]),
         text,
         font=font,
         fill=INK + (255,),
     )
+
     print(
         "font_size", font_size,
         "text_w", round(text_w), "text_h", round(text_h),
