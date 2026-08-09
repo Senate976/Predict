@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Image,
   Modal,
   PanResponder,
   Platform,
@@ -37,9 +38,18 @@ const EMOJI_PANEL_WIDTH = 272;
 /** 12 réactions sur 2 rangées de 6 plutôt qu'une seule rangée trop dense. */
 const EMOJI_COLUMNS = 6;
 const EMOJI_ROWS = Math.ceil(EMOJI_REACTIONS.length / EMOJI_COLUMNS);
-/** Diamètre fixe du Sceau d'Orgueil (tampon « ENCORE RAISON ») — largeur et
- * hauteur identiques, condition nécessaire pour un cercle plutôt qu'un ovale. */
+/** Artwork statique du Sceau d'Orgueil (généré par scripts/generate_stamp.py)
+ * — anneaux et texte « ENCORE RAISON » gravés dans l'image ; seule la date,
+ * qui change à chaque prédiction, est superposée dynamiquement par-dessus. */
+const STAMP_IMAGE = require('../assets/images/stamp-encore-raison.png');
+/** Diamètre d'affichage du tampon — largeur et hauteur identiques pour rester
+ * un cercle parfait. */
 const STAMP_DIAMETER = 120;
+/** Position de la date et de son soulignement, en fraction du diamètre —
+ * doit rester cohérente avec l'espace laissé vide sous « ENCORE RAISON »
+ * dans l'artwork généré par scripts/generate_stamp.py. */
+const STAMP_DATE_TOP_FRACTION = 0.53;
+const STAMP_DATE_RULE_TOP_FRACTION = 0.62;
 
 /**
  * Carte d'une prédiction, partagée entre les onglets À venir et Passées du
@@ -111,12 +121,19 @@ export function PredictionCard({
   // trop lent. `null` tant que l'auteur n'a rien affirmé pendant cette
   // session — la valeur posée en base fait foi dès le rechargement suivant.
   const [localVerdict, setLocalVerdict] = useState<'realized' | 'missed' | null>(null);
+  // Écho optimiste de la date du Sceau d'Orgueil, posée en même temps que
+  // `localVerdict` — sans lui, le tampon afficherait `item.verdict_set_at`
+  // (encore `null` avant le prochain chargement du fil) au lieu du jour où
+  // l'auteur vient tout juste d'affirmer son verdict.
+  const [localVerdictSetAt, setLocalVerdictSetAt] = useState<Date | null>(null);
   const [verdictPending, setVerdictPending] = useState(false);
   const [verdictError, setVerdictError] = useState<string | null>(null);
   const revealed = isRevealed(item, now);
   const isAuthor = item.author_id === userId;
 
   const verdict = localVerdict ?? (revealed && item.final_status !== 'pending' ? item.final_status : null);
+  const verdictSetAt =
+    localVerdictSetAt ?? (item.verdict_set_at ? new Date(item.verdict_set_at) : new Date(item.reveal_at));
 
   /** Bandeau d'état en tête de carte : la nature de la prédiction d'un coup
    * d'œil, avant même de lire le teaser. Remplace l'ancien liseré de verdict
@@ -192,10 +209,12 @@ export function PredictionCard({
     setVerdictPending(true);
     setVerdictError(null);
     setLocalVerdict(next);
+    setLocalVerdictSetAt(new Date());
     const { error } = await setPredictionVerdict(item.id, next);
     setVerdictPending(false);
     if (error) {
       setLocalVerdict(null);
+      setLocalVerdictSetAt(null);
       setVerdictError('Action impossible.');
       return;
     }
@@ -475,22 +494,16 @@ export function PredictionCard({
           {/* Le tampon certifie le verdict sous la prédiction, dans le flux
               normal (plus en position absolue par-dessus le texte) — droit,
               sans rotation, pour ne jamais chevaucher ni gêner la lecture du
-              contenu au-dessus. Réalisé reprend le Sceau d'Orgueil (triple
-              cercle concentric façon tampon encreur officiel) ; Manqué garde
-              l'ancien encadré simple, plus sobre. */}
+              contenu au-dessus. Réalisé reprend le Sceau d'Orgueil : artwork
+              statique (scripts/generate_stamp.py) avec la date de l'auteur
+              superposée par-dessus, la seule partie qui change d'une
+              prédiction à l'autre. Manqué garde l'ancien encadré simple, plus
+              sobre. */}
           {verdict === 'realized' && (
             <View style={styles.verdictStampRealized}>
-              <View style={styles.verdictStampRealizedRingOuter}>
-                <View style={styles.verdictStampRealizedRingMiddle}>
-                  <View style={styles.verdictStampRealizedRingInner}>
-                    <Text style={styles.verdictStampRealizedText} numberOfLines={1}>
-                      ENCORE RAISON
-                    </Text>
-                    <Text style={styles.verdictStampRealizedDate}>{formatStampDate(new Date(item.reveal_at))}</Text>
-                    <View style={styles.verdictStampRealizedDateRule} />
-                  </View>
-                </View>
-              </View>
+              <Image source={STAMP_IMAGE} style={styles.verdictStampRealizedImage} resizeMode="contain" />
+              <Text style={styles.verdictStampRealizedDate}>{formatStampDate(verdictSetAt)}</Text>
+              <View style={styles.verdictStampRealizedDateRule} />
             </View>
           )}
           {verdict === 'missed' && (
@@ -828,69 +841,39 @@ const styles = StyleSheet.create({
   },
   // Le Sceau d'Orgueil « ENCORE RAISON » : triple cercle concentrique (deux
   // filets noirs, un filet or/ocre) façon tampon encreur officiel — un
-  // cercle parfait, pas un ovale : largeur ET hauteur fixées et identiques
-  // (`STAMP_DIAMETER`), `radius.pill` se chargeant d'arrondir chaque anneau
-  // à la moitié de son côté. Aucun padding horizontal sur l'anneau
-  // intérieur : le texte, dimensionné pour dépasser légèrement le diamètre
-  // utile, empiète volontairement sur le cercle intérieur à ses deux
-  // extrémités — fidèle à la photo de référence, pas seulement au contact.
-  // Toujours dans le flux normal, aligné à droite, jamais en surimpression
-  // du texte de la prédiction.
-  verdictStampRealized: { alignSelf: 'flex-end', marginTop: 8 },
-  verdictStampRealizedRingOuter: {
+  // cercle parfait : artwork statique (scripts/generate_stamp.py), la date
+  // de l'auteur superposée par-dessus en position absolue. Toujours dans le
+  // flux normal, aligné à droite, jamais en surimpression du texte de la
+  // prédiction.
+  verdictStampRealized: {
+    alignSelf: 'flex-end',
+    marginTop: 8,
     width: STAMP_DIAMETER,
     height: STAMP_DIAMETER,
-    borderWidth: 2.1,
-    borderColor: colors.text,
-    borderRadius: radius.pill,
-    padding: 2.1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  verdictStampRealizedRingMiddle: {
-    width: '100%',
-    height: '100%',
-    borderWidth: 1.05,
-    borderColor: colors.text,
-    borderRadius: radius.pill,
-    padding: 2.1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  verdictStampRealizedRingInner: {
-    width: '100%',
-    height: '100%',
-    borderWidth: 1.05,
-    borderColor: colors.goldTransition,
-    borderRadius: radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  verdictStampRealizedText: {
-    fontFamily: fonts.sansBold,
-    fontSize: 10.5,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    color: colors.text,
-    textAlign: 'center',
-  },
-  // Date de révélation, en dessous du texte principal — plus petite mais
-  // toujours lisible, soulignée d'un fin trait comme sur le tampon de
-  // référence.
+  verdictStampRealizedImage: { width: '100%', height: '100%' },
+  // Positionnée par-dessus l'artwork, dans l'espace laissé vide sous
+  // « ENCORE RAISON » — voir `STAMP_DATE_TOP_FRACTION` et le script de
+  // génération pour la correspondance des positions.
   verdictStampRealizedDate: {
+    position: 'absolute',
+    top: STAMP_DIAMETER * STAMP_DATE_TOP_FRACTION,
+    left: 0,
+    right: 0,
     fontFamily: fonts.bodyEmphasis,
-    fontSize: 6.3,
+    fontSize: 9,
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
     color: colors.text,
-    marginTop: 2,
     textAlign: 'center',
   },
   verdictStampRealizedDateRule: {
-    width: '55%',
+    position: 'absolute',
+    top: STAMP_DIAMETER * STAMP_DATE_RULE_TOP_FRACTION,
+    left: '27%',
+    width: '46%',
     height: 1,
     backgroundColor: colors.text,
-    marginTop: 1.4,
   },
   // Tout sur une seule ligne : [avatar 32][pseudo] ...espace flexible...
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
