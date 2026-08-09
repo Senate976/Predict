@@ -39,7 +39,7 @@ const EMOJI_COLUMNS = 6;
 const EMOJI_ROWS = Math.ceil(EMOJI_REACTIONS.length / EMOJI_COLUMNS);
 /** Diamètre fixe du Sceau d'Orgueil (tampon « ENCORE RAISON ») — largeur et
  * hauteur identiques, condition nécessaire pour un cercle plutôt qu'un ovale. */
-const STAMP_DIAMETER = 172;
+const STAMP_DIAMETER = 120;
 
 /**
  * Carte d'une prédiction, partagée entre les onglets À venir et Passées du
@@ -830,47 +830,47 @@ const styles = StyleSheet.create({
   // filets noirs, un filet or/ocre) façon tampon encreur officiel — un
   // cercle parfait, pas un ovale : largeur ET hauteur fixées et identiques
   // (`STAMP_DIAMETER`), `radius.pill` se chargeant d'arrondir chaque anneau
-  // à la moitié de son côté. Le texte tient sur une seule ligne, quitte à
-  // frôler le cercle intérieur à ses deux extrémités (référence fournie) —
-  // padding horizontal volontairement minime plutôt qu'un repli sur deux
-  // lignes. Toujours dans le flux normal, aligné à droite, jamais en
-  // surimpression.
+  // à la moitié de son côté. Aucun padding horizontal sur l'anneau
+  // intérieur : le texte, dimensionné pour dépasser légèrement le diamètre
+  // utile, empiète volontairement sur le cercle intérieur à ses deux
+  // extrémités — fidèle à la photo de référence, pas seulement au contact.
+  // Toujours dans le flux normal, aligné à droite, jamais en surimpression
+  // du texte de la prédiction.
   verdictStampRealized: { alignSelf: 'flex-end', marginTop: 8 },
   verdictStampRealizedRingOuter: {
     width: STAMP_DIAMETER,
     height: STAMP_DIAMETER,
-    borderWidth: 3,
+    borderWidth: 2.1,
     borderColor: colors.text,
     borderRadius: radius.pill,
-    padding: 3,
+    padding: 2.1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   verdictStampRealizedRingMiddle: {
     width: '100%',
     height: '100%',
-    borderWidth: 1.5,
+    borderWidth: 1.05,
     borderColor: colors.text,
     borderRadius: radius.pill,
-    padding: 3,
+    padding: 2.1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   verdictStampRealizedRingInner: {
     width: '100%',
     height: '100%',
-    borderWidth: 1.5,
+    borderWidth: 1.05,
     borderColor: colors.goldTransition,
     borderRadius: radius.pill,
-    paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
   },
   verdictStampRealizedText: {
     fontFamily: fonts.sansBold,
-    fontSize: 15,
+    fontSize: 10.5,
     textTransform: 'uppercase',
-    letterSpacing: 0.6,
+    letterSpacing: 0.4,
     color: colors.text,
     textAlign: 'center',
   },
@@ -879,18 +879,18 @@ const styles = StyleSheet.create({
   // référence.
   verdictStampRealizedDate: {
     fontFamily: fonts.bodyEmphasis,
-    fontSize: 9,
+    fontSize: 6.3,
     textTransform: 'uppercase',
-    letterSpacing: 0.6,
+    letterSpacing: 0.4,
     color: colors.text,
-    marginTop: 3,
+    marginTop: 2,
     textAlign: 'center',
   },
   verdictStampRealizedDateRule: {
     width: '55%',
     height: 1,
     backgroundColor: colors.text,
-    marginTop: 2,
+    marginTop: 1.4,
   },
   // Tout sur une seule ligne : [avatar 32][pseudo] ...espace flexible...
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
