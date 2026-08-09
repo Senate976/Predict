@@ -39,7 +39,7 @@ const EMOJI_COLUMNS = 6;
 const EMOJI_ROWS = Math.ceil(EMOJI_REACTIONS.length / EMOJI_COLUMNS);
 /** Diamètre fixe du Sceau d'Orgueil (tampon « ENCORE RAISON ») — largeur et
  * hauteur identiques, condition nécessaire pour un cercle plutôt qu'un ovale. */
-const STAMP_DIAMETER = 138;
+const STAMP_DIAMETER = 172;
 
 /**
  * Carte d'une prédiction, partagée entre les onglets À venir et Passées du
@@ -483,7 +483,9 @@ export function PredictionCard({
               <View style={styles.verdictStampRealizedRingOuter}>
                 <View style={styles.verdictStampRealizedRingMiddle}>
                   <View style={styles.verdictStampRealizedRingInner}>
-                    <Text style={styles.verdictStampRealizedText}>ENCORE RAISON</Text>
+                    <Text style={styles.verdictStampRealizedText} numberOfLines={1}>
+                      ENCORE RAISON
+                    </Text>
                     <Text style={styles.verdictStampRealizedDate}>{formatStampDate(new Date(item.reveal_at))}</Text>
                     <View style={styles.verdictStampRealizedDateRule} />
                   </View>
@@ -828,9 +830,11 @@ const styles = StyleSheet.create({
   // filets noirs, un filet or/ocre) façon tampon encreur officiel — un
   // cercle parfait, pas un ovale : largeur ET hauteur fixées et identiques
   // (`STAMP_DIAMETER`), `radius.pill` se chargeant d'arrondir chaque anneau
-  // à la moitié de son côté. Le texte, trop large pour tenir sur une seule
-  // ligne dans un cercle, se replie naturellement sur deux lignes centrées.
-  // Toujours dans le flux normal, aligné à droite, jamais en surimpression.
+  // à la moitié de son côté. Le texte tient sur une seule ligne, quitte à
+  // frôler le cercle intérieur à ses deux extrémités (référence fournie) —
+  // padding horizontal volontairement minime plutôt qu'un repli sur deux
+  // lignes. Toujours dans le flux normal, aligné à droite, jamais en
+  // surimpression.
   verdictStampRealized: { alignSelf: 'flex-end', marginTop: 8 },
   verdictStampRealizedRingOuter: {
     width: STAMP_DIAMETER,
@@ -858,15 +862,15 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.goldTransition,
     borderRadius: radius.pill,
-    paddingHorizontal: 10,
+    paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
   },
   verdictStampRealizedText: {
     fontFamily: fonts.sansBold,
-    fontSize: 13,
+    fontSize: 15,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 0.6,
     color: colors.text,
     textAlign: 'center',
   },
