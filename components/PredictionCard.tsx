@@ -147,20 +147,20 @@ export function PredictionCard({
   const verdictSetAt =
     localVerdictSetAt ?? (item.verdict_set_at ? new Date(item.verdict_set_at) : new Date(item.reveal_at));
 
-  /** Bandeau d'état en tête de carte : la nature de la prédiction d'un coup
-   * d'œil, avant même de lire le teaser. Remplace l'ancien liseré de verdict
-   * dans l'en-tête — ce bandeau couvre désormais les 4 états. */
-  const statusBanner: { kind: 'sealed' | 'active' | 'realized' | 'missed'; label: string; extra?: string } = !revealed
+  /** Encart d'état en coin de carte : la nature de la prédiction d'un coup
+   * d'œil, avant même de lire le teaser — mais seulement tant que le verdict
+   * n'est pas affirmé. Une fois réalisée ou manquée, le tampon apporte déjà
+   * la réponse : répéter « Réalisé »/« Manqué » ici serait redondant, donc
+   * `null` dans ces deux cas plutôt qu'un troisième et quatrième état. */
+  const statusBadge: { kind: 'sealed' | 'active'; label: string; extra?: string } | null = !revealed
     ? {
         kind: 'sealed',
         label: `Scellé le ${toDateInput(new Date(item.created_at))}`,
         extra: item.open_ended ? undefined : `Révélé ${formatCountdown(new Date(item.reveal_at), now)}`,
       }
-    : verdict === 'realized'
-      ? { kind: 'realized', label: 'Réalisé' }
-      : verdict === 'missed'
-        ? { kind: 'missed', label: 'Manqué' }
-        : { kind: 'active', label: 'En cours' };
+    : verdict === null
+      ? { kind: 'active', label: 'Predict' }
+      : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -383,13 +383,34 @@ export function PredictionCard({
 
   return (
     <View style={[styles.card, unseen && styles.cardUnseen]}>
+      {/* Encart flottant en coin de carte plutôt qu'inline dans l'en-tête :
+          à cette place, il ne dispute plus la largeur au pseudo, qui peut
+          désormais s'étaler sur toute la ligne. Absent une fois le verdict
+          affirmé (voir `statusBadge`) — rien à répéter, le tampon en dessous
+          fait déjà le travail. */}
+      {statusBadge && (
+        <View style={styles.cornerBadge}>
+          {statusBadge.kind === 'sealed' && <Lock size={10} color={colors.textMuted} strokeWidth={2} />}
+          <View
+            style={[
+              styles.statusBadgeDot,
+              statusBadge.kind === 'sealed' ? styles.statusDotSealed : styles.statusDotActive,
+            ]}
+          />
+          <Text style={styles.statusBadgeText} numberOfLines={1}>
+            {statusBadge.label}
+            {statusBadge.extra ? ` · ${statusBadge.extra}` : ''}
+          </Text>
+        </View>
+      )}
+
       {/* Invite l'auteur à trancher dès que sa prédiction est révélée mais
-          encore « En cours » — nulle part ailleurs que sur sa propre carte,
-          en dehors de la zone tappable (`onPress` navigue vers le détail) :
-          un tap sur un bouton ne doit jamais aussi ouvrir l'écran détail.
-          Rien que les deux boutons, aucun texte d'accompagnement — une fois
-          posé, revenir dessus n'est plus possible ici, seulement depuis
-          l'écran détail (voir `set_prediction_verdict`, section 35). */}
+          encore en attente de verdict — nulle part ailleurs que sur sa propre
+          carte, en dehors de la zone tappable (`onPress` navigue vers le
+          détail) : un tap sur un bouton ne doit jamais aussi ouvrir l'écran
+          détail. Rien que les deux boutons, aucun texte d'accompagnement —
+          une fois posé, revenir dessus n'est plus possible ici, seulement
+          depuis l'écran détail (voir `set_prediction_verdict`, section 35). */}
       {isAuthor && revealed && verdict === null && (
         <View style={styles.verdictPrompt}>
           <View style={styles.verdictPromptButtons}>
@@ -433,36 +454,12 @@ export function PredictionCard({
 
           <View style={styles.headerSpacer} />
 
-          <View style={styles.headerRightGroup}>
-            {/* Badge d'état façon verre dépoli : fond sombre semi-transparent
-                + bordure fine, une pastille lumineuse colorée selon le
-                statut plutôt qu'un bandeau plein toute la largeur. Le compte
-                à rebours (avant révélation) se glisse dans le même badge au
-                lieu d'une bulle séparée. */}
-            <View style={styles.statusBadge}>
-              {statusBanner.kind === 'sealed' && <Lock size={10} color={colors.textMuted} strokeWidth={2} />}
-              <View
-                style={[
-                  styles.statusBadgeDot,
-                  statusBanner.kind === 'sealed' && styles.statusDotSealed,
-                  statusBanner.kind === 'active' && styles.statusDotActive,
-                  statusBanner.kind === 'realized' && styles.statusDotRealized,
-                  statusBanner.kind === 'missed' && styles.statusDotMissed,
-                ]}
-              />
-              <Text style={styles.statusBadgeText} numberOfLines={1}>
-                {statusBanner.label}
-                {statusBanner.extra ? ` · ${statusBanner.extra}` : ''}
-              </Text>
-            </View>
-
-            {/* Favoris, masquer, supprimer : des actions de gestion, pas des
-                réactions sociales — regroupées ici plutôt que dans le pied de
-                carte, qui ne garde que commentaire et réaction. */}
-            <Pressable onPress={() => setMenuOpen(true)} hitSlop={8} style={styles.headerMenuButton}>
-              <MoreHorizontal size={18} color={colors.icon} strokeWidth={1.75} />
-            </Pressable>
-          </View>
+          {/* Favoris, masquer, supprimer : des actions de gestion, pas des
+              réactions sociales — regroupées ici plutôt que dans le pied de
+              carte, qui ne garde que commentaire et réaction. */}
+          <Pressable onPress={() => setMenuOpen(true)} hitSlop={8} style={styles.headerMenuButton}>
+            <MoreHorizontal size={18} color={colors.icon} strokeWidth={1.75} />
+          </Pressable>
         </View>
 
         <View>
@@ -714,11 +711,16 @@ const styles = StyleSheet.create({
     borderColor: colors.gold,
     backgroundColor: colors.goldSoft,
   },
-  // Badge d'état façon verre dépoli : fond sombre semi-transparent + bordure
-  // claire fine, en lieu et place de l'ancien bandeau plein toute la largeur
-  // (aplat de couleur vive). Compact, dans l'en-tête de carte — jamais un
-  // élément qui domine visuellement la prédiction elle-même.
-  statusBadge: {
+  // Encart flottant façon verre dépoli, en coin de carte plutôt qu'inline
+  // dans l'en-tête : posé hors du flux (`position: absolute`), il ne dispute
+  // plus la largeur au pseudo. Léger débord au-dessus du bord de la carte,
+  // façon ruban de statut, pour bien le détacher visuellement de l'en-tête
+  // dessous plutôt que de sembler simplement posé dans son coin.
+  cornerBadge: {
+    position: 'absolute',
+    top: -10,
+    right: 16,
+    zIndex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
@@ -731,17 +733,11 @@ const styles = StyleSheet.create({
     maxWidth: 190,
   },
   // La pastille lumineuse porte seule la couleur du statut — jamais le fond
-  // du badge, qui reste neutre pour les quatre états.
+  // de l'encart, qui reste neutre pour les deux états.
   statusBadgeDot: { width: 6, height: 6, borderRadius: 3 },
   statusDotSealed: { backgroundColor: colors.statusDotSealed },
   statusDotActive: { backgroundColor: colors.statusDotActive },
-  statusDotRealized: { backgroundColor: colors.statusDotRealized },
-  statusDotMissed: { backgroundColor: colors.statusDotMissed },
   statusBadgeText: { fontSize: 11, fontFamily: fonts.label, color: colors.textMuted, flexShrink: 1 },
-  // Regroupe le badge d'état et le bouton ••• — ce dernier reste toujours
-  // visible, avant comme après révélation, puisque favoris/masquer/supprimer
-  // restent pertinents dans les deux cas.
-  headerRightGroup: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   headerMenuButton: { padding: 2 },
   // Invite l'auteur à trancher — au-dessus de la carte tappable, jamais
   // dedans, pour qu'un tap sur un bouton ne navigue jamais aussi vers le

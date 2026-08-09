@@ -5,9 +5,10 @@ import { Pressable, StyleSheet } from 'react-native';
 import { colors } from '../lib/theme';
 
 /**
- * Bouton d'action flottant unique et standardisé, présent sur chaque page
- * (hors création elle-même et connexion) : un seul point d'entrée vers la
- * création, cohérent partout, plutôt qu'un lien discret par écran.
+ * Bouton d'action flottant, pour les pages hors barre de navigation (détail
+ * d'une prédiction, profil d'un ami) où il n'y a donc pas d'onglet central
+ * où se glisser — voir `CreateTabButton` dans `(tabs)/_layout.tsx` pour les
+ * quatre onglets principaux, qui n'utilisent plus ce composant.
  */
 export function CreateFab() {
   const router = useRouter();

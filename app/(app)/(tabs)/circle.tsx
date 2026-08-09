@@ -15,7 +15,6 @@ import { TextInput } from '../../../components/TextInput';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
-import { CreateFab } from '../../../components/CreateFab';
 import { useAuth } from '../../../lib/auth';
 import {
   acceptFriendRequest,
@@ -651,8 +650,6 @@ export default function CircleScreen() {
           </>
         )}
       </ScrollView>
-
-      <CreateFab />
     </SafeAreaView>
   );
 }

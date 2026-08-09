@@ -13,7 +13,6 @@ import { Text } from '../../../components/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
-import { CreateFab } from '../../../components/CreateFab';
 import { PredictWord } from '../../../components/PredictWord';
 import { PrediscoreGauge } from '../../../components/PrediscoreGauge';
 import { pickAvatarImage, removeAvatar, uploadAvatar } from '../../../lib/avatar';
@@ -287,8 +286,6 @@ export default function ProfileScreen() {
           </>
         )}
       </ScrollView>
-
-      <CreateFab />
     </SafeAreaView>
   );
 }
