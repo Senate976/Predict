@@ -27,6 +27,7 @@ import {
   deletePrediction,
   feedErrorMessage,
   fetchPredictionsFeed,
+  isRevealed,
   setPredictionUserState,
   type PredictionFeedItem,
 } from '../../../lib/predictions';
@@ -76,12 +77,12 @@ export default function HomeScreen() {
   const [menuView, setMenuView] = useState<MenuView>('main');
   const [authorFilter, setAuthorFilter] = useState<string | null>(null);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [unrevealedOnly, setUnrevealedOnly] = useState(false);
   // `'default'` : l'ordre de chaque onglet reste celui déjà établi (À venir
   // par publication, Passées par date de révélation) — un tri par date de
   // scellé ou de révélation est une bascule optionnelle, pas un nouveau défaut.
   const [sortKey, setSortKey] = useState<SortKey>('default');
   const [sortOrder, setSortOrder] = useState<SortOrder>('recent');
-  const [showHidden, setShowHidden] = useState(false);
 
   function toggleSortKey(key: 'seal' | 'reveal') {
     if (sortKey === key) {
@@ -92,14 +93,12 @@ export default function HomeScreen() {
     }
   }
 
-  // `showHidden` n'est pas compté : c'est un « afficher plus », pas un filtre
-  // qui cache du contenu — sa propre ligne dans le menu se désactive déjà
-  // d'elle-même en la retapant.
-  const hasActiveFilters = authorFilter !== null || favoritesOnly || sortKey !== 'default';
+  const hasActiveFilters = authorFilter !== null || favoritesOnly || unrevealedOnly || sortKey !== 'default';
 
   function resetFilters() {
     setAuthorFilter(null);
     setFavoritesOnly(false);
+    setUnrevealedOnly(false);
     setSortKey('default');
     setSortOrder('recent');
   }
@@ -229,6 +228,18 @@ export default function HomeScreen() {
     );
   }
 
+  /** « X masquées — afficher » ne rouvre pas une simple vue temporaire : les
+   * démasquer les rend à nouveau visibles pour de bon, comme si on avait
+   * retapé l'œil de chacune une par une depuis sa carte. */
+  async function handleUnhideAll() {
+    if (!userId) return;
+    const hiddenItems = byTab.filter((item) => item.is_hidden);
+    if (hiddenItems.length === 0) return;
+    const hiddenIds = new Set(hiddenItems.map((item) => item.id));
+    setFeed((prev) => (prev ?? []).map((item) => (hiddenIds.has(item.id) ? { ...item, is_hidden: false } : item)));
+    await Promise.all(hiddenItems.map((item) => setPredictionUserState(item.id, userId, { hidden: false })));
+  }
+
   // Une fois l'auteur affirme le verdict de l'une de ses cartes : même
   // synchronisation immédiate que favori/masqué, pour que l'onglet « Mes
   // Predicts » reflète tout de suite le nouveau statut.
@@ -263,9 +274,10 @@ export default function HomeScreen() {
   }));
 
   const filtered = byTab
-    .filter((item) => showHidden || !item.is_hidden)
+    .filter((item) => !item.is_hidden)
     .filter((item) => !authorFilter || item.author_id === authorFilter)
-    .filter((item) => !favoritesOnly || item.is_favorite);
+    .filter((item) => !favoritesOnly || item.is_favorite)
+    .filter((item) => !unrevealedOnly || !isRevealed(item, now));
 
   const shown = [...filtered].sort((a, b) => {
     if (sortKey === 'seal') {
@@ -391,24 +403,28 @@ export default function HomeScreen() {
                   )}
                 </Pressable>
 
-                <Pressable
-                  onPress={() => setFavoritesOnly((o) => !o)}
-                  style={hiddenCount === 0 && !hasActiveFilters ? styles.menuRowLast : styles.menuRow}
-                >
+                <Pressable onPress={() => setFavoritesOnly((o) => !o)} style={styles.menuRow}>
                   <Text style={[styles.menuRowText, favoritesOnly && styles.menuRowTextActive]}>
                     ★ Favoris uniquement
                   </Text>
                 </Pressable>
 
+                <Pressable
+                  onPress={() => setUnrevealedOnly((o) => !o)}
+                  style={hiddenCount === 0 && !hasActiveFilters ? styles.menuRowLast : styles.menuRow}
+                >
+                  <Text style={[styles.menuRowText, unrevealedOnly && styles.menuRowTextActive]}>
+                    Non révélés uniquement
+                  </Text>
+                </Pressable>
+
                 {hiddenCount > 0 && (
                   <Pressable
-                    onPress={() => setShowHidden((o) => !o)}
+                    onPress={handleUnhideAll}
                     style={hasActiveFilters ? styles.menuRow : styles.menuRowLast}
                   >
                     <Text style={styles.menuRowText}>
-                      {showHidden
-                        ? 'Masquer à nouveau les masquées'
-                        : `${hiddenCount} masquée${hiddenCount > 1 ? 's' : ''} — afficher`}
+                      {`${hiddenCount} masquée${hiddenCount > 1 ? 's' : ''} — afficher`}
                     </Text>
                   </Pressable>
                 )}
@@ -610,10 +626,10 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   filtersToggleActive: { borderBottomColor: colors.text },
-  filtersToggleText: { fontSize: 12, fontWeight: '700', color: colors.textFaint },
+  filtersToggleText: { fontSize: 13, fontWeight: '700', color: colors.textFaint },
   filtersToggleTextActive: { color: colors.text },
   filtersReset: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  filtersResetText: { fontSize: 12, fontWeight: '600', color: colors.textFaint },
+  filtersResetText: { fontSize: 13, fontWeight: '600', color: colors.textFaint },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
@@ -649,10 +665,10 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   menuRowRight: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, maxWidth: '70%' },
-  menuRowText: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
+  menuRowText: { fontSize: 16, fontWeight: '600', color: colors.textMuted },
   menuRowTextActive: { color: colors.text, fontWeight: '700' },
-  menuRowTextReset: { fontSize: 14, fontWeight: '600', color: colors.danger },
-  menuRowValue: { fontSize: 13, color: colors.textFaint, flexShrink: 1 },
+  menuRowTextReset: { fontSize: 16, fontWeight: '600', color: colors.danger },
+  menuRowValue: { fontSize: 14, color: colors.textFaint, flexShrink: 1 },
   menuBack: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -662,7 +678,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  menuBackText: { fontSize: 13, fontWeight: '700', color: colors.text },
+  menuBackText: { fontSize: 14, fontWeight: '700', color: colors.text },
   scroll: { padding: spacing.lg, paddingBottom: 88, flexGrow: 1 },
   loader: { marginTop: 32 },
   empty: { paddingVertical: 24, alignItems: 'center' },
