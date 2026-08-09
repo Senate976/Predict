@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { Eye, EyeOff, Lock, MessageCircle, Star, ThumbsUp, Trash2 } from 'lucide-react-native';
+import { Eye, EyeOff, Lock, MessageCircle, MoreHorizontal, Star, ThumbsUp, Trash2 } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -37,6 +37,18 @@ const EMOJI_PANEL_WIDTH = 272;
 /** 12 réactions sur 2 rangées de 6 plutôt qu'une seule rangée trop dense. */
 const EMOJI_COLUMNS = 6;
 const EMOJI_ROWS = Math.ceil(EMOJI_REACTIONS.length / EMOJI_COLUMNS);
+
+/** Rotation légère du tampon de verdict, façon coup de tampon encreur donné
+ * à la main — jamais parfaitement droit. Toujours entre -4° et -8°, dérivée
+ * de l'identifiant de la prédiction pour rester stable d'un rendu à l'autre
+ * plutôt que de sauter aléatoirement à chaque re-render. */
+function stampRotationDeg(id: string): number {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash * 31 + id.charCodeAt(i)) | 0;
+  }
+  return -(4 + (Math.abs(hash) % 5));
+}
 
 /**
  * Carte d'une prédiction, partagée entre les onglets À venir et Passées du
@@ -91,6 +103,7 @@ export function PredictionCard({
 }) {
   const router = useRouter();
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [commentCount, setCommentCount] = useState<number | null>(null);
   const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
   const [isFavorite, setIsFavorite] = useState(item.is_favorite);
@@ -429,16 +442,25 @@ export function PredictionCard({
 
           <View style={styles.headerSpacer} />
 
-          {statusBanner.extra && (
-            <View style={styles.revealBubble}>
-              <Text style={styles.revealBubbleText} numberOfLines={1}>
-                {statusBanner.extra}
-              </Text>
-            </View>
-          )}
+          <View style={styles.headerRightGroup}>
+            {statusBanner.extra && (
+              <View style={styles.revealBubble}>
+                <Text style={styles.revealBubbleText} numberOfLines={1}>
+                  {statusBanner.extra}
+                </Text>
+              </View>
+            )}
+
+            {/* Favoris, masquer, supprimer : des actions de gestion, pas des
+                réactions sociales — regroupées ici plutôt que dans le pied de
+                carte, qui ne garde que commentaire et réaction. */}
+            <Pressable onPress={() => setMenuOpen(true)} hitSlop={8} style={styles.headerMenuButton}>
+              <MoreHorizontal size={18} color={colors.icon} strokeWidth={1.75} />
+            </Pressable>
+          </View>
         </View>
 
-        <View>
+        <View style={styles.predictionBody}>
           {/* Sur sa propre ligne, jamais accolée au pseudo — la liste
               complète des personnes citées y empiétait dès qu'il y en avait
               plusieurs. */}
@@ -459,54 +481,52 @@ export function PredictionCard({
             <Text style={styles.cardContent}>{item.content}</Text>
           )}
 
-          {/* Le tampon certifie le verdict sous la prédiction, dans le flux
-              normal (plus en position absolue par-dessus le texte) — droit,
-              sans rotation, pour ne jamais chevaucher ni gêner la lecture du
-              contenu au-dessus. */}
+          {/* Le Sceau d'Orgueil : un tampon encreur passif, pas un bouton —
+              posé en position absolue dans le coin inférieur droit de la
+              zone de contenu, légèrement décalé et de travers (jamais
+              parfaitement aligné), quitte à chevaucher le texte au-dessus.
+              Aucun fond : le texte qu'il recouvre reste visible en dessous,
+              comme un vrai coup de tampon donné à la main sur un document
+              déjà écrit. */}
           {verdict && (
-            <View style={styles.verdictStamp}>
-              <View style={styles.verdictStampInner}>
-                <Text style={styles.verdictStampText}>{verdict === 'realized' ? 'J’avais raison' : 'Flop'}</Text>
-                <View style={styles.verdictStampRule} />
-              </View>
+            <View
+              style={[styles.verdictStampAnchor, { transform: [{ rotate: `${stampRotationDeg(item.id)}deg` }] }]}
+              pointerEvents="none"
+            >
+              {verdict === 'realized' ? (
+                <View style={styles.verdictStampRealizedOuter}>
+                  <View style={styles.verdictStampRealizedInner}>
+                    <Text style={styles.verdictStampRealizedText}>J’AVAIS RAISON</Text>
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.verdictStampMissedFrame}>
+                  <Text style={styles.verdictStampMissedText}>RATÉ</Text>
+                </View>
+              )}
             </View>
           )}
         </View>
       </Pressable>
 
-      {/* Une seule rangée, espacement régulier (`space-between`) entre les
-          icônes elles-mêmes plutôt que trois blocs groupés à gauche/centre/
-          droite — ces blocs créaient des écarts très inégaux (serré entre
-          commentaire et favori, immense jusqu'au pouce). Taille d'icône et
-          boîte (`iconSlot`) identiques partout pour que les cinq icônes
-          restent alignées sur une même ligne. */}
+      {/* Fil épuré façon réseau social : plus que les deux interactions
+          sociales, alignées à gauche et groupées de près — favoris, masquer
+          et supprimer sont désormais des actions de gestion, reléguées au
+          menu ••• de l'en-tête. Le chiffre s'affiche toujours (y compris à
+          zéro), pas seulement dès la première interaction. */}
       <View style={styles.footerRow}>
-        {/* Sobre quand il n'y a rien à voir ; icône plus marquée et chiffre
-            en gras noir dès qu'il y a au moins un commentaire. */}
         <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
           <View style={styles.iconSlot}>
             <MessageCircle
               size={18}
-              color={(commentCount ?? 0) > 0 ? colors.icon : colors.textFaint}
+              color={(commentCount ?? 0) > 0 ? colors.text : colors.footerIconInactive}
               strokeWidth={1.75}
-              fill={commentsOpen ? colors.icon : 'none'}
+              fill={commentsOpen ? colors.text : 'none'}
             />
           </View>
-          {(commentCount ?? 0) > 0 && (
-            <Text style={styles.commentsToggleText}>{commentCount}</Text>
-          )}
-        </Pressable>
-
-        {/* Favori : étoile pleine dès qu'activée, discrète sinon — remis en
-            icône directe plutôt que caché dans un menu, pour un accès en un
-            tap comme le commentaire et la réaction juste à côté. */}
-        <Pressable onPress={handleToggleFavorite} hitSlop={8} style={styles.iconSlot}>
-          <Star
-            size={18}
-            color={isFavorite ? colors.gold : colors.textFaint}
-            fill={isFavorite ? colors.gold : 'none'}
-            strokeWidth={1.75}
-          />
+          <Text style={[styles.commentsToggleText, (commentCount ?? 0) === 0 && styles.footerCountInactive]}>
+            {commentCount ?? 0}
+          </Text>
         </Pressable>
 
         {/* Discret, façon Facebook : un pouce en filigrane (ou l'emoji déjà
@@ -520,7 +540,11 @@ export function PredictionCard({
               {myEmoji ? (
                 <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
               ) : (
-                <ThumbsUp size={18} color={totalReactions > 0 ? colors.icon : colors.textFaint} strokeWidth={1.75} />
+                <ThumbsUp
+                  size={18}
+                  color={totalReactions > 0 ? colors.text : colors.footerIconInactive}
+                  strokeWidth={1.75}
+                />
               )}
             </View>
 
@@ -553,31 +577,12 @@ export function PredictionCard({
               </View>
             )}
           </View>
-          {totalReactions > 0 && (
-            <Pressable onPress={openReactors} hitSlop={8}>
-              <Text style={styles.reactionTriggerCount}>{totalReactions}</Text>
-            </Pressable>
-          )}
-        </View>
-
-        {/* Masquer : préférence personnelle (comme le favori), pas réservée
-            à l'auteur — remis en icône directe pour le même accès rapide. */}
-        <Pressable onPress={handleToggleHidden} hitSlop={8} style={styles.iconSlot}>
-          {isHidden ? (
-            <Eye size={18} color={colors.icon} strokeWidth={1.75} />
-          ) : (
-            <EyeOff size={18} color={colors.textFaint} strokeWidth={1.75} />
-          )}
-        </Pressable>
-
-        {/* Suppression réservée à l'auteur — plus la peine de révéler
-            d'abord (la RLS `predictions_delete_own` ne l'a jamais exigé,
-            seule l'UI le faisait) : à tout moment sur son propre Predict. */}
-        {isAuthor && onDelete && (
-          <Pressable onPress={handleDeletePress} hitSlop={8} style={styles.iconSlot}>
-            <Trash2 size={18} color={colors.icon} strokeWidth={1.75} />
+          <Pressable onPress={openReactors} hitSlop={8}>
+            <Text style={[styles.reactionTriggerCount, totalReactions === 0 && styles.footerCountInactive]}>
+              {totalReactions}
+            </Text>
           </Pressable>
-        )}
+        </View>
       </View>
 
       {commentsOpen && (
@@ -589,6 +594,66 @@ export function PredictionCard({
           isPredictionAuthor={isAuthor}
         />
       )}
+
+      {/* Menu de gestion (favoris / masquer / supprimer) — déplacé ici
+          depuis le pied de carte, qui ne garde plus que les réactions
+          sociales. Ouvert depuis le bouton ••• de l'en-tête. */}
+      <Modal
+        visible={menuOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuOpen(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setMenuOpen(false)}>
+          <Pressable style={styles.cardMenuBox} onPress={() => {}}>
+            <Pressable
+              onPress={() => {
+                setMenuOpen(false);
+                handleToggleFavorite();
+              }}
+              style={styles.cardMenuRow}
+            >
+              <Star
+                size={18}
+                color={isFavorite ? colors.gold : colors.icon}
+                fill={isFavorite ? colors.gold : 'none'}
+                strokeWidth={1.75}
+              />
+              <Text style={styles.cardMenuRowText}>
+                {isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                setMenuOpen(false);
+                handleToggleHidden();
+              }}
+              style={[styles.cardMenuRow, !(isAuthor && onDelete) && styles.cardMenuRowLast]}
+            >
+              {isHidden ? (
+                <Eye size={18} color={colors.icon} strokeWidth={1.75} />
+              ) : (
+                <EyeOff size={18} color={colors.icon} strokeWidth={1.75} />
+              )}
+              <Text style={styles.cardMenuRowText}>{isHidden ? 'Afficher à nouveau' : 'Masquer'}</Text>
+            </Pressable>
+
+            {isAuthor && onDelete && (
+              <Pressable
+                onPress={() => {
+                  setMenuOpen(false);
+                  handleDeletePress();
+                }}
+                style={[styles.cardMenuRow, styles.cardMenuRowLast]}
+              >
+                <Trash2 size={18} color={colors.danger} strokeWidth={1.75} />
+                <Text style={[styles.cardMenuRowText, styles.cardMenuRowTextDanger]}>Supprimer</Text>
+              </Pressable>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal
         visible={reactorsOpen}
@@ -698,6 +763,15 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   revealBubbleText: { fontSize: 11, fontFamily: fonts.label, color: colors.textMuted },
+  // Regroupe la bulle de révélation (facultative) et le bouton ••• — ce
+  // dernier reste toujours visible, avant comme après révélation, puisque
+  // favoris/masquer/supprimer restent pertinents dans les deux cas.
+  headerRightGroup: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  headerMenuButton: { padding: 2 },
+  // Ancre le Sceau d'Orgueil : `position: relative` pour que le tampon, en
+  // position absolue, se place par rapport à ce bloc précis (teaser +
+  // contenu) et non par rapport à toute la carte.
+  predictionBody: { position: 'relative' },
   // Invite l'auteur à trancher — au-dessus de la carte tappable, jamais
   // dedans, pour qu'un tap sur un bouton ne navigue jamais aussi vers le
   // détail (`onPress` de la `Pressable` qui suit). Rien que les deux
@@ -721,45 +795,63 @@ const styles = StyleSheet.create({
   },
   verdictPromptButtonText: { fontFamily: fonts.label, fontSize: 12, fontWeight: '700', color: colors.text },
   verdictPromptError: { fontSize: 11, color: colors.danger, marginTop: 6, textAlign: 'right' },
-  // Le tampon de certification : un sceau institutionnel — double filet noir,
-  // texte capitales tracké, un seul trait or en soulignement pour tout rappel
-  // de couleur. Identique pour Réalisé et Manqué (seul le mot change) :
-  // jamais de rouge ni de vert, la charte reste noir/blanc/gris/or même pour
-  // trancher un verdict. Posé droit, sous le contenu, dans le flux normal —
-  // jamais en surimpression du texte de la prédiction.
-  verdictStamp: {
-    alignSelf: 'flex-end',
-    marginTop: 8,
-    borderWidth: 1.75,
-    borderColor: colors.text,
-    borderRadius: 4.2,
-    padding: 2.1,
+  // Ancre le Sceau d'Orgueil en position absolue, coin inférieur droit de la
+  // zone de contenu (au-dessus du pied de carte) — légèrement décalé, quitte
+  // à chevaucher le texte au-dessus : un vrai coup de tampon ne respecte pas
+  // la mise en page qu'il certifie.
+  verdictStampAnchor: {
+    position: 'absolute',
+    bottom: -6,
+    right: -4,
   },
-  // Second filet, à l'intérieur du premier avec un fin espace entre les deux
-  // (`padding` du parent) — la double bordure d'un sceau officiel plutôt
-  // qu'un simple encadré.
-  verdictStampInner: {
-    borderWidth: 1.4,
-    borderColor: colors.text,
-    borderRadius: 2.8,
-    paddingHorizontal: 11.2,
-    paddingTop: 5.6,
-    paddingBottom: 4.2,
-    alignItems: 'center',
+  // Tampon « J'AVAIS RAISON » : double cadre (filet fin à l'intérieur, épais
+  // à l'extérieur), jaune d'orgueil de la charte — `goldBright` plutôt que
+  // `gold` : ce dernier est réservé aux fonds/bordures, jamais au texte,
+  // trop pâle pour rester lisible sur une carte blanche (voir lib/theme.ts).
+  // Opacité légèrement réduite et léger halo (`shadow*`, ignoré sans effet
+  // sur Android) pour un rendu encré et imparfait plutôt qu'un badge
+  // numérique net.
+  verdictStampRealizedOuter: {
+    borderWidth: 2.5,
+    borderColor: colors.goldBright,
+    borderRadius: 4,
+    padding: 3,
+    opacity: 0.88,
+    shadowColor: colors.goldBright,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 1.5,
   },
-  verdictStampText: {
-    fontFamily: fonts.sansBold,
-    fontSize: 13.3,
+  verdictStampRealizedInner: {
+    borderWidth: 1,
+    borderColor: colors.goldBright,
+    borderRadius: 2,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  verdictStampRealizedText: {
+    fontFamily: fonts.bodyEmphasis,
+    fontSize: 15,
+    textTransform: 'uppercase',
+    letterSpacing: 1.4,
+    color: colors.goldBright,
+  },
+  // Tampon « RATÉ » : cadre simple et fin, gris zinc moyen — sobre, s'efface
+  // visuellement à côté du tampon de victoire.
+  verdictStampMissedFrame: {
+    borderWidth: 1,
+    borderColor: colors.stampMissed,
+    borderRadius: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    opacity: 0.85,
+  },
+  verdictStampMissedText: {
+    fontFamily: fonts.label,
+    fontSize: 13,
     textTransform: 'uppercase',
     letterSpacing: 1.1,
-    color: colors.text,
-  },
-  verdictStampRule: {
-    width: '70%',
-    height: 2.1,
-    backgroundColor: colors.gold,
-    borderRadius: 1.05,
-    marginTop: 3.5,
+    color: colors.stampMissed,
   },
   // Tout sur une seule ligne : [avatar 32][pseudo] ...espace flexible...
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
@@ -840,29 +932,54 @@ const styles = StyleSheet.create({
   },
   emojiBubbleItemActive: { backgroundColor: colors.goldSoft },
   emojiButtonText: { fontSize: 20 },
-  // `space-between` répartit l'espace disponible à parts égales entre les
-  // icônes elles-mêmes (et non entre des blocs groupés) — sinon les écarts
-  // entre commentaire/favori/pouce/œil/poubelle restent très inégaux.
+  // Fil épuré façon réseau social : les deux blocs restants (commentaire,
+  // réaction) packés à gauche avec un espacement modeste, plus le
+  // `space-between` sur toute la largeur qui n'a plus lieu d'être une fois
+  // favoris/masquer/supprimer partis dans le menu ••• de l'en-tête.
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
+    gap: 20,
     marginTop: 10,
   },
-  // Boîte identique (taille + centrage) pour chacune des cinq icônes du pied
-  // de carte (commentaire, favori, pouce, œil, poubelle) : sans elle, des
-  // icônes Lucide de tailles ou de fonds différents (le pouce porte parfois
-  // un emoji texte à la place) ne s'alignaient pas visuellement entre elles.
+  // Boîte identique (taille + centrage) pour les icônes du pied de carte.
   iconSlot: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
   commentsToggle: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  // Affiché seulement s'il y a au moins un commentaire — donc toujours en
-  // gras noir : c'est une interaction réelle, pas un zéro décoratif.
+  // Toujours affiché, y compris à zéro — noir dès qu'il y a au moins une
+  // interaction, zinc discret sinon (voir `footerCountInactive`).
   commentsToggleText: { fontSize: 13, fontWeight: '700', color: colors.text },
   reactionTriggerWrap: { position: 'relative' },
   reactionTriggerRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   reactionTrigger: { flexDirection: 'row', alignItems: 'center' },
   reactionTriggerEmoji: { fontSize: 17 },
   reactionTriggerCount: { fontSize: 13, fontWeight: '700', color: colors.text },
+  footerCountInactive: { color: colors.footerIconInactive },
+  // Menu ••• de gestion (favoris / masquer / supprimer), ouvert depuis
+  // l'en-tête — même registre visuel que `reactorsBox` (boîte centrée sur
+  // fond assombri).
+  cardMenuBox: {
+    width: '100%',
+    maxWidth: 260,
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 6,
+    overflow: 'hidden',
+  },
+  cardMenuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  cardMenuRowLast: { borderBottomWidth: 0 },
+  cardMenuRowText: { fontSize: 15, fontWeight: '600', color: colors.text },
+  cardMenuRowTextDanger: { color: colors.danger },
   // Détail « qui a réagi avec quoi » — une ligne par personne, ouverte en
   // tapant le compteur de réactions.
   reactorsBox: {

@@ -49,6 +49,13 @@ export const colors = {
   // Trait des icônes (Lucide) : noir adouci plutôt que gris clair, pour
   // qu'elles ressortent sans être aussi dures qu'un noir pur.
   icon: '#374151',
+  // Icônes du pied de carte (commentaire, réaction) au repos — zinc foncé,
+  // plus soutenu que `textFaint`, pour un rendu fil d'actualité épuré ;
+  // noir (`text`) dès qu'il y a au moins une interaction.
+  footerIconInactive: '#52525B',
+  // Tampon « Raté » du Sceau d'Orgueil — zinc moyen, sobre : l'échec s'efface
+  // visuellement à côté du tampon doré de victoire.
+  stampMissed: '#A1A1AA',
   // Barre de navigation : blanc pur, tranche sur le fond papier.
   navBar: '#FFFFFF',
   navBarBorder: 'rgba(17, 24, 39, 0.10)',
