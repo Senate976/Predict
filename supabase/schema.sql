@@ -3561,7 +3561,132 @@ alter table public.prediction_emoji_reactions add constraint prediction_emoji_re
   check (emoji in ('👍', '🖕', '❤️', '👎', '😊', '😮', '😢', '🫣', '😬', '🤣', '💀', '🔮'));
 
 -- ---------------------------------------------------------------------------
--- 38. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 39. Date du Sceau d'Orgueil — jour où le verdict a été affirmé
+-- ---------------------------------------------------------------------------
+--
+-- Le tampon « ENCORE RAISON » (components/PredictionCard.tsx) affiche la date
+-- du jour où l'auteur a affirmé son verdict — comme un vrai tampon dateur,
+-- figée pour toujours au moment du geste, jamais recalculée à l'affichage.
+-- `reveal_at`/`created_at` ne conviennent pas : l'auteur peut affirmer son
+-- verdict n'importe quand après la révélation, potentiellement bien après.
+alter table public.predictions add column if not exists verdict_set_at timestamptz;
+
+-- Approximation raisonnable pour les verdicts déjà affirmés avant l'ajout de
+-- cette colonne (la vraie date du geste n'a jamais été enregistrée) : la date
+-- de révélation, le moment le plus proche de la réalité dont on dispose.
+update public.predictions
+set verdict_set_at = coalesce(reveal_at, created_at)
+where author_verdict is not null
+  and verdict_set_at is null;
+
+-- Reprend `set_prediction_verdict` de la section 36 à l'identique, avec en
+-- plus la pose de `verdict_set_at = now()` à chaque affirmation — y compris
+-- une correction ultérieure (section 35 : le geste reste modifiable), qui
+-- redate donc le tampon au jour de la correction, pas de la première pose.
+create or replace function public.set_prediction_verdict(p_prediction_id uuid, p_verdict text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if p_verdict not in ('realized', 'missed') then
+    raise exception 'Verdict invalide : %', p_verdict;
+  end if;
+
+  update public.predictions
+  set author_verdict = p_verdict,
+      verdict_set_at = now()
+  where id = p_prediction_id
+    and author_id = auth.uid()
+    and reveal_at <= now();
+
+  insert into public.notifications (user_id, prediction_id, type)
+  select pa.user_id, p_prediction_id,
+    case p_verdict when 'realized' then 'prediction_realized' else 'prediction_missed' end
+  from public.predictions p
+  join public.prediction_access pa on pa.prediction_id = p.id
+  join public.profiles pr on pr.id = pa.user_id
+  where p.id = p_prediction_id
+    and p.author_verdict = p_verdict
+    and coalesce((pr.notification_prefs->>'prediction_verdict')::boolean, true)
+  on conflict (user_id, prediction_id, type) do nothing;
+end;
+$$;
+
+revoke all on function public.set_prediction_verdict(uuid, text) from public;
+grant execute on function public.set_prediction_verdict(uuid, text) to authenticated;
+
+-- `predictions_feed` reprend sa définition de la section 34 et ajoute
+-- `verdict_set_at`, pour que la carte affiche la bonne date sur le tampon.
+drop view if exists public.predictions_feed;
+
+create view public.predictions_feed
+with (security_invoker = true) as
+select
+  p.id,
+  p.author_id,
+  p.teaser,
+  pc.content,
+  pc.audio_path,
+  p.reveal_at,
+  p.scope,
+  p.open_ended,
+  p.is_immediate,
+  p.category,
+  p.mentioned_user_ids,
+  p.created_at,
+  p.verdict_set_at,
+  (p.reveal_at <= now()) as is_revealed,
+  case
+    when p.reveal_at > now() then 'pending'
+    when p.author_verdict is not null then p.author_verdict
+    else 'pending'
+  end as final_status,
+  coalesce(
+    (
+      select us.favorite from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_favorite,
+  coalesce(
+    (
+      select us.hidden from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_hidden,
+  coalesce(
+    (
+      select us.seen from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_seen,
+  coalesce(
+    (
+      select jsonb_object_agg(counts.emoji, counts.total)
+      from (
+        select emoji, count(*) as total
+        from public.prediction_emoji_reactions er
+        where er.prediction_id = p.id
+        group by emoji
+      ) counts
+    ),
+    '{}'::jsonb
+  ) as emoji_counts,
+  (
+    select er2.emoji from public.prediction_emoji_reactions er2
+    where er2.prediction_id = p.id and er2.user_id = auth.uid()
+  ) as my_emoji_reaction
+from public.predictions p
+left join public.prediction_contents pc on pc.prediction_id = p.id;
+
+grant select on public.predictions_feed to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 40. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une

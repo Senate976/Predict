@@ -89,6 +89,10 @@ export type PredictionFeedItem = {
   /** `pending` tant que l'auteur n'a pas affirmé le résultat (voir
    * `setPredictionVerdict`) — jamais déduit d'un vote du Cercle. */
   final_status: PredictionOutcomeStatus;
+  /** Date à laquelle l'auteur a affirmé `final_status` — `null` tant que
+   * `pending`. Sert de date au Sceau d'Orgueil (tampon « ENCORE RAISON »),
+   * figée comme un vrai tampon dateur plutôt que recalculée à l'affichage. */
+  verdict_set_at: string | null;
   /** Préférences propres à l'appelant — jamais partagées avec les autres. */
   is_favorite: boolean;
   is_hidden: boolean;
@@ -172,7 +176,7 @@ export function predictionErrorMessage(error: PostgrestError): string {
  */
 const FEED_COLUMNS =
   'id, author_id, teaser, content, audio_path, reveal_at, scope, open_ended, is_immediate, category, created_at, ' +
-  'is_revealed, final_status, is_favorite, is_hidden, is_seen, emoji_counts, my_emoji_reaction, ' +
+  'is_revealed, final_status, verdict_set_at, is_favorite, is_hidden, is_seen, emoji_counts, my_emoji_reaction, ' +
   'mentioned_user_ids';
 
 export async function fetchPredictionsFeed() {
