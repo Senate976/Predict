@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { Eye, EyeOff, Lock, MessageCircle, Star, ThumbsUp, Trash2 } from 'lucide-react-native';
+import { Eye, EyeOff, Lock, MessageCircle, MoreHorizontal, Star, ThumbsUp, Trash2 } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -91,6 +91,7 @@ export function PredictionCard({
 }) {
   const router = useRouter();
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [commentCount, setCommentCount] = useState<number | null>(null);
   const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
   const [isFavorite, setIsFavorite] = useState(item.is_favorite);
@@ -429,13 +430,22 @@ export function PredictionCard({
 
           <View style={styles.headerSpacer} />
 
-          {statusBanner.extra && (
-            <View style={styles.revealBubble}>
-              <Text style={styles.revealBubbleText} numberOfLines={1}>
-                {statusBanner.extra}
-              </Text>
-            </View>
-          )}
+          <View style={styles.headerRightGroup}>
+            {statusBanner.extra && (
+              <View style={styles.revealBubble}>
+                <Text style={styles.revealBubbleText} numberOfLines={1}>
+                  {statusBanner.extra}
+                </Text>
+              </View>
+            )}
+
+            {/* Favoris, masquer, supprimer : des actions de gestion, pas des
+                réactions sociales — regroupées ici plutôt que dans le pied de
+                carte, qui ne garde que commentaire et réaction. */}
+            <Pressable onPress={() => setMenuOpen(true)} hitSlop={8} style={styles.headerMenuButton}>
+              <MoreHorizontal size={18} color={colors.icon} strokeWidth={1.75} />
+            </Pressable>
+          </View>
         </View>
 
         <View>
@@ -474,39 +484,24 @@ export function PredictionCard({
         </View>
       </Pressable>
 
-      {/* Une seule rangée, espacement régulier (`space-between`) entre les
-          icônes elles-mêmes plutôt que trois blocs groupés à gauche/centre/
-          droite — ces blocs créaient des écarts très inégaux (serré entre
-          commentaire et favori, immense jusqu'au pouce). Taille d'icône et
-          boîte (`iconSlot`) identiques partout pour que les cinq icônes
-          restent alignées sur une même ligne. */}
+      {/* Fil épuré façon réseau social : plus que les deux interactions
+          sociales, alignées à gauche et groupées de près — favoris, masquer
+          et supprimer sont désormais des actions de gestion, reléguées au
+          menu ••• de l'en-tête. Le chiffre s'affiche toujours (y compris à
+          zéro), pas seulement dès la première interaction. */}
       <View style={styles.footerRow}>
-        {/* Sobre quand il n'y a rien à voir ; icône plus marquée et chiffre
-            en gras noir dès qu'il y a au moins un commentaire. */}
         <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
           <View style={styles.iconSlot}>
             <MessageCircle
               size={18}
-              color={(commentCount ?? 0) > 0 ? colors.icon : colors.textFaint}
+              color={(commentCount ?? 0) > 0 ? colors.text : colors.footerIconInactive}
               strokeWidth={1.75}
-              fill={commentsOpen ? colors.icon : 'none'}
+              fill={commentsOpen ? colors.text : 'none'}
             />
           </View>
-          {(commentCount ?? 0) > 0 && (
-            <Text style={styles.commentsToggleText}>{commentCount}</Text>
-          )}
-        </Pressable>
-
-        {/* Favori : étoile pleine dès qu'activée, discrète sinon — remis en
-            icône directe plutôt que caché dans un menu, pour un accès en un
-            tap comme le commentaire et la réaction juste à côté. */}
-        <Pressable onPress={handleToggleFavorite} hitSlop={8} style={styles.iconSlot}>
-          <Star
-            size={18}
-            color={isFavorite ? colors.gold : colors.textFaint}
-            fill={isFavorite ? colors.gold : 'none'}
-            strokeWidth={1.75}
-          />
+          <Text style={[styles.commentsToggleText, (commentCount ?? 0) === 0 && styles.footerCountInactive]}>
+            {commentCount ?? 0}
+          </Text>
         </Pressable>
 
         {/* Discret, façon Facebook : un pouce en filigrane (ou l'emoji déjà
@@ -520,7 +515,11 @@ export function PredictionCard({
               {myEmoji ? (
                 <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
               ) : (
-                <ThumbsUp size={18} color={totalReactions > 0 ? colors.icon : colors.textFaint} strokeWidth={1.75} />
+                <ThumbsUp
+                  size={18}
+                  color={totalReactions > 0 ? colors.text : colors.footerIconInactive}
+                  strokeWidth={1.75}
+                />
               )}
             </View>
 
@@ -553,31 +552,12 @@ export function PredictionCard({
               </View>
             )}
           </View>
-          {totalReactions > 0 && (
-            <Pressable onPress={openReactors} hitSlop={8}>
-              <Text style={styles.reactionTriggerCount}>{totalReactions}</Text>
-            </Pressable>
-          )}
-        </View>
-
-        {/* Masquer : préférence personnelle (comme le favori), pas réservée
-            à l'auteur — remis en icône directe pour le même accès rapide. */}
-        <Pressable onPress={handleToggleHidden} hitSlop={8} style={styles.iconSlot}>
-          {isHidden ? (
-            <Eye size={18} color={colors.icon} strokeWidth={1.75} />
-          ) : (
-            <EyeOff size={18} color={colors.textFaint} strokeWidth={1.75} />
-          )}
-        </Pressable>
-
-        {/* Suppression réservée à l'auteur — plus la peine de révéler
-            d'abord (la RLS `predictions_delete_own` ne l'a jamais exigé,
-            seule l'UI le faisait) : à tout moment sur son propre Predict. */}
-        {isAuthor && onDelete && (
-          <Pressable onPress={handleDeletePress} hitSlop={8} style={styles.iconSlot}>
-            <Trash2 size={18} color={colors.icon} strokeWidth={1.75} />
+          <Pressable onPress={openReactors} hitSlop={8}>
+            <Text style={[styles.reactionTriggerCount, totalReactions === 0 && styles.footerCountInactive]}>
+              {totalReactions}
+            </Text>
           </Pressable>
-        )}
+        </View>
       </View>
 
       {commentsOpen && (
@@ -589,6 +569,66 @@ export function PredictionCard({
           isPredictionAuthor={isAuthor}
         />
       )}
+
+      {/* Menu de gestion (favoris / masquer / supprimer) — déplacé ici
+          depuis le pied de carte, qui ne garde plus que les réactions
+          sociales. Ouvert depuis le bouton ••• de l'en-tête. */}
+      <Modal
+        visible={menuOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuOpen(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setMenuOpen(false)}>
+          <Pressable style={styles.cardMenuBox} onPress={() => {}}>
+            <Pressable
+              onPress={() => {
+                setMenuOpen(false);
+                handleToggleFavorite();
+              }}
+              style={styles.cardMenuRow}
+            >
+              <Star
+                size={18}
+                color={isFavorite ? colors.gold : colors.icon}
+                fill={isFavorite ? colors.gold : 'none'}
+                strokeWidth={1.75}
+              />
+              <Text style={styles.cardMenuRowText}>
+                {isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                setMenuOpen(false);
+                handleToggleHidden();
+              }}
+              style={[styles.cardMenuRow, !(isAuthor && onDelete) && styles.cardMenuRowLast]}
+            >
+              {isHidden ? (
+                <Eye size={18} color={colors.icon} strokeWidth={1.75} />
+              ) : (
+                <EyeOff size={18} color={colors.icon} strokeWidth={1.75} />
+              )}
+              <Text style={styles.cardMenuRowText}>{isHidden ? 'Afficher à nouveau' : 'Masquer'}</Text>
+            </Pressable>
+
+            {isAuthor && onDelete && (
+              <Pressable
+                onPress={() => {
+                  setMenuOpen(false);
+                  handleDeletePress();
+                }}
+                style={[styles.cardMenuRow, styles.cardMenuRowLast]}
+              >
+                <Trash2 size={18} color={colors.danger} strokeWidth={1.75} />
+                <Text style={[styles.cardMenuRowText, styles.cardMenuRowTextDanger]}>Supprimer</Text>
+              </Pressable>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal
         visible={reactorsOpen}
@@ -698,6 +738,11 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   revealBubbleText: { fontSize: 11, fontFamily: fonts.label, color: colors.textMuted },
+  // Regroupe la bulle de révélation (facultative) et le bouton ••• — ce
+  // dernier reste toujours visible, avant comme après révélation, puisque
+  // favoris/masquer/supprimer restent pertinents dans les deux cas.
+  headerRightGroup: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  headerMenuButton: { padding: 2 },
   // Invite l'auteur à trancher — au-dessus de la carte tappable, jamais
   // dedans, pour qu'un tap sur un bouton ne navigue jamais aussi vers le
   // détail (`onPress` de la `Pressable` qui suit). Rien que les deux
@@ -840,29 +885,54 @@ const styles = StyleSheet.create({
   },
   emojiBubbleItemActive: { backgroundColor: colors.goldSoft },
   emojiButtonText: { fontSize: 20 },
-  // `space-between` répartit l'espace disponible à parts égales entre les
-  // icônes elles-mêmes (et non entre des blocs groupés) — sinon les écarts
-  // entre commentaire/favori/pouce/œil/poubelle restent très inégaux.
+  // Fil épuré façon réseau social : les deux blocs restants (commentaire,
+  // réaction) packés à gauche avec un espacement modeste, plus le
+  // `space-between` sur toute la largeur qui n'a plus lieu d'être une fois
+  // favoris/masquer/supprimer partis dans le menu ••• de l'en-tête.
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
+    gap: 20,
     marginTop: 10,
   },
-  // Boîte identique (taille + centrage) pour chacune des cinq icônes du pied
-  // de carte (commentaire, favori, pouce, œil, poubelle) : sans elle, des
-  // icônes Lucide de tailles ou de fonds différents (le pouce porte parfois
-  // un emoji texte à la place) ne s'alignaient pas visuellement entre elles.
+  // Boîte identique (taille + centrage) pour les icônes du pied de carte.
   iconSlot: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
   commentsToggle: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  // Affiché seulement s'il y a au moins un commentaire — donc toujours en
-  // gras noir : c'est une interaction réelle, pas un zéro décoratif.
+  // Toujours affiché, y compris à zéro — noir dès qu'il y a au moins une
+  // interaction, zinc discret sinon (voir `footerCountInactive`).
   commentsToggleText: { fontSize: 13, fontWeight: '700', color: colors.text },
   reactionTriggerWrap: { position: 'relative' },
   reactionTriggerRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   reactionTrigger: { flexDirection: 'row', alignItems: 'center' },
   reactionTriggerEmoji: { fontSize: 17 },
   reactionTriggerCount: { fontSize: 13, fontWeight: '700', color: colors.text },
+  footerCountInactive: { color: colors.footerIconInactive },
+  // Menu ••• de gestion (favoris / masquer / supprimer), ouvert depuis
+  // l'en-tête — même registre visuel que `reactorsBox` (boîte centrée sur
+  // fond assombri).
+  cardMenuBox: {
+    width: '100%',
+    maxWidth: 260,
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 6,
+    overflow: 'hidden',
+  },
+  cardMenuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  cardMenuRowLast: { borderBottomWidth: 0 },
+  cardMenuRowText: { fontSize: 15, fontWeight: '600', color: colors.text },
+  cardMenuRowTextDanger: { color: colors.danger },
   // Détail « qui a réagi avec quoi » — une ligne par personne, ouverte en
   // tapant le compteur de réactions.
   reactorsBox: {
