@@ -212,5 +212,5 @@ const styles = StyleSheet.create({
   cellTextDisabled: { color: colors.border },
   cellTextToday: { color: colors.text, fontWeight: '700', textDecorationLine: 'underline' },
   // Texte noir sur la pastille jaune du jour sélectionné — du blanc y serait peu lisible.
-  cellTextSelected: { color: colors.text, fontWeight: '700' },
+  cellTextSelected: { color: colors.textOnGold, fontWeight: '700' },
 });

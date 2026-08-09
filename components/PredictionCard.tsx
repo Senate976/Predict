@@ -383,37 +383,6 @@ export function PredictionCard({
 
   return (
     <View style={[styles.card, unseen && styles.cardUnseen]}>
-      {/* Bandeau d'état : la nature de la carte (scellée / en cours / réalisée
-          / manquée) d'un coup d'œil, avant même de lire le teaser. Tout en
-          haut, en dehors de la zone tappable et à cheval sur le padding de la
-          carte (marges négatives) pour occuper toute sa largeur et venir
-          affleurer ses coins arrondis — `overflow: hidden` sur la carte fait
-          le reste. Rien d'autre que le libellé (plus l'icône pour Scellé) :
-          le compte à rebours de révélation vit désormais dans sa propre bulle
-          plus bas, à droite de l'en-tête de carte. */}
-      <View
-        style={[
-          styles.statusBanner,
-          statusBanner.kind === 'sealed' && styles.statusBannerSealed,
-          statusBanner.kind === 'active' && styles.statusBannerActive,
-          statusBanner.kind === 'realized' && styles.statusBannerRealized,
-          statusBanner.kind === 'missed' && styles.statusBannerMissed,
-        ]}
-      >
-        {statusBanner.kind === 'sealed' && (
-          <Lock size={11} color={colors.gold} strokeWidth={2} style={styles.statusBannerIcon} />
-        )}
-        <Text
-          style={[
-            styles.statusBannerText,
-            statusBanner.kind === 'sealed' && styles.statusBannerTextSealed,
-            statusBanner.kind === 'missed' && styles.statusBannerTextMissed,
-          ]}
-        >
-          {statusBanner.label}
-        </Text>
-      </View>
-
       {/* Invite l'auteur à trancher dès que sa prédiction est révélée mais
           encore « En cours » — nulle part ailleurs que sur sa propre carte,
           en dehors de la zone tappable (`onPress` navigue vers le détail) :
@@ -465,13 +434,27 @@ export function PredictionCard({
           <View style={styles.headerSpacer} />
 
           <View style={styles.headerRightGroup}>
-            {statusBanner.extra && (
-              <View style={styles.revealBubble}>
-                <Text style={styles.revealBubbleText} numberOfLines={1}>
-                  {statusBanner.extra}
-                </Text>
-              </View>
-            )}
+            {/* Badge d'état façon verre dépoli : fond sombre semi-transparent
+                + bordure fine, une pastille lumineuse colorée selon le
+                statut plutôt qu'un bandeau plein toute la largeur. Le compte
+                à rebours (avant révélation) se glisse dans le même badge au
+                lieu d'une bulle séparée. */}
+            <View style={styles.statusBadge}>
+              {statusBanner.kind === 'sealed' && <Lock size={10} color={colors.textMuted} strokeWidth={2} />}
+              <View
+                style={[
+                  styles.statusBadgeDot,
+                  statusBanner.kind === 'sealed' && styles.statusDotSealed,
+                  statusBanner.kind === 'active' && styles.statusDotActive,
+                  statusBanner.kind === 'realized' && styles.statusDotRealized,
+                  statusBanner.kind === 'missed' && styles.statusDotMissed,
+                ]}
+              />
+              <Text style={styles.statusBadgeText} numberOfLines={1}>
+                {statusBanner.label}
+                {statusBanner.extra ? ` · ${statusBanner.extra}` : ''}
+              </Text>
+            </View>
 
             {/* Favoris, masquer, supprimer : des actions de gestion, pas des
                 réactions sociales — regroupées ici plutôt que dans le pied de
@@ -710,8 +693,8 @@ export function PredictionCard({
 
 const styles = StyleSheet.create({
   cardPressed: { opacity: 0.85 },
-  // Fine bordure noire, fond blanc pur, pas d'ombre lourde — carte sobre
-  // façon presse plutôt que carte « flottante ».
+  // Fond ardoise distinct du fond de page quasi-noir, fine bordure blanche à
+  // faible opacité — jamais un aplat de couleur vive en fond ou en en-tête.
   card: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -719,11 +702,6 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 12,
     backgroundColor: colors.surface,
-    // Le bandeau d'état (juste en dessous) déborde volontairement du padding
-    // via des marges négatives pour occuper toute la largeur de la carte —
-    // `overflow: hidden` le clippe proprement aux coins arrondis plutôt que
-    // de les déborder en carré.
-    overflow: 'hidden',
     // Web uniquement : sans ça, glisser le pouce vers un emoji du panneau
     // sélectionne le texte de la carte au passage, ce qui coupe le geste
     // (`onPanResponderTerminate`) au lieu de faire glisser la sélection
@@ -731,61 +709,38 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web' ? { userSelect: 'none' } : null),
   },
   // Non lue : fine bordure lumineuse + fond très légèrement teinté, assez
-  // discret pour ne pas jurer avec le reste de la charte noir/blanc/jaune.
+  // discret pour ne pas jurer avec le reste de la charte sombre/jaune.
   cardUnseen: {
     borderColor: colors.gold,
     backgroundColor: colors.goldSoft,
   },
-  // Bandeau d'état : toute la largeur de la carte, tout en haut — les marges
-  // négatives annulent le padding de la carte sur les 3 côtés concernés,
-  // `overflow: hidden` sur la carte fait le reste pour les coins arrondis.
-  // Rien qu'un libellé centré (plus l'icône pour Scellé) : plus de compte à
-  // rebours à partager la largeur, il vit désormais dans sa propre bulle.
-  statusBanner: {
+  // Badge d'état façon verre dépoli : fond sombre semi-transparent + bordure
+  // claire fine, en lieu et place de l'ancien bandeau plein toute la largeur
+  // (aplat de couleur vive). Compact, dans l'en-tête de carte — jamais un
+  // élément qui domine visuellement la prédiction elle-même.
+  statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: -18,
-    marginHorizontal: -18,
-    marginBottom: 12,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-  },
-  statusBannerIcon: { marginRight: 4 },
-  // Tous les fonds de bandeau à 65% d'opacité (charte) — Manqué garde sa
-  // teinte magenta de marque, seul le mot « Manqué » se blanchit, pas le fond.
-  statusBannerSealed: { backgroundColor: 'rgba(43, 43, 43, 0.65)' },
-  statusBannerActive: { backgroundColor: 'rgba(250, 204, 21, 0.65)' },
-  statusBannerRealized: { backgroundColor: 'rgba(54, 168, 160, 0.65)' },
-  statusBannerMissed: { backgroundColor: 'rgba(156, 29, 110, 0.65)' },
-  // Le libellé n'a plus de voisin à partager avec dans le bandeau : plus de
-  // troncature, la date complète reste toujours visible. Noir par défaut (en
-  // cours / réalisé) ; Scellé et Manqué, les deux fonds les plus soutenus,
-  // passent en blanc via `statusBannerTextSealed`/`statusBannerTextMissed`.
-  statusBannerText: {
-    textAlign: 'center',
-    fontFamily: fonts.label,
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  statusBannerTextSealed: { color: colors.bannerTextOnDark },
-  statusBannerTextMissed: { color: colors.bannerTextOnDark },
-  // Bulle de révélation, désormais dans l'en-tête de carte (plus dans le
-  // bandeau) — fond clair assorti à la carte blanche, plus la teinte
-  // translucide pensée pour un fond sombre.
-  revealBubble: {
-    backgroundColor: colors.background,
+    gap: 5,
+    backgroundColor: colors.glassBg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.glassBorder,
     borderRadius: radius.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    maxWidth: 190,
   },
-  revealBubbleText: { fontSize: 11, fontFamily: fonts.label, color: colors.textMuted },
-  // Regroupe la bulle de révélation (facultative) et le bouton ••• — ce
-  // dernier reste toujours visible, avant comme après révélation, puisque
-  // favoris/masquer/supprimer restent pertinents dans les deux cas.
+  // La pastille lumineuse porte seule la couleur du statut — jamais le fond
+  // du badge, qui reste neutre pour les quatre états.
+  statusBadgeDot: { width: 6, height: 6, borderRadius: 3 },
+  statusDotSealed: { backgroundColor: colors.statusDotSealed },
+  statusDotActive: { backgroundColor: colors.statusDotActive },
+  statusDotRealized: { backgroundColor: colors.statusDotRealized },
+  statusDotMissed: { backgroundColor: colors.statusDotMissed },
+  statusBadgeText: { fontSize: 11, fontFamily: fonts.label, color: colors.textMuted, flexShrink: 1 },
+  // Regroupe le badge d'état et le bouton ••• — ce dernier reste toujours
+  // visible, avant comme après révélation, puisque favoris/masquer/supprimer
+  // restent pertinents dans les deux cas.
   headerRightGroup: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   headerMenuButton: { padding: 2 },
   // Invite l'auteur à trancher — au-dessus de la carte tappable, jamais
@@ -822,6 +777,11 @@ const styles = StyleSheet.create({
     marginTop: 8,
     width: STAMP_DIAMETER,
     height: STAMP_DIAMETER,
+    // L'artwork est une vraie photo d'encre sombre sur papier (détouré en
+    // transparence) — sur la carte désormais sombre, cette encre s'y fondrait
+    // sans ce disque couleur papier qui restaure le contraste d'origine.
+    borderRadius: STAMP_DIAMETER / 2,
+    backgroundColor: 'rgba(245, 242, 232, 0.94)',
     transform: [{ rotate: `${STAMP_REALIZED_ROTATION_DEG}deg` }],
   },
   verdictStampRealizedImage: { width: '100%', height: '100%' },
@@ -837,7 +797,9 @@ const styles = StyleSheet.create({
     fontSize: 9,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    color: colors.text,
+    // Posée sur le disque couleur papier du tampon, pas sur la carte sombre —
+    // toujours une teinte sombre ici, jamais `text` (clair en mode sombre).
+    color: colors.textOnGold,
     textAlign: 'center',
   },
   verdictStampRealizedDateRule: {
@@ -846,7 +808,7 @@ const styles = StyleSheet.create({
     left: '27%',
     width: '46%',
     height: 1,
-    backgroundColor: colors.text,
+    backgroundColor: colors.textOnGold,
   },
   // Le tampon « FAIL », même gabarit (diamètre identique) mais droit, sans
   // rotation — voir scripts/erase_stamp_fail_date.py. Le trait doré de cette
@@ -857,6 +819,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
     width: STAMP_DIAMETER,
     height: STAMP_DIAMETER,
+    // Même disque couleur papier que le tampon « ENCORE RAISON » — voir ce
+    // style pour le détail.
+    borderRadius: STAMP_DIAMETER / 2,
+    backgroundColor: 'rgba(245, 242, 232, 0.94)',
   },
   verdictStampFailDate: {
     position: 'absolute',
@@ -867,7 +833,8 @@ const styles = StyleSheet.create({
     fontSize: 9,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    color: colors.text,
+    // Voir `verdictStampRealizedDate` — même disque couleur papier en fond.
+    color: colors.textOnGold,
     textAlign: 'center',
   },
   // Tout sur une seule ligne : [avatar 32][pseudo] ...espace flexible...

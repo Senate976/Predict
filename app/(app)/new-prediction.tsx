@@ -697,5 +697,5 @@ const styles = StyleSheet.create({
   },
   submitPressed: { backgroundColor: colors.goldBright },
   submitDisabled: { opacity: 0.6 },
-  submitText: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  submitText: { color: colors.textOnGold, fontSize: 16, fontWeight: '700' },
 });

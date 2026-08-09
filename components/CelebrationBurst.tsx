@@ -8,7 +8,7 @@ import { PredictWord } from './PredictWord';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PARTICLE_COUNT = 160;
 const HOLD_MS = 3000;
-const GOLD_TONES = ['#FACC15', '#EAB308', '#111827'];
+const GOLD_TONES = ['#FACC15', '#EAB308', '#F5F5F0'];
 
 type Particle = {
   left: number;
@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
     left: 24,
     right: 24,
     alignItems: 'center',
-    backgroundColor: 'rgba(251, 251, 249, 0.94)',
+    backgroundColor: colors.surfaceRaised,
     borderRadius: radius.xl,
     paddingVertical: 20,
     paddingHorizontal: 24,
