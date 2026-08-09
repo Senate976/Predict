@@ -15,7 +15,7 @@ import {
 import { Text } from './Text';
 
 import { fetchCommentCount } from '../lib/comments';
-import { formatCountdown, toDateInput } from '../lib/datetime';
+import { formatCountdown, formatStampDate, toDateInput } from '../lib/datetime';
 import {
   castEmojiReaction,
   EMOJI_REACTIONS,
@@ -472,11 +472,26 @@ export function PredictionCard({
           {/* Le tampon certifie le verdict sous la prédiction, dans le flux
               normal (plus en position absolue par-dessus le texte) — droit,
               sans rotation, pour ne jamais chevaucher ni gêner la lecture du
-              contenu au-dessus. */}
-          {verdict && (
+              contenu au-dessus. Réalisé reprend le Sceau d'Orgueil (triple
+              cercle concentric façon tampon encreur officiel) ; Manqué garde
+              l'ancien encadré simple, plus sobre. */}
+          {verdict === 'realized' && (
+            <View style={styles.verdictStampRealized}>
+              <View style={styles.verdictStampRealizedRingOuter}>
+                <View style={styles.verdictStampRealizedRingMiddle}>
+                  <View style={styles.verdictStampRealizedRingInner}>
+                    <Text style={styles.verdictStampRealizedText}>ENCORE RAISON</Text>
+                    <Text style={styles.verdictStampRealizedDate}>{formatStampDate(new Date(item.reveal_at))}</Text>
+                    <View style={styles.verdictStampRealizedDateRule} />
+                  </View>
+                </View>
+              </View>
+            </View>
+          )}
+          {verdict === 'missed' && (
             <View style={styles.verdictStamp}>
               <View style={styles.verdictStampInner}>
-                <Text style={styles.verdictStampText}>{verdict === 'realized' ? 'J’avais raison' : 'Flop'}</Text>
+                <Text style={styles.verdictStampText}>Flop</Text>
                 <View style={styles.verdictStampRule} />
               </View>
             </View>
@@ -805,6 +820,56 @@ const styles = StyleSheet.create({
     backgroundColor: colors.gold,
     borderRadius: 1.05,
     marginTop: 3.5,
+  },
+  // Le Sceau d'Orgueil « ENCORE RAISON » : triple cercle concentrique (deux
+  // filets noirs, un filet or/ocre) façon tampon encreur officiel, ovale
+  // plutôt que rectangulaire — `radius.pill` sur les trois anneaux suffit,
+  // React Native le limite automatiquement à la moitié du plus petit côté.
+  // Toujours dans le flux normal, aligné à droite, jamais en surimpression.
+  verdictStampRealized: { alignSelf: 'flex-end', marginTop: 8 },
+  verdictStampRealizedRingOuter: {
+    borderWidth: 3,
+    borderColor: colors.text,
+    borderRadius: radius.pill,
+    padding: 3,
+  },
+  verdictStampRealizedRingMiddle: {
+    borderWidth: 1.5,
+    borderColor: colors.text,
+    borderRadius: radius.pill,
+    padding: 3,
+  },
+  verdictStampRealizedRingInner: {
+    borderWidth: 1.5,
+    borderColor: colors.goldTransition,
+    borderRadius: radius.pill,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  verdictStampRealizedText: {
+    fontFamily: fonts.sansBold,
+    fontSize: 15,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    color: colors.text,
+  },
+  // Date de révélation, en dessous du texte principal — plus petite mais
+  // toujours lisible, soulignée d'un fin trait comme sur le tampon de
+  // référence.
+  verdictStampRealizedDate: {
+    fontFamily: fonts.bodyEmphasis,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    color: colors.text,
+    marginTop: 3,
+  },
+  verdictStampRealizedDateRule: {
+    width: '55%',
+    height: 1,
+    backgroundColor: colors.text,
+    marginTop: 3,
   },
   // Tout sur une seule ligne : [avatar 32][pseudo] ...espace flexible...
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
