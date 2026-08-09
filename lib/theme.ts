@@ -1,68 +1,89 @@
-// Charte graphique « Éditorial Chic & Premium » : presse/magazine moderne,
-// strictement blanc / noir / jaune. Le blanc domine (fonds, cartes), le noir
-// porte tout le texte et les bordures fines, le jaune est réservé aux
-// éléments interactifs majeurs (FAB, onglet actif, badges d'état, jauges) —
-// jamais comme couleur de texte courant, son contraste sur blanc est trop
-// faible. Un seul endroit à changer si la palette évolue — tous les écrans
-// importent d'ici plutôt que de coder leurs propres couleurs.
+// Charte graphique « Dark Mode Moderne » : fond très sombre quasi-noir, cartes
+// ardoise légèrement plus claires, texte quasi-blanc — le jaune reste l'unique
+// accent (bordures ciblées, pastilles d'état, boutons d'action), jamais un
+// aplat de couleur vive en fond de carte ou d'en-tête. Un seul endroit à
+// changer si la palette évolue — tous les écrans importent d'ici plutôt que
+// de coder leurs propres couleurs.
 
 export const colors = {
-  // Blanc cassé très sobre, aspect papier — jamais un blanc pur en fond de
-  // page, pour que les cartes (blanc pur) tranchent légèrement dessus.
-  background: '#FBFBF9',
-  surface: '#FFFFFF',
-  surfaceRaised: '#FFFFFF',
-  // Fine bordure « encre » plutôt qu'un gris neutre — cohérent avec le noir
-  // profond du texte.
-  border: 'rgba(17, 24, 39, 0.10)',
-  text: '#111827',
-  textMuted: '#6B7280',
-  textFaint: '#9CA3AF',
-  // Accent jaune — uniquement fonds/bordures d'éléments interactifs majeurs
-  // (jamais en couleur de texte : illisible sur blanc).
+  // Fond de page quasi-noir — les cartes (`surface`, plus clair) tranchent
+  // dessus sans jamais atteindre un noir ou un blanc pur.
+  background: '#090A0F',
+  surface: '#161B22',
+  // Légèrement plus clair que `surface` — modales, panneaux flottants,
+  // tout ce qui doit sembler « au-dessus » d'une carte.
+  surfaceRaised: '#1C232D',
+  // Fine bordure blanche à très faible opacité — tranche juste assez sur le
+  // fond sombre, jamais une ligne dure.
+  border: 'rgba(255, 255, 255, 0.08)',
+  text: '#F2F3F5',
+  textMuted: '#A0A6B0',
+  textFaint: '#6B7280',
+  // Accent jaune — uniquement bordures/pastilles/boutons d'action ciblés,
+  // jamais un aplat de fond de carte ou d'en-tête. Contraste élevé sur fond
+  // sombre : contrairement au mode clair, il reste lisible en texte court.
   gold: '#FACC15',
   goldBright: '#EAB308',
-  goldSoft: 'rgba(250, 204, 21, 0.20)',
-  // Étape intermédiaire des dégradés noir → jaune (Prediscore, jauge de
-  // confiance) : une interpolation RVB directe entre #111827 et #FACC15
-  // traverse un brun/kaki terne au milieu. Cet ambre chaud comme étape
-  // du milieu donne une transition propre plutôt que ce ventre mou.
+  goldSoft: 'rgba(250, 204, 21, 0.16)',
+  // Texte/icônes posés sur un aplat doré plein (CTA, pastille de coche) —
+  // toujours une teinte sombre : `text` (quasi-blanc en mode sombre) y serait
+  // illisible, l'accent jaune restant clair quel que soit le thème.
+  textOnGold: '#171308',
+  // Étape intermédiaire des dégradés sombre → jaune (Prediscore, jauge de
+  // confiance) : une interpolation RVB directe entre `text` et `gold`
+  // traverse un brun/kaki terne au milieu. Cet ambre chaud comme étape du
+  // milieu donne une transition propre plutôt que ce ventre mou.
   goldTransition: '#B45309',
   // Rouge fonctionnel, réservé aux erreurs et actions destructrices — pas une
-  // couleur de marque, un signal d'alerte standard.
-  danger: '#B91C1C',
-  dangerSoft: 'rgba(185, 28, 28, 0.08)',
+  // couleur de marque, un signal d'alerte standard. Éclairci pour rester
+  // lisible sur fond sombre.
+  danger: '#F87171',
+  dangerSoft: 'rgba(248, 113, 113, 0.12)',
   // Pastille de notification (badge de la cloche).
-  notificationBadge: '#DC2626',
-  // Fond du bandeau d'état de la carte une fois le verdict connu (texte
-  // toujours noir dessus) — teal et magenta plutôt qu'un vert/rouge de
-  // circulation classique, pour rester dans une palette de marque plutôt que
-  // le code couleur générique succès/échec.
-  verdictRealized: '#36A8A0',
-  verdictMissed: '#9C1D6E',
-  // Bandeau d'état « Scellé » de la carte : anthracite plutôt que noir pur,
-  // pour se distinguer du fond jaune de l'état « En cours ».
-  bannerSealedBg: '#2B2B2B',
-  // Texte des bandeaux à fond soutenu (Scellé, Manqué) : blanc, pour un
-  // contraste maximal aussi bien sur l'anthracite que sur le magenta.
-  bannerTextOnDark: '#FFFFFF',
-  // Trait des icônes (Lucide) : noir adouci plutôt que gris clair, pour
-  // qu'elles ressortent sans être aussi dures qu'un noir pur.
-  icon: '#374151',
-  // Icônes du pied de carte (commentaire, réaction) au repos — zinc foncé,
-  // plus soutenu que `textFaint`, pour un rendu fil d'actualité épuré ;
-  // noir (`text`) dès qu'il y a au moins une interaction.
-  footerIconInactive: '#52525B',
-  // Barre de navigation : blanc pur, tranche sur le fond papier.
-  navBar: '#FFFFFF',
-  navBarBorder: 'rgba(17, 24, 39, 0.10)',
-  navBarActive: '#111827',
+  notificationBadge: '#EF4444',
+  // Pastilles lumineuses des badges d'état (glassmorphism) — une couleur par
+  // statut plutôt qu'un aplat de fond derrière tout le libellé. Éclaircies
+  // par rapport aux teintes de marque pour rester « lumineuses » sur fond
+  // sombre plutôt que ternes.
+  statusDotSealed: '#8B93A1',
+  statusDotActive: '#FACC15',
+  statusDotRealized: '#2DD4BF',
+  statusDotMissed: '#F472B6',
+  // Bordures des boutons Réalisé/Manqué proposés à l'auteur — mêmes teintes
+  // de marque que les pastilles, avant qu'un verdict ne soit affirmé.
+  verdictRealized: '#2DD4BF',
+  verdictMissed: '#F472B6',
+  // Fond semi-transparent des badges/panneaux glassmorphism (statut de
+  // carte, bulles) — assombri plutôt qu'un flou réel (non disponible sans
+  // dépendance native supplémentaire), posé sur une bordure claire fine pour
+  // suggérer la même profondeur.
+  glassBg: 'rgba(22, 27, 34, 0.72)',
+  glassBorder: 'rgba(255, 255, 255, 0.10)',
+  // Trait des icônes (Lucide) : gris clair plutôt que blanc pur, pour
+  // qu'elles restent discrètes sans se fondre dans le fond sombre.
+  icon: '#C9CDD3',
+  // Icônes du pied de carte (commentaire, réaction) au repos — un ton plus
+  // sourd que `icon`, pour un rendu fil d'actualité épuré ; `text` dès qu'il
+  // y a au moins une interaction.
+  footerIconInactive: '#6B7280',
+  // Tampon « Raté » du Sceau d'Orgueil — zinc clair, sobre : l'échec s'efface
+  // visuellement à côté du tampon doré de victoire.
+  stampMissed: '#A1A1AA',
+  // Barre de navigation : même noir que le fond de page, tranche seulement
+  // via sa bordure supérieure.
+  navBar: '#090A0F',
+  navBarBorder: 'rgba(255, 255, 255, 0.08)',
+  // Onglet actif en jaune (accent), inactif en gris neutre — l'accent ne sert
+  // qu'à désigner l'état actif, jamais un fond.
+  navBarActive: '#FACC15',
   navBarActiveSoft: 'rgba(250, 204, 21, 0.35)',
-  navBarInactive: '#9CA3AF',
-  // Bouton d'action flottant (FAB), unique et standardisé sur tout l'app :
-  // cercle jaune, icône noire.
-  fab: '#FACC15',
-  fabIcon: '#111827',
+  navBarInactive: '#6B7280',
+  // Bouton d'action flottant (FAB) : fond ardoise (`surfaceRaised`), bordure
+  // et icône jaunes — plus un cercle jaune plein, une lueur discrète plutôt
+  // qu'un aplat de couleur vive.
+  fab: '#1C232D',
+  fabBorder: '#FACC15',
+  fabIcon: '#FACC15',
 } as const;
 
 export const radius = {

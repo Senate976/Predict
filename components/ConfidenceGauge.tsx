@@ -17,7 +17,7 @@ export function ConfidenceGauge({ belief }: { belief: number }) {
   return (
     <View style={styles.track}>
       <LinearGradient
-        colors={[colors.text, colors.goldTransition, colors.gold]}
+        colors={[colors.textFaint, colors.goldTransition, colors.gold]}
         locations={[0, 0.5, 1]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}

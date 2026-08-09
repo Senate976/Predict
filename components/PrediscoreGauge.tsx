@@ -44,14 +44,14 @@ export function PrediscoreGauge({
       <View style={styles.barBox}>
         <Svg width={BAR_WIDTH} height={BAR_HEIGHT}>
           <Defs>
-            {/* Noir → jaune, strictement sur la charte — pas de rouge/vert.
-                Le noir et le jaune tiennent chacun leur teinte pleine
-                jusqu'à 42%/58% : l'étape ambre qui évite le brun terne d'une
-                interpolation directe ne s'étale plus que sur cette bande
-                étroite du milieu, au lieu de teinter tout le dégradé. */}
+            {/* Gris sourd → jaune, strictement sur la charte — pas de
+                rouge/vert. Les deux teintes tiennent chacune leur couleur
+                pleine jusqu'à 42%/58% : l'étape ambre qui évite le brun terne
+                d'une interpolation directe ne s'étale plus que sur cette
+                bande étroite du milieu, au lieu de teinter tout le dégradé. */}
             <LinearGradient id="prediscoreGradient" x1="0" y1="0" x2="1" y2="0">
-              <Stop offset="0" stopColor={colors.text} />
-              <Stop offset="0.42" stopColor={colors.text} />
+              <Stop offset="0" stopColor={colors.textFaint} />
+              <Stop offset="0.42" stopColor={colors.textFaint} />
               <Stop offset="0.5" stopColor={colors.goldTransition} />
               <Stop offset="0.58" stopColor={colors.gold} />
               <Stop offset="1" stopColor={colors.gold} />

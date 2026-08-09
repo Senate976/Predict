@@ -278,5 +278,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  sendText: { color: colors.text, fontSize: 12, fontWeight: '700' },
+  sendText: { color: colors.textOnGold, fontSize: 12, fontWeight: '700' },
 });
