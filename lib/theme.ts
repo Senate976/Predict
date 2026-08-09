@@ -41,14 +41,12 @@ export const colors = {
   dangerSoft: 'rgba(248, 113, 113, 0.12)',
   // Pastille de notification (badge de la cloche).
   notificationBadge: '#EF4444',
-  // Pastilles lumineuses des badges d'état (glassmorphism) — une couleur par
-  // statut plutôt qu'un aplat de fond derrière tout le libellé. Éclaircies
-  // par rapport aux teintes de marque pour rester « lumineuses » sur fond
-  // sombre plutôt que ternes.
+  // Pastilles lumineuses de l'encart d'état (glassmorphism) — une couleur
+  // par statut plutôt qu'un aplat de fond derrière tout le libellé. Rien
+  // qu'un statut « scellé » et « en attente » : une fois le verdict affirmé,
+  // le tampon fait déjà le travail, l'encart ne s'affiche plus du tout.
   statusDotSealed: '#8B93A1',
   statusDotActive: '#FACC15',
-  statusDotRealized: '#2DD4BF',
-  statusDotMissed: '#F472B6',
   // Bordures des boutons Réalisé/Manqué proposés à l'auteur — mêmes teintes
   // de marque que les pastilles, avant qu'un verdict ne soit affirmé.
   verdictRealized: '#2DD4BF',

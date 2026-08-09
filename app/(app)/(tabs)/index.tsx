@@ -15,7 +15,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
 import { CelebrationBurst } from '../../../components/CelebrationBurst';
-import { CreateFab } from '../../../components/CreateFab';
 import { PredictionCard } from '../../../components/PredictionCard';
 import { PredictWord } from '../../../components/PredictWord';
 import { WelcomeOnboarding } from '../../../components/WelcomeOnboarding';
@@ -539,8 +538,6 @@ export default function HomeScreen() {
           ))
         )}
       </ScrollView>
-
-      <CreateFab />
     </SafeAreaView>
   );
 }

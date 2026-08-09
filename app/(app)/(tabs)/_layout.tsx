@@ -1,7 +1,7 @@
-import { Tabs } from 'expo-router';
-import { Bell, CircleUserRound, Users } from 'lucide-react-native';
+import { Tabs, useRouter } from 'expo-router';
+import { Bell, CircleUserRound, Plus, Users } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { StyleSheet, View, type ColorValue } from 'react-native';
+import { Pressable, StyleSheet, View, type ColorValue } from 'react-native';
 import { Text } from '../../../components/Text';
 
 import { useAuth } from '../../../lib/auth';
@@ -33,6 +33,30 @@ function TabIcon({ focused, children }: { focused: boolean; children: React.Reac
 /** Fréquence de rafraîchissement du badge — juste assez pour rester à jour
  * sans matraquer la base pendant que l'app reste ouverte. */
 const UNREAD_POLL_MS = 20_000;
+
+/**
+ * Bouton de création, centré parmi les icônes plutôt qu'en survol flottant
+ * de tout l'écran : surélevé au-dessus de la barre, façon médaillon —
+ * bordure et icône dorées sur fond ardoise, comme l'ancien FAB, mais posé
+ * au milieu de la navigation plutôt que dans un coin de chaque page.
+ * Ignore délibérément `props.onPress` (celui de React Navigation, qui
+ * activerait l'onglet factice `create` — voir `create.tsx`) et navigue
+ * directement vers l'écran de création à la place.
+ */
+function CreateTabButton() {
+  const router = useRouter();
+  return (
+    <View style={styles.centerButtonSlot} pointerEvents="box-none">
+      <Pressable
+        onPress={() => router.push('/new-prediction')}
+        style={({ pressed }) => [styles.centerButton, pressed && styles.centerButtonPressed]}
+        hitSlop={6}
+      >
+        <Plus size={26} color={colors.fabIcon} strokeWidth={2.5} />
+      </Pressable>
+    </View>
+  );
+}
 
 export default function TabsLayout() {
   const { session } = useAuth();
@@ -90,6 +114,16 @@ export default function TabsLayout() {
               <Bell size={ICON_SIZE} color={color} strokeWidth={STROKE} />
             </TabIcon>
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="create"
+        options={{
+          title: 'Créer',
+          // Bouton entièrement custom : ignore l'apparence standard d'un
+          // onglet (icône + point actif) et le press par défaut de React
+          // Navigation — voir `CreateTabButton`.
+          tabBarButton: () => <CreateTabButton />,
         }}
       />
       <Tabs.Screen
@@ -152,4 +186,29 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
   },
+  // Occupe le même emplacement flexible qu'un onglet normal dans la rangée
+  // (React Navigation lui donne `flex: 1` comme aux autres), mais laisse le
+  // vrai bouton s'élever au-dessus par un décalage vertical négatif.
+  centerButtonSlot: { flex: 1, alignItems: 'center' },
+  // Médaillon surélevé façon FAB : fond ardoise, bordure et icône dorées,
+  // légère lueur — jamais un simple cercle jaune plein. Le décalage vers le
+  // haut le détache de la rangée d'icônes plutôt que de s'y aligner à plat.
+  centerButton: {
+    position: 'absolute',
+    top: -18,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.fab,
+    borderWidth: 1.5,
+    borderColor: colors.fabBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.gold,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  centerButtonPressed: { opacity: 0.85 },
 });
