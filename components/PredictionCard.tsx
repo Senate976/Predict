@@ -37,6 +37,9 @@ const EMOJI_PANEL_WIDTH = 272;
 /** 12 réactions sur 2 rangées de 6 plutôt qu'une seule rangée trop dense. */
 const EMOJI_COLUMNS = 6;
 const EMOJI_ROWS = Math.ceil(EMOJI_REACTIONS.length / EMOJI_COLUMNS);
+/** Diamètre fixe du Sceau d'Orgueil (tampon « ENCORE RAISON ») — largeur et
+ * hauteur identiques, condition nécessaire pour un cercle plutôt qu'un ovale. */
+const STAMP_DIAMETER = 138;
 
 /**
  * Carte d'une prédiction, partagée entre les onglets À venir et Passées du
@@ -822,54 +825,68 @@ const styles = StyleSheet.create({
     marginTop: 3.5,
   },
   // Le Sceau d'Orgueil « ENCORE RAISON » : triple cercle concentrique (deux
-  // filets noirs, un filet or/ocre) façon tampon encreur officiel, ovale
-  // plutôt que rectangulaire — `radius.pill` sur les trois anneaux suffit,
-  // React Native le limite automatiquement à la moitié du plus petit côté.
+  // filets noirs, un filet or/ocre) façon tampon encreur officiel — un
+  // cercle parfait, pas un ovale : largeur ET hauteur fixées et identiques
+  // (`STAMP_DIAMETER`), `radius.pill` se chargeant d'arrondir chaque anneau
+  // à la moitié de son côté. Le texte, trop large pour tenir sur une seule
+  // ligne dans un cercle, se replie naturellement sur deux lignes centrées.
   // Toujours dans le flux normal, aligné à droite, jamais en surimpression.
   verdictStampRealized: { alignSelf: 'flex-end', marginTop: 8 },
   verdictStampRealizedRingOuter: {
+    width: STAMP_DIAMETER,
+    height: STAMP_DIAMETER,
     borderWidth: 3,
     borderColor: colors.text,
     borderRadius: radius.pill,
     padding: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   verdictStampRealizedRingMiddle: {
+    width: '100%',
+    height: '100%',
     borderWidth: 1.5,
     borderColor: colors.text,
     borderRadius: radius.pill,
     padding: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   verdictStampRealizedRingInner: {
+    width: '100%',
+    height: '100%',
     borderWidth: 1.5,
     borderColor: colors.goldTransition,
     borderRadius: radius.pill,
-    paddingHorizontal: 22,
-    paddingVertical: 12,
+    paddingHorizontal: 10,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   verdictStampRealizedText: {
     fontFamily: fonts.sansBold,
-    fontSize: 15,
+    fontSize: 13,
     textTransform: 'uppercase',
-    letterSpacing: 1.2,
+    letterSpacing: 1,
     color: colors.text,
+    textAlign: 'center',
   },
   // Date de révélation, en dessous du texte principal — plus petite mais
   // toujours lisible, soulignée d'un fin trait comme sur le tampon de
   // référence.
   verdictStampRealizedDate: {
     fontFamily: fonts.bodyEmphasis,
-    fontSize: 11,
+    fontSize: 9,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 0.6,
     color: colors.text,
     marginTop: 3,
+    textAlign: 'center',
   },
   verdictStampRealizedDateRule: {
     width: '55%',
     height: 1,
     backgroundColor: colors.text,
-    marginTop: 3,
+    marginTop: 2,
   },
   // Tout sur une seule ligne : [avatar 32][pseudo] ...espace flexible...
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
