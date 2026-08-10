@@ -15,7 +15,6 @@ import {
 import { Text } from './Text';
 
 import { fetchCommentCount } from '../lib/comments';
-import { formatStampDate } from '../lib/datetime';
 import {
   castEmojiReaction,
   EMOJI_REACTIONS,
@@ -120,11 +119,6 @@ export function PredictionCard({
   // trop lent. `null` tant que l'auteur n'a rien affirmé pendant cette
   // session — la valeur posée en base fait foi dès le rechargement suivant.
   const [localVerdict, setLocalVerdict] = useState<'realized' | 'missed' | null>(null);
-  // Écho optimiste de la date du Sceau d'Orgueil, posée en même temps que
-  // `localVerdict` — sans lui, le tampon afficherait `item.verdict_set_at`
-  // (encore `null` avant le prochain chargement du fil) au lieu du jour où
-  // l'auteur vient tout juste d'affirmer son verdict.
-  const [localVerdictSetAt, setLocalVerdictSetAt] = useState<Date | null>(null);
   const [verdictPending, setVerdictPending] = useState(false);
   const [verdictError, setVerdictError] = useState<string | null>(null);
   // Écho optimiste de `revealPredictionNow` : une fois l'appel réussi, la
@@ -138,8 +132,6 @@ export function PredictionCard({
   const isAuthor = item.author_id === userId;
 
   const verdict = localVerdict ?? (revealed && item.final_status !== 'pending' ? item.final_status : null);
-  const verdictSetAt =
-    localVerdictSetAt ?? (item.verdict_set_at ? new Date(item.verdict_set_at) : new Date(item.reveal_at));
 
   /** Les 4 états visuels de la carte — un contour néon dédié (voir `styles`)
    * à tous, mais un libellé en haut à droite seulement pour Scellé/En cours :
@@ -243,12 +235,10 @@ export function PredictionCard({
     setVerdictPending(true);
     setVerdictError(null);
     setLocalVerdict(next);
-    setLocalVerdictSetAt(new Date());
     const { error } = await setPredictionVerdict(item.id, next);
     setVerdictPending(false);
     if (error) {
       setLocalVerdict(null);
-      setLocalVerdictSetAt(null);
       setVerdictError('Action impossible.');
       return;
     }
@@ -530,15 +520,6 @@ export function PredictionCard({
             </Text>
           )}
 
-          {/* Le contour néon de la carte (voir `cardRealized`/`cardMissed`)
-              porte déjà le verdict — cette légende ne fait plus qu'en dater
-              la confirmation, sans tampon. */}
-          {verdict !== null && (
-            <Text style={styles.verdictDate}>
-              {verdict === 'realized' ? 'Confirmé réalisé le ' : 'Confirmé manqué le '}
-              {formatStampDate(verdictSetAt)}
-            </Text>
-          )}
         </View>
       </Pressable>
 
@@ -835,17 +816,6 @@ function createStyles(colors: Colors) {
   },
   verdictPromptButtonText: { fontFamily: fonts.label, fontSize: 12, fontWeight: '700', color: colors.text },
   verdictPromptError: { fontSize: 11, color: colors.danger, marginTop: 6, textAlign: 'right' },
-  // Plus de tampon : seule cette légende date la confirmation du verdict, le
-  // contour néon de la carte porte déjà la couleur du résultat.
-  verdictDate: {
-    alignSelf: 'flex-end',
-    marginTop: 8,
-    fontFamily: fonts.label,
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    color: colors.textFaint,
-  },
   // Tout sur une seule ligne : [avatar 32][pseudo] ...espace flexible...
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   headerSpacer: { flex: 1, minWidth: 8 },
