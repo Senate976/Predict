@@ -16,7 +16,7 @@ import {
 import { Text } from './Text';
 
 import { fetchCommentCount } from '../lib/comments';
-import { formatStampDate, toDateInput } from '../lib/datetime';
+import { formatStampDate } from '../lib/datetime';
 import {
   castEmojiReaction,
   EMOJI_REACTIONS,
@@ -148,18 +148,15 @@ export function PredictionCard({
     localVerdictSetAt ?? (item.verdict_set_at ? new Date(item.verdict_set_at) : new Date(item.reveal_at));
 
   /** Les 4 états visuels de la carte — un contour néon dédié (voir `styles`)
-   * et un libellé en haut à droite, tous deux dérivés de ce seul objet. */
-  const cardState: { kind: 'sealed' | 'active' | 'realized' | 'missed'; label: string; extra?: string } = !revealed
+   * et un libellé en haut à droite, tous deux dérivés de ce seul objet. Rien
+   * qu'un mot chacun, jamais de date accolée. */
+  const cardState: { kind: 'sealed' | 'active' | 'realized' | 'missed'; label: string } = !revealed
     ? { kind: 'sealed', label: 'SCELLÉ' }
     : verdict === 'realized'
       ? { kind: 'realized', label: 'RÉALISÉ' }
       : verdict === 'missed'
         ? { kind: 'missed', label: 'MANQUÉ' }
-        : {
-            kind: 'active',
-            label: 'EN COURS',
-            extra: item.open_ended ? undefined : toDateInput(new Date(item.reveal_at)),
-          };
+        : { kind: 'active', label: 'EN COURS' };
 
   useEffect(() => {
     let cancelled = false;
@@ -408,7 +405,6 @@ export function PredictionCard({
           numberOfLines={1}
         >
           {cardState.label}
-          {cardState.extra ? ` • ${cardState.extra}` : ''}
         </Text>
       </View>
 
@@ -478,30 +474,16 @@ export function PredictionCard({
 
           <Text style={styles.cardTeaser}>{item.teaser}</Text>
 
-          {/* Tant que non révélée, le vrai contenu reste masqué — y compris
-              pour l'auteur, qui n'a que la RLS d'exception le laissant
-              passer avant les autres. Des lignes tronquées façon texte flouté
-              plutôt que le texte net : le secret reste entier jusqu'à la
-              date, il ne suffit pas de garder la carte fermée pour les
-              destinataires (qui eux n'ont de toute façon aucun `content`
-              avant révélation, RLS oblige). */}
-          {!revealed && isAuthor && item.content && (
-            <View style={styles.maskedContent}>
-              <View style={[styles.maskedLine, styles.maskedLineW1]} />
-              <View style={[styles.maskedLine, styles.maskedLineW2]} />
-              <View style={[styles.maskedLine, styles.maskedLineW3]} />
-              <Text style={styles.maskedCaption}>
-                {item.open_ended
-                  ? 'Révélation manuelle, quand vous le déciderez'
-                  : `Révélation le ${toDateInput(new Date(item.reveal_at))}`}
-              </Text>
-            </View>
-          )}
-
-          {/* Le contenu devient visible directement sur la carte une fois
+          {/* Le contenu (la vraie prédiction, derrière la promesse du
+              teaser) devient visible directement sur la carte une fois
               révélée — sans ça, l'onglet Predict n'avait rien de plus à
-              montrer qu'un teaser déjà lu avant révélation. */}
-          {revealed && item.content && <Text style={styles.cardContent}>{item.content}</Text>}
+              montrer qu'un teaser déjà lu avant révélation. La RLS ne
+              renvoie `content` que si révélée ou si on en est l'auteur : lui
+              seul voit toujours son propre texte en clair, y compris avant
+              révélation — jamais masqué, même pour lui. */}
+          {(revealed || isAuthor) && item.content && (
+            <Text style={styles.cardContent}>{item.content}</Text>
+          )}
 
           {/* Le tampon certifie le verdict sous la prédiction, dans le flux
               normal (plus en position absolue par-dessus le texte), pour ne
@@ -774,15 +756,6 @@ const styles = StyleSheet.create({
   stateLabelRealized: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.neonGreen },
   stateLabelMissed: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.neonRed },
   headerMenuButton: { padding: 2 },
-  // Lignes tronquées façon texte flouté, en lieu et place du vrai contenu
-  // tant que non révélée — même pour l'auteur : le secret reste entier
-  // jusqu'à la date, il ne suffit pas de le garder net rien que pour lui.
-  maskedContent: { marginTop: 4, gap: 8 },
-  maskedLine: { height: 13, borderRadius: 4, backgroundColor: colors.surfaceRaised },
-  maskedLineW1: { width: '94%' },
-  maskedLineW2: { width: '80%' },
-  maskedLineW3: { width: '58%' },
-  maskedCaption: { fontSize: 11, fontFamily: fonts.label, color: colors.textFaint, marginTop: 6 },
   // Invite l'auteur à trancher — au-dessus de la carte tappable, jamais
   // dedans, pour qu'un tap sur un bouton ne navigue jamais aussi vers le
   // détail (`onPress` de la `Pressable` qui suit). Rien que les deux
