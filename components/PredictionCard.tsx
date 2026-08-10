@@ -12,6 +12,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { Text } from './Text';
 
 import { fetchCommentCount } from '../lib/comments';
@@ -404,6 +405,29 @@ export function PredictionCard({
         unseen && styles.cardUnseen,
       ]}
     >
+      {/* Réalisé : le contour doré se prolonge en une petite couronne au
+          centre du bord supérieur — le même trait, sans rupture ni
+          remplissage, plutôt qu'une icône séparée posée sur la carte. Assez
+          réduite pour rester discrète, mais reconnaissable comme couronne. */}
+      {cardState.kind === 'realized' && (
+        <Svg
+          style={styles.crownAccent}
+          viewBox="0 0 34 12"
+          width={34}
+          height={12}
+          pointerEvents="none"
+        >
+          <Path
+            d="M0,12 L6,4 L12,11 L17,0 L22,11 L28,4 L34,12"
+            stroke={colors.gold}
+            strokeWidth={1.25}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            fill="none"
+          />
+        </Svg>
+      )}
+
       {/* Sur sa propre ligne, au-dessus de [avatar][pseudo] plutôt qu'inline
           dans l'en-tête : le pseudo garde toute la largeur de sa ligne au
           lieu de la disputer à ce libellé. Absent pour Réalisé/Manqué — le
@@ -734,10 +758,18 @@ function createStyles(colors: Colors) {
     borderColor: colors.cardBorderNeutral,
   },
   // Réalisé : contour doré, sans glow (contrairement à l'ancien contour
-  // vert qu'il remplaçait) — le tampon (rendu plus bas) porte le détail du
-  // verdict, ce contour attire l'œil sur la carte elle-même.
+  // vert qu'il remplaçait) — la petite couronne au sommet (`crownAccent`)
+  // porte seule le supplément de signalétique, plus de tampon en dessous.
   cardRealized: {
     borderColor: colors.gold,
+  },
+  // Prolonge le trait du contour doré en une couronne au centre du bord
+  // supérieur — même trait, sans rupture, plutôt qu'une icône rapportée.
+  crownAccent: {
+    position: 'absolute',
+    top: -12,
+    left: '50%',
+    marginLeft: -17,
   },
   // Manqué, l'élément clé du site, garde son contour néon + lueur externe
   // (`shadow*` — se traduit en `box-shadow` sur le web, `elevation` sur
