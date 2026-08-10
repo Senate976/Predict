@@ -406,11 +406,10 @@ export function PredictionCard({
       ]}
     >
       {/* Réalisé : le contour doré se prolonge en une petite couronne au
-          centre du bord supérieur — deux montants verticaux droits (comme les
-          bords d'une vraie couronne), puis entre eux trois arches continues
-          en courbes de Bézier (tangente horizontale à chaque crête/creux,
-          jamais d'angle vif dans la couronne elle-même). Prolongement direct
-          de la bordure, jamais une icône rapportée. */}
+          centre du bord supérieur — deux montants verticaux droits, puis
+          entre eux trois pointes nettes (silhouette classique de couronne,
+          pas des vagues arrondies). Prolongement direct de la bordure,
+          jamais une icône rapportée. */}
       {cardState.kind === 'realized' && (
         <Svg
           style={styles.crownAccent}
@@ -420,11 +419,11 @@ export function PredictionCard({
           pointerEvents="none"
         >
           <Path
-            d="M0,22 L0,12 C2.67,12 5.33,3 8,3 C10,3 12,8 14,8 C16,8 18,1 20,1 C22,1 24,8 26,8 C28,8 30,3 32,3 C34.67,3 37.33,12 40,12 L40,22"
+            d="M0,22 L0,14 L7,3 L13,11 L20,1 L27,11 L33,3 L40,14 L40,22"
             stroke={colors.gold}
             strokeWidth={1.4}
             strokeLinecap="butt"
-            strokeLinejoin="round"
+            strokeLinejoin="miter"
             fill="none"
           />
         </Svg>
