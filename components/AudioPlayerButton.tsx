@@ -1,10 +1,11 @@
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import { Text } from './Text';
 
 import { getPredictionAudioUrl } from '../lib/audio';
-import { colors, radius } from '../lib/theme';
+import { radius, type Colors } from '../lib/theme';
+import { useColors } from '../lib/themeMode';
 
 /**
  * Lecture d'un message vocal à partir de son chemin de stockage. `path`
@@ -18,6 +19,8 @@ export function AudioPlayerButton({ path }: { path: string }) {
   const [failed, setFailed] = useState(false);
   const player = useAudioPlayer(url ?? undefined);
   const status = useAudioPlayerStatus(player);
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,16 +60,18 @@ export function AudioPlayerButton({ path }: { path: string }) {
   );
 }
 
-const styles = StyleSheet.create({
-  button: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.pill,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    alignSelf: 'flex-start',
-    backgroundColor: colors.goldSoft,
-  },
-  text: { fontSize: 13, fontWeight: '600', color: colors.text },
-  errorText: { fontSize: 12, color: colors.textFaint },
-});
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
+    button: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.pill,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      alignSelf: 'flex-start',
+      backgroundColor: colors.goldSoft,
+    },
+    text: { fontSize: 13, fontWeight: '600', color: colors.text },
+    errorText: { fontSize: 12, color: colors.textFaint },
+  });
+}

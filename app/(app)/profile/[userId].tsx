@@ -1,5 +1,5 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -23,7 +23,8 @@ import {
   isMissingSchema,
   type PredictionStats,
 } from '../../../lib/predictions';
-import { colors, eyebrow, fonts, radius, spacing } from '../../../lib/theme';
+import { eyebrow, fonts, radius, spacing, type Colors } from '../../../lib/theme';
+import { useColors } from '../../../lib/themeMode';
 
 /**
  * Profil consultable d'un ami — accessible depuis Le Cercle ou depuis le nom
@@ -35,6 +36,8 @@ import { colors, eyebrow, fonts, radius, spacing } from '../../../lib/theme';
 export default function FriendProfileScreen() {
   const { userId } = useLocalSearchParams<{ userId: string }>();
   const router = useRouter();
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [profile, setProfile] = useState<FriendProfile | null>(null);
   const [stats, setStats] = useState<PredictionStats | null>(null);
@@ -171,7 +174,8 @@ export default function FriendProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
@@ -191,7 +195,7 @@ const styles = StyleSheet.create({
   headerSpacer: { width: 56 },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   loader: { marginTop: 24 },
-  eyebrow: { ...eyebrow },
+  eyebrow: { ...eyebrow(colors) },
   sectionSpacing: { marginTop: spacing.xl },
   identityCard: {
     marginTop: spacing.sm,
@@ -238,4 +242,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   lightboxImage: { width: '88%', height: '70%' },
-});
+  });
+}

@@ -1,7 +1,9 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { colors, radius } from '../lib/theme';
+import { radius, type Colors } from '../lib/theme';
+import { useColors } from '../lib/themeMode';
 
 /** Diamètre du curseur — partagé par la carte et l'écran détail, pour un
  * rendu identique aux deux endroits. */
@@ -14,6 +16,8 @@ const CURSOR_SIZE = 12;
  * (carte et écran détail l'affichent différemment).
  */
 export function ConfidenceGauge({ belief }: { belief: number }) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.track}>
       <LinearGradient
@@ -28,21 +32,23 @@ export function ConfidenceGauge({ belief }: { belief: number }) {
   );
 }
 
-const styles = StyleSheet.create({
-  track: { height: CURSOR_SIZE, justifyContent: 'center' },
-  trackLine: { height: 3, borderRadius: radius.pill, overflow: 'hidden' },
-  cursor: {
-    position: 'absolute',
-    width: CURSOR_SIZE,
-    height: CURSOR_SIZE,
-    borderRadius: CURSOR_SIZE / 2,
-    backgroundColor: colors.surface,
-    borderWidth: 2,
-    borderColor: colors.text,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.25,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-});
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
+    track: { height: CURSOR_SIZE, justifyContent: 'center' },
+    trackLine: { height: 3, borderRadius: radius.pill, overflow: 'hidden' },
+    cursor: {
+      position: 'absolute',
+      width: CURSOR_SIZE,
+      height: CURSOR_SIZE,
+      borderRadius: CURSOR_SIZE / 2,
+      backgroundColor: colors.surface,
+      borderWidth: 2,
+      borderColor: colors.text,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.25,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+  });
+}

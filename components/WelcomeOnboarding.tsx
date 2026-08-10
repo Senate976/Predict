@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 
-import { colors, fonts, radius, spacing } from '../lib/theme';
+import { fonts, radius, spacing, type Colors } from '../lib/theme';
+import { useColors } from '../lib/themeMode';
 import { PredictWord } from './PredictWord';
 
 const STEPS: ReactNode[] = [
@@ -28,6 +29,8 @@ export function WelcomeOnboarding({
   visible: boolean;
   onStart: () => void;
 }) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.backdrop}>
@@ -74,7 +77,8 @@ export function WelcomeOnboarding({
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(23, 21, 18, 0.55)',
@@ -147,4 +151,5 @@ const styles = StyleSheet.create({
   },
   ctaPressed: { backgroundColor: colors.goldBright },
   ctaText: { color: colors.textOnGold, fontSize: 16, fontWeight: '700' },
-});
+  });
+}

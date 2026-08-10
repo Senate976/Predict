@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { ChevronLeft, ChevronRight, SlidersHorizontal, XCircle } from 'lucide-react-native';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -31,7 +31,8 @@ import {
   type PredictionFeedItem,
 } from '../../../lib/predictions';
 import { supabase } from '../../../lib/supabase';
-import { colors, fonts, radius, spacing } from '../../../lib/theme';
+import { fonts, radius, spacing, type Colors } from '../../../lib/theme';
+import { useColors } from '../../../lib/themeMode';
 
 /**
  * Période de rafraîchissement des comptes à rebours.
@@ -56,6 +57,8 @@ type MenuView = 'main' | 'author';
 export default function HomeScreen() {
   const { username, session, onboarded, markOnboarded, reduceMotion } = useAuth();
   const router = useRouter();
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [feed, setFeed] = useState<PredictionFeedItem[] | null>(null);
   const [authors, setAuthors] = useState<AuthorMap>({});
@@ -542,7 +545,8 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
@@ -694,4 +698,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 12,
   },
-});
+  });
+}

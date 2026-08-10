@@ -1,24 +1,26 @@
 import { useRouter } from 'expo-router';
 import { Check } from 'lucide-react-native';
+import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '../../../components/Text';
 
-import { colors, fonts, spacing } from '../../../lib/theme';
-import { useThemeMode, type ThemeMode } from '../../../lib/themeMode';
+import { fonts, spacing, type Colors } from '../../../lib/theme';
+import { useColors, useThemeMode, type ThemeMode } from '../../../lib/themeMode';
 
 const OPTIONS: { id: ThemeMode; label: string }[] = [
   { id: 'light', label: 'Clair' },
   { id: 'dark', label: 'Sombre' },
 ];
 
-/** Le choix est mémorisé (voir `useThemeMode`), mais aucun écran n'y réagit
- * encore — toute l'app reste câblée sur la palette sombre de `lib/theme.ts`
- * quel que soit le mode choisi ici. Câbler chaque écran sur ce mode viendra
- * dans une passe suivante ; ce sélecteur pose la préférence en amont. */
+/** Le choix est mémorisé (`useThemeMode`) et s'applique immédiatement à toute
+ * l'app : chaque écran lit sa palette via `useColors()` (`lib/themeMode.tsx`),
+ * réévalué à chaque changement de mode. */
 export default function AppearanceSettingsScreen() {
   const router = useRouter();
   const { mode, setMode } = useThemeMode();
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -43,16 +45,14 @@ export default function AppearanceSettingsScreen() {
             </Pressable>
           ))}
         </View>
-        <Text style={styles.hint}>
-          Ton choix est mémorisé, mais Predict reste en mode sombre pour l’instant — le mode clair
-          arrive dans une prochaine mise à jour.
-        </Text>
+        <Text style={styles.hint}>Ton choix est appliqué immédiatement et mémorisé pour la prochaine fois.</Text>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
@@ -86,4 +86,5 @@ const styles = StyleSheet.create({
   rowLast: { borderBottomWidth: 0 },
   rowLabel: { fontSize: 15, fontWeight: '600', color: colors.text },
   hint: { fontSize: 12, color: colors.textFaint, marginTop: 10 },
-});
+  });
+}

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { Animated, Dimensions, Modal, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 
-import { colors, fonts, radius } from '../lib/theme';
+import { fonts, radius, type Colors } from '../lib/theme';
+import { useColors } from '../lib/themeMode';
 import { PredictWord } from './PredictWord';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -51,6 +52,8 @@ export function CelebrationBurst({
   ),
   onFinish,
 }: Props) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const particles = useMemo(() => (visible ? makeParticles() : []), [visible]);
   const values = useRef<Animated.Value[]>([]).current;
   if (values.length !== particles.length) {
@@ -130,26 +133,28 @@ export function CelebrationBurst({
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: { flex: 1 },
-  particle: { position: 'absolute', bottom: 0 },
-  messageBox: {
-    position: 'absolute',
-    top: '42%',
-    left: 24,
-    right: 24,
-    alignItems: 'center',
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: radius.xl,
-    paddingVertical: 20,
-    paddingHorizontal: 24,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  message: {
-    fontFamily: fonts.bodyEmphasis,
-    fontSize: 22,
-    color: colors.text,
-    textAlign: 'center',
-  },
-});
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
+    overlay: { flex: 1 },
+    particle: { position: 'absolute', bottom: 0 },
+    messageBox: {
+      position: 'absolute',
+      top: '42%',
+      left: 24,
+      right: 24,
+      alignItems: 'center',
+      backgroundColor: colors.surfaceRaised,
+      borderRadius: radius.xl,
+      paddingVertical: 20,
+      paddingHorizontal: 24,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    message: {
+      fontFamily: fonts.bodyEmphasis,
+      fontSize: 22,
+      color: colors.text,
+      textAlign: 'center',
+    },
+  });
+}

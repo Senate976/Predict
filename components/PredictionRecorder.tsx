@@ -7,11 +7,12 @@ import {
   useAudioRecorder,
   useAudioRecorderState,
 } from 'expo-audio';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 
-import { colors, fonts, radius } from '../lib/theme';
+import { fonts, radius, type Colors } from '../lib/theme';
+import { useColors } from '../lib/themeMode';
 import { PredictWord } from './PredictWord';
 
 type Props = {
@@ -40,6 +41,8 @@ export function PredictionRecorder({ uri, onChange, disabled }: Props) {
   const player = useAudioPlayer(uri ?? undefined);
   const playerStatus = useAudioPlayerStatus(player);
   const [permissionError, setPermissionError] = useState<string | null>(null);
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   async function handleStart() {
     setPermissionError(null);
@@ -101,7 +104,8 @@ export function PredictionRecorder({ uri, onChange, disabled }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
   box: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -126,4 +130,5 @@ const styles = StyleSheet.create({
   resetButton: { marginTop: 10, alignSelf: 'flex-start' },
   resetButtonText: { fontSize: 13, color: colors.textMuted, fontWeight: '600' },
   errorText: { color: colors.danger, fontSize: 13, marginBottom: 10 },
-});
+  });
+}

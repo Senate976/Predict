@@ -1,14 +1,18 @@
 import { useRouter } from 'expo-router';
 import { ChevronRight } from 'lucide-react-native';
+import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '../../../../components/Text';
 
 import { LEGAL_DOCS } from '../../../../lib/settingsSections';
-import { colors, fonts, spacing } from '../../../../lib/theme';
+import { fonts, spacing, type Colors } from '../../../../lib/theme';
+import { useColors } from '../../../../lib/themeMode';
 
 export default function LegalScreen() {
   const router = useRouter();
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -38,7 +42,8 @@ export default function LegalScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
@@ -72,4 +77,5 @@ const styles = StyleSheet.create({
   },
   rowLast: { borderBottomWidth: 0 },
   rowText: { fontSize: 15, fontWeight: '600', color: colors.text },
-});
+  });
+}

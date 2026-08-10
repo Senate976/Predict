@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { Eye, EyeOff, Lock, MessageCircle, MoreHorizontal, Star, ThumbsUp, Trash2 } from 'lucide-react-native';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -30,7 +30,8 @@ import {
   type EmojiReactor,
   type PredictionFeedItem,
 } from '../lib/predictions';
-import { colors, fonts, radius } from '../lib/theme';
+import { fonts, radius, type Colors } from '../lib/theme';
+import { useColors } from '../lib/themeMode';
 import { Avatar } from './Avatar';
 import { InlineComments } from './InlineComments';
 
@@ -113,6 +114,8 @@ export function PredictionCard({
   onVerdictChange?: (verdict: 'realized' | 'missed') => void;
 }) {
   const router = useRouter();
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [commentCount, setCommentCount] = useState<number | null>(null);
@@ -747,7 +750,8 @@ export function PredictionCard({
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
   cardPressed: { opacity: 0.85 },
   // Fond anthracite distinct du fond de page quasi-noir, fine bordure
   // blanche à faible opacité par défaut (état Scellé) — Predict/Réalisé/
@@ -1033,4 +1037,5 @@ const styles = StyleSheet.create({
   reactorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7 },
   reactorName: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.text },
   reactorEmoji: { fontSize: 18 },
-});
+  });
+}

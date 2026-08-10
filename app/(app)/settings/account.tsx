@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '../../../components/Text';
@@ -15,7 +15,8 @@ import {
   updateUsername,
   usernameErrorMessage,
 } from '../../../lib/settings';
-import { colors, eyebrow, fonts, radius, spacing } from '../../../lib/theme';
+import { eyebrow, fonts, radius, spacing, type Colors } from '../../../lib/theme';
+import { useColors } from '../../../lib/themeMode';
 
 /** Nom d'utilisateur et email — les deux identifiants du compte, jamais
  * modifiables ailleurs dans l'app (le Profil ne fait qu'afficher le
@@ -23,6 +24,8 @@ import { colors, eyebrow, fonts, radius, spacing } from '../../../lib/theme';
 export default function AccountSettingsScreen() {
   const router = useRouter();
   const { session, username: currentUsername } = useAuth();
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const userId = session?.user.id;
 
   const [username, setUsername] = useState(currentUsername ?? '');
@@ -167,7 +170,8 @@ export default function AccountSettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
@@ -182,7 +186,7 @@ const styles = StyleSheet.create({
   back: { fontSize: 15, color: colors.text, width: 56 },
   headerSpacer: { width: 56 },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
-  eyebrow: { ...eyebrow, marginBottom: 8 },
+  eyebrow: { ...eyebrow(colors), marginBottom: 8 },
   sectionSpacing: { marginTop: spacing.xl },
   input: {
     borderWidth: 1,
@@ -216,4 +220,5 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.4 },
   buttonText: { color: colors.background, fontSize: 14, fontWeight: '700' },
-});
+  });
+}

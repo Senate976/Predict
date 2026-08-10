@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Check, Trash2 } from 'lucide-react-native';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -32,7 +32,8 @@ import {
   type Notification,
 } from '../../../lib/notifications';
 import { supabase } from '../../../lib/supabase';
-import { colors, fonts, radius, spacing } from '../../../lib/theme';
+import { fonts, radius, spacing, type Colors } from '../../../lib/theme';
+import { useColors } from '../../../lib/themeMode';
 
 function notificationLabel(notification: Notification) {
   switch (notification.type) {
@@ -92,6 +93,8 @@ function notificationLabel(notification: Notification) {
 export default function NotificationsScreen() {
   const { session } = useAuth();
   const router = useRouter();
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const userId = session?.user.id;
 
   const [notifications, setNotifications] = useState<Notification[] | null>(null);
@@ -358,7 +361,8 @@ export default function NotificationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
@@ -449,4 +453,5 @@ const styles = StyleSheet.create({
   },
   pillOutlineText: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
   respondedText: { fontSize: 12, color: colors.textFaint, marginTop: 8 },
-});
+  });
+}

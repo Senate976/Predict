@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 
-import { colors, fonts, radius } from '../lib/theme';
+import { fonts, radius, type Colors } from '../lib/theme';
+import { useColors } from '../lib/themeMode';
 
 export type SelectOption<T> = { value: T; label: string };
 
@@ -29,6 +30,8 @@ export function SelectField<T extends string | number>({
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const selected = options.find((option) => option.value === value);
 
   return (
@@ -85,7 +88,8 @@ export function SelectField<T extends string | number>({
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
   label: { fontSize: 12, color: colors.textFaint, marginBottom: 6 },
   field: {
     flexDirection: 'row',
@@ -132,4 +136,5 @@ const styles = StyleSheet.create({
   optionActive: { backgroundColor: colors.goldSoft },
   optionText: { fontSize: 15, color: colors.text },
   optionTextActive: { color: colors.text, fontWeight: '700' },
-});
+  });
+}

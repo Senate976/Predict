@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Settings } from 'lucide-react-native';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -26,7 +26,8 @@ import {
   type PredictionOutcome,
   type PredictionOutcomeStatus,
 } from '../../../lib/predictions';
-import { colors, eyebrow, fonts, radius, spacing } from '../../../lib/theme';
+import { eyebrow, fonts, radius, spacing, type Colors } from '../../../lib/theme';
+import { useColors } from '../../../lib/themeMode';
 
 type Filter = 'total' | 'realized' | 'missed' | 'pending';
 
@@ -47,6 +48,8 @@ function statusLabel(status: PredictionOutcomeStatus, isRevealed: boolean): stri
 export default function ProfileScreen() {
   const { username, session, signOut } = useAuth();
   const router = useRouter();
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const userId = session?.user.id;
 
   const [outcomes, setOutcomes] = useState<PredictionOutcome[] | null>(null);
@@ -290,7 +293,8 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
@@ -303,7 +307,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   scroll: { padding: spacing.lg, paddingBottom: 40 },
-  eyebrow: { ...eyebrow },
+  eyebrow: { ...eyebrow(colors) },
   sectionSpacing: { marginTop: spacing.xl },
   brand: {
     fontFamily: fonts.display,
@@ -413,4 +417,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: spacing.md,
   },
-});
+  });
+}

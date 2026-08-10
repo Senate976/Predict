@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '../../../components/Text';
@@ -7,11 +7,14 @@ import { TextInput } from '../../../components/TextInput';
 
 import { useAuth } from '../../../lib/auth';
 import { authErrorMessage, deleteOwnAccount, MIN_PASSWORD_LENGTH, updatePassword } from '../../../lib/settings';
-import { colors, eyebrow, fonts, radius, spacing } from '../../../lib/theme';
+import { eyebrow, fonts, radius, spacing, type Colors } from '../../../lib/theme';
+import { useColors } from '../../../lib/themeMode';
 
 export default function SecuritySettingsScreen() {
   const router = useRouter();
   const { signOut } = useAuth();
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -161,7 +164,8 @@ export default function SecuritySettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
@@ -176,7 +180,7 @@ const styles = StyleSheet.create({
   back: { fontSize: 15, color: colors.text, width: 56 },
   headerSpacer: { width: 56 },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
-  eyebrow: { ...eyebrow, marginBottom: 8 },
+  eyebrow: { ...eyebrow(colors), marginBottom: 8 },
   sectionSpacing: { marginTop: spacing.xl },
   dangerSpacing: { marginTop: spacing.xl * 1.5 },
   input: {
@@ -238,4 +242,5 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   deleteButtonText: { color: colors.danger, fontSize: 14, fontWeight: '700' },
-});
+  });
+}

@@ -1,5 +1,5 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -33,12 +33,15 @@ import {
   type PredictionRecipient,
 } from '../../../lib/predictions';
 import { supabase } from '../../../lib/supabase';
-import { colors, eyebrow, fonts, radius, spacing } from '../../../lib/theme';
+import { eyebrow, fonts, radius, spacing, type Colors } from '../../../lib/theme';
+import { useColors } from '../../../lib/themeMode';
 
 export default function PredictionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuth();
   const router = useRouter();
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const userId = session?.user.id;
 
   const [prediction, setPrediction] = useState<PredictionFeedItem | null>(null);
@@ -434,7 +437,8 @@ export default function PredictionDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
@@ -454,7 +458,7 @@ const styles = StyleSheet.create({
   headerSpacer: { width: 56 },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   loader: { marginTop: 24 },
-  eyebrow: { ...eyebrow },
+  eyebrow: { ...eyebrow(colors) },
   authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginBottom: 12 },
   authorName: { fontFamily: fonts.bodyEmphasis, fontSize: 16, color: colors.icon },
   // La catégorie n'apparaît plus sur la carte du Fil — seulement ici, une
@@ -570,4 +574,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: spacing.md,
   },
-});
+  });
+}

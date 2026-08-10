@@ -1,6 +1,6 @@
 import { useNavigation, useRouter } from 'expo-router';
 import { Check } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -39,7 +39,8 @@ import {
   type PredictionCategory,
   type PredictionScope,
 } from '../../lib/predictions';
-import { colors, fonts, radius, spacing } from '../../lib/theme';
+import { fonts, radius, spacing, type Colors } from '../../lib/theme';
+import { useColors } from '../../lib/themeMode';
 
 type ContentMode = 'text' | 'audio';
 /** `scheduled` (« Programmée ») : date fixée par l'auteur. `open_ended`
@@ -70,6 +71,8 @@ export default function NewPredictionScreen() {
   const { session, defaultScope } = useAuth();
   const router = useRouter();
   const navigation = useNavigation();
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const userId = session?.user.id;
 
   const [teaser, setTeaser] = useState('');
@@ -587,7 +590,8 @@ export default function NewPredictionScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
   header: {
@@ -698,4 +702,5 @@ const styles = StyleSheet.create({
   submitPressed: { backgroundColor: colors.goldBright },
   submitDisabled: { opacity: 0.6 },
   submitText: { color: colors.textOnGold, fontSize: 16, fontWeight: '700' },
-});
+  });
+}
