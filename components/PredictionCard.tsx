@@ -47,6 +47,26 @@ const EMOJI_ROWS = Math.ceil(EMOJI_REACTIONS.length / EMOJI_COLUMNS);
 const SEALED_CONTENT_PLACEHOLDER =
   'Un secret bien gardé jusqu’à la date de révélation, connu de son seul auteur pour l’instant.';
 
+/** Durée d'une pulsation du glow de renforcement (Réalisé) : moitié montée,
+ * moitié descente. Deux pulsations dos à dos = `GLOW_PULSE_TOTAL_MS`. */
+const GLOW_PULSE_CYCLE_MS = 750;
+const GLOW_PULSE_TOTAL_MS = GLOW_PULSE_CYCLE_MS * 2;
+
+function easeInOutQuad(t: number): number {
+  return t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2;
+}
+
+/** `shadow*` est déprécié (avertissement React Native) au profit de
+ * `boxShadow`, qui attend une couleur `rgba()` plutôt qu'un hex + une
+ * opacité séparée — nécessaire ici puisque l'opacité varie pendant la
+ * pulsation. */
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 /**
  * Carte d'une prédiction, partagée entre les onglets À venir et Passées du
  * Fil. Toujours dépliée (teaser, puis contenu une fois révélé) ; un tap sur
@@ -133,6 +153,21 @@ export function PredictionCard({
 
   const verdict = localVerdict ?? (revealed && item.final_status !== 'pending' ? item.final_status : null);
 
+  // Verrou posé seulement au premier vrai tick de l'animation (pas à la
+  // programmation du premier `requestAnimationFrame`) : en développement,
+  // React invoque un effet une fois « pour de faux » puis le nettoie avant
+  // même la prochaine frame — verrouiller trop tôt éteindrait l'animation
+  // avant qu'elle n'ait joué une seule frame.
+  const hasAnimatedGlowRef = useRef(false);
+  // 0 = état neutre (glow standard) ; 1 = pic d'intensité pendant une
+  // pulsation. Piloté par `requestAnimationFrame` plutôt que par `Animated` :
+  // `shadowOpacity`/`shadowRadius` se combinent en un seul `box-shadow` CSS
+  // sur le web, une composition que `Animated` ne recalcule pas à chaque
+  // frame — seul un nombre simple, posé via `useState`, s'y reflète correctement.
+  const [glowIntensity, setGlowIntensity] = useState(0);
+  const glowShadowOpacity = 0.55 + glowIntensity * (0.85 - 0.55);
+  const glowShadowRadius = 14 + glowIntensity * (22 - 14);
+
   /** Les 4 états visuels de la carte — un contour néon dédié (voir `styles`)
    * à tous, mais un libellé en haut à droite seulement pour Scellé/En cours :
    * une fois le verdict affirmé, le tampon en dessous porte seul la réponse,
@@ -154,6 +189,44 @@ export function PredictionCard({
       cancelled = true;
     };
   }, [item.id]);
+
+  /** Renforcement visuel du passage à Réalisé : deux pulsations du glow vert
+   * (0,75 s chacune, 1,5 s au total), jouées une seule fois par utilisateur
+   * — auteur compris — puis jamais rejouées, y compris après un rechargement
+   * (persistance via `verdict_seen`, voir lib/predictions.ts). */
+  useEffect(() => {
+    if (cardState.kind !== 'realized' || item.is_verdict_seen || hasAnimatedGlowRef.current) return;
+    let cancelled = false;
+    let frameId: ReturnType<typeof requestAnimationFrame> | undefined;
+    const start = Date.now();
+    const tick = () => {
+      if (cancelled) return;
+      // Posé ici, à la première frame qui joue réellement — jamais avant de
+      // programmer la frame — pour ne pas verrouiller une animation que
+      // React aurait immédiatement nettoyée sans qu'elle n'ait rien joué.
+      if (!hasAnimatedGlowRef.current) {
+        hasAnimatedGlowRef.current = true;
+        setPredictionUserState(item.id, userId, { verdictSeen: true });
+      }
+      const elapsed = Date.now() - start;
+      if (elapsed >= GLOW_PULSE_TOTAL_MS) {
+        setGlowIntensity(0);
+        return;
+      }
+      const cyclePos = elapsed % GLOW_PULSE_CYCLE_MS;
+      const half = GLOW_PULSE_CYCLE_MS / 2;
+      const rising = cyclePos < half;
+      const localT = (rising ? cyclePos : cyclePos - half) / half;
+      const eased = easeInOutQuad(localT);
+      setGlowIntensity(rising ? eased : 1 - eased);
+      frameId = requestAnimationFrame(tick);
+    };
+    frameId = requestAnimationFrame(tick);
+    return () => {
+      cancelled = true;
+      if (frameId !== undefined) cancelAnimationFrame(frameId);
+    };
+  }, [cardState.kind, item.id, item.is_verdict_seen, userId]);
 
   function handleDeletePress() {
     const message =
@@ -399,7 +472,16 @@ export function PredictionCard({
         styles.card,
         cardState.kind === 'sealed' && styles.cardSealed,
         cardState.kind === 'active' && styles.cardActive,
-        cardState.kind === 'realized' && styles.cardRealized,
+        cardState.kind === 'realized' && styles.cardRealizedBorder,
+        // `boxShadow` plutôt que `shadow*` (déprécié) : seule cette forme
+        // recompose correctement un glow dont l'opacité et le rayon varient
+        // à chaque frame de la pulsation (`glowIntensity`, piloté par
+        // `requestAnimationFrame` — voir plus haut).
+        cardState.kind === 'realized' && {
+          boxShadow: [
+            { offsetX: 0, offsetY: 0, color: hexToRgba(colors.neonGreen, glowShadowOpacity), blurRadius: glowShadowRadius },
+          ],
+        },
         cardState.kind === 'missed' && styles.cardMissed,
         unseen && styles.cardUnseen,
       ]}
@@ -733,11 +815,12 @@ function createStyles(colors: Colors) {
   cardActive: {
     borderColor: colors.cardBorderNeutral,
   },
-  // Réalisé : contour doré, sans glow (contrairement à l'ancien contour
-  // vert qu'il remplaçait) — plus de tampon ni de motif en dessous, le
-  // contour porte seul la signalétique du verdict.
-  cardRealized: {
-    borderColor: colors.gold,
+  // Réalisé : bordure verte néon — la lueur (shadow*) est appliquée à part,
+  // dans le composant, colocalisée avec les valeurs animées de la pulsation
+  // de renforcement (react-native-web recompose mal un `box-shadow` dont
+  // les quatre propriétés viendraient de deux styles différents).
+  cardRealizedBorder: {
+    borderColor: colors.neonGreen,
   },
   // Manqué, l'élément clé du site, garde son contour néon + lueur externe
   // (`shadow*` — se traduit en `box-shadow` sur le web, `elevation` sur

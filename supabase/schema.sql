@@ -3686,7 +3686,92 @@ left join public.prediction_contents pc on pc.prediction_id = p.id;
 grant select on public.predictions_feed to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 40. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 40. Première vue de l'animation de renforcement du verdict Réalisé
+-- ---------------------------------------------------------------------------
+--
+-- Marque, par destinataire (auteur inclus), que l'animation de pulsation
+-- verte jouée à la première vue d'un Predict Réalisé a déjà eu lieu — sans
+-- cette colonne, rouvrir le Fil ou recharger l'app la rejouerait à chaque
+-- fois plutôt qu'une seule fois dans la vie du Predict pour cet utilisateur.
+alter table public.prediction_user_state add column if not exists verdict_seen boolean not null default false;
+
+-- `predictions_feed` reprend sa définition de la section 39 et ajoute
+-- `is_verdict_seen`.
+drop view if exists public.predictions_feed;
+
+create view public.predictions_feed
+with (security_invoker = true) as
+select
+  p.id,
+  p.author_id,
+  p.teaser,
+  pc.content,
+  pc.audio_path,
+  p.reveal_at,
+  p.scope,
+  p.open_ended,
+  p.is_immediate,
+  p.category,
+  p.mentioned_user_ids,
+  p.created_at,
+  p.verdict_set_at,
+  (p.reveal_at <= now()) as is_revealed,
+  case
+    when p.reveal_at > now() then 'pending'
+    when p.author_verdict is not null then p.author_verdict
+    else 'pending'
+  end as final_status,
+  coalesce(
+    (
+      select us.favorite from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_favorite,
+  coalesce(
+    (
+      select us.hidden from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_hidden,
+  coalesce(
+    (
+      select us.seen from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_seen,
+  coalesce(
+    (
+      select us.verdict_seen from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_verdict_seen,
+  coalesce(
+    (
+      select jsonb_object_agg(counts.emoji, counts.total)
+      from (
+        select emoji, count(*) as total
+        from public.prediction_emoji_reactions er
+        where er.prediction_id = p.id
+        group by emoji
+      ) counts
+    ),
+    '{}'::jsonb
+  ) as emoji_counts,
+  (
+    select er2.emoji from public.prediction_emoji_reactions er2
+    where er2.prediction_id = p.id and er2.user_id = auth.uid()
+  ) as my_emoji_reaction
+from public.predictions p
+left join public.prediction_contents pc on pc.prediction_id = p.id;
+
+grant select on public.predictions_feed to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 41. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une
