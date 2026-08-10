@@ -23,6 +23,7 @@ import {
   fetchEmojiReactors,
   isRevealed,
   removeEmojiReaction,
+  revealPredictionNow,
   setPredictionUserState,
   setPredictionVerdict,
   type EmojiReaction,
@@ -62,6 +63,14 @@ const STAMP_FAIL_DATE_TOP_FRACTION = 0.665;
 /** Légère rotation du tampon « ENCORE RAISON », façon coup de tampon donné
  * à la main plutôt que parfaitement aligné. */
 const STAMP_REALIZED_ROTATION_DEG = 10;
+/** Silhouette affichée à la place du contenu pour un destinataire, avant
+ * révélation — la RLS ne lui donne aucun `content` à cet endroit (voir plus
+ * bas), donc rien de réel à flouter. Un texte de longueur plausible plutôt
+ * que des barres pleines : rendu avec le même style que `cardContent` et le
+ * même flou, il se fond visuellement dans le même traitement que le vrai
+ * texte flouté vu par l'auteur, au lieu de lire comme un composant à part. */
+const SEALED_CONTENT_PLACEHOLDER =
+  'Un secret bien gardé jusqu’à la date de révélation, connu de son seul auteur pour l’instant.';
 
 /**
  * Carte d'une prédiction, partagée entre les onglets À venir et Passées du
@@ -140,7 +149,14 @@ export function PredictionCard({
   const [localVerdictSetAt, setLocalVerdictSetAt] = useState<Date | null>(null);
   const [verdictPending, setVerdictPending] = useState(false);
   const [verdictError, setVerdictError] = useState<string | null>(null);
-  const revealed = isRevealed(item, now);
+  // Écho optimiste de `revealPredictionNow` : une fois l'appel réussi, la
+  // carte doit basculer en « En cours » sans attendre le prochain
+  // chargement du fil, où `item.reveal_at` (encore dans le futur côté props)
+  // continuerait sinon de la montrer scellée.
+  const [localRevealed, setLocalRevealed] = useState(false);
+  const [revealPending, setRevealPending] = useState(false);
+  const [revealError, setRevealError] = useState<string | null>(null);
+  const revealed = localRevealed || isRevealed(item, now);
   const isAuthor = item.author_id === userId;
 
   const verdict = localVerdict ?? (revealed && item.final_status !== 'pending' ? item.final_status : null);
@@ -185,6 +201,37 @@ export function PredictionCard({
     Alert.alert('Supprimer ce Predict ?', message, [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Supprimer', style: 'destructive', onPress: () => onDelete?.() },
+    ]);
+  }
+
+  /** Réservée à l'auteur d'une carte encore Scellée — rend visible qu'un
+   * Predict attend sa révélation plutôt que de laisser deviner s'il y a
+   * simplement une date programmée. Irréversible (la RLS de
+   * `reveal_prediction_now` refuse tout appel une fois déjà révélée), donc
+   * confirmée avant d'agir, comme la suppression. */
+  function handleRevealNow() {
+    const message =
+      'Le contenu deviendra visible pour tes destinataires et le verdict pourra être donné. Cette action est irréversible.';
+
+    const run = async () => {
+      setRevealError(null);
+      setRevealPending(true);
+      const { error } = await revealPredictionNow(item.id);
+      setRevealPending(false);
+      if (error) {
+        setRevealError('Révélation impossible.');
+        return;
+      }
+      setLocalRevealed(true);
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Révéler ce Predict maintenant ?\n\n${message}`)) run();
+      return;
+    }
+    Alert.alert('Révéler ce Predict maintenant ?', message, [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Révéler', style: 'destructive', onPress: run },
     ]);
   }
 
@@ -402,6 +449,24 @@ export function PredictionCard({
         </View>
       )}
 
+      {/* Sous l'étiquette, jamais dans la zone tappable (`onPress` de la
+          `Pressable` qui suit) : rend visible qu'un Predict Scellé attend sa
+          révélation, plutôt que de laisser deviner s'il y a simplement une
+          date programmée — réservé à l'auteur, seul habilité par la RLS de
+          `reveal_prediction_now`. */}
+      {isAuthor && cardState.kind === 'sealed' && (
+        <View style={styles.revealRow}>
+          <Pressable
+            onPress={handleRevealNow}
+            disabled={revealPending}
+            style={({ pressed }) => [styles.revealButton, pressed && styles.revealButtonPressed]}
+          >
+            <Text style={styles.revealButtonText}>{revealPending ? 'Révélation…' : 'Révéler'}</Text>
+          </Pressable>
+          {revealError && <Text style={styles.revealErrorText}>{revealError}</Text>}
+        </View>
+      )}
+
       {/* Invite l'auteur à trancher dès que sa prédiction est révélée mais
           encore en attente de verdict — nulle part ailleurs que sur sa propre
           carte, en dehors de la zone tappable (`onPress` navigue vers le
@@ -474,27 +539,17 @@ export function PredictionCard({
 
           <Text style={styles.cardTeaser}>{item.teaser}</Text>
 
-          {/* Le contenu (la vraie prédiction, derrière la promesse du
-              teaser) reste toujours affiché, mais flouté tant que non
-              révélée — le texte reste bien là (jamais remplacé par un
-              faux contenu), juste illisible, jusqu'à la date. La RLS ne
-              renvoie `content` que si révélée ou si on en est l'auteur :
-              seul l'auteur a donc un vrai texte à flouter avant révélation. */}
-          {item.content ? (
-            <Text style={[styles.cardContent, !revealed && styles.cardContentBlurred]}>
-              {item.content}
+          {/* La RLS ne renvoie `content` que si révélée ou si on en est
+              l'auteur — l'auteur voit donc toujours son propre texte en
+              clair, jamais flouté, y compris avant révélation (le bouton
+              Révéler ci-dessus fait déjà ce travail de signal). Sans lui
+              (destinataire, avant révélation), `SEALED_CONTENT_PLACEHOLDER`
+              prend la même place, floutée : jamais du vrai texte, juste sa
+              silhouette. */}
+          {(item.content || !revealed) && (
+            <Text style={[styles.cardContent, !item.content && styles.cardContentBlurred]}>
+              {item.content ?? SEALED_CONTENT_PLACEHOLDER}
             </Text>
-          ) : (
-            /* Sans contenu à flouter (destinataire, avant révélation — RLS
-               ne le lui donne pas), un simulacre de lignes de texte floutées
-               garde la carte visuellement cohérente avec celle de l'auteur :
-               jamais du vrai texte, juste sa silhouette. */
-            !revealed && (
-              <View style={[styles.cardContentPlaceholder, styles.cardContentBlurred]}>
-                <View style={[styles.cardContentPlaceholderLine, styles.cardContentPlaceholderLineW1]} />
-                <View style={[styles.cardContentPlaceholderLine, styles.cardContentPlaceholderLineW2]} />
-              </View>
-            )
           )}
 
           {/* Le tampon certifie le verdict sous la prédiction, dans le flux
@@ -786,6 +841,21 @@ const styles = StyleSheet.create({
   // rendu séparément avant ce conteneur et donc toujours à `opacity: 1`.
   cardBodyMissed: { opacity: 0.85 },
   headerMenuButton: { padding: 2 },
+  // Bouton « Révéler », sous l'étiquette « Scellé » — même registre que les
+  // boutons Réalisé/Manqué proposés plus bas (contour fin, pas un aplat),
+  // en jaune plutôt qu'en vert/rouge puisque rien n'est encore tranché.
+  revealRow: { alignItems: 'flex-end', marginBottom: 10 },
+  revealButton: {
+    borderWidth: 1,
+    borderColor: colors.gold,
+    borderRadius: radius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: colors.goldSoft,
+  },
+  revealButtonPressed: { opacity: 0.7 },
+  revealButtonText: { fontFamily: fonts.label, fontSize: 12, fontWeight: '700', color: colors.gold },
+  revealErrorText: { fontSize: 11, color: colors.danger, marginTop: 6, textAlign: 'right' },
   // Invite l'auteur à trancher — au-dessus de la carte tappable, jamais
   // dedans, pour qu'un tap sur un bouton ne navigue jamais aussi vers le
   // détail (`onPress` de la `Pressable` qui suit). Rien que les deux
@@ -920,12 +990,6 @@ const styles = StyleSheet.create({
     web: { filter: 'blur(5px)' } as object,
     default: { opacity: 0.15 },
   }),
-  // Silhouette de texte pour les destinataires avant révélation — même
-  // rythme visuel que `cardContent`, sans jamais en être un aperçu réel.
-  cardContentPlaceholder: { marginTop: 2, gap: 6 },
-  cardContentPlaceholderLine: { height: 16, borderRadius: 4, backgroundColor: colors.surfaceRaised },
-  cardContentPlaceholderLineW1: { width: '88%' },
-  cardContentPlaceholderLineW2: { width: '62%' },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
