@@ -99,6 +99,9 @@ export type PredictionFeedItem = {
   /** Posée au premier tap sur la carte — sert au badge de compteur des
    * onglets et au surlignage des cartes non lues. */
   is_seen: boolean;
+  /** Posée après la première apparition de l'animation de pulsation verte
+   * du verdict Réalisé, pour cet utilisateur — ne rejoue jamais deux fois. */
+  is_verdict_seen: boolean;
   /** `{ '👍': 2, '❤️': 1, ... }` — absent des clés sans aucune réaction. */
   emoji_counts: Partial<Record<EmojiReaction, number>>;
   my_emoji_reaction: EmojiReaction | null;
@@ -176,8 +179,8 @@ export function predictionErrorMessage(error: PostgrestError): string {
  */
 const FEED_COLUMNS =
   'id, author_id, teaser, content, audio_path, reveal_at, scope, open_ended, is_immediate, category, created_at, ' +
-  'is_revealed, final_status, verdict_set_at, is_favorite, is_hidden, is_seen, emoji_counts, my_emoji_reaction, ' +
-  'mentioned_user_ids';
+  'is_revealed, final_status, verdict_set_at, is_favorite, is_hidden, is_seen, is_verdict_seen, emoji_counts, ' +
+  'my_emoji_reaction, mentioned_user_ids';
 
 export async function fetchPredictionsFeed() {
   return supabase
@@ -307,20 +310,26 @@ export async function revealPredictionNow(predictionId: string) {
 }
 
 /**
- * Favori/masqué : une préférence propre à l'appelant, jamais partagée.
+ * Favori/masqué/vu : une préférence propre à l'appelant, jamais partagée.
  * `upsert` plutôt qu'un `update` : la ligne peut ne pas exister encore (aucune
  * préférence posée jusque-là) — `onConflict` bascule alors en update sans
- * écraser l'autre champ (`favorite` ou `hidden`) que celui qu'on modifie.
+ * écraser les autres champs que celui qu'on modifie.
  */
 export async function setPredictionUserState(
   predictionId: string,
   userId: string,
-  patch: { favorite?: boolean; hidden?: boolean; seen?: boolean }
+  patch: { favorite?: boolean; hidden?: boolean; seen?: boolean; verdictSeen?: boolean }
 ) {
+  const { verdictSeen, ...rest } = patch;
   return supabase
     .from('prediction_user_state')
     .upsert(
-      { prediction_id: predictionId, user_id: userId, ...patch },
+      {
+        prediction_id: predictionId,
+        user_id: userId,
+        ...rest,
+        ...(verdictSeen !== undefined ? { verdict_seen: verdictSeen } : {}),
+      },
       { onConflict: 'prediction_id,user_id' }
     );
 }

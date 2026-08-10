@@ -5,7 +5,6 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  Image,
   Modal,
   PanResponder,
   Platform,
@@ -16,7 +15,6 @@ import {
 import { Text } from './Text';
 
 import { fetchCommentCount } from '../lib/comments';
-import { formatStampDate } from '../lib/datetime';
 import {
   castEmojiReaction,
   EMOJI_REACTIONS,
@@ -40,19 +38,6 @@ const EMOJI_PANEL_WIDTH = 272;
 /** 12 réactions sur 2 rangées de 6 plutôt qu'une seule rangée trop dense. */
 const EMOJI_COLUMNS = 6;
 const EMOJI_ROWS = Math.ceil(EMOJI_REACTIONS.length / EMOJI_COLUMNS);
-/** Sceau de cire photoréaliste, texte « ENCORE RAISON » gravé dans la cire
- * elle-même — contrairement à l'ancien tampon encre-sur-papier, la date n'a
- * plus de zone dédiée dans l'artwork : elle s'affiche en légende sous le
- * sceau plutôt que superposée par-dessus (voir `verdictStampRealizedDate`). */
-const STAMP_IMAGE = require('../assets/images/stamp-encore-raison.png');
-/** Même principe pour le verdict manqué (« RATÉ »). */
-const STAMP_FAIL_IMAGE = require('../assets/images/stamp-fail.png');
-/** Diamètre d'affichage des deux tampons — identique pour les deux verdicts,
- * largeur et hauteur égales pour rester un cercle parfait. */
-const STAMP_DIAMETER = 96;
-/** Légère rotation du sceau « ENCORE RAISON », façon coup de tampon donné à
- * la main plutôt que parfaitement aligné. */
-const STAMP_REALIZED_ROTATION_DEG = 10;
 /** Silhouette affichée à la place du contenu pour un destinataire, avant
  * révélation — la RLS ne lui donne aucun `content` à cet endroit (voir plus
  * bas), donc rien de réel à flouter. Un texte de longueur plausible plutôt
@@ -61,6 +46,26 @@ const STAMP_REALIZED_ROTATION_DEG = 10;
  * texte flouté vu par l'auteur, au lieu de lire comme un composant à part. */
 const SEALED_CONTENT_PLACEHOLDER =
   'Un secret bien gardé jusqu’à la date de révélation, connu de son seul auteur pour l’instant.';
+
+/** Durée d'une pulsation du glow de renforcement (Réalisé) : moitié montée,
+ * moitié descente. Deux pulsations dos à dos = `GLOW_PULSE_TOTAL_MS`. */
+const GLOW_PULSE_CYCLE_MS = 750;
+const GLOW_PULSE_TOTAL_MS = GLOW_PULSE_CYCLE_MS * 2;
+
+function easeInOutQuad(t: number): number {
+  return t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2;
+}
+
+/** `shadow*` est déprécié (avertissement React Native) au profit de
+ * `boxShadow`, qui attend une couleur `rgba()` plutôt qu'un hex + une
+ * opacité séparée — nécessaire ici puisque l'opacité varie pendant la
+ * pulsation. */
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 /**
  * Carte d'une prédiction, partagée entre les onglets À venir et Passées du
@@ -134,11 +139,6 @@ export function PredictionCard({
   // trop lent. `null` tant que l'auteur n'a rien affirmé pendant cette
   // session — la valeur posée en base fait foi dès le rechargement suivant.
   const [localVerdict, setLocalVerdict] = useState<'realized' | 'missed' | null>(null);
-  // Écho optimiste de la date du Sceau d'Orgueil, posée en même temps que
-  // `localVerdict` — sans lui, le tampon afficherait `item.verdict_set_at`
-  // (encore `null` avant le prochain chargement du fil) au lieu du jour où
-  // l'auteur vient tout juste d'affirmer son verdict.
-  const [localVerdictSetAt, setLocalVerdictSetAt] = useState<Date | null>(null);
   const [verdictPending, setVerdictPending] = useState(false);
   const [verdictError, setVerdictError] = useState<string | null>(null);
   // Écho optimiste de `revealPredictionNow` : une fois l'appel réussi, la
@@ -152,8 +152,21 @@ export function PredictionCard({
   const isAuthor = item.author_id === userId;
 
   const verdict = localVerdict ?? (revealed && item.final_status !== 'pending' ? item.final_status : null);
-  const verdictSetAt =
-    localVerdictSetAt ?? (item.verdict_set_at ? new Date(item.verdict_set_at) : new Date(item.reveal_at));
+
+  // Verrou posé seulement au premier vrai tick de l'animation (pas à la
+  // programmation du premier `requestAnimationFrame`) : en développement,
+  // React invoque un effet une fois « pour de faux » puis le nettoie avant
+  // même la prochaine frame — verrouiller trop tôt éteindrait l'animation
+  // avant qu'elle n'ait joué une seule frame.
+  const hasAnimatedGlowRef = useRef(false);
+  // 0 = état neutre (glow standard) ; 1 = pic d'intensité pendant une
+  // pulsation. Piloté par `requestAnimationFrame` plutôt que par `Animated` :
+  // `shadowOpacity`/`shadowRadius` se combinent en un seul `box-shadow` CSS
+  // sur le web, une composition que `Animated` ne recalcule pas à chaque
+  // frame — seul un nombre simple, posé via `useState`, s'y reflète correctement.
+  const [glowIntensity, setGlowIntensity] = useState(0);
+  const glowShadowOpacity = 0.55 + glowIntensity * (0.85 - 0.55);
+  const glowShadowRadius = 14 + glowIntensity * (22 - 14);
 
   /** Les 4 états visuels de la carte — un contour néon dédié (voir `styles`)
    * à tous, mais un libellé en haut à droite seulement pour Scellé/En cours :
@@ -176,6 +189,44 @@ export function PredictionCard({
       cancelled = true;
     };
   }, [item.id]);
+
+  /** Renforcement visuel du passage à Réalisé : deux pulsations du glow vert
+   * (0,75 s chacune, 1,5 s au total), jouées une seule fois par utilisateur
+   * — auteur compris — puis jamais rejouées, y compris après un rechargement
+   * (persistance via `verdict_seen`, voir lib/predictions.ts). */
+  useEffect(() => {
+    if (cardState.kind !== 'realized' || item.is_verdict_seen || hasAnimatedGlowRef.current) return;
+    let cancelled = false;
+    let frameId: ReturnType<typeof requestAnimationFrame> | undefined;
+    const start = Date.now();
+    const tick = () => {
+      if (cancelled) return;
+      // Posé ici, à la première frame qui joue réellement — jamais avant de
+      // programmer la frame — pour ne pas verrouiller une animation que
+      // React aurait immédiatement nettoyée sans qu'elle n'ait rien joué.
+      if (!hasAnimatedGlowRef.current) {
+        hasAnimatedGlowRef.current = true;
+        setPredictionUserState(item.id, userId, { verdictSeen: true });
+      }
+      const elapsed = Date.now() - start;
+      if (elapsed >= GLOW_PULSE_TOTAL_MS) {
+        setGlowIntensity(0);
+        return;
+      }
+      const cyclePos = elapsed % GLOW_PULSE_CYCLE_MS;
+      const half = GLOW_PULSE_CYCLE_MS / 2;
+      const rising = cyclePos < half;
+      const localT = (rising ? cyclePos : cyclePos - half) / half;
+      const eased = easeInOutQuad(localT);
+      setGlowIntensity(rising ? eased : 1 - eased);
+      frameId = requestAnimationFrame(tick);
+    };
+    frameId = requestAnimationFrame(tick);
+    return () => {
+      cancelled = true;
+      if (frameId !== undefined) cancelAnimationFrame(frameId);
+    };
+  }, [cardState.kind, item.id, item.is_verdict_seen, userId]);
 
   function handleDeletePress() {
     const message =
@@ -257,12 +308,10 @@ export function PredictionCard({
     setVerdictPending(true);
     setVerdictError(null);
     setLocalVerdict(next);
-    setLocalVerdictSetAt(new Date());
     const { error } = await setPredictionVerdict(item.id, next);
     setVerdictPending(false);
     if (error) {
       setLocalVerdict(null);
-      setLocalVerdictSetAt(null);
       setVerdictError('Action impossible.');
       return;
     }
@@ -423,7 +472,16 @@ export function PredictionCard({
         styles.card,
         cardState.kind === 'sealed' && styles.cardSealed,
         cardState.kind === 'active' && styles.cardActive,
-        cardState.kind === 'realized' && styles.cardRealized,
+        cardState.kind === 'realized' && styles.cardRealizedBorder,
+        // `boxShadow` plutôt que `shadow*` (déprécié) : seule cette forme
+        // recompose correctement un glow dont l'opacité et le rayon varient
+        // à chaque frame de la pulsation (`glowIntensity`, piloté par
+        // `requestAnimationFrame` — voir plus haut).
+        cardState.kind === 'realized' && {
+          boxShadow: [
+            { offsetX: 0, offsetY: 0, color: hexToRgba(colors.neonGreen, glowShadowOpacity), blurRadius: glowShadowRadius },
+          ],
+        },
         cardState.kind === 'missed' && styles.cardMissed,
         unseen && styles.cardUnseen,
       ]}
@@ -544,29 +602,6 @@ export function PredictionCard({
             </Text>
           )}
 
-          {/* Le sceau certifie le verdict sous la prédiction, dans le flux
-              normal (jamais en surimpression du texte), pour ne jamais gêner
-              la lecture du contenu au-dessus. Sceau de cire photoréaliste
-              pour les deux verdicts, même diamètre ; la date n'est plus
-              gravée dans l'artwork (contrairement à l'ancien tampon
-              encre-sur-papier) donc s'affiche en légende dessous plutôt que
-              superposée par-dessus. Seul « ENCORE RAISON » est légèrement
-              pivoté, façon coup de tampon donné à la main — la légende, elle,
-              reste toujours droite pour rester lisible. */}
-          {verdict === 'realized' && (
-            <View style={styles.verdictStamp}>
-              <View style={styles.verdictStampRealizedImageWrap}>
-                <Image source={STAMP_IMAGE} style={styles.verdictStampImage} resizeMode="contain" />
-              </View>
-              <Text style={styles.verdictStampDate}>{formatStampDate(verdictSetAt)}</Text>
-            </View>
-          )}
-          {verdict === 'missed' && (
-            <View style={styles.verdictStamp}>
-              <Image source={STAMP_FAIL_IMAGE} style={styles.verdictStampImage} resizeMode="contain" />
-              <Text style={styles.verdictStampDate}>{formatStampDate(verdictSetAt)}</Text>
-            </View>
-          )}
         </View>
       </Pressable>
 
@@ -780,11 +815,12 @@ function createStyles(colors: Colors) {
   cardActive: {
     borderColor: colors.cardBorderNeutral,
   },
-  // Réalisé : contour doré, sans glow (contrairement à l'ancien contour
-  // vert qu'il remplaçait) — le tampon (rendu plus bas) porte le détail du
-  // verdict, ce contour attire l'œil sur la carte elle-même.
-  cardRealized: {
-    borderColor: colors.gold,
+  // Réalisé : bordure verte néon — la lueur (shadow*) est appliquée à part,
+  // dans le composant, colocalisée avec les valeurs animées de la pulsation
+  // de renforcement (react-native-web recompose mal un `box-shadow` dont
+  // les quatre propriétés viendraient de deux styles différents).
+  cardRealizedBorder: {
+    borderColor: colors.neonGreen,
   },
   // Manqué, l'élément clé du site, garde son contour néon + lueur externe
   // (`shadow*` — se traduit en `box-shadow` sur le web, `elevation` sur
@@ -863,27 +899,6 @@ function createStyles(colors: Colors) {
   },
   verdictPromptButtonText: { fontFamily: fonts.label, fontSize: 12, fontWeight: '700', color: colors.text },
   verdictPromptError: { fontSize: 11, color: colors.danger, marginTop: 6, textAlign: 'right' },
-  // Sceau de cire (« ENCORE RAISON » / « RATÉ ») : artwork photoréaliste,
-  // détouré en transparence — s'affiche directement sur la carte sombre,
-  // sans disque de fond (contrairement à l'ancien tampon encre-sur-papier,
-  // qui en avait besoin pour rester lisible). Toujours dans le flux normal,
-  // aligné à droite, jamais en surimpression du texte de la prédiction.
-  verdictStamp: { alignSelf: 'flex-end', alignItems: 'center', marginTop: 8 },
-  verdictStampImage: { width: STAMP_DIAMETER, height: STAMP_DIAMETER },
-  // Seul « ENCORE RAISON » est légèrement pivoté, façon coup de tampon donné
-  // à la main — isolé dans son propre conteneur pour que la légende de date
-  // sous l'image, elle, reste toujours droite.
-  verdictStampRealizedImageWrap: { transform: [{ rotate: `${STAMP_REALIZED_ROTATION_DEG}deg` }] },
-  // Sous le sceau plutôt que superposée par-dessus : l'artwork n'a plus de
-  // zone dédiée à la date (contrairement à l'ancien tampon).
-  verdictStampDate: {
-    marginTop: 4,
-    fontFamily: fonts.label,
-    fontSize: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    color: colors.textFaint,
-  },
   // Tout sur une seule ligne : [avatar 32][pseudo] ...espace flexible...
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   headerSpacer: { flex: 1, minWidth: 8 },

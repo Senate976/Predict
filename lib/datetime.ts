@@ -91,14 +91,6 @@ export function formatShortDateTime(date: Date): string {
   return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${year2} - ${toTimeInput(date)}`;
 }
 
-/** « 26 NOVEMBRE 2024 » — jour, mois en toutes lettres et année, tout en
- * majuscules : mise en forme officielle du Sceau d'Orgueil (tampon de
- * verdict), qui ne reprend ni le format `JJ/MM/AAAA` ni le jour de la
- * semaine des autres affichages. */
-export function formatStampDate(date: Date): string {
-  return `${date.getDate()} ${MONTHS[date.getMonth()].toUpperCase()} ${date.getFullYear()}`;
-}
-
 /**
  * « Prédit 4 jours à l’avance » ou, en-deçà de 24 h, « Prédit 3 heures à
  * l’avance » — l'écart entre le scellé et la révélation compterait comme
