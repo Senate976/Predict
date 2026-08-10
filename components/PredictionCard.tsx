@@ -12,7 +12,6 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
 import { Text } from './Text';
 
 import { fetchCommentCount } from '../lib/comments';
@@ -405,30 +404,6 @@ export function PredictionCard({
         unseen && styles.cardUnseen,
       ]}
     >
-      {/* Réalisé : le contour doré se prolonge en une petite couronne au
-          centre du bord supérieur — deux montants verticaux droits, puis
-          entre eux trois pointes nettes (silhouette classique de couronne,
-          pas des vagues arrondies). Prolongement direct de la bordure,
-          jamais une icône rapportée. */}
-      {cardState.kind === 'realized' && (
-        <Svg
-          style={styles.crownAccent}
-          viewBox="0 0 40 22"
-          width={40}
-          height={22}
-          pointerEvents="none"
-        >
-          <Path
-            d="M0,22 L0,14 L7,3 L13,11 L20,1 L27,11 L33,3 L40,14 L40,22"
-            stroke={colors.gold}
-            strokeWidth={1.4}
-            strokeLinecap="butt"
-            strokeLinejoin="miter"
-            fill="none"
-          />
-        </Svg>
-      )}
-
       {/* Sur sa propre ligne, au-dessus de [avatar][pseudo] plutôt qu'inline
           dans l'en-tête : le pseudo garde toute la largeur de sa ligne au
           lieu de la disputer à ce libellé. Absent pour Réalisé/Manqué — le
@@ -759,18 +734,10 @@ function createStyles(colors: Colors) {
     borderColor: colors.cardBorderNeutral,
   },
   // Réalisé : contour doré, sans glow (contrairement à l'ancien contour
-  // vert qu'il remplaçait) — la petite couronne au sommet (`crownAccent`)
-  // porte seule le supplément de signalétique, plus de tampon en dessous.
+  // vert qu'il remplaçait) — plus de tampon ni de motif en dessous, le
+  // contour porte seul la signalétique du verdict.
   cardRealized: {
     borderColor: colors.gold,
-  },
-  // Prolonge le trait du contour doré en une couronne au centre du bord
-  // supérieur — même trait, sans rupture, plutôt qu'une icône rapportée.
-  crownAccent: {
-    position: 'absolute',
-    top: -22,
-    left: '50%',
-    marginLeft: -20,
   },
   // Manqué, l'élément clé du site, garde son contour néon + lueur externe
   // (`shadow*` — se traduit en `box-shadow` sur le web, `elevation` sur
