@@ -2778,12 +2778,21 @@ grant execute on function public.create_prediction(text, text, timestamptz, text
 -- un vote par catégorie sans que l'un écrase l'autre.
 alter table public.prediction_votes add column if not exists vote_type text not null default 'outcome';
 
--- Le défaut ci-dessus classe tout en `outcome`, y compris les votes
--- believe/disbelieve déjà posés (révélations immédiates) — sans cette
--- correction, la contrainte plus bas les rejetterait aussitôt.
+-- Le défaut ci-dessus classe tout en `outcome`, y compris les votes déjà
+-- posés d'une autre catégorie — sans ce rattrapage (toutes les catégories,
+-- pas seulement believe/disbelieve), la contrainte plus bas les rejetterait
+-- aussitôt.
 update public.prediction_votes
 set vote_type = 'belief'
 where vote_value in ('believe', 'disbelieve') and vote_type = 'outcome';
+
+update public.prediction_votes
+set vote_type = 'hype'
+where vote_value in ('chaud', 'froid') and vote_type = 'outcome';
+
+update public.prediction_votes
+set vote_type = 'reputation'
+where vote_value in ('mytho', 'confiance') and vote_type = 'outcome';
 
 drop index if exists prediction_votes_unique_voter;
 create unique index if not exists prediction_votes_unique_voter
