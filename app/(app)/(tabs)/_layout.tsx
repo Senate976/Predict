@@ -153,7 +153,9 @@ function buildCradlePoints(cx: number, width: number): [number, number][] {
  * bouton central « + », qui déborde déjà au-dessus de la barre. Un seul
  * `Path`, en trait seul (`fill="none"`) — jamais de remplissage : le noir
  * sous la courbe est celui, uni, de `styles.bar.backgroundColor`, pas
- * celui de ce SVG.
+ * celui de ce SVG. Blanc plein plutôt que semi-transparent (`colors.
+ * navBarBorder`, abandonné ici) : à faible opacité sur fond noir, le trait
+ * se lit comme un gris terne plutôt qu'un blanc net.
  */
 function TabBarNotchBorder() {
   const { width } = useWindowDimensions();
@@ -163,7 +165,7 @@ function TabBarNotchBorder() {
 
   return (
     <Svg width={width} height={NOTCH_RADIUS + BUTTON_CENTER_Y + 2} style={styles.notchBorder} pointerEvents="none">
-      <Path d={d} stroke={colors.navBarBorder} strokeWidth={1.5} fill="none" />
+      <Path d={d} stroke="#FFFFFF" strokeWidth={1.5} fill="none" />
     </Svg>
   );
 }
@@ -294,6 +296,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.navBar,
     height: 64,
     paddingTop: BAR_PADDING_TOP,
+    // React Navigation pose par défaut une bordure supérieure grise unie —
+    // une vraie ligne CSS, parfaitement droite, qui coupait tout droit à
+    // travers le bouton (sans connaître la découpe du SVG posé par-dessus).
+    // Seul le trait de `TabBarNotchBorder` doit rester visible.
+    borderTopWidth: 0,
   },
   // Le canevas s'aligne pile sur le bord supérieur de la barre, sans
   // décalage : c'est depuis ce bord (Y=0) que `buildCradlePoints` calcule
