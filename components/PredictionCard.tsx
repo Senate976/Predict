@@ -39,29 +39,18 @@ const EMOJI_PANEL_WIDTH = 272;
 /** 12 réactions sur 2 rangées de 6 plutôt qu'une seule rangée trop dense. */
 const EMOJI_COLUMNS = 6;
 const EMOJI_ROWS = Math.ceil(EMOJI_REACTIONS.length / EMOJI_COLUMNS);
-/** Artwork du Sceau d'Orgueil — dérivé de la vraie photo de référence
- * (assets/images/stamp-encore-raison-source.png) par scripts/erase_stamp_date.py,
- * qui efface uniquement la date d'exemple gravée dans la source. Anneaux et
- * texte « ENCORE RAISON » restent la photo telle quelle ; seule la date, qui
- * change à chaque prédiction, est superposée dynamiquement par-dessus. */
+/** Sceau de cire photoréaliste, texte « ENCORE RAISON » gravé dans la cire
+ * elle-même — contrairement à l'ancien tampon encre-sur-papier, la date n'a
+ * plus de zone dédiée dans l'artwork : elle s'affiche en légende sous le
+ * sceau plutôt que superposée par-dessus (voir `verdictStampRealizedDate`). */
 const STAMP_IMAGE = require('../assets/images/stamp-encore-raison.png');
-/** Même principe pour le verdict manqué, à partir de la photo
- * assets/images/stamp-fail-source.png (scripts/erase_stamp_fail_date.py). */
+/** Même principe pour le verdict manqué (« RATÉ »). */
 const STAMP_FAIL_IMAGE = require('../assets/images/stamp-fail.png');
 /** Diamètre d'affichage des deux tampons — identique pour les deux verdicts,
  * largeur et hauteur égales pour rester un cercle parfait. */
 const STAMP_DIAMETER = 96;
-/** Position de la date et de son soulignement, en fraction du diamètre —
- * doit rester cohérente avec la zone effacée par scripts/erase_stamp_date.py
- * (dont ce script imprime les fractions exactes à chaque exécution). */
-const STAMP_DATE_TOP_FRACTION = 0.6;
-const STAMP_DATE_RULE_TOP_FRACTION = 0.696;
-/** Idem pour le tampon « FAIL » — voir scripts/erase_stamp_fail_date.py. Pas
- * de soulignement ici : le trait doré de cette photo est gravé au-dessus de
- * la date (pas en dessous), donc déjà présent dans l'artwork lui-même. */
-const STAMP_FAIL_DATE_TOP_FRACTION = 0.665;
-/** Légère rotation du tampon « ENCORE RAISON », façon coup de tampon donné
- * à la main plutôt que parfaitement aligné. */
+/** Légère rotation du sceau « ENCORE RAISON », façon coup de tampon donné à
+ * la main plutôt que parfaitement aligné. */
 const STAMP_REALIZED_ROTATION_DEG = 10;
 /** Silhouette affichée à la place du contenu pour un destinataire, avant
  * révélation — la RLS ne lui donne aucun `content` à cet endroit (voir plus
@@ -552,27 +541,27 @@ export function PredictionCard({
             </Text>
           )}
 
-          {/* Le tampon certifie le verdict sous la prédiction, dans le flux
-              normal (plus en position absolue par-dessus le texte), pour ne
-              jamais chevaucher ni gêner la lecture du contenu au-dessus — que
-              ce soit « ENCORE RAISON » ou « FAIL », chacun dérivé d'une vraie
-              photo de référence (scripts/erase_stamp_date.py et
-              scripts/erase_stamp_fail_date.py), seule la date de l'auteur
-              étant superposée par-dessus, la seule partie qui change d'une
-              prédiction à l'autre. Même diamètre pour les deux verdicts ;
-              seul « ENCORE RAISON » est légèrement pivoté, façon coup de
-              tampon donné à la main. */}
+          {/* Le sceau certifie le verdict sous la prédiction, dans le flux
+              normal (jamais en surimpression du texte), pour ne jamais gêner
+              la lecture du contenu au-dessus. Sceau de cire photoréaliste
+              pour les deux verdicts, même diamètre ; la date n'est plus
+              gravée dans l'artwork (contrairement à l'ancien tampon
+              encre-sur-papier) donc s'affiche en légende dessous plutôt que
+              superposée par-dessus. Seul « ENCORE RAISON » est légèrement
+              pivoté, façon coup de tampon donné à la main — la légende, elle,
+              reste toujours droite pour rester lisible. */}
           {verdict === 'realized' && (
-            <View style={styles.verdictStampRealized}>
-              <Image source={STAMP_IMAGE} style={styles.verdictStampRealizedImage} resizeMode="contain" />
-              <Text style={styles.verdictStampRealizedDate}>{formatStampDate(verdictSetAt)}</Text>
-              <View style={styles.verdictStampRealizedDateRule} />
+            <View style={styles.verdictStamp}>
+              <View style={styles.verdictStampRealizedImageWrap}>
+                <Image source={STAMP_IMAGE} style={styles.verdictStampImage} resizeMode="contain" />
+              </View>
+              <Text style={styles.verdictStampDate}>{formatStampDate(verdictSetAt)}</Text>
             </View>
           )}
           {verdict === 'missed' && (
-            <View style={styles.verdictStampFail}>
-              <Image source={STAMP_FAIL_IMAGE} style={styles.verdictStampRealizedImage} resizeMode="contain" />
-              <Text style={styles.verdictStampFailDate}>{formatStampDate(verdictSetAt)}</Text>
+            <View style={styles.verdictStamp}>
+              <Image source={STAMP_FAIL_IMAGE} style={styles.verdictStampImage} resizeMode="contain" />
+              <Text style={styles.verdictStampDate}>{formatStampDate(verdictSetAt)}</Text>
             </View>
           )}
         </View>
@@ -870,76 +859,26 @@ const styles = StyleSheet.create({
   },
   verdictPromptButtonText: { fontFamily: fonts.label, fontSize: 12, fontWeight: '700', color: colors.text },
   verdictPromptError: { fontSize: 11, color: colors.danger, marginTop: 6, textAlign: 'right' },
-  // Le Sceau d'Orgueil « ENCORE RAISON » : artwork photo (voir
-  // scripts/erase_stamp_date.py), la date de l'auteur superposée par-dessus
-  // en position absolue. Toujours dans le flux normal, aligné à droite,
-  // jamais en surimpression du texte de la prédiction — légèrement pivoté,
-  // façon coup de tampon donné à la main plutôt qu'un cercle parfaitement
-  // droit.
-  verdictStampRealized: {
-    alignSelf: 'flex-end',
-    marginTop: 8,
-    width: STAMP_DIAMETER,
-    height: STAMP_DIAMETER,
-    // L'artwork est une vraie photo d'encre sombre sur papier (détouré en
-    // transparence) — sur la carte désormais sombre, cette encre s'y fondrait
-    // sans ce disque couleur papier qui restaure le contraste d'origine.
-    borderRadius: STAMP_DIAMETER / 2,
-    backgroundColor: 'rgba(245, 242, 232, 0.94)',
-    transform: [{ rotate: `${STAMP_REALIZED_ROTATION_DEG}deg` }],
-  },
-  verdictStampRealizedImage: { width: '100%', height: '100%' },
-  // Positionnée par-dessus l'artwork, dans l'espace laissé vide sous
-  // « ENCORE RAISON » — voir `STAMP_DATE_TOP_FRACTION` et le script de
-  // génération pour la correspondance des positions.
-  verdictStampRealizedDate: {
-    position: 'absolute',
-    top: STAMP_DIAMETER * STAMP_DATE_TOP_FRACTION,
-    left: 0,
-    right: 0,
-    fontFamily: fonts.bodyEmphasis,
-    fontSize: 9,
+  // Sceau de cire (« ENCORE RAISON » / « RATÉ ») : artwork photoréaliste,
+  // détouré en transparence — s'affiche directement sur la carte sombre,
+  // sans disque de fond (contrairement à l'ancien tampon encre-sur-papier,
+  // qui en avait besoin pour rester lisible). Toujours dans le flux normal,
+  // aligné à droite, jamais en surimpression du texte de la prédiction.
+  verdictStamp: { alignSelf: 'flex-end', alignItems: 'center', marginTop: 8 },
+  verdictStampImage: { width: STAMP_DIAMETER, height: STAMP_DIAMETER },
+  // Seul « ENCORE RAISON » est légèrement pivoté, façon coup de tampon donné
+  // à la main — isolé dans son propre conteneur pour que la légende de date
+  // sous l'image, elle, reste toujours droite.
+  verdictStampRealizedImageWrap: { transform: [{ rotate: `${STAMP_REALIZED_ROTATION_DEG}deg` }] },
+  // Sous le sceau plutôt que superposée par-dessus : l'artwork n'a plus de
+  // zone dédiée à la date (contrairement à l'ancien tampon).
+  verdictStampDate: {
+    marginTop: 4,
+    fontFamily: fonts.label,
+    fontSize: 10,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    // Posée sur le disque couleur papier du tampon, pas sur la carte sombre —
-    // toujours une teinte sombre ici, jamais `text` (clair en mode sombre).
-    color: colors.textOnGold,
-    textAlign: 'center',
-  },
-  verdictStampRealizedDateRule: {
-    position: 'absolute',
-    top: STAMP_DIAMETER * STAMP_DATE_RULE_TOP_FRACTION,
-    left: '27%',
-    width: '46%',
-    height: 1,
-    backgroundColor: colors.textOnGold,
-  },
-  // Le tampon « FAIL », même gabarit (diamètre identique) mais droit, sans
-  // rotation — voir scripts/erase_stamp_fail_date.py. Le trait doré de cette
-  // photo est gravé au-dessus de la date, déjà présent dans l'artwork : pas
-  // de second soulignement dessiné par l'app ici.
-  verdictStampFail: {
-    alignSelf: 'flex-end',
-    marginTop: 8,
-    width: STAMP_DIAMETER,
-    height: STAMP_DIAMETER,
-    // Même disque couleur papier que le tampon « ENCORE RAISON » — voir ce
-    // style pour le détail.
-    borderRadius: STAMP_DIAMETER / 2,
-    backgroundColor: 'rgba(245, 242, 232, 0.94)',
-  },
-  verdictStampFailDate: {
-    position: 'absolute',
-    top: STAMP_DIAMETER * STAMP_FAIL_DATE_TOP_FRACTION,
-    left: 0,
-    right: 0,
-    fontFamily: fonts.bodyEmphasis,
-    fontSize: 9,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    // Voir `verdictStampRealizedDate` — même disque couleur papier en fond.
-    color: colors.textOnGold,
-    textAlign: 'center',
+    color: colors.textFaint,
   },
   // Tout sur une seule ligne : [avatar 32][pseudo] ...espace flexible...
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
