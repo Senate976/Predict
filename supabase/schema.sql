@@ -2924,17 +2924,10 @@ grant select on public.predictions_feed to authenticated;
 -- prédiction, jamais les deux à la fois).
 delete from public.prediction_votes where vote_value in ('chaud', 'froid', 'mytho', 'confiance');
 
-drop index if exists prediction_votes_unique_voter;
-alter table public.prediction_votes drop constraint if exists prediction_votes_vote_value_check;
-alter table public.prediction_votes drop column if exists vote_type;
-
-create unique index if not exists prediction_votes_unique_voter
-  on public.prediction_votes (prediction_id, voter_id);
-
-alter table public.prediction_votes add constraint prediction_votes_vote_value_check
-  check (vote_value in ('realized', 'missed', 'believe', 'disbelieve'));
-
--- Revient à la policy de la section 31 (avant l'exception Hype).
+-- Revient à la policy de la section 31 (avant l'exception Hype) — avant de
+-- supprimer `vote_type` plus bas, jamais après : cette policy (section 32)
+-- teste encore cette colonne, sa seule dépendante, ce qui bloquerait le
+-- `drop column`.
 drop policy if exists "prediction_votes_insert" on public.prediction_votes;
 create policy "prediction_votes_insert"
   on public.prediction_votes
@@ -2951,6 +2944,16 @@ create policy "prediction_votes_insert"
       where p.id = prediction_votes.prediction_id and p.reveal_at <= now()
     )
   );
+
+drop index if exists prediction_votes_unique_voter;
+alter table public.prediction_votes drop constraint if exists prediction_votes_vote_value_check;
+alter table public.prediction_votes drop column if exists vote_type;
+
+create unique index if not exists prediction_votes_unique_voter
+  on public.prediction_votes (prediction_id, voter_id);
+
+alter table public.prediction_votes add constraint prediction_votes_vote_value_check
+  check (vote_value in ('realized', 'missed', 'believe', 'disbelieve'));
 
 -- `predictions_feed` reprend sa définition de la section 28, sans les
 -- compteurs Hype/Réputation de la section 32.
