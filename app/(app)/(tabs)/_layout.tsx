@@ -36,11 +36,12 @@ function TabIcon({ focused, children }: { focused: boolean; children: React.Reac
 const UNREAD_POLL_MS = 20_000;
 
 /** Rayon et décalage vertical du bouton central (`centerButton` plus bas) —
- * la découpe de `TabBarNotchBorder` s'appuie sur ces mêmes valeurs plutôt
+ * la découpe de `TabBarBackground` s'appuie sur ces mêmes valeurs plutôt
  * que sur des chiffres redevinés à l'œil, pour rester cohérente si l'un des
  * deux change. */
 const CENTER_BUTTON_RADIUS = 26;
 const CENTER_BUTTON_RISE = 18;
+const BAR_HEIGHT = 64;
 /** `paddingTop` de `styles.bar` : le bouton (comme les icônes) vit dans le
  * contenu de la barre, décalé de cette marge par rapport à son bord
  * supérieur — sans elle, le centre du bouton calculé ici tombait 10px plus
@@ -52,52 +53,112 @@ const BAR_PADDING_TOP = 10;
  * bord du contenu (déjà `BAR_PADDING_TOP` sous le bord de la barre), son
  * centre tombe `CENTER_BUTTON_RISE` sous son propre rayon, plus ce padding. */
 const BUTTON_CENTER_Y = BAR_PADDING_TOP + CENTER_BUTTON_RADIUS - CENTER_BUTTON_RISE;
-/** Espace exact, en tout point, entre le trait et le bouton — jamais un
- * simple dégagement approximatif : le trait suit un arc concentrique au
- * bouton, à ce rayon en plus du sien, donc à cette distance constante de
- * son contour partout, pas seulement à son point le plus proche. */
+/** Espace exact, sous le bouton, entre son contour et le fond de la cuvette
+ * — l'arc central qui le contourne est concentrique à son cercle, à ce
+ * rayon en plus du sien, donc à cette distance constante de son contour à
+ * l'aplomb du bouton (pas nécessairement ailleurs, voir `NOTCH_FILLET_RADIUS`
+ * ci-dessous : la jonction avec la ligne droite doit rester lisse, ce
+ * qu'un simple arc concentrique ne permet pas — il croiserait la ligne à
+ * angle vif). */
 const NOTCH_GAP = 3;
 const NOTCH_RADIUS = CENTER_BUTTON_RADIUS + NOTCH_GAP;
-/** Angles (radians) où ce cercle concentrique croise la ligne Y=0 — au-delà,
- * le trait reste la ligne droite normale de la barre. `Math.asin` ne rend
- * que le quadrant [-90°, 90°] ; le second point est son symétrique par
- * rapport à l'axe vertical (180° - angle), pas son opposé. */
-const NOTCH_CROSSING_ANGLE = Math.asin(-BUTTON_CENTER_Y / NOTCH_RADIUS);
-/** Nombre de segments de l'arc — une ligne brisée assez dense pour se lire
- * comme une courbe lisse, chaque sommet calculé exactement sur le cercle
- * concentrique plutôt qu'approché par une courbe de Bézier. */
+/** Rayon des deux raccords qui relient la ligne droite de la barre à l'arc
+ * central : chaque raccord est tangent à la fois à la ligne (Y=0) et à cet
+ * arc (tangence externe, centres à distance `NOTCH_RADIUS + r`), donc sans
+ * aucun angle vif à ses deux jonctions — deux cercles tangents partagent
+ * toujours une même tangente à leur point de contact, par construction
+ * géométrique et non par approximation visuelle. Vérifié numériquement :
+ * l'angle entre segments consécutifs à chaque jonction décroît en 1/N (N =
+ * nombre de segments), signature d'une courbe réellement lisse plutôt que
+ * d'une vraie cassure qui resterait constante quel que soit N. */
+const NOTCH_FILLET_RADIUS = 8;
+/** Nombre de segments par arc — une ligne brisée assez dense pour se lire
+ * comme une courbe lisse, chaque sommet calculé exactement sur son cercle
+ * plutôt qu'approché par une courbe de Bézier. */
 const NOTCH_SEGMENTS = 24;
 
 /**
- * Trait du haut de la barre de navigation, en SVG plutôt qu'une simple
- * bordure CSS : une ligne droite aurait coupé tout droit à travers le
- * bouton central « + », qui déborde déjà au-dessus de la barre. Cette
- * découpe contourne sa silhouette par le dessous, sur un arc concentrique à
- * son cercle (même centre, rayon `NOTCH_GAP` plus grand) : la distance au
- * bouton reste donc exactement `NOTCH_GAP`, en tout point de la courbe, et
- * pas seulement à son sommet — jamais un simple rapprochement à l'œil.
+ * Points du contour supérieur de la barre, en coordonnées absolues (0..width
+ * en X, 0 à `BAR_HEIGHT` en Y) : ligne droite → raccord lisse → arc
+ * concentrique au bouton (passant par son point le plus bas) → raccord
+ * symétrique → ligne droite. Une « cuvette » à trois arcs plutôt qu'un seul
+ * arc sec : celui-ci épouserait exactement le bouton mais croiserait la
+ * ligne droite à angle vif (une sécante, jamais tangente, à une droite) —
+ * les deux raccords absorbent cette cassure en douceur, aux deux jonctions.
  */
-function TabBarNotchBorder() {
+function buildCradlePoints(cx: number, width: number): [number, number][] {
+  const r = NOTCH_FILLET_RADIUS;
+  const R = NOTCH_RADIUS;
+  const cy = BUTTON_CENTER_Y;
+
+  const dist = R + r;
+  const halfWidth = Math.sqrt(dist * dist - (cy - r) * (cy - r));
+  const tx = -halfWidth;
+  // Point de tangence commun aux deux cercles, sur le segment reliant leurs
+  // centres (le centre du raccord et celui du bouton), à distance R de ce
+  // dernier.
+  const px = (R / dist) * tx;
+  const py = cy + (R / dist) * (r - cy);
+
+  const angFlat = Math.atan2(-r, 0);
+  const angTangentFromFillet = Math.atan2(py - r, px - tx);
+
+  function arcPoints(
+    centerX: number,
+    centerY: number,
+    radius: number,
+    angFrom: number,
+    angTo: number,
+    segments: number
+  ): [number, number][] {
+    const pts: [number, number][] = [];
+    for (let i = 0; i <= segments; i++) {
+      const angle = angFrom + ((angTo - angFrom) * i) / segments;
+      pts.push([centerX + radius * Math.cos(angle), centerY + radius * Math.sin(angle)]);
+    }
+    return pts;
+  }
+
+  const leftFillet = arcPoints(tx, r, r, angFlat, angTangentFromFillet, NOTCH_SEGMENTS);
+  const angCenterLeft = Math.atan2(py - cy, px);
+  // -2π force le passage par le bas du cercle (90°) plutôt que par le haut,
+  // qui serait le chemin le plus court entre ces deux angles.
+  const angCenterRight = Math.atan2(py - cy, -px) - Math.PI * 2;
+  const bigArc = arcPoints(0, cy, R, angCenterLeft, angCenterRight, NOTCH_SEGMENTS * 2);
+  const rightFillet = leftFillet
+    .slice()
+    .reverse()
+    .map(([x, y]): [number, number] => [-x, y]);
+
+  return [
+    [0, 0],
+    ...leftFillet.map(([x, y]): [number, number] => [cx + x, y]),
+    ...bigArc.slice(1).map(([x, y]): [number, number] => [cx + x, y]),
+    ...rightFillet.slice(1).map(([x, y]): [number, number] => [cx + x, y]),
+    [width, 0],
+  ];
+}
+
+/**
+ * Fond de la barre de navigation, en SVG plutôt qu'un simple rectangle CSS :
+ * le conteneur lui-même adopte la forme en cuvette (pas seulement un trait
+ * décoratif dessus), pour qu'une éventuelle lueur appliquée à ce tracé suive
+ * fidèlement son contour plutôt que de rester bornée à un rectangle. Un
+ * premier `Path` plein assure le remplissage réel de la barre (remplace
+ * `backgroundColor` sur `styles.bar`), un second reprend le même tracé en
+ * simple trait pour la bordure supérieure.
+ */
+function TabBarBackground() {
   const { width } = useWindowDimensions();
   const cx = width / 2;
-
-  // Du point gauche (angle π - crossing) au point droit (angle crossing),
-  // en décroissant : ce sens passe par π/2 (le point le plus bas du
-  // cercle, sous le bouton) plutôt que par le haut, à l'opposé.
-  const startAngle = Math.PI - NOTCH_CROSSING_ANGLE;
-  const endAngle = NOTCH_CROSSING_ANGLE;
-  const points: string[] = [];
-  for (let i = 0; i <= NOTCH_SEGMENTS; i++) {
-    const angle = startAngle + ((endAngle - startAngle) * i) / NOTCH_SEGMENTS;
-    const x = cx + NOTCH_RADIUS * Math.cos(angle);
-    const y = BUTTON_CENTER_Y + NOTCH_RADIUS * Math.sin(angle);
-    points.push(`${x.toFixed(2)} ${y.toFixed(2)}`);
-  }
-  const d = `M 0 0 L ${points[0]} L ${points.slice(1).join(' L ')} L ${width} 0`;
+  const points = buildCradlePoints(cx, width);
+  const topD = `M ${points.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ')}`;
+  const fillD = `${topD} L ${width} ${BAR_HEIGHT} L 0 ${BAR_HEIGHT} Z`;
 
   return (
-    <Svg width={width} height={NOTCH_RADIUS + BUTTON_CENTER_Y + 2} style={styles.notchBorder} pointerEvents="none">
-      <Path d={d} stroke={colors.navBarBorder} strokeWidth={1} fill="none" />
+    <Svg width={width} height={BAR_HEIGHT} style={styles.notchBorder} pointerEvents="none">
+      <Path d={fillD} fill={colors.navBar} />
+      <Path d={topD} stroke={colors.navBarBorder} strokeWidth={1} fill="none" />
     </Svg>
   );
 }
@@ -155,7 +216,7 @@ export default function TabsLayout() {
         tabBarActiveTintColor: colors.navBarActive,
         tabBarInactiveTintColor: colors.navBarInactive,
         tabBarStyle: styles.bar,
-        tabBarBackground: () => <TabBarNotchBorder />,
+        tabBarBackground: () => <TabBarBackground />,
         tabBarShowLabel: false,
       }}
     >
@@ -223,13 +284,15 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   bar: {
-    backgroundColor: colors.navBar,
-    height: 64,
+    // Plus de `backgroundColor` ici : le fond réel est le `Path` rempli de
+    // `TabBarBackground`, seul à porter la forme en cuvette — un aplat posé
+    // en plus derrière aurait annulé l'échancrure en la recouvrant.
+    height: BAR_HEIGHT,
     paddingTop: BAR_PADDING_TOP,
   },
-  // La découpe plonge sous le bord supérieur de la barre (vers le bouton,
-  // qui déborde bien plus bas) plutôt que de dépasser par-dessus — le
-  // canevas s'aligne donc pile sur ce bord, sans décalage vers le haut.
+  // Le canevas s'aligne pile sur le bord supérieur de la barre, sans
+  // décalage : c'est depuis ce bord (Y=0) que `buildCradlePoints` calcule
+  // la cuvette.
   notchBorder: { position: 'absolute', top: 0, left: 0 },
   // Boîte de taille fixe : c'est elle qui aligne les quatre onglets entre eux.
   // Sans ça, le monogramme « P » (un glyphe texte, avec sa propre hauteur de
