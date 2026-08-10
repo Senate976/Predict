@@ -16,7 +16,7 @@ import {
 import { Text } from './Text';
 
 import { fetchCommentCount } from '../lib/comments';
-import { formatCountdown, formatStampDate, toDateInput } from '../lib/datetime';
+import { formatStampDate } from '../lib/datetime';
 import {
   castEmojiReaction,
   EMOJI_REACTIONS,
@@ -147,20 +147,16 @@ export function PredictionCard({
   const verdictSetAt =
     localVerdictSetAt ?? (item.verdict_set_at ? new Date(item.verdict_set_at) : new Date(item.reveal_at));
 
-  /** Encart d'état en coin de carte : la nature de la prédiction d'un coup
-   * d'œil, avant même de lire le teaser — mais seulement tant que le verdict
-   * n'est pas affirmé. Une fois réalisée ou manquée, le tampon apporte déjà
-   * la réponse : répéter « Réalisé »/« Manqué » ici serait redondant, donc
-   * `null` dans ces deux cas plutôt qu'un troisième et quatrième état. */
-  const statusBadge: { kind: 'sealed' | 'active'; label: string; extra?: string } | null = !revealed
-    ? {
-        kind: 'sealed',
-        label: `Scellé le ${toDateInput(new Date(item.created_at))}`,
-        extra: item.open_ended ? undefined : `Révélé ${formatCountdown(new Date(item.reveal_at), now)}`,
-      }
-    : verdict === null
-      ? { kind: 'active', label: 'Predict' }
-      : null;
+  /** Les 4 états visuels de la carte — un contour néon dédié (voir `styles`)
+   * et un libellé en haut à droite, tous deux dérivés de ce seul objet. Rien
+   * qu'un mot chacun, jamais de date accolée. */
+  const cardState: { kind: 'sealed' | 'active' | 'realized' | 'missed'; label: string } = !revealed
+    ? { kind: 'sealed', label: 'SCELLÉ' }
+    : verdict === 'realized'
+      ? { kind: 'realized', label: 'RÉALISÉ' }
+      : verdict === 'missed'
+        ? { kind: 'missed', label: 'MANQUÉ' }
+        : { kind: 'active', label: 'EN COURS' };
 
   useEffect(() => {
     let cancelled = false;
@@ -382,27 +378,35 @@ export function PredictionCard({
   ).current;
 
   return (
-    <View style={[styles.card, unseen && styles.cardUnseen]}>
-      {/* Encart flottant en coin de carte plutôt qu'inline dans l'en-tête :
-          à cette place, il ne dispute plus la largeur au pseudo, qui peut
-          désormais s'étaler sur toute la ligne. Absent une fois le verdict
-          affirmé (voir `statusBadge`) — rien à répéter, le tampon en dessous
-          fait déjà le travail. */}
-      {statusBadge && (
-        <View style={styles.cornerBadge}>
-          {statusBadge.kind === 'sealed' && <Lock size={10} color={colors.textMuted} strokeWidth={2} />}
-          <View
-            style={[
-              styles.statusBadgeDot,
-              statusBadge.kind === 'sealed' ? styles.statusDotSealed : styles.statusDotActive,
-            ]}
-          />
-          <Text style={styles.statusBadgeText} numberOfLines={1}>
-            {statusBadge.label}
-            {statusBadge.extra ? ` · ${statusBadge.extra}` : ''}
-          </Text>
-        </View>
-      )}
+    <View
+      style={[
+        styles.card,
+        cardState.kind === 'active' && styles.cardActive,
+        cardState.kind === 'realized' && styles.cardRealized,
+        cardState.kind === 'missed' && styles.cardMissed,
+        unseen && styles.cardUnseen,
+      ]}
+    >
+      {/* Sur sa propre ligne, au-dessus de [avatar][pseudo] plutôt qu'inline
+          dans l'en-tête : le pseudo garde toute la largeur de sa ligne au
+          lieu de la disputer à ce libellé. Scellé/En cours restent discrets ;
+          Réalisé/Manqué reprennent la couleur néon du contour en plus grand
+          — l'élément clé du site, pas une mention en passant. */}
+      <View style={styles.stateRow}>
+        {cardState.kind === 'sealed' && <Lock size={12} color={colors.sealedLabel} strokeWidth={2} />}
+        <Text
+          style={[
+            styles.stateLabel,
+            cardState.kind === 'sealed' && styles.stateLabelSealed,
+            cardState.kind === 'active' && styles.stateLabelActive,
+            cardState.kind === 'realized' && styles.stateLabelRealized,
+            cardState.kind === 'missed' && styles.stateLabelMissed,
+          ]}
+          numberOfLines={1}
+        >
+          {cardState.label}
+        </Text>
+      </View>
 
       {/* Invite l'auteur à trancher dès que sa prédiction est révélée mais
           encore en attente de verdict — nulle part ailleurs que sur sa propre
@@ -474,11 +478,9 @@ export function PredictionCard({
               teaser) devient visible directement sur la carte une fois
               révélée — sans ça, l'onglet Predict n'avait rien de plus à
               montrer qu'un teaser déjà lu avant révélation. La RLS ne
-              renvoie `content` que si révélée ou si on en est l'auteur, donc
-              ce test suffit. Le flou ne concerne que les destinataires
-              (avant révélation, ils n'ont de toute façon rien à cet
-              endroit) : l'auteur voit toujours son propre texte net, y
-              compris avant révélation. */}
+              renvoie `content` que si révélée ou si on en est l'auteur : lui
+              seul voit toujours son propre texte en clair, y compris avant
+              révélation — jamais masqué, même pour lui. */}
           {(revealed || isAuthor) && item.content && (
             <Text style={styles.cardContent}>{item.content}</Text>
           )}
@@ -690,8 +692,10 @@ export function PredictionCard({
 
 const styles = StyleSheet.create({
   cardPressed: { opacity: 0.85 },
-  // Fond ardoise distinct du fond de page quasi-noir, fine bordure blanche à
-  // faible opacité — jamais un aplat de couleur vive en fond ou en en-tête.
+  // Fond anthracite distinct du fond de page quasi-noir, fine bordure
+  // blanche à faible opacité par défaut (état Scellé) — Predict/Réalisé/
+  // Manqué reprennent cette même bordure en néon (`cardActive`/`cardRealized`
+  // /`cardMissed`) plutôt qu'un aplat de couleur vive en fond ou en en-tête.
   card: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -705,39 +709,52 @@ const styles = StyleSheet.create({
     // d'emoji comme sur Facebook.
     ...(Platform.OS === 'web' ? { userSelect: 'none' } : null),
   },
+  // Predict revélé, en attente de verdict : contour néon cyan, sans lueur —
+  // la lueur externe (`shadow*`) reste réservée aux deux verdicts.
+  cardActive: { borderColor: colors.neonCyan },
+  // Les deux verdicts, l'élément clé du site : contour néon + lueur externe
+  // (`shadow*` — se traduit en `box-shadow` sur le web, `elevation` sur
+  // Android n'en reprend que l'ombre portée, sans teinte colorée).
+  cardRealized: {
+    borderColor: colors.neonGreen,
+    shadowColor: colors.neonGreen,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.55,
+    shadowRadius: 14,
+    elevation: 10,
+  },
+  cardMissed: {
+    borderColor: colors.neonRed,
+    shadowColor: colors.neonRed,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.55,
+    shadowRadius: 14,
+    elevation: 10,
+  },
   // Non lue : fine bordure lumineuse + fond très légèrement teinté, assez
   // discret pour ne pas jurer avec le reste de la charte sombre/jaune.
+  // Toujours appliquée en dernier : elle prime sur la couleur néon de l'état
+  // — signaler « pas encore vue » reste plus urgent que le statut lui-même.
   cardUnseen: {
     borderColor: colors.gold,
     backgroundColor: colors.goldSoft,
   },
-  // Encart flottant façon verre dépoli, en coin de carte plutôt qu'inline
-  // dans l'en-tête : posé hors du flux (`position: absolute`), il ne dispute
-  // plus la largeur au pseudo. Léger débord au-dessus du bord de la carte,
-  // façon ruban de statut, pour bien le détacher visuellement de l'en-tête
-  // dessous plutôt que de sembler simplement posé dans son coin.
-  cornerBadge: {
-    position: 'absolute',
-    top: -10,
-    right: 16,
-    zIndex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: colors.glassBg,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-    borderRadius: radius.pill,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    maxWidth: 190,
+  // Libellé d'état sur sa propre ligne, au-dessus de [avatar][pseudo] —
+  // jamais inline dans l'en-tête, où il disputerait la largeur au pseudo.
+  stateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6, marginBottom: 10 },
+  stateLabel: {
+    fontFamily: fonts.label,
+    fontSize: 11,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
   },
-  // La pastille lumineuse porte seule la couleur du statut — jamais le fond
-  // de l'encart, qui reste neutre pour les deux états.
-  statusBadgeDot: { width: 6, height: 6, borderRadius: 3 },
-  statusDotSealed: { backgroundColor: colors.statusDotSealed },
-  statusDotActive: { backgroundColor: colors.statusDotActive },
-  statusBadgeText: { fontSize: 11, fontFamily: fonts.label, color: colors.textMuted, flexShrink: 1 },
+  stateLabelSealed: { color: colors.sealedLabel },
+  stateLabelActive: { color: colors.neonCyan },
+  // Titre imposant plutôt que le même petit libellé discret que Scellé/En
+  // cours : Réalisé/Manqué sont l'élément clé du site, pas une mention en
+  // passant — même couleur que le contour néon de la carte.
+  stateLabelRealized: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.neonGreen },
+  stateLabelMissed: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.neonRed },
   headerMenuButton: { padding: 2 },
   // Invite l'auteur à trancher — au-dessus de la carte tappable, jamais
   // dedans, pour qu'un tap sur un bouton ne navigue jamais aussi vers le
@@ -752,13 +769,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
+  // Mêmes couleurs néon que le contour de carte une fois le verdict affirmé
+  // (`cardRealized`/`cardMissed`) — cohérence entre le choix proposé ici et
+  // son résultat visuel une fois posé.
   verdictPromptButtonRealized: {
-    borderColor: colors.verdictRealized,
-    backgroundColor: 'rgba(54, 168, 160, 0.12)',
+    borderColor: colors.neonGreen,
+    backgroundColor: 'rgba(0, 230, 118, 0.12)',
   },
   verdictPromptButtonMissed: {
-    borderColor: colors.verdictMissed,
-    backgroundColor: 'rgba(156, 29, 110, 0.12)',
+    borderColor: colors.neonRed,
+    backgroundColor: 'rgba(255, 23, 68, 0.12)',
   },
   verdictPromptButtonText: { fontFamily: fonts.label, fontSize: 12, fontWeight: '700', color: colors.text },
   verdictPromptError: { fontSize: 11, color: colors.danger, marginTop: 6, textAlign: 'right' },
