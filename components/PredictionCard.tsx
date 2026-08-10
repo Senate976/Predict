@@ -49,7 +49,7 @@ const STAMP_IMAGE = require('../assets/images/stamp-encore-raison.png');
 const STAMP_FAIL_IMAGE = require('../assets/images/stamp-fail.png');
 /** Diamètre d'affichage des deux tampons — identique pour les deux verdicts,
  * largeur et hauteur égales pour rester un cercle parfait. */
-const STAMP_DIAMETER = 120;
+const STAMP_DIAMETER = 96;
 /** Position de la date et de son soulignement, en fraction du diamètre —
  * doit rester cohérente avec la zone effacée par scripts/erase_stamp_date.py
  * (dont ce script imprime les fractions exactes à chaque exécution). */
@@ -148,14 +148,15 @@ export function PredictionCard({
     localVerdictSetAt ?? (item.verdict_set_at ? new Date(item.verdict_set_at) : new Date(item.reveal_at));
 
   /** Les 4 états visuels de la carte — un contour néon dédié (voir `styles`)
-   * et un libellé en haut à droite, tous deux dérivés de ce seul objet. Rien
-   * qu'un mot chacun, jamais de date accolée. */
-  const cardState: { kind: 'sealed' | 'active' | 'realized' | 'missed'; label: string } = !revealed
+   * à tous, mais un libellé en haut à droite seulement pour Scellé/En cours :
+   * une fois le verdict affirmé, le tampon en dessous porte seul la réponse,
+   * `label` reste `undefined` plutôt que de la répéter en haut de la carte. */
+  const cardState: { kind: 'sealed' | 'active' | 'realized' | 'missed'; label?: string } = !revealed
     ? { kind: 'sealed', label: 'SCELLÉ' }
     : verdict === 'realized'
-      ? { kind: 'realized', label: 'RÉALISÉ' }
+      ? { kind: 'realized' }
       : verdict === 'missed'
-        ? { kind: 'missed', label: 'MANQUÉ' }
+        ? { kind: 'missed' }
         : { kind: 'active', label: 'EN COURS' };
 
   useEffect(() => {
@@ -381,6 +382,7 @@ export function PredictionCard({
     <View
       style={[
         styles.card,
+        cardState.kind === 'sealed' && styles.cardSealed,
         cardState.kind === 'active' && styles.cardActive,
         cardState.kind === 'realized' && styles.cardRealized,
         cardState.kind === 'missed' && styles.cardMissed,
@@ -389,24 +391,23 @@ export function PredictionCard({
     >
       {/* Sur sa propre ligne, au-dessus de [avatar][pseudo] plutôt qu'inline
           dans l'en-tête : le pseudo garde toute la largeur de sa ligne au
-          lieu de la disputer à ce libellé. Scellé/En cours restent discrets ;
-          Réalisé/Manqué reprennent la couleur néon du contour en plus grand
-          — l'élément clé du site, pas une mention en passant. */}
-      <View style={styles.stateRow}>
-        {cardState.kind === 'sealed' && <Lock size={12} color={colors.sealedLabel} strokeWidth={2} />}
-        <Text
-          style={[
-            styles.stateLabel,
-            cardState.kind === 'sealed' && styles.stateLabelSealed,
-            cardState.kind === 'active' && styles.stateLabelActive,
-            cardState.kind === 'realized' && styles.stateLabelRealized,
-            cardState.kind === 'missed' && styles.stateLabelMissed,
-          ]}
-          numberOfLines={1}
-        >
-          {cardState.label}
-        </Text>
-      </View>
+          lieu de la disputer à ce libellé. Absent pour Réalisé/Manqué — le
+          tampon en dessous porte seul la réponse, plus de titre à répéter. */}
+      {cardState.label && (
+        <View style={styles.stateRow}>
+          {cardState.kind === 'sealed' && <Lock size={12} color={colors.sealedLabel} strokeWidth={2} />}
+          <Text
+            style={[
+              styles.stateLabel,
+              cardState.kind === 'sealed' && styles.stateLabelSealed,
+              cardState.kind === 'active' && styles.stateLabelActive,
+            ]}
+            numberOfLines={1}
+          >
+            {cardState.label}
+          </Text>
+        </View>
+      )}
 
       {/* Invite l'auteur à trancher dès que sa prédiction est révélée mais
           encore en attente de verdict — nulle part ailleurs que sur sa propre
@@ -437,7 +438,17 @@ export function PredictionCard({
         </View>
       )}
 
-      <Pressable onPress={() => onPress?.()} style={({ pressed }) => pressed && styles.cardPressed}>
+      {/* Le corps de la carte (avatar, pseudo, texte, réactions) — jamais le
+          badge d'état ci-dessus — s'assourdit tant que Scellée, et un peu
+          moins une fois Manquée : la carte reste lisible, mais se lit
+          d'emblée comme secondaire par rapport à un Predict Réalisé. */}
+      <View
+        style={[
+          cardState.kind === 'sealed' && styles.cardBodySealed,
+          cardState.kind === 'missed' && styles.cardBodyMissed,
+        ]}
+      >
+        <Pressable onPress={() => onPress?.()} style={({ pressed }) => pressed && styles.cardPressed}>
         {/* Une seule ligne : [avatar][pseudo] ...espace flexible... [bulle de
             révélation (si programmée et pas encore révélée) ou tampon de
             verdict (une fois affirmé par l'auteur) — jamais les deux à la
@@ -586,6 +597,7 @@ export function PredictionCard({
           </Pressable>
         </View>
       </View>
+      </View>
 
       {commentsOpen && (
         <InlineComments
@@ -709,6 +721,9 @@ const styles = StyleSheet.create({
     // d'emoji comme sur Facebook.
     ...(Platform.OS === 'web' ? { userSelect: 'none' } : null),
   },
+  // Scellée : contour neutre et fond assombri dédiés — plus sombre que
+  // `surface`, jamais une couleur vive, contrairement aux 3 autres états.
+  cardSealed: { borderColor: colors.sealedBorder, backgroundColor: colors.sealedBg },
   // Predict revélé, en attente de verdict : contour néon cyan, sans lueur —
   // la lueur externe (`shadow*`) reste réservée aux deux verdicts.
   cardActive: { borderColor: colors.neonCyan },
@@ -750,11 +765,10 @@ const styles = StyleSheet.create({
   },
   stateLabelSealed: { color: colors.sealedLabel },
   stateLabelActive: { color: colors.neonCyan },
-  // Titre imposant plutôt que le même petit libellé discret que Scellé/En
-  // cours : Réalisé/Manqué sont l'élément clé du site, pas une mention en
-  // passant — même couleur que le contour néon de la carte.
-  stateLabelRealized: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.neonGreen },
-  stateLabelMissed: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.neonRed },
+  // Corps de carte assourdi — jamais le badge d'état, rendu séparément avant
+  // ce conteneur et donc toujours à `opacity: 1`.
+  cardBodySealed: { opacity: 0.65 },
+  cardBodyMissed: { opacity: 0.85 },
   headerMenuButton: { padding: 2 },
   // Invite l'auteur à trancher — au-dessus de la carte tappable, jamais
   // dedans, pour qu'un tap sur un bouton ne navigue jamais aussi vers le
