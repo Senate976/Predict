@@ -479,12 +479,22 @@ export function PredictionCard({
               révélée — le texte reste bien là (jamais remplacé par un
               faux contenu), juste illisible, jusqu'à la date. La RLS ne
               renvoie `content` que si révélée ou si on en est l'auteur :
-              seul l'auteur voit donc ce flou avant révélation, les
-              destinataires n'ayant de toute façon rien à cet endroit. */}
-          {item.content && (
+              seul l'auteur a donc un vrai texte à flouter avant révélation. */}
+          {item.content ? (
             <Text style={[styles.cardContent, !revealed && styles.cardContentBlurred]}>
               {item.content}
             </Text>
+          ) : (
+            /* Sans contenu à flouter (destinataire, avant révélation — RLS
+               ne le lui donne pas), un simulacre de lignes de texte floutées
+               garde la carte visuellement cohérente avec celle de l'auteur :
+               jamais du vrai texte, juste sa silhouette. */
+            !revealed && (
+              <View style={[styles.cardContentPlaceholder, styles.cardContentBlurred]}>
+                <View style={[styles.cardContentPlaceholderLine, styles.cardContentPlaceholderLineW1]} />
+                <View style={[styles.cardContentPlaceholderLine, styles.cardContentPlaceholderLineW2]} />
+              </View>
+            )
           )}
 
           {/* Le tampon certifie le verdict sous la prédiction, dans le flux
@@ -910,6 +920,12 @@ const styles = StyleSheet.create({
     web: { filter: 'blur(5px)' } as object,
     default: { opacity: 0.15 },
   }),
+  // Silhouette de texte pour les destinataires avant révélation — même
+  // rythme visuel que `cardContent`, sans jamais en être un aperçu réel.
+  cardContentPlaceholder: { marginTop: 2, gap: 6 },
+  cardContentPlaceholderLine: { height: 16, borderRadius: 4, backgroundColor: colors.surfaceRaised },
+  cardContentPlaceholderLineW1: { width: '88%' },
+  cardContentPlaceholderLineW2: { width: '62%' },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
