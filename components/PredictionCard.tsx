@@ -5,7 +5,6 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  Image,
   Modal,
   PanResponder,
   Platform,
@@ -40,19 +39,6 @@ const EMOJI_PANEL_WIDTH = 272;
 /** 12 réactions sur 2 rangées de 6 plutôt qu'une seule rangée trop dense. */
 const EMOJI_COLUMNS = 6;
 const EMOJI_ROWS = Math.ceil(EMOJI_REACTIONS.length / EMOJI_COLUMNS);
-/** Sceau de cire photoréaliste, texte « ENCORE RAISON » gravé dans la cire
- * elle-même — contrairement à l'ancien tampon encre-sur-papier, la date n'a
- * plus de zone dédiée dans l'artwork : elle s'affiche en légende sous le
- * sceau plutôt que superposée par-dessus (voir `verdictStampRealizedDate`). */
-const STAMP_IMAGE = require('../assets/images/stamp-encore-raison.png');
-/** Même principe pour le verdict manqué (« RATÉ »). */
-const STAMP_FAIL_IMAGE = require('../assets/images/stamp-fail.png');
-/** Diamètre d'affichage des deux tampons — identique pour les deux verdicts,
- * largeur et hauteur égales pour rester un cercle parfait. */
-const STAMP_DIAMETER = 96;
-/** Légère rotation du sceau « ENCORE RAISON », façon coup de tampon donné à
- * la main plutôt que parfaitement aligné. */
-const STAMP_REALIZED_ROTATION_DEG = 10;
 /** Silhouette affichée à la place du contenu pour un destinataire, avant
  * révélation — la RLS ne lui donne aucun `content` à cet endroit (voir plus
  * bas), donc rien de réel à flouter. Un texte de longueur plausible plutôt
@@ -544,28 +530,14 @@ export function PredictionCard({
             </Text>
           )}
 
-          {/* Le sceau certifie le verdict sous la prédiction, dans le flux
-              normal (jamais en surimpression du texte), pour ne jamais gêner
-              la lecture du contenu au-dessus. Sceau de cire photoréaliste
-              pour les deux verdicts, même diamètre ; la date n'est plus
-              gravée dans l'artwork (contrairement à l'ancien tampon
-              encre-sur-papier) donc s'affiche en légende dessous plutôt que
-              superposée par-dessus. Seul « ENCORE RAISON » est légèrement
-              pivoté, façon coup de tampon donné à la main — la légende, elle,
-              reste toujours droite pour rester lisible. */}
-          {verdict === 'realized' && (
-            <View style={styles.verdictStamp}>
-              <View style={styles.verdictStampRealizedImageWrap}>
-                <Image source={STAMP_IMAGE} style={styles.verdictStampImage} resizeMode="contain" />
-              </View>
-              <Text style={styles.verdictStampDate}>{formatStampDate(verdictSetAt)}</Text>
-            </View>
-          )}
-          {verdict === 'missed' && (
-            <View style={styles.verdictStamp}>
-              <Image source={STAMP_FAIL_IMAGE} style={styles.verdictStampImage} resizeMode="contain" />
-              <Text style={styles.verdictStampDate}>{formatStampDate(verdictSetAt)}</Text>
-            </View>
+          {/* Le contour néon de la carte (voir `cardRealized`/`cardMissed`)
+              porte déjà le verdict — cette légende ne fait plus qu'en dater
+              la confirmation, sans tampon. */}
+          {verdict !== null && (
+            <Text style={styles.verdictDate}>
+              {verdict === 'realized' ? 'Confirmé réalisé le ' : 'Confirmé manqué le '}
+              {formatStampDate(verdictSetAt)}
+            </Text>
           )}
         </View>
       </Pressable>
@@ -863,23 +835,13 @@ function createStyles(colors: Colors) {
   },
   verdictPromptButtonText: { fontFamily: fonts.label, fontSize: 12, fontWeight: '700', color: colors.text },
   verdictPromptError: { fontSize: 11, color: colors.danger, marginTop: 6, textAlign: 'right' },
-  // Sceau de cire (« ENCORE RAISON » / « RATÉ ») : artwork photoréaliste,
-  // détouré en transparence — s'affiche directement sur la carte sombre,
-  // sans disque de fond (contrairement à l'ancien tampon encre-sur-papier,
-  // qui en avait besoin pour rester lisible). Toujours dans le flux normal,
-  // aligné à droite, jamais en surimpression du texte de la prédiction.
-  verdictStamp: { alignSelf: 'flex-end', alignItems: 'center', marginTop: 8 },
-  verdictStampImage: { width: STAMP_DIAMETER, height: STAMP_DIAMETER },
-  // Seul « ENCORE RAISON » est légèrement pivoté, façon coup de tampon donné
-  // à la main — isolé dans son propre conteneur pour que la légende de date
-  // sous l'image, elle, reste toujours droite.
-  verdictStampRealizedImageWrap: { transform: [{ rotate: `${STAMP_REALIZED_ROTATION_DEG}deg` }] },
-  // Sous le sceau plutôt que superposée par-dessus : l'artwork n'a plus de
-  // zone dédiée à la date (contrairement à l'ancien tampon).
-  verdictStampDate: {
-    marginTop: 4,
+  // Plus de tampon : seule cette légende date la confirmation du verdict, le
+  // contour néon de la carte porte déjà la couleur du résultat.
+  verdictDate: {
+    alignSelf: 'flex-end',
+    marginTop: 8,
     fontFamily: fonts.label,
-    fontSize: 10,
+    fontSize: 11,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     color: colors.textFaint,
