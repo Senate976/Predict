@@ -36,12 +36,11 @@ function TabIcon({ focused, children }: { focused: boolean; children: React.Reac
 const UNREAD_POLL_MS = 20_000;
 
 /** Rayon et décalage vertical du bouton central (`centerButton` plus bas) —
- * la découpe de `TabBarBackground` s'appuie sur ces mêmes valeurs plutôt
+ * la découpe de `TabBarNotchBorder` s'appuie sur ces mêmes valeurs plutôt
  * que sur des chiffres redevinés à l'œil, pour rester cohérente si l'un des
  * deux change. */
 const CENTER_BUTTON_RADIUS = 26;
 const CENTER_BUTTON_RISE = 18;
-const BAR_HEIGHT = 64;
 /** `paddingTop` de `styles.bar` : le bouton (comme les icônes) vit dans le
  * contenu de la barre, décalé de cette marge par rapport à son bord
  * supérieur — sans elle, le centre du bouton calculé ici tombait 10px plus
@@ -70,21 +69,30 @@ const NOTCH_RADIUS = CENTER_BUTTON_RADIUS + NOTCH_GAP;
  * géométrique et non par approximation visuelle. Vérifié numériquement :
  * l'angle entre segments consécutifs à chaque jonction décroît en 1/N (N =
  * nombre de segments), signature d'une courbe réellement lisse plutôt que
- * d'une vraie cassure qui resterait constante quel que soit N. */
-const NOTCH_FILLET_RADIUS = 8;
+ * d'une vraie cassure qui resterait constante quel que soit N. Grand
+ * (20px) pour que la descente commence bien avant la silhouette du bouton
+ * — un raccord étroit paraît toujours plus « cassé » à l'œil qu'un raccord
+ * large, même parfaitement tangent. */
+const NOTCH_FILLET_RADIUS = 20;
 /** Nombre de segments par arc — une ligne brisée assez dense pour se lire
  * comme une courbe lisse, chaque sommet calculé exactement sur son cercle
  * plutôt qu'approché par une courbe de Bézier. */
-const NOTCH_SEGMENTS = 24;
+const NOTCH_SEGMENTS = 32;
 
 /**
- * Points du contour supérieur de la barre, en coordonnées absolues (0..width
- * en X, 0 à `BAR_HEIGHT` en Y) : ligne droite → raccord lisse → arc
- * concentrique au bouton (passant par son point le plus bas) → raccord
- * symétrique → ligne droite. Une « cuvette » à trois arcs plutôt qu'un seul
- * arc sec : celui-ci épouserait exactement le bouton mais croiserait la
- * ligne droite à angle vif (une sécante, jamais tangente, à une droite) —
- * les deux raccords absorbent cette cassure en douceur, aux deux jonctions.
+ * Points du contour de la découpe, en coordonnées absolues (0..width en X,
+ * Y croissant vers le bas depuis le bord supérieur de la barre) : ligne
+ * droite → raccord lisse → arc concentrique au bouton (passant par son
+ * point le plus bas) → raccord symétrique → ligne droite. Une « cuvette » à
+ * trois arcs plutôt qu'un seul arc sec : celui-ci épouserait exactement le
+ * bouton mais croiserait la ligne droite à angle vif (une sécante, jamais
+ * tangente, à une droite) — les deux raccords absorbent cette cassure en
+ * douceur, aux deux jonctions. Ce tracé sert uniquement de trait de
+ * bordure (voir `TabBarNotchBorder`) : la barre elle-même reste un
+ * rectangle plein classique (`styles.bar.backgroundColor`), jamais découpé
+ * — sinon la zone sous la courbe laisserait voir, par transparence, le
+ * fond par défaut du conteneur de React Navigation (blanc sur certaines
+ * plateformes) plutôt que rester du noir uni.
  */
 function buildCradlePoints(cx: number, width: number): [number, number][] {
   const r = NOTCH_FILLET_RADIUS;
@@ -140,25 +148,22 @@ function buildCradlePoints(cx: number, width: number): [number, number][] {
 }
 
 /**
- * Fond de la barre de navigation, en SVG plutôt qu'un simple rectangle CSS :
- * le conteneur lui-même adopte la forme en cuvette (pas seulement un trait
- * décoratif dessus), pour qu'une éventuelle lueur appliquée à ce tracé suive
- * fidèlement son contour plutôt que de rester bornée à un rectangle. Un
- * premier `Path` plein assure le remplissage réel de la barre (remplace
- * `backgroundColor` sur `styles.bar`), un second reprend le même tracé en
- * simple trait pour la bordure supérieure.
+ * Trait du haut de la barre de navigation, en SVG plutôt qu'une simple
+ * bordure CSS : une ligne droite aurait coupé tout droit à travers le
+ * bouton central « + », qui déborde déjà au-dessus de la barre. Un seul
+ * `Path`, en trait seul (`fill="none"`) — jamais de remplissage : le noir
+ * sous la courbe est celui, uni, de `styles.bar.backgroundColor`, pas
+ * celui de ce SVG.
  */
-function TabBarBackground() {
+function TabBarNotchBorder() {
   const { width } = useWindowDimensions();
   const cx = width / 2;
   const points = buildCradlePoints(cx, width);
-  const topD = `M ${points.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ')}`;
-  const fillD = `${topD} L ${width} ${BAR_HEIGHT} L 0 ${BAR_HEIGHT} Z`;
+  const d = `M ${points.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ')}`;
 
   return (
-    <Svg width={width} height={BAR_HEIGHT} style={styles.notchBorder} pointerEvents="none">
-      <Path d={fillD} fill={colors.navBar} />
-      <Path d={topD} stroke={colors.navBarBorder} strokeWidth={1} fill="none" />
+    <Svg width={width} height={NOTCH_RADIUS + BUTTON_CENTER_Y + 2} style={styles.notchBorder} pointerEvents="none">
+      <Path d={d} stroke={colors.navBarBorder} strokeWidth={1.5} fill="none" />
     </Svg>
   );
 }
@@ -216,7 +221,7 @@ export default function TabsLayout() {
         tabBarActiveTintColor: colors.navBarActive,
         tabBarInactiveTintColor: colors.navBarInactive,
         tabBarStyle: styles.bar,
-        tabBarBackground: () => <TabBarBackground />,
+        tabBarBackground: () => <TabBarNotchBorder />,
         tabBarShowLabel: false,
       }}
     >
@@ -284,10 +289,10 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   bar: {
-    // Plus de `backgroundColor` ici : le fond réel est le `Path` rempli de
-    // `TabBarBackground`, seul à porter la forme en cuvette — un aplat posé
-    // en plus derrière aurait annulé l'échancrure en la recouvrant.
-    height: BAR_HEIGHT,
+    // Rectangle plein classique — jamais découpé : voir la note sur
+    // `buildCradlePoints`, le SVG ne dessine qu'un trait par-dessus.
+    backgroundColor: colors.navBar,
+    height: 64,
     paddingTop: BAR_PADDING_TOP,
   },
   // Le canevas s'aligne pile sur le bord supérieur de la barre, sans
