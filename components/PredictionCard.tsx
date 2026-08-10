@@ -787,10 +787,11 @@ const styles = StyleSheet.create({
   cardActive: {
     borderColor: colors.cardBorderNeutral,
   },
-  // Réalisé : même contour gris neutre — plus de bordure ni de lueur
-  // vertes, le tampon (rendu plus bas) porte seul le verdict.
+  // Réalisé : contour doré, sans glow (contrairement à l'ancien contour
+  // vert qu'il remplaçait) — le tampon (rendu plus bas) porte le détail du
+  // verdict, ce contour attire l'œil sur la carte elle-même.
   cardRealized: {
-    borderColor: colors.cardBorderNeutral,
+    borderColor: colors.gold,
   },
   // Manqué, l'élément clé du site, garde son contour néon + lueur externe
   // (`shadow*` — se traduit en `box-shadow` sur le web, `elevation` sur
@@ -856,9 +857,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  // Vert/rouge conservés ici (boutons d'action, pas le contour de carte une
-  // fois le verdict posé — voir `cardRealized`/`cardMissed`, désormais gris
-  // neutre côté Réalisé) : le choix à trancher doit rester net.
+  // Vert/rouge conservés ici (boutons d'action, distincts du contour de
+  // carte une fois le verdict posé — voir `cardRealized`/`cardMissed`) : le
+  // choix à trancher doit rester net.
   verdictPromptButtonRealized: {
     borderColor: colors.neonGreen,
     backgroundColor: 'rgba(0, 230, 118, 0.12)',

@@ -45,15 +45,14 @@ export const colors = {
   notificationBadge: '#EF4444',
   // Couleurs néon des boutons d'action « Réalisé »/« Manqué » (voir
   // `verdictPromptButton*`) et du contour de carte une fois Manqué affirmé
-  // (`cardMissed`, avec en plus une lueur externe `shadow*`) — Scellé, En
-  // cours et Réalisé sont eux passés au gris neutre (`cardBorderNeutral`)
-  // une fois le verdict posé ou en attente, plus aucune couleur vive.
+  // (`cardMissed`, avec en plus une lueur externe `shadow*`). `neonGreen`
+  // ne sert plus qu'au bouton d'action — le contour de carte Réalisé est
+  // repassé au doré (`gold`), voir `cardRealized`.
   neonGreen: '#00E676',
   neonRed: '#FF1744',
-  // Contour de carte Scellé/En cours/Réalisé, et libellé assorti (texte +
-  // cadenas) — voir `PredictionCard` : gris neutre mais assez clair pour
-  // rester bien visible sur le fond anthracite, sans lueur colorée. Seul
-  // Manqué garde encore une couleur vive.
+  // Contour de carte Scellé/En cours, et libellé assorti (texte + cadenas)
+  // — voir `PredictionCard` : gris neutre mais assez clair pour rester
+  // bien visible sur le fond anthracite, sans lueur colorée.
   cardBorderNeutral: '#9CA3AF',
   // Trait des icônes (Lucide) : gris clair plutôt que blanc pur, pour
   // qu'elles restent discrètes sans se fondre dans le fond sombre.
