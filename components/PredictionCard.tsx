@@ -395,15 +395,8 @@ export function PredictionCard({
           tampon en dessous porte seul la réponse, plus de titre à répéter. */}
       {cardState.label && (
         <View style={styles.stateRow}>
-          {cardState.kind === 'sealed' && <Lock size={12} color={colors.sealedLabel} strokeWidth={2} />}
-          <Text
-            style={[
-              styles.stateLabel,
-              cardState.kind === 'sealed' && styles.stateLabelSealed,
-              cardState.kind === 'active' && styles.stateLabelActive,
-            ]}
-            numberOfLines={1}
-          >
+          {cardState.kind === 'sealed' && <Lock size={12} color={colors.gold} strokeWidth={2} />}
+          <Text style={styles.stateLabel} numberOfLines={1}>
             {cardState.label}
           </Text>
         </View>
@@ -482,14 +475,16 @@ export function PredictionCard({
           <Text style={styles.cardTeaser}>{item.teaser}</Text>
 
           {/* Le contenu (la vraie prédiction, derrière la promesse du
-              teaser) devient visible directement sur la carte une fois
-              révélée — sans ça, l'onglet Predict n'avait rien de plus à
-              montrer qu'un teaser déjà lu avant révélation. La RLS ne
-              renvoie `content` que si révélée ou si on en est l'auteur : lui
-              seul voit toujours son propre texte en clair, y compris avant
-              révélation — jamais masqué, même pour lui. */}
-          {(revealed || isAuthor) && item.content && (
-            <Text style={styles.cardContent}>{item.content}</Text>
+              teaser) reste toujours affiché, mais flouté tant que non
+              révélée — le texte reste bien là (jamais remplacé par un
+              faux contenu), juste illisible, jusqu'à la date. La RLS ne
+              renvoie `content` que si révélée ou si on en est l'auteur :
+              seul l'auteur voit donc ce flou avant révélation, les
+              destinataires n'ayant de toute façon rien à cet endroit. */}
+          {item.content && (
+            <Text style={[styles.cardContent, !revealed && styles.cardContentBlurred]}>
+              {item.content}
+            </Text>
           )}
 
           {/* Le tampon certifie le verdict sous la prédiction, dans le flux
@@ -717,21 +712,27 @@ const styles = StyleSheet.create({
     // d'emoji comme sur Facebook.
     ...(Platform.OS === 'web' ? { userSelect: 'none' } : null),
   },
-  // Scellée : même traitement glow que les 3 autres états, doré plutôt que
-  // cyan/vert/rouge — un halo discret (`shadowOpacity` faible), pas la lueur
-  // marquée des deux verdicts. Fond `surface` inchangé : la lisibilité prime,
-  // seul le contour néon marque le statut.
+  // Scellé et En cours partagent le même traitement : le jaune de la charte
+  // (`gold`), pas une couleur néon à part (cyan, ambre) — ce sont deux états
+  // d'attente, pas encore le verdict. Halo discret (`shadowOpacity` faible),
+  // pas la lueur marquée des deux verdicts. Fond `surface` inchangé : la
+  // lisibilité prime, seul le contour porte la couleur.
   cardSealed: {
-    borderColor: colors.sealedBorder,
-    shadowColor: colors.sealedBorder,
+    borderColor: colors.gold,
+    shadowColor: colors.gold,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.2,
     shadowRadius: 10,
     elevation: 4,
   },
-  // Predict revélé, en attente de verdict : contour néon cyan, sans lueur —
-  // la lueur externe (`shadow*`) reste réservée aux verdicts et à Scellée.
-  cardActive: { borderColor: colors.neonCyan },
+  cardActive: {
+    borderColor: colors.gold,
+    shadowColor: colors.gold,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 4,
+  },
   // Les deux verdicts, l'élément clé du site : contour néon + lueur externe
   // (`shadow*` — se traduit en `box-shadow` sur le web, `elevation` sur
   // Android n'en reprend que l'ombre portée, sans teinte colorée).
@@ -762,14 +763,15 @@ const styles = StyleSheet.create({
   // Libellé d'état sur sa propre ligne, au-dessus de [avatar][pseudo] —
   // jamais inline dans l'en-tête, où il disputerait la largeur au pseudo.
   stateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6, marginBottom: 10 },
+  // Scellé et En cours partagent le même libellé doré — voir `cardSealed`/
+  // `cardActive` pour le contour assorti.
   stateLabel: {
     fontFamily: fonts.label,
     fontSize: 11,
     letterSpacing: 1.2,
     textTransform: 'uppercase',
+    color: colors.gold,
   },
-  stateLabelSealed: { color: colors.sealedLabel },
-  stateLabelActive: { color: colors.neonCyan },
   // Corps de carte assourdi une fois Manquée — jamais le badge d'état,
   // rendu séparément avant ce conteneur et donc toujours à `opacity: 1`.
   cardBodyMissed: { opacity: 0.85 },
@@ -891,15 +893,23 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   // La vraie prédiction est le cœur de la carte : plus grande, plus foncée,
-  // en gras marqué — jamais grisée, y compris floutée avant révélation (le
-  // flou matérialise déjà le secret, un texte terne en plus serait redondant
-  // et affaiblirait l'impact au moment où elle devient lisible).
+  // en gras marqué — nette dès qu'elle est lisible (`cardContentBlurred` la
+  // couvre d'un flou tant que ce n'est pas le cas).
   cardContent: {
     fontFamily: fonts.bodyEmphasis,
     fontSize: 18,
     color: colors.text,
     lineHeight: 25,
   },
+  // Le texte reste bien affiché (jamais remplacé par un faux contenu), mais
+  // flouté tant que non révélée — matérialise le secret sans le masquer.
+  // `filter` n'existe que sur le web (RN Web le laisse passer tel quel vers
+  // le CSS) ; à défaut sur natif, une opacité très faible approche le même
+  // effet d'illisibilité.
+  cardContentBlurred: Platform.select({
+    web: { filter: 'blur(5px)' } as object,
+    default: { opacity: 0.15 },
+  }),
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
