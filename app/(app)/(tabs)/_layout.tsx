@@ -54,26 +54,30 @@ const BAR_PADDING_TOP = 10;
 const BUTTON_CENTER_Y = BAR_PADDING_TOP + CENTER_BUTTON_RADIUS - CENTER_BUTTON_RISE;
 /** Demi-largeur, en X, où la ligne droite quitte l'horizontale pour amorcer
  * la cuvette (symétrique de part et d'autre du centre) — voir
- * `buildCradlePath`. */
-const NOTCH_HALF_WIDTH = 40;
-/** Profondeur de la cuvette (Y du point le plus bas, sous le bouton). Choisie
- * avec `NOTCH_HALF_WIDTH` et les deux décalages de contrôle ci-dessous par
- * recherche numérique (script Node, hors dépôt) : la marge entre la courbe
- * et le vrai cercle du bouton (centre `BUTTON_CENTER_Y`, rayon
- * `CENTER_BUTTON_RADIUS`) reste toujours positive sur toute la courbe
- * (minimum ≈ 4,9px, jamais un contact), sans être nulle part excessive
- * (maximum ≈ 17,9px, près des jonctions avec la ligne droite). */
-const NOTCH_DEPTH = 58;
+ * `buildCradlePath`. Grande par rapport aux décalages de contrôle
+ * ci-dessous (rapport ~0.43 / ~0.57, plutôt que ~0.25 / ~0.85 dans une
+ * version antérieure) : la courbe s'incurve dès qu'elle quitte la ligne
+ * droite au lieu de rester quasi plate puis plonger d'un coup près du
+ * bouton — c'est ce rapport, pas seulement la largeur, qui donne une
+ * descente perçue comme progressive. */
+const NOTCH_HALF_WIDTH = 70;
+/** Profondeur de la cuvette (Y du point le plus bas, sous le bouton). Avec
+ * ces décalages de contrôle, le point le plus proche du bouton sur toute la
+ * courbe est exactement son sommet (X = centre du bouton) — vérifié par
+ * échantillonnage dense (script Node, hors dépôt) — donc la marge s'y
+ * résume à `NOTCH_DEPTH - BUTTON_CENTER_Y - CENTER_BUTTON_RADIUS` : ≈8px
+ * ici, jamais un contact. */
+const NOTCH_DEPTH = 52;
 /** Décalage horizontal du premier point de contrôle de chaque Bézier —
  * partage la même ordonnée que son point de départ (la ligne droite ou le
  * fond de la cuvette), ce qui rend la tangente horizontale à cet endroit
  * par construction géométrique (pas une approximation) : aucun angle vif
  * possible à la jonction, contrairement à un arc de cercle qui croiserait
  * la droite en sécante. */
-const NOTCH_CONTROL_1 = 10;
+const NOTCH_CONTROL_1 = 30;
 /** Même principe pour le second point de contrôle de chaque Bézier, qui
  * partage l'ordonnée de son point d'arrivée. */
-const NOTCH_CONTROL_2 = 34;
+const NOTCH_CONTROL_2 = 40;
 
 /**
  * Tracé du contour de la découpe, en coordonnées absolues (0..width en X) :
