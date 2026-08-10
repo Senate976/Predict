@@ -2146,9 +2146,12 @@ alter table public.profiles drop column if exists phone;
 -- l'afficher dans le Fil ; `notify_mention` ajoute la notification dédiée.
 alter table public.predictions add column if not exists mentioned_user_ids uuid[] not null default '{}'::uuid[];
 
-alter table public.notifications drop constraint if exists notifications_type_check;
-alter table public.notifications add constraint notifications_type_check
-  check (type in ('new_teaser', 'prediction_revealed', 'prediction_approved', 'group_invite', 'prediction_mentioned'));
+-- `notifications_type_check` n'est (re)posée que plus bas, une seule fois,
+-- avec la liste complète et à jour de tous les types connus — la reposer ici
+-- avec la liste plus étroite de l'époque de cette section casserait la
+-- ré-exécution de ce script sur une base qui contient déjà des notifications
+-- d'un type ajouté dans une section ultérieure (« check constraint ...
+-- is violated by some row »).
 
 -- `security definer` : la notification est pour le destinataire cité, pas
 -- pour l'auteur qui appelle — elle se revérifie donc elle-même (auteur de la
@@ -2358,9 +2361,13 @@ alter table public.predictions add column if not exists is_immediate boolean not
 -- groupe visé sur la prédiction elle-même).
 alter table public.predictions add column if not exists group_id uuid references public.groups (id) on delete set null;
 
-alter table public.prediction_votes drop constraint if exists prediction_votes_vote_value_check;
-alter table public.prediction_votes add constraint prediction_votes_vote_value_check
-  check (vote_value in ('realized', 'missed', 'believe', 'disbelieve'));
+-- `prediction_votes_vote_value_check` n'est posée qu'à partir de la section
+-- Hype/Réputation plus bas (liste la plus large, quatre catégories) — la
+-- poser ici avec cette liste plus étroite casserait la ré-exécution de ce
+-- script sur une base qui contient déjà des votes Hype/Réputation
+-- (`chaud`/`froid`/`mytho`/`confiance`), pas encore nettoyés à ce stade du
+-- script (voir la suppression explicite plus bas, une fois cette catégorie
+-- de vote retirée de l'app).
 
 -- `create_prediction` reprend sa signature de la section 27 et ajoute
 -- `p_is_immediate` : quand `true`, la base pose elle-même `reveal_at = now()`
@@ -2771,12 +2778,21 @@ grant execute on function public.create_prediction(text, text, timestamptz, text
 -- un vote par catégorie sans que l'un écrase l'autre.
 alter table public.prediction_votes add column if not exists vote_type text not null default 'outcome';
 
--- Le défaut ci-dessus classe tout en `outcome`, y compris les votes
--- believe/disbelieve déjà posés (révélations immédiates) — sans cette
--- correction, la contrainte plus bas les rejetterait aussitôt.
+-- Le défaut ci-dessus classe tout en `outcome`, y compris les votes déjà
+-- posés d'une autre catégorie — sans ce rattrapage (toutes les catégories,
+-- pas seulement believe/disbelieve), la contrainte plus bas les rejetterait
+-- aussitôt.
 update public.prediction_votes
 set vote_type = 'belief'
 where vote_value in ('believe', 'disbelieve') and vote_type = 'outcome';
+
+update public.prediction_votes
+set vote_type = 'hype'
+where vote_value in ('chaud', 'froid') and vote_type = 'outcome';
+
+update public.prediction_votes
+set vote_type = 'reputation'
+where vote_value in ('mytho', 'confiance') and vote_type = 'outcome';
 
 drop index if exists prediction_votes_unique_voter;
 create unique index if not exists prediction_votes_unique_voter
@@ -2908,17 +2924,10 @@ grant select on public.predictions_feed to authenticated;
 -- prédiction, jamais les deux à la fois).
 delete from public.prediction_votes where vote_value in ('chaud', 'froid', 'mytho', 'confiance');
 
-drop index if exists prediction_votes_unique_voter;
-alter table public.prediction_votes drop constraint if exists prediction_votes_vote_value_check;
-alter table public.prediction_votes drop column if exists vote_type;
-
-create unique index if not exists prediction_votes_unique_voter
-  on public.prediction_votes (prediction_id, voter_id);
-
-alter table public.prediction_votes add constraint prediction_votes_vote_value_check
-  check (vote_value in ('realized', 'missed', 'believe', 'disbelieve'));
-
--- Revient à la policy de la section 31 (avant l'exception Hype).
+-- Revient à la policy de la section 31 (avant l'exception Hype) — avant de
+-- supprimer `vote_type` plus bas, jamais après : cette policy (section 32)
+-- teste encore cette colonne, sa seule dépendante, ce qui bloquerait le
+-- `drop column`.
 drop policy if exists "prediction_votes_insert" on public.prediction_votes;
 create policy "prediction_votes_insert"
   on public.prediction_votes
@@ -2935,6 +2944,16 @@ create policy "prediction_votes_insert"
       where p.id = prediction_votes.prediction_id and p.reveal_at <= now()
     )
   );
+
+drop index if exists prediction_votes_unique_voter;
+alter table public.prediction_votes drop constraint if exists prediction_votes_vote_value_check;
+alter table public.prediction_votes drop column if exists vote_type;
+
+create unique index if not exists prediction_votes_unique_voter
+  on public.prediction_votes (prediction_id, voter_id);
+
+alter table public.prediction_votes add constraint prediction_votes_vote_value_check
+  check (vote_value in ('realized', 'missed', 'believe', 'disbelieve'));
 
 -- `predictions_feed` reprend sa définition de la section 28, sans les
 -- compteurs Hype/Réputation de la section 32.
@@ -3028,14 +3047,8 @@ alter table public.predictions add constraint predictions_author_verdict_check
   check (author_verdict in ('realized', 'missed'));
 
 -- Deux nouveaux types de notification : chaque destinataire est prévenu dès
--- que l'auteur tranche. (La contrainte n'est reposée qu'une fois, avec la
--- liste complète à jour, comme à chaque ajout précédent.)
-alter table public.notifications drop constraint if exists notifications_type_check;
-alter table public.notifications add constraint notifications_type_check
-  check (type in (
-    'new_teaser', 'prediction_revealed', 'prediction_approved', 'group_invite',
-    'prediction_mentioned', 'prediction_realized', 'prediction_missed'
-  ));
+-- que l'auteur tranche. (Toujours pas reposée ici, pour la même raison —
+-- voir plus haut — la liste complète et à jour reste plus bas, section 36.)
 
 -- `security definer` : seul l'auteur peut affirmer le verdict de sa propre
 -- prédiction, une fois révélée, et une seule fois — `author_verdict is null`
