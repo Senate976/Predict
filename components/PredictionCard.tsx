@@ -62,6 +62,14 @@ const STAMP_FAIL_DATE_TOP_FRACTION = 0.665;
 /** Légère rotation du tampon « ENCORE RAISON », façon coup de tampon donné
  * à la main plutôt que parfaitement aligné. */
 const STAMP_REALIZED_ROTATION_DEG = 10;
+/** Silhouette affichée à la place du contenu pour un destinataire, avant
+ * révélation — la RLS ne lui donne aucun `content` à cet endroit (voir plus
+ * bas), donc rien de réel à flouter. Un texte de longueur plausible plutôt
+ * que des barres pleines : rendu avec le même style que `cardContent` et le
+ * même flou, il se fond visuellement dans le même traitement que le vrai
+ * texte flouté vu par l'auteur, au lieu de lire comme un composant à part. */
+const SEALED_CONTENT_PLACEHOLDER =
+  'Un secret bien gardé jusqu’à la date de révélation, connu de son seul auteur pour l’instant.';
 
 /**
  * Carte d'une prédiction, partagée entre les onglets À venir et Passées du
@@ -476,25 +484,17 @@ export function PredictionCard({
 
           {/* Le contenu (la vraie prédiction, derrière la promesse du
               teaser) reste toujours affiché, mais flouté tant que non
-              révélée — le texte reste bien là (jamais remplacé par un
-              faux contenu), juste illisible, jusqu'à la date. La RLS ne
-              renvoie `content` que si révélée ou si on en est l'auteur :
-              seul l'auteur a donc un vrai texte à flouter avant révélation. */}
-          {item.content ? (
+              révélée — le texte reste bien là (jamais remplacé par un faux
+              contenu), juste illisible, jusqu'à la date. La RLS ne renvoie
+              `content` que si révélée ou si on en est l'auteur : sans lui
+              (destinataire, avant révélation), `SEALED_CONTENT_PLACEHOLDER`
+              prend la même place avec le même style et le même flou — la
+              carte reste identique que la prédiction soit la sienne ou
+              celle d'un autre membre du Cercle. */}
+          {(item.content || !revealed) && (
             <Text style={[styles.cardContent, !revealed && styles.cardContentBlurred]}>
-              {item.content}
+              {item.content ?? SEALED_CONTENT_PLACEHOLDER}
             </Text>
-          ) : (
-            /* Sans contenu à flouter (destinataire, avant révélation — RLS
-               ne le lui donne pas), un simulacre de lignes de texte floutées
-               garde la carte visuellement cohérente avec celle de l'auteur :
-               jamais du vrai texte, juste sa silhouette. */
-            !revealed && (
-              <View style={[styles.cardContentPlaceholder, styles.cardContentBlurred]}>
-                <View style={[styles.cardContentPlaceholderLine, styles.cardContentPlaceholderLineW1]} />
-                <View style={[styles.cardContentPlaceholderLine, styles.cardContentPlaceholderLineW2]} />
-              </View>
-            )
           )}
 
           {/* Le tampon certifie le verdict sous la prédiction, dans le flux
@@ -920,12 +920,6 @@ const styles = StyleSheet.create({
     web: { filter: 'blur(5px)' } as object,
     default: { opacity: 0.15 },
   }),
-  // Silhouette de texte pour les destinataires avant révélation — même
-  // rythme visuel que `cardContent`, sans jamais en être un aperçu réel.
-  cardContentPlaceholder: { marginTop: 2, gap: 6 },
-  cardContentPlaceholderLine: { height: 16, borderRadius: 4, backgroundColor: colors.surfaceRaised },
-  cardContentPlaceholderLineW1: { width: '88%' },
-  cardContentPlaceholderLineW2: { width: '62%' },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
