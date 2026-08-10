@@ -12,6 +12,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { AuthProvider, useAuth } from '../lib/auth';
 import { colors } from '../lib/theme';
+import { ThemeModeProvider } from '../lib/themeMode';
 
 function RootNavigator() {
   const { session, loading } = useAuth();
@@ -70,10 +71,12 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthProvider>
-      <StatusBar style="light" />
-      <RootNavigator />
-    </AuthProvider>
+    <ThemeModeProvider>
+      <AuthProvider>
+        <StatusBar style="light" />
+        <RootNavigator />
+      </AuthProvider>
+    </ThemeModeProvider>
   );
 }
 
