@@ -50,6 +50,11 @@ export const colors = {
   // les deux verdicts portent en plus une lueur externe (`shadow*`).
   neonGreen: '#00E676',
   neonRed: '#FF1744',
+  // Contour de carte Scellé/Réalisé (voir `PredictionCard`) : gris neutre
+  // mais assez clair pour rester bien visible sur le fond anthracite — ces
+  // deux états ne portent plus de couleur vive en bordure, seule l'étiquette
+  // (ou le tampon) doit attirer l'œil.
+  cardBorderNeutral: '#9CA3AF',
   // Trait des icônes (Lucide) : gris clair plutôt que blanc pur, pour
   // qu'elles restent discrètes sans se fondre dans le fond sombre.
   icon: '#C9CDD3',
