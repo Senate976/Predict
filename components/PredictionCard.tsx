@@ -777,19 +777,14 @@ const styles = StyleSheet.create({
     // d'emoji comme sur Facebook.
     ...(Platform.OS === 'web' ? { userSelect: 'none' } : null),
   },
-  // Scellé et En cours partagent le même traitement : le jaune de la charte
-  // (`gold`), pas une couleur néon à part (cyan, ambre) — ce sont deux états
-  // d'attente, pas encore le verdict. Halo discret (`shadowOpacity` faible),
-  // pas la lueur marquée des deux verdicts. Fond `surface` inchangé : la
-  // lisibilité prime, seul le contour porte la couleur.
+  // Scellé : plus de bordure ni de lueur dorées — un contour gris neutre,
+  // sans glow, pour ne pas concurrencer l'étiquette « SCELLÉ » (elle reste
+  // dorée, voir `stateLabel`) qui doit seule porter l'attention colorée.
   cardSealed: {
-    borderColor: colors.gold,
-    shadowColor: colors.gold,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 4,
+    borderColor: colors.cardBorderNeutral,
   },
+  // En cours garde le contour doré (état d'attente encore actif, distinct
+  // de Scellé) — voir `stateLabel` pour l'étiquette assortie.
   cardActive: {
     borderColor: colors.gold,
     shadowColor: colors.gold,
@@ -798,17 +793,14 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 4,
   },
-  // Les deux verdicts, l'élément clé du site : contour néon + lueur externe
+  // Réalisé : même logique que Scellé — plus de bordure ni de lueur vertes,
+  // le tampon (rendu plus bas) porte seul le verdict.
+  cardRealized: {
+    borderColor: colors.cardBorderNeutral,
+  },
+  // Manqué, l'élément clé du site, garde son contour néon + lueur externe
   // (`shadow*` — se traduit en `box-shadow` sur le web, `elevation` sur
   // Android n'en reprend que l'ombre portée, sans teinte colorée).
-  cardRealized: {
-    borderColor: colors.neonGreen,
-    shadowColor: colors.neonGreen,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.55,
-    shadowRadius: 14,
-    elevation: 10,
-  },
   cardMissed: {
     borderColor: colors.neonRed,
     shadowColor: colors.neonRed,
@@ -869,9 +861,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  // Mêmes couleurs néon que le contour de carte une fois le verdict affirmé
-  // (`cardRealized`/`cardMissed`) — cohérence entre le choix proposé ici et
-  // son résultat visuel une fois posé.
+  // Vert/rouge conservés ici (boutons d'action, pas le contour de carte une
+  // fois le verdict posé — voir `cardRealized`/`cardMissed`, désormais gris
+  // neutre côté Réalisé) : le choix à trancher doit rester net.
   verdictPromptButtonRealized: {
     borderColor: colors.neonGreen,
     backgroundColor: 'rgba(0, 230, 118, 0.12)',
