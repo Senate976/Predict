@@ -2361,9 +2361,13 @@ alter table public.predictions add column if not exists is_immediate boolean not
 -- groupe visé sur la prédiction elle-même).
 alter table public.predictions add column if not exists group_id uuid references public.groups (id) on delete set null;
 
-alter table public.prediction_votes drop constraint if exists prediction_votes_vote_value_check;
-alter table public.prediction_votes add constraint prediction_votes_vote_value_check
-  check (vote_value in ('realized', 'missed', 'believe', 'disbelieve'));
+-- `prediction_votes_vote_value_check` n'est posée qu'à partir de la section
+-- Hype/Réputation plus bas (liste la plus large, quatre catégories) — la
+-- poser ici avec cette liste plus étroite casserait la ré-exécution de ce
+-- script sur une base qui contient déjà des votes Hype/Réputation
+-- (`chaud`/`froid`/`mytho`/`confiance`), pas encore nettoyés à ce stade du
+-- script (voir la suppression explicite plus bas, une fois cette catégorie
+-- de vote retirée de l'app).
 
 -- `create_prediction` reprend sa signature de la section 27 et ajoute
 -- `p_is_immediate` : quand `true`, la base pose elle-même `reveal_at = now()`
