@@ -439,15 +439,11 @@ export function PredictionCard({
       )}
 
       {/* Le corps de la carte (avatar, pseudo, texte, réactions) — jamais le
-          badge d'état ci-dessus — s'assourdit tant que Scellée, et un peu
-          moins une fois Manquée : la carte reste lisible, mais se lit
-          d'emblée comme secondaire par rapport à un Predict Réalisé. */}
-      <View
-        style={[
-          cardState.kind === 'sealed' && styles.cardBodySealed,
-          cardState.kind === 'missed' && styles.cardBodyMissed,
-        ]}
-      >
+          badge d'état ci-dessus — s'assourdit légèrement une fois Manquée :
+          la carte reste lisible, mais se lit d'emblée comme secondaire par
+          rapport à un Predict Réalisé. Scellée reste à pleine opacité — la
+          lisibilité prime, seul le contour néon doré marque son statut. */}
+      <View style={[cardState.kind === 'missed' && styles.cardBodyMissed]}>
         <Pressable onPress={() => onPress?.()} style={({ pressed }) => pressed && styles.cardPressed}>
         {/* Une seule ligne : [avatar][pseudo] ...espace flexible... [bulle de
             révélation (si programmée et pas encore révélée) ou tampon de
@@ -721,11 +717,20 @@ const styles = StyleSheet.create({
     // d'emoji comme sur Facebook.
     ...(Platform.OS === 'web' ? { userSelect: 'none' } : null),
   },
-  // Scellée : contour neutre et fond assombri dédiés — plus sombre que
-  // `surface`, jamais une couleur vive, contrairement aux 3 autres états.
-  cardSealed: { borderColor: colors.sealedBorder, backgroundColor: colors.sealedBg },
+  // Scellée : même traitement glow que les 3 autres états, doré plutôt que
+  // cyan/vert/rouge — un halo discret (`shadowOpacity` faible), pas la lueur
+  // marquée des deux verdicts. Fond `surface` inchangé : la lisibilité prime,
+  // seul le contour néon marque le statut.
+  cardSealed: {
+    borderColor: colors.sealedBorder,
+    shadowColor: colors.sealedBorder,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 4,
+  },
   // Predict revélé, en attente de verdict : contour néon cyan, sans lueur —
-  // la lueur externe (`shadow*`) reste réservée aux deux verdicts.
+  // la lueur externe (`shadow*`) reste réservée aux verdicts et à Scellée.
   cardActive: { borderColor: colors.neonCyan },
   // Les deux verdicts, l'élément clé du site : contour néon + lueur externe
   // (`shadow*` — se traduit en `box-shadow` sur le web, `elevation` sur
@@ -765,9 +770,8 @@ const styles = StyleSheet.create({
   },
   stateLabelSealed: { color: colors.sealedLabel },
   stateLabelActive: { color: colors.neonCyan },
-  // Corps de carte assourdi — jamais le badge d'état, rendu séparément avant
-  // ce conteneur et donc toujours à `opacity: 1`.
-  cardBodySealed: { opacity: 0.65 },
+  // Corps de carte assourdi une fois Manquée — jamais le badge d'état,
+  // rendu séparément avant ce conteneur et donc toujours à `opacity: 1`.
   cardBodyMissed: { opacity: 0.85 },
   headerMenuButton: { padding: 2 },
   // Invite l'auteur à trancher — au-dessus de la carte tappable, jamais
