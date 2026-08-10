@@ -43,17 +43,11 @@ export const colors = {
   dangerSoft: 'rgba(248, 113, 113, 0.12)',
   // Pastille de notification (badge de la cloche).
   notificationBadge: '#EF4444',
-  // Libellé « SCELLÉ » (+ cadenas) et contour de la carte Scellée — même
-  // doré que les 3 autres états portent leur propre néon (cyan/vert/rouge) :
-  // cohérence visuelle du glow sur les 4 états plutôt qu'un traitement
-  // neutre à part pour celui-ci.
-  sealedLabel: '#E5A93C',
-  sealedBorder: '#E5A93C',
-  // Les trois couleurs néon des 4 états de carte (voir `PredictionCard`) :
-  // cyan pour « En cours », vert pour un Predict réalisé, rouge pour manqué.
-  // Contour fin partout ; vert et rouge portent en plus une lueur externe
-  // (`shadow*`) — ce sont les deux verdicts, l'élément clé du site.
-  neonCyan: '#00E5FF',
+  // Les couleurs néon des 4 états de carte (voir `PredictionCard`) : Scellé
+  // et En cours partagent le jaune de la charte (`gold`) plutôt qu'un cyan ou
+  // un ambre à part — seuls Réalisé (vert) et Manqué (rouge) tranchent en une
+  // couleur différente, puisqu'ils portent le verdict. Contour fin partout ;
+  // les deux verdicts portent en plus une lueur externe (`shadow*`).
   neonGreen: '#00E676',
   neonRed: '#FF1744',
   // Trait des icônes (Lucide) : gris clair plutôt que blanc pur, pour
