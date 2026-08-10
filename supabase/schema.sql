@@ -2146,9 +2146,12 @@ alter table public.profiles drop column if exists phone;
 -- l'afficher dans le Fil ; `notify_mention` ajoute la notification dédiée.
 alter table public.predictions add column if not exists mentioned_user_ids uuid[] not null default '{}'::uuid[];
 
-alter table public.notifications drop constraint if exists notifications_type_check;
-alter table public.notifications add constraint notifications_type_check
-  check (type in ('new_teaser', 'prediction_revealed', 'prediction_approved', 'group_invite', 'prediction_mentioned'));
+-- `notifications_type_check` n'est (re)posée que plus bas, une seule fois,
+-- avec la liste complète et à jour de tous les types connus — la reposer ici
+-- avec la liste plus étroite de l'époque de cette section casserait la
+-- ré-exécution de ce script sur une base qui contient déjà des notifications
+-- d'un type ajouté dans une section ultérieure (« check constraint ...
+-- is violated by some row »).
 
 -- `security definer` : la notification est pour le destinataire cité, pas
 -- pour l'auteur qui appelle — elle se revérifie donc elle-même (auteur de la
@@ -3028,14 +3031,8 @@ alter table public.predictions add constraint predictions_author_verdict_check
   check (author_verdict in ('realized', 'missed'));
 
 -- Deux nouveaux types de notification : chaque destinataire est prévenu dès
--- que l'auteur tranche. (La contrainte n'est reposée qu'une fois, avec la
--- liste complète à jour, comme à chaque ajout précédent.)
-alter table public.notifications drop constraint if exists notifications_type_check;
-alter table public.notifications add constraint notifications_type_check
-  check (type in (
-    'new_teaser', 'prediction_revealed', 'prediction_approved', 'group_invite',
-    'prediction_mentioned', 'prediction_realized', 'prediction_missed'
-  ));
+-- que l'auteur tranche. (Toujours pas reposée ici, pour la même raison —
+-- voir plus haut — la liste complète et à jour reste plus bas, section 36.)
 
 -- `security definer` : seul l'auteur peut affirmer le verdict de sa propre
 -- prédiction, une fois révélée, et une seule fois — `author_verdict is null`
