@@ -41,10 +41,17 @@ const UNREAD_POLL_MS = 20_000;
  * deux change. */
 const CENTER_BUTTON_RADIUS = 26;
 const CENTER_BUTTON_RISE = 18;
+/** `paddingTop` de `styles.bar` : le bouton (comme les icônes) vit dans le
+ * contenu de la barre, décalé de cette marge par rapport à son bord
+ * supérieur — sans elle, le centre du bouton calculé ici tombait 10px plus
+ * haut que sa vraie position, cassant la concentricité de la découpe (elle
+ * s'approchait bien plus près du bouton réel que le `NOTCH_GAP` visé). */
+const BAR_PADDING_TOP = 10;
 /** Centre du bouton, en Y, relatif au bord supérieur de la barre (Y=0) —
- * le bouton étant décalé de `CENTER_BUTTON_RISE` vers le haut, son centre
- * tombe `CENTER_BUTTON_RISE` sous son propre rayon. */
-const BUTTON_CENTER_Y = CENTER_BUTTON_RADIUS - CENTER_BUTTON_RISE;
+ * le bouton étant décalé de `CENTER_BUTTON_RISE` vers le haut depuis le
+ * bord du contenu (déjà `BAR_PADDING_TOP` sous le bord de la barre), son
+ * centre tombe `CENTER_BUTTON_RISE` sous son propre rayon, plus ce padding. */
+const BUTTON_CENTER_Y = BAR_PADDING_TOP + CENTER_BUTTON_RADIUS - CENTER_BUTTON_RISE;
 /** Espace exact, en tout point, entre le trait et le bouton — jamais un
  * simple dégagement approximatif : le trait suit un arc concentrique au
  * bouton, à ce rayon en plus du sien, donc à cette distance constante de
@@ -218,13 +225,10 @@ const styles = StyleSheet.create({
   bar: {
     backgroundColor: colors.navBar,
     height: 64,
-    paddingTop: 10,
+    paddingTop: BAR_PADDING_TOP,
   },
-  // Positionné pour que son `baseY` (voir `TabBarNotchBorder`) tombe
-  // exactement sur le bord supérieur de la barre, la bosse dépassant par-
-  // dessus plutôt que d'être tronquée.
-  // La découpe plonge sous la barre (vers le bouton, qui déborde bien plus
-  // bas que le bord supérieur) plutôt que de dépasser par-dessus — le
+  // La découpe plonge sous le bord supérieur de la barre (vers le bouton,
+  // qui déborde bien plus bas) plutôt que de dépasser par-dessus — le
   // canevas s'aligne donc pile sur ce bord, sans décalage vers le haut.
   notchBorder: { position: 'absolute', top: 0, left: 0 },
   // Boîte de taille fixe : c'est elle qui aligne les quatre onglets entre eux.
