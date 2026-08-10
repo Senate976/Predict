@@ -63,7 +63,9 @@ export const colors = {
   // Barre de navigation : même noir que le fond de page, tranche seulement
   // via sa bordure supérieure.
   navBar: '#090A0F',
-  navBarBorder: 'rgba(255, 255, 255, 0.08)',
+  // Assez visible pour lire clairement la découpe autour du bouton central
+  // (voir `TabBarNotchBorder`) — `border` (0.08) s'y fondrait complètement.
+  navBarBorder: 'rgba(255, 255, 255, 0.3)',
   // Onglet actif en jaune (accent), inactif en gris neutre — l'accent ne sert
   // qu'à désigner l'état actif, jamais un fond.
   navBarActive: '#FACC15',
