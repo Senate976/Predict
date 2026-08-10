@@ -406,23 +406,23 @@ export function PredictionCard({
       ]}
     >
       {/* Réalisé : le contour doré se prolonge en une petite couronne au
-          centre du bord supérieur — le même trait, sans rupture ni
-          remplissage, plutôt qu'une icône séparée posée sur la carte. Assez
-          réduite pour rester discrète, mais reconnaissable comme couronne. */}
+          centre du bord supérieur — trois arches continues (courbes de
+          Bézier à tangente horizontale à chaque crête/creux, jamais un angle
+          vif) pour que le trait reste un seul geste fluide, dans le
+          prolongement direct de la bordure plutôt qu'une icône rapportée. */}
       {cardState.kind === 'realized' && (
         <Svg
           style={styles.crownAccent}
-          viewBox="0 0 34 12"
-          width={34}
-          height={12}
+          viewBox="0 0 40 16"
+          width={40}
+          height={16}
           pointerEvents="none"
         >
           <Path
-            d="M0,12 L6,4 L12,11 L17,0 L22,11 L28,4 L34,12"
+            d="M0,16 C2.67,16 5.33,7 8,7 C10,7 12,12 14,12 C16,12 18,3 20,3 C22,3 24,12 26,12 C28,12 30,7 32,7 C34.67,7 37.33,16 40,16"
             stroke={colors.gold}
-            strokeWidth={1.25}
-            strokeLinejoin="round"
-            strokeLinecap="round"
+            strokeWidth={1.4}
+            strokeLinecap="butt"
             fill="none"
           />
         </Svg>
@@ -767,9 +767,9 @@ function createStyles(colors: Colors) {
   // supérieur — même trait, sans rupture, plutôt qu'une icône rapportée.
   crownAccent: {
     position: 'absolute',
-    top: -12,
+    top: -16,
     left: '50%',
-    marginLeft: -17,
+    marginLeft: -20,
   },
   // Manqué, l'élément clé du site, garde son contour néon + lueur externe
   // (`shadow*` — se traduit en `box-shadow` sur le web, `elevation` sur
