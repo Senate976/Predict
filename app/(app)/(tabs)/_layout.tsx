@@ -41,41 +41,55 @@ const UNREAD_POLL_MS = 20_000;
  * deux change. */
 const CENTER_BUTTON_RADIUS = 26;
 const CENTER_BUTTON_RISE = 18;
-/** Espace laissé entre le trait de la barre et le bouton — la découpe
- * « épouse » sa silhouette sans jamais la toucher. */
-const NOTCH_GAP = 8;
-const NOTCH_HALF_WIDTH = Math.ceil(Math.sqrt(CENTER_BUTTON_RADIUS ** 2 - CENTER_BUTTON_RISE ** 2)) + NOTCH_GAP;
-/** Hauteur de la bosse : combien le trait remonte au centre de la découpe. */
-const NOTCH_RISE = 14;
-/** Marge au-dessus du trait normal de la barre pour loger cette bosse — le
- * canevas SVG doit être décalé vers le haut d'autant, sans quoi la bosse
- * serait tronquée au lieu de dépasser proprement au-dessus de la barre. */
-const NOTCH_CANVAS_RISE = 20;
+/** Centre du bouton, en Y, relatif au bord supérieur de la barre (Y=0) —
+ * le bouton étant décalé de `CENTER_BUTTON_RISE` vers le haut, son centre
+ * tombe `CENTER_BUTTON_RISE` sous son propre rayon. */
+const BUTTON_CENTER_Y = CENTER_BUTTON_RADIUS - CENTER_BUTTON_RISE;
+/** Espace exact, en tout point, entre le trait et le bouton — jamais un
+ * simple dégagement approximatif : le trait suit un arc concentrique au
+ * bouton, à ce rayon en plus du sien, donc à cette distance constante de
+ * son contour partout, pas seulement à son point le plus proche. */
+const NOTCH_GAP = 3;
+const NOTCH_RADIUS = CENTER_BUTTON_RADIUS + NOTCH_GAP;
+/** Angles (radians) où ce cercle concentrique croise la ligne Y=0 — au-delà,
+ * le trait reste la ligne droite normale de la barre. `Math.asin` ne rend
+ * que le quadrant [-90°, 90°] ; le second point est son symétrique par
+ * rapport à l'axe vertical (180° - angle), pas son opposé. */
+const NOTCH_CROSSING_ANGLE = Math.asin(-BUTTON_CENTER_Y / NOTCH_RADIUS);
+/** Nombre de segments de l'arc — une ligne brisée assez dense pour se lire
+ * comme une courbe lisse, chaque sommet calculé exactement sur le cercle
+ * concentrique plutôt qu'approché par une courbe de Bézier. */
+const NOTCH_SEGMENTS = 24;
 
 /**
  * Trait du haut de la barre de navigation, en SVG plutôt qu'une simple
  * bordure CSS : une ligne droite aurait coupé tout droit à travers le
- * bouton central « + », qui déborde déjà au-dessus de la barre — cette
- * découpe épouse sa silhouette avec un espace, au lieu de le traverser.
+ * bouton central « + », qui déborde déjà au-dessus de la barre. Cette
+ * découpe contourne sa silhouette par le dessous, sur un arc concentrique à
+ * son cercle (même centre, rayon `NOTCH_GAP` plus grand) : la distance au
+ * bouton reste donc exactement `NOTCH_GAP`, en tout point de la courbe, et
+ * pas seulement à son sommet — jamais un simple rapprochement à l'œil.
  */
 function TabBarNotchBorder() {
   const { width } = useWindowDimensions();
   const cx = width / 2;
-  const baseY = NOTCH_CANVAS_RISE;
-  const peakY = baseY - NOTCH_RISE;
-  const d =
-    `M 0 ${baseY} L ${cx - NOTCH_HALF_WIDTH} ${baseY} ` +
-    `C ${cx - NOTCH_HALF_WIDTH * 0.5} ${baseY}, ${cx - NOTCH_HALF_WIDTH * 0.5} ${peakY}, ${cx} ${peakY} ` +
-    `C ${cx + NOTCH_HALF_WIDTH * 0.5} ${peakY}, ${cx + NOTCH_HALF_WIDTH * 0.5} ${baseY}, ${cx + NOTCH_HALF_WIDTH} ${baseY} ` +
-    `L ${width} ${baseY}`;
+
+  // Du point gauche (angle π - crossing) au point droit (angle crossing),
+  // en décroissant : ce sens passe par π/2 (le point le plus bas du
+  // cercle, sous le bouton) plutôt que par le haut, à l'opposé.
+  const startAngle = Math.PI - NOTCH_CROSSING_ANGLE;
+  const endAngle = NOTCH_CROSSING_ANGLE;
+  const points: string[] = [];
+  for (let i = 0; i <= NOTCH_SEGMENTS; i++) {
+    const angle = startAngle + ((endAngle - startAngle) * i) / NOTCH_SEGMENTS;
+    const x = cx + NOTCH_RADIUS * Math.cos(angle);
+    const y = BUTTON_CENTER_Y + NOTCH_RADIUS * Math.sin(angle);
+    points.push(`${x.toFixed(2)} ${y.toFixed(2)}`);
+  }
+  const d = `M 0 0 L ${points[0]} L ${points.slice(1).join(' L ')} L ${width} 0`;
 
   return (
-    <Svg
-      width={width}
-      height={NOTCH_CANVAS_RISE + 2}
-      style={styles.notchBorder}
-      pointerEvents="none"
-    >
+    <Svg width={width} height={NOTCH_RADIUS + BUTTON_CENTER_Y + 2} style={styles.notchBorder} pointerEvents="none">
       <Path d={d} stroke={colors.navBarBorder} strokeWidth={1} fill="none" />
     </Svg>
   );
@@ -209,7 +223,10 @@ const styles = StyleSheet.create({
   // Positionné pour que son `baseY` (voir `TabBarNotchBorder`) tombe
   // exactement sur le bord supérieur de la barre, la bosse dépassant par-
   // dessus plutôt que d'être tronquée.
-  notchBorder: { position: 'absolute', top: -NOTCH_CANVAS_RISE, left: 0 },
+  // La découpe plonge sous la barre (vers le bouton, qui déborde bien plus
+  // bas que le bord supérieur) plutôt que de dépasser par-dessus — le
+  // canevas s'aligne donc pile sur ce bord, sans décalage vers le haut.
+  notchBorder: { position: 'absolute', top: 0, left: 0 },
   // Boîte de taille fixe : c'est elle qui aligne les quatre onglets entre eux.
   // Sans ça, le monogramme « P » (un glyphe texte, avec sa propre hauteur de
   // ligne) ne tombait pas sur la même ligne optique que les icônes Lucide.
