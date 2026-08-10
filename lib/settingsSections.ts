@@ -1,5 +1,5 @@
 /** Sections de l'écran Paramètres — chacune a son propre écran sous
- * `app/(app)/settings/<id>.tsx`. Pas de mode sombre : hors périmètre. */
+ * `app/(app)/settings/<id>.tsx`. */
 export type SettingsSectionId =
   | 'account'
   | 'privacy'
@@ -7,6 +7,7 @@ export type SettingsSectionId =
   | 'security'
   | 'reminders'
   | 'accessibility'
+  | 'appearance'
   | 'languages';
 
 export const SETTINGS_SECTIONS: { id: SettingsSectionId; label: string }[] = [
@@ -16,6 +17,7 @@ export const SETTINGS_SECTIONS: { id: SettingsSectionId; label: string }[] = [
   { id: 'security', label: 'Sécurité' },
   { id: 'reminders', label: 'Gestion du temps' },
   { id: 'accessibility', label: 'Accessibilité' },
+  { id: 'appearance', label: 'Apparence' },
   { id: 'languages', label: 'Langues' },
 ];
 
