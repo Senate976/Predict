@@ -406,23 +406,25 @@ export function PredictionCard({
       ]}
     >
       {/* Réalisé : le contour doré se prolonge en une petite couronne au
-          centre du bord supérieur — trois arches continues (courbes de
-          Bézier à tangente horizontale à chaque crête/creux, jamais un angle
-          vif) pour que le trait reste un seul geste fluide, dans le
-          prolongement direct de la bordure plutôt qu'une icône rapportée. */}
+          centre du bord supérieur — deux montants verticaux droits (comme les
+          bords d'une vraie couronne), puis entre eux trois arches continues
+          en courbes de Bézier (tangente horizontale à chaque crête/creux,
+          jamais d'angle vif dans la couronne elle-même). Prolongement direct
+          de la bordure, jamais une icône rapportée. */}
       {cardState.kind === 'realized' && (
         <Svg
           style={styles.crownAccent}
-          viewBox="0 0 40 16"
+          viewBox="0 0 40 22"
           width={40}
-          height={16}
+          height={22}
           pointerEvents="none"
         >
           <Path
-            d="M0,16 C2.67,16 5.33,7 8,7 C10,7 12,12 14,12 C16,12 18,3 20,3 C22,3 24,12 26,12 C28,12 30,7 32,7 C34.67,7 37.33,16 40,16"
+            d="M0,22 L0,12 C2.67,12 5.33,3 8,3 C10,3 12,8 14,8 C16,8 18,1 20,1 C22,1 24,8 26,8 C28,8 30,3 32,3 C34.67,3 37.33,12 40,12 L40,22"
             stroke={colors.gold}
             strokeWidth={1.4}
             strokeLinecap="butt"
+            strokeLinejoin="round"
             fill="none"
           />
         </Svg>
@@ -767,7 +769,7 @@ function createStyles(colors: Colors) {
   // supérieur — même trait, sans rupture, plutôt qu'une icône rapportée.
   crownAccent: {
     position: 'absolute',
-    top: -16,
+    top: -22,
     left: '50%',
     marginLeft: -20,
   },
