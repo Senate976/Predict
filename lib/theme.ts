@@ -9,7 +9,9 @@ export const colors = {
   // Fond de page quasi-noir — les cartes (`surface`, plus clair) tranchent
   // dessus sans jamais atteindre un noir ou un blanc pur.
   background: '#090A0F',
-  surface: '#161B22',
+  // Anthracite plutôt qu'ardoise bleutée : plus neutre, pour laisser les
+  // contours néon (Sealed/Predict/Réalisé/Manqué) porter seuls la couleur.
+  surface: '#12141A',
   // Légèrement plus clair que `surface` — modales, panneaux flottants,
   // tout ce qui doit sembler « au-dessus » d'une carte.
   surfaceRaised: '#1C232D',
@@ -41,22 +43,17 @@ export const colors = {
   dangerSoft: 'rgba(248, 113, 113, 0.12)',
   // Pastille de notification (badge de la cloche).
   notificationBadge: '#EF4444',
-  // Pastilles lumineuses de l'encart d'état (glassmorphism) — une couleur
-  // par statut plutôt qu'un aplat de fond derrière tout le libellé. Rien
-  // qu'un statut « scellé » et « en attente » : une fois le verdict affirmé,
-  // le tampon fait déjà le travail, l'encart ne s'affiche plus du tout.
-  statusDotSealed: '#8B93A1',
-  statusDotActive: '#FACC15',
-  // Bordures des boutons Réalisé/Manqué proposés à l'auteur — mêmes teintes
-  // de marque que les pastilles, avant qu'un verdict ne soit affirmé.
-  verdictRealized: '#2DD4BF',
-  verdictMissed: '#F472B6',
-  // Fond semi-transparent des badges/panneaux glassmorphism (statut de
-  // carte, bulles) — assombri plutôt qu'un flou réel (non disponible sans
-  // dépendance native supplémentaire), posé sur une bordure claire fine pour
-  // suggérer la même profondeur.
-  glassBg: 'rgba(22, 27, 34, 0.72)',
-  glassBorder: 'rgba(255, 255, 255, 0.10)',
+  // Libellé « SCELLÉ » (+ cadenas) en coin de carte — gris légèrement teinté
+  // de jaune, jamais l'accent `gold` en pleine intensité : un statut neutre
+  // en attente, pas une action.
+  sealedLabel: '#B8AD84',
+  // Les trois couleurs néon des 4 états de carte (voir `PredictionCard`) :
+  // cyan pour « En cours », vert pour un Predict réalisé, rouge pour manqué.
+  // Contour fin partout ; vert et rouge portent en plus une lueur externe
+  // (`shadow*`) — ce sont les deux verdicts, l'élément clé du site.
+  neonCyan: '#00E5FF',
+  neonGreen: '#00E676',
+  neonRed: '#FF1744',
   // Trait des icônes (Lucide) : gris clair plutôt que blanc pur, pour
   // qu'elles restent discrètes sans se fondre dans le fond sombre.
   icon: '#C9CDD3',
