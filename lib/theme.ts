@@ -43,17 +43,17 @@ export const colors = {
   dangerSoft: 'rgba(248, 113, 113, 0.12)',
   // Pastille de notification (badge de la cloche).
   notificationBadge: '#EF4444',
-  // Les couleurs néon des 4 états de carte (voir `PredictionCard`) : Scellé
-  // et En cours partagent le jaune de la charte (`gold`) plutôt qu'un cyan ou
-  // un ambre à part — seuls Réalisé (vert) et Manqué (rouge) tranchent en une
-  // couleur différente, puisqu'ils portent le verdict. Contour fin partout ;
-  // les deux verdicts portent en plus une lueur externe (`shadow*`).
+  // Couleurs néon des boutons d'action « Réalisé »/« Manqué » (voir
+  // `verdictPromptButton*`) et du contour de carte une fois Manqué affirmé
+  // (`cardMissed`, avec en plus une lueur externe `shadow*`) — Scellé, En
+  // cours et Réalisé sont eux passés au gris neutre (`cardBorderNeutral`)
+  // une fois le verdict posé ou en attente, plus aucune couleur vive.
   neonGreen: '#00E676',
   neonRed: '#FF1744',
-  // Contour de carte Scellé/Réalisé (voir `PredictionCard`) : gris neutre
-  // mais assez clair pour rester bien visible sur le fond anthracite — ces
-  // deux états ne portent plus de couleur vive en bordure, seule l'étiquette
-  // (ou le tampon) doit attirer l'œil.
+  // Contour de carte Scellé/En cours/Réalisé, et libellé assorti (texte +
+  // cadenas) — voir `PredictionCard` : gris neutre mais assez clair pour
+  // rester bien visible sur le fond anthracite, sans lueur colorée. Seul
+  // Manqué garde encore une couleur vive.
   cardBorderNeutral: '#9CA3AF',
   // Trait des icônes (Lucide) : gris clair plutôt que blanc pur, pour
   // qu'elles restent discrètes sans se fondre dans le fond sombre.
