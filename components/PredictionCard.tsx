@@ -442,7 +442,7 @@ export function PredictionCard({
           tampon en dessous porte seul la réponse, plus de titre à répéter. */}
       {cardState.label && (
         <View style={styles.stateRow}>
-          {cardState.kind === 'sealed' && <Lock size={12} color={colors.gold} strokeWidth={2} />}
+          {cardState.kind === 'sealed' && <Lock size={12} color={colors.cardBorderNeutral} strokeWidth={2} />}
           <Text style={styles.stateLabel} numberOfLines={1}>
             {cardState.label}
           </Text>
@@ -777,24 +777,18 @@ const styles = StyleSheet.create({
     // d'emoji comme sur Facebook.
     ...(Platform.OS === 'web' ? { userSelect: 'none' } : null),
   },
-  // Scellé : plus de bordure ni de lueur dorées — un contour gris neutre,
-  // sans glow, pour ne pas concurrencer l'étiquette « SCELLÉ » (elle reste
-  // dorée, voir `stateLabel`) qui doit seule porter l'attention colorée.
+  // Scellé et En cours : plus de bordure ni de lueur dorées — un contour
+  // gris neutre, sans glow, tout comme l'étiquette elle-même (texte +
+  // cadenas, voir `stateLabel`/`Lock` plus bas) : ces deux états d'attente
+  // ne portent plus aucune couleur vive, réservée aux deux verdicts.
   cardSealed: {
     borderColor: colors.cardBorderNeutral,
   },
-  // En cours garde le contour doré (état d'attente encore actif, distinct
-  // de Scellé) — voir `stateLabel` pour l'étiquette assortie.
   cardActive: {
-    borderColor: colors.gold,
-    shadowColor: colors.gold,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 4,
+    borderColor: colors.cardBorderNeutral,
   },
-  // Réalisé : même logique que Scellé — plus de bordure ni de lueur vertes,
-  // le tampon (rendu plus bas) porte seul le verdict.
+  // Réalisé : même contour gris neutre — plus de bordure ni de lueur
+  // vertes, le tampon (rendu plus bas) porte seul le verdict.
   cardRealized: {
     borderColor: colors.cardBorderNeutral,
   },
@@ -820,14 +814,15 @@ const styles = StyleSheet.create({
   // Libellé d'état sur sa propre ligne, au-dessus de [avatar][pseudo] —
   // jamais inline dans l'en-tête, où il disputerait la largeur au pseudo.
   stateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6, marginBottom: 10 },
-  // Scellé et En cours partagent le même libellé doré — voir `cardSealed`/
-  // `cardActive` pour le contour assorti.
+  // Scellé et En cours partagent le même libellé gris neutre, assorti au
+  // contour de la carte (voir `cardSealed`/`cardActive`) — plus aucune
+  // couleur vive pour ces deux états d'attente.
   stateLabel: {
     fontFamily: fonts.label,
     fontSize: 11,
     letterSpacing: 1.2,
     textTransform: 'uppercase',
-    color: colors.gold,
+    color: colors.cardBorderNeutral,
   },
   // Corps de carte assourdi une fois Manquée — jamais le badge d'état,
   // rendu séparément avant ce conteneur et donc toujours à `opacity: 1`.
