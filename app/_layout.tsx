@@ -7,17 +7,20 @@ import {
 import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { AuthProvider, useAuth } from '../lib/auth';
-import { colors } from '../lib/theme';
-import { ThemeModeProvider } from '../lib/themeMode';
+import { darkColors, type Colors } from '../lib/theme';
+import { ThemeModeProvider, useColors, useThemeMode } from '../lib/themeMode';
 
 function RootNavigator() {
   const { session, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const { mode } = useThemeMode();
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   useEffect(() => {
     // On attend la fin de la restauration de session pour ne pas afficher
@@ -42,10 +45,13 @@ function RootNavigator() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(app)" />
-    </Stack>
+    <>
+      <StatusBar style={mode === 'light' ? 'dark' : 'light'} />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(app)" />
+      </Stack>
+    </>
   );
 }
 
@@ -63,9 +69,12 @@ export default function RootLayout() {
   });
 
   if (!fontsLoaded) {
+    // Rendu avant même `ThemeModeProvider` (la préférence n'est pas encore
+    // chargée) — palette sombre fixe pour cette brève amorce, pas de
+    // `useColors()` possible ici.
     return (
-      <View style={styles.loader}>
-        <ActivityIndicator size="large" color={colors.text} />
+      <View style={splashStyles.loader}>
+        <ActivityIndicator size="large" color={darkColors.text} />
       </View>
     );
   }
@@ -73,18 +82,23 @@ export default function RootLayout() {
   return (
     <ThemeModeProvider>
       <AuthProvider>
-        <StatusBar style="light" />
         <RootNavigator />
       </AuthProvider>
     </ThemeModeProvider>
   );
 }
 
-const styles = StyleSheet.create({
-  loader: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.background,
-  },
+const splashStyles = StyleSheet.create({
+  loader: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: darkColors.background },
 });
+
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
+    loader: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.background,
+    },
+  });
+}

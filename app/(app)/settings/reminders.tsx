@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '../../../components/Text';
@@ -11,7 +11,8 @@ import {
   updateReminderSettings,
   type ReminderSettings,
 } from '../../../lib/settings';
-import { colors, eyebrow, fonts, radius, spacing } from '../../../lib/theme';
+import { eyebrow, fonts, radius, spacing, type Colors } from '../../../lib/theme';
+import { useColors } from '../../../lib/themeMode';
 
 /** Gestion du temps : rappel avant qu'un Predict qu'on peut voir se révèle —
  * pendant symétrique de la notification « Révélation », mais avant l'heure
@@ -19,6 +20,8 @@ import { colors, eyebrow, fonts, radius, spacing } from '../../../lib/theme';
 export default function RemindersSettingsScreen() {
   const router = useRouter();
   const { session } = useAuth();
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const userId = session?.user.id;
 
   const [settings, setSettings] = useState<ReminderSettings | null>(null);
@@ -112,7 +115,8 @@ export default function RemindersSettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
@@ -128,7 +132,7 @@ const styles = StyleSheet.create({
   headerSpacer: { width: 56 },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   loader: { marginTop: 24 },
-  eyebrow: { ...eyebrow, marginBottom: 8 },
+  eyebrow: { ...eyebrow(colors), marginBottom: 8 },
   sectionSpacing: { marginTop: spacing.xl },
   row: {
     flexDirection: 'row',
@@ -171,4 +175,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: spacing.md,
   },
-});
+  });
+}

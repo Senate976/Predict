@@ -7,7 +7,8 @@ import { Text } from '../../../components/Text';
 
 import { useAuth } from '../../../lib/auth';
 import { fetchUnreadNotificationCount } from '../../../lib/notifications';
-import { colors, fonts } from '../../../lib/theme';
+import { fonts } from '../../../lib/theme';
+import { useColors } from '../../../lib/themeMode';
 
 /** Taille et épaisseur communes aux quatre onglets — une seule source, pour
  * qu'aucune icône ne détonne dans la rangée. */
@@ -23,10 +24,11 @@ function PTabIcon({ color, size }: { color: ColorValue; size: number }) {
 /** Enveloppe commune : boîte de taille fixe (alignement) + point jaune sous
  * l'onglet actif. */
 function TabIcon({ focused, children }: { focused: boolean; children: React.ReactNode }) {
+  const colors = useColors();
   return (
     <View style={{ alignItems: 'center' }}>
       <View style={styles.iconBox}>{children}</View>
-      <View style={[styles.dot, focused && styles.dotActive]} />
+      <View style={[styles.dot, focused && { backgroundColor: colors.gold }]} />
     </View>
   );
 }
@@ -113,20 +115,22 @@ function buildCradlePath(cx: number, width: number): string {
  * Trait du haut de la barre de navigation, en SVG plutôt qu'une simple
  * bordure CSS : une ligne droite aurait coupé tout droit à travers le
  * bouton central « + », qui déborde déjà au-dessus de la barre. Un seul
- * `Path`, en trait seul (`fill="none"`) — jamais de remplissage : le noir
- * sous la courbe est celui, uni, de `styles.bar.backgroundColor`, pas
- * celui de ce SVG. Blanc plein plutôt que semi-transparent : à faible
- * opacité sur fond noir, le trait se lit comme un gris terne plutôt qu'un
- * blanc net.
+ * `Path`, en trait seul (`fill="none"`) — jamais de remplissage : le fond
+ * sous la courbe est celui, uni, de `styles.bar`/`colors.navBar`, pas celui
+ * de ce SVG. Couleur du trait alignée sur `colors.text` (quasi-blanc en
+ * sombre, quasi-noir en clair) plutôt qu'un blanc fixe : à faible opacité
+ * ou sur fond clair, un blanc fixe se lirait comme un gris terne ou
+ * disparaîtrait complètement.
  */
 function TabBarNotchBorder() {
   const { width } = useWindowDimensions();
+  const colors = useColors();
   const cx = width / 2;
   const d = buildCradlePath(cx, width);
 
   return (
     <Svg width={width} height={NOTCH_DEPTH + 4} style={styles.notchBorder} pointerEvents="none">
-      <Path d={d} stroke="#FFFFFF" strokeWidth={1.5} fill="none" />
+      <Path d={d} stroke={colors.text} strokeWidth={1.5} fill="none" />
     </Svg>
   );
 }
@@ -142,11 +146,20 @@ function TabBarNotchBorder() {
  */
 function CreateTabButton() {
   const router = useRouter();
+  const colors = useColors();
   return (
     <View style={styles.centerButtonSlot} pointerEvents="box-none">
       <Pressable
         onPress={() => router.push('/new-prediction')}
-        style={({ pressed }) => [styles.centerButton, pressed && styles.centerButtonPressed]}
+        style={({ pressed }) => [
+          styles.centerButton,
+          {
+            backgroundColor: colors.fab,
+            borderColor: colors.fabBorder,
+            shadowColor: colors.gold,
+          },
+          pressed && styles.centerButtonPressed,
+        ]}
         hitSlop={6}
       >
         <Plus size={26} color={colors.fabIcon} strokeWidth={2.5} />
@@ -157,6 +170,7 @@ function CreateTabButton() {
 
 export default function TabsLayout() {
   const { session } = useAuth();
+  const colors = useColors();
   const userId = session?.user.id;
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -183,7 +197,7 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: colors.navBarActive,
         tabBarInactiveTintColor: colors.navBarInactive,
-        tabBarStyle: styles.bar,
+        tabBarStyle: [styles.bar, { backgroundColor: colors.navBar }],
         tabBarBackground: () => <TabBarNotchBorder />,
         tabBarShowLabel: false,
       }}
@@ -206,7 +220,7 @@ export default function TabsLayout() {
           // Badge natif façon iPhone — style et positionnement gérés par
           // React Navigation, cohérents entre iOS/Android/web sans CSS maison.
           tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
-          tabBarBadgeStyle: styles.badge,
+          tabBarBadgeStyle: [styles.badge, { backgroundColor: colors.notificationBadge }],
           tabBarIcon: ({ color, focused }) => (
             <TabIcon focused={focused}>
               <Bell size={ICON_SIZE} color={color} strokeWidth={STROKE} />
@@ -252,9 +266,6 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   bar: {
-    // Rectangle plein classique — jamais découpé : voir la note sur
-    // `buildCradlePoints`, le SVG ne dessine qu'un trait par-dessus.
-    backgroundColor: colors.navBar,
     height: 64,
     paddingTop: BAR_PADDING_TOP,
     // React Navigation pose par défaut une bordure supérieure grise unie —
@@ -287,9 +298,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
     backgroundColor: 'transparent',
   },
-  dotActive: { backgroundColor: colors.gold },
   badge: {
-    backgroundColor: colors.notificationBadge,
     fontSize: 10,
     fontWeight: '700',
   },
@@ -306,12 +315,9 @@ const styles = StyleSheet.create({
     width: CENTER_BUTTON_RADIUS * 2,
     height: CENTER_BUTTON_RADIUS * 2,
     borderRadius: CENTER_BUTTON_RADIUS,
-    backgroundColor: colors.fab,
     borderWidth: 1.5,
-    borderColor: colors.fabBorder,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.gold,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.35,
     shadowRadius: 10,

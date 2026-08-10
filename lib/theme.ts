@@ -1,11 +1,13 @@
-// Charte graphique « Dark Mode Moderne » : fond très sombre quasi-noir, cartes
-// ardoise légèrement plus claires, texte quasi-blanc — le jaune reste l'unique
-// accent (bordures ciblées, pastilles d'état, boutons d'action), jamais un
-// aplat de couleur vive en fond de carte ou d'en-tête. Un seul endroit à
-// changer si la palette évolue — tous les écrans importent d'ici plutôt que
-// de coder leurs propres couleurs.
+// Charte graphique : deux palettes (sombre par défaut, claire en option — voir
+// Paramètres > Apparence, `lib/themeMode.tsx`), mêmes tokens des deux côtés
+// pour que chaque écran reste identique dans sa structure quel que soit le
+// thème actif. Base blanc/noir/gris avec le jaune comme unique accent
+// (bordures ciblées, pastilles d'état, boutons d'action), jamais un aplat de
+// couleur vive en fond de carte ou d'en-tête. Un seul endroit à changer si
+// l'une des deux palettes évolue — tous les écrans importent `useColors()`
+// (`lib/themeMode.tsx`) plutôt que de coder leurs propres couleurs.
 
-export const colors = {
+export const darkColors = {
   // Fond de page quasi-noir — les cartes (`surface`, plus clair) tranchent
   // dessus sans jamais atteindre un noir ou un blanc pur.
   background: '#090A0F',
@@ -45,14 +47,14 @@ export const colors = {
   notificationBadge: '#EF4444',
   // Couleurs néon des boutons d'action « Réalisé »/« Manqué » (voir
   // `verdictPromptButton*`) et du contour de carte une fois Manqué affirmé
-  // (`cardMissed`, avec en plus une lueur externe `shadow*`). `neonGreen`
-  // ne sert plus qu'au bouton d'action — le contour de carte Réalisé est
-  // repassé au doré (`gold`), voir `cardRealized`.
+  // (`cardMissed`, avec en plus une lueur externe `shadow*`). `neonGreen` ne
+  // sert plus qu'au bouton d'action — le contour de carte Réalisé est passé
+  // au doré (`gold`), voir `cardRealized`.
   neonGreen: '#00E676',
   neonRed: '#FF1744',
-  // Contour de carte Scellé/En cours, et libellé assorti (texte + cadenas)
-  // — voir `PredictionCard` : gris neutre mais assez clair pour rester
-  // bien visible sur le fond anthracite, sans lueur colorée.
+  // Contour de carte Scellé/En cours, et libellé assorti (texte + cadenas) —
+  // voir `PredictionCard` : gris neutre mais assez clair pour rester bien
+  // visible sur le fond anthracite, sans lueur colorée.
   cardBorderNeutral: '#9CA3AF',
   // Trait des icônes (Lucide) : gris clair plutôt que blanc pur, pour
   // qu'elles restent discrètes sans se fondre dans le fond sombre.
@@ -61,16 +63,12 @@ export const colors = {
   // sourd que `icon`, pour un rendu fil d'actualité épuré ; `text` dès qu'il
   // y a au moins une interaction.
   footerIconInactive: '#6B7280',
-  // Tampon « Raté » du Sceau d'Orgueil — zinc clair, sobre : l'échec s'efface
-  // visuellement à côté du tampon doré de victoire.
-  stampMissed: '#A1A1AA',
   // Barre de navigation : même noir que le fond de page, tranche seulement
   // via sa bordure supérieure.
   navBar: '#090A0F',
   // Onglet actif en jaune (accent), inactif en gris neutre — l'accent ne sert
   // qu'à désigner l'état actif, jamais un fond.
   navBarActive: '#FACC15',
-  navBarActiveSoft: 'rgba(250, 204, 21, 0.35)',
   navBarInactive: '#6B7280',
   // Bouton d'action flottant (FAB) : fond ardoise (`surfaceRaised`), bordure
   // et icône jaunes — plus un cercle jaune plein, une lueur discrète plutôt
@@ -78,7 +76,49 @@ export const colors = {
   fab: '#1C232D',
   fabBorder: '#FACC15',
   fabIcon: '#FACC15',
+};
+
+/**
+ * Palette claire : mêmes rôles de tokens, fond blanc/gris très clair, texte
+ * quasi-noir — le jaune reste le seul accent, juste assombri (`#CA8A04`
+ * plutôt que `#FACC15`) pour rester lisible en texte/icône sur fond clair,
+ * où le jaune vif de la palette sombre serait trop pâle. `textOnGold`
+ * s'inverse en conséquence (blanc, posé sur un aplat doré désormais plus
+ * soutenu). Rouge/vert fonctionnels resserrés de même, pour la même raison
+ * de contraste sur blanc plutôt que sur fond quasi-noir.
+ */
+export const lightColors: typeof darkColors = {
+  background: '#FFFFFF',
+  surface: '#F5F5F6',
+  surfaceRaised: '#EBEBEC',
+  border: 'rgba(0, 0, 0, 0.08)',
+  text: '#111114',
+  textMuted: '#5B5F66',
+  textFaint: '#8A8F98',
+  gold: '#CA8A04',
+  goldBright: '#A16207',
+  goldSoft: 'rgba(202, 138, 4, 0.12)',
+  textOnGold: '#FFFFFF',
+  goldTransition: '#92400E',
+  danger: '#DC2626',
+  dangerSoft: 'rgba(220, 38, 38, 0.08)',
+  notificationBadge: '#EF4444',
+  neonGreen: '#16A34A',
+  neonRed: '#DC2626',
+  cardBorderNeutral: '#6B7280',
+  icon: '#4B5563',
+  footerIconInactive: '#9CA3AF',
+  navBar: '#FFFFFF',
+  navBarActive: '#CA8A04',
+  navBarInactive: '#9CA3AF',
+  fab: '#F5F5F6',
+  fabBorder: '#CA8A04',
+  fabIcon: '#CA8A04',
 } as const;
+
+/** Forme commune aux deux palettes — paramètre de toute fonction de style
+ * qui doit réagir au thème (voir `useColors()`, `lib/themeMode.tsx`). */
+export type Colors = typeof darkColors;
 
 export const radius = {
   sm: 8,
@@ -127,12 +167,12 @@ export const fonts = {
 /**
  * Style partagé pour les petites étiquettes de métadonnées (« Destinataires »,
  * « Mes amis »...) : Medium, casse normale, sans tracking, toujours petit.
- * Référence visuelle globale — tous les écrans l'utilisent au lieu de coder
- * leur propre variante. Un objet exporté plutôt qu'un composant : il se
- * glisse tel quel dans un tableau de `style`, sans imposer de structure JSX.
+ * Fonction plutôt qu'objet statique — dépend de `colors.textFaint`, donc du
+ * thème actif — tous les écrans l'utilisent au lieu de coder leur propre
+ * variante.
  */
-export const eyebrow = {
+export const eyebrow = (colors: Colors) => ({
   fontFamily: fonts.label,
   fontSize: 12,
   color: colors.textFaint,
-};
+});

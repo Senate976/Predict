@@ -1,7 +1,9 @@
+import { useMemo } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 
-import { colors } from '../lib/theme';
+import type { Colors } from '../lib/theme';
+import { useColors } from '../lib/themeMode';
 
 /**
  * Avatar circulaire avec repli sur l'initiale du pseudo tant que
@@ -17,6 +19,8 @@ export function Avatar({
   username?: string | null;
   size?: number;
 }) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const initial = username?.trim().charAt(0).toUpperCase() || '?';
   const dimensions = { width: size, height: size, borderRadius: size / 2 };
 
@@ -31,8 +35,10 @@ export function Avatar({
   );
 }
 
-const styles = StyleSheet.create({
-  image: { backgroundColor: colors.border },
-  fallback: { backgroundColor: colors.goldSoft, alignItems: 'center', justifyContent: 'center' },
-  fallbackText: { color: colors.text, fontWeight: '700' },
-});
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
+    image: { backgroundColor: colors.border },
+    fallback: { backgroundColor: colors.goldSoft, alignItems: 'center', justifyContent: 'center' },
+    fallbackText: { color: colors.text, fontWeight: '700' },
+  });
+}

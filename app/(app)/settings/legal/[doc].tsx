@@ -1,11 +1,13 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '../../../../components/Text';
 
 import { LEGAL_CONTENT } from '../../../../lib/legalContent';
 import { LEGAL_DOCS, type LegalDocId } from '../../../../lib/settingsSections';
-import { colors, fonts, spacing } from '../../../../lib/theme';
+import { fonts, spacing, type Colors } from '../../../../lib/theme';
+import { useColors } from '../../../../lib/themeMode';
 
 /**
  * Rend le contenu réel de chaque document légal (lib/legalContent.ts) — un
@@ -16,6 +18,8 @@ import { colors, fonts, spacing } from '../../../../lib/theme';
 export default function LegalDocScreen() {
   const { doc } = useLocalSearchParams<{ doc: string }>();
   const router = useRouter();
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const docId = doc as LegalDocId;
   const label = LEGAL_DOCS.find((d) => d.id === docId)?.label ?? 'Informations légales';
   const content = LEGAL_CONTENT[docId];
@@ -56,7 +60,8 @@ export default function LegalDocScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
@@ -78,4 +83,5 @@ const styles = StyleSheet.create({
   paragraph: { fontSize: 14, color: colors.textMuted, lineHeight: 21, marginBottom: 8 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   placeholder: { fontSize: 14, color: colors.textFaint },
-});
+  });
+}

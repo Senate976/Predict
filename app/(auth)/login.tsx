@@ -1,5 +1,5 @@
 import type { AuthError, PostgrestError } from '@supabase/supabase-js';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -15,7 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PredictWord } from '../../components/PredictWord';
 import { supabase } from '../../lib/supabase';
-import { colors, eyebrow, fonts, radius, spacing } from '../../lib/theme';
+import { eyebrow, fonts, radius, spacing, type Colors } from '../../lib/theme';
+import { useColors } from '../../lib/themeMode';
 
 type Mode = 'signIn' | 'signUp';
 
@@ -94,6 +95,8 @@ async function checkUsernameAvailable(candidate: string): Promise<boolean | null
 }
 
 export default function LoginScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [mode, setMode] = useState<Mode>('signUp');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -331,7 +334,8 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: spacing.lg },
@@ -350,7 +354,7 @@ const styles = StyleSheet.create({
     marginBottom: 28,
   },
   field: { marginBottom: spacing.md },
-  label: { ...eyebrow, marginBottom: 6 },
+  label: { ...eyebrow(colors), marginBottom: 6 },
   fieldHint: { fontSize: 12, color: colors.textFaint, marginTop: 6 },
   input: {
     borderWidth: 1,
@@ -393,4 +397,5 @@ const styles = StyleSheet.create({
   submitText: { fontFamily: fonts.sansBold, color: colors.textOnGold, fontSize: 16, textTransform: 'uppercase', letterSpacing: 0.5 },
   switch: { marginTop: 18, alignItems: 'center' },
   switchText: { fontFamily: fonts.bodyEmphasis, color: colors.text, fontSize: 14 },
-});
+  });
+}

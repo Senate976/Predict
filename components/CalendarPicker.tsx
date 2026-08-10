@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 
 import { MONTHS } from '../lib/datetime';
-import { colors, fonts, radius } from '../lib/theme';
+import { fonts, radius, type Colors } from '../lib/theme';
+import { useColors } from '../lib/themeMode';
 
 const WEEKDAY_LABELS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
@@ -63,6 +64,8 @@ export function CalendarPicker({
 }) {
   const [open, setOpen] = useState(false);
   const [viewDate, setViewDate] = useState(() => value ?? new Date());
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const today = startOfDay(new Date());
   const year = viewDate.getFullYear();
@@ -151,7 +154,8 @@ export function CalendarPicker({
 
 const CELL_SIZE = '14.2857%';
 
-const styles = StyleSheet.create({
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
   label: { fontSize: 12, color: colors.textFaint, marginBottom: 6 },
   field: {
     flexDirection: 'row',
@@ -213,4 +217,5 @@ const styles = StyleSheet.create({
   cellTextToday: { color: colors.text, fontWeight: '700', textDecorationLine: 'underline' },
   // Texte noir sur la pastille jaune du jour sélectionné — du blanc y serait peu lisible.
   cellTextSelected: { color: colors.textOnGold, fontWeight: '700' },
-});
+  });
+}

@@ -1,6 +1,6 @@
 import type { PostgrestError } from '@supabase/supabase-js';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -43,7 +43,8 @@ import {
   type GroupMember,
   type GroupVisibility,
 } from '../../../lib/groups';
-import { colors, eyebrow, fonts, radius, spacing } from '../../../lib/theme';
+import { eyebrow, fonts, radius, spacing, type Colors } from '../../../lib/theme';
+import { useColors } from '../../../lib/themeMode';
 
 /**
  * `Alert.alert` de React Native Web ne fait rien (implémentation vide) — sans
@@ -72,6 +73,8 @@ type Tab = 'friends' | 'groups';
 export default function CircleScreen() {
   const { session } = useAuth();
   const router = useRouter();
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const userId = session?.user.id;
 
   const [tab, setTab] = useState<Tab>('friends');
@@ -654,7 +657,8 @@ export default function CircleScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
@@ -666,7 +670,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  eyebrow: { ...eyebrow, marginBottom: 4 },
+  eyebrow: { ...eyebrow(colors), marginBottom: 4 },
   headerTitle: {
     fontFamily: fonts.display,
     fontSize: 24,
@@ -806,4 +810,5 @@ const styles = StyleSheet.create({
   },
   deleteGroup: { marginTop: 10, alignSelf: 'flex-start' },
   deleteGroupText: { fontSize: 12, color: colors.danger, fontWeight: '600' },
-});
+  });
+}

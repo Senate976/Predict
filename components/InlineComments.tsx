@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { Trash2, X } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 import { TextInput } from './TextInput';
@@ -14,7 +14,8 @@ import {
   type Comment,
 } from '../lib/comments';
 import { formatTimeAgo } from '../lib/datetime';
-import { colors, fonts, radius } from '../lib/theme';
+import { fonts, radius, type Colors } from '../lib/theme';
+import { useColors } from '../lib/themeMode';
 import { Avatar } from './Avatar';
 
 /**
@@ -56,6 +57,8 @@ export function InlineComments({
     null
   );
   const router = useRouter();
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   useEffect(() => {
     let cancelled = false;
@@ -218,7 +221,8 @@ export function InlineComments({
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
   container: {
     marginTop: 12,
     paddingTop: 12,
@@ -279,4 +283,5 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   sendText: { color: colors.textOnGold, fontSize: 12, fontWeight: '700' },
-});
+  });
+}

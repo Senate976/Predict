@@ -1,8 +1,10 @@
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
+import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 
-import { colors, eyebrow, fonts } from '../lib/theme';
+import { eyebrow, fonts, type Colors } from '../lib/theme';
+import { useColors } from '../lib/themeMode';
 
 const BAR_WIDTH = 260;
 const BAR_HEIGHT = 10;
@@ -25,6 +27,9 @@ export function PrediscoreGauge({
    * personne, sans quoi « Ton Prediscore… » n'a aucun sens affiché là. */
   emptyMessage?: string;
 }) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   if (score === null) {
     return (
       <View style={styles.wrap}>
@@ -80,7 +85,8 @@ export function PrediscoreGauge({
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
   wrap: { alignItems: 'center', width: BAR_WIDTH },
   emptyText: {
     fontSize: 13,
@@ -89,7 +95,7 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     paddingVertical: 8,
   },
-  scoreLabel: { ...eyebrow, marginBottom: 2 },
+  scoreLabel: { ...eyebrow(colors), marginBottom: 2 },
   scoreValue: {
     fontFamily: fonts.body,
     fontSize: 34,
@@ -117,4 +123,5 @@ const styles = StyleSheet.create({
   labelLeft: { color: colors.textMuted },
   labelRightBlock: { alignItems: 'flex-end' },
   labelRight: { color: colors.text, textAlign: 'right' },
-});
+  });
+}

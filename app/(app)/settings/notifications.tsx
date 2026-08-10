@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '../../../components/Text';
@@ -12,11 +12,14 @@ import {
   updateNotificationPrefs,
   type NotificationPrefs,
 } from '../../../lib/settings';
-import { colors, fonts, radius, spacing } from '../../../lib/theme';
+import { fonts, radius, spacing, type Colors } from '../../../lib/theme';
+import { useColors } from '../../../lib/themeMode';
 
 export default function NotificationsSettingsScreen() {
   const router = useRouter();
   const { session } = useAuth();
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const userId = session?.user.id;
 
   const [prefs, setPrefs] = useState<NotificationPrefs | null>(null);
@@ -91,7 +94,8 @@ export default function NotificationsSettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: Colors) {
+  return StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
@@ -136,4 +140,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: spacing.md,
   },
-});
+  });
+}
