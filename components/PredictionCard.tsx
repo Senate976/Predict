@@ -25,7 +25,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import Svg, { Polygon, Rect } from 'react-native-svg';
+import Svg, { Polygon } from 'react-native-svg';
 import { Text } from './Text';
 
 import { fetchCommentCount } from '../lib/comments';
@@ -77,6 +77,13 @@ const FLAP_HEIGHT = 108;
 /** Décalage (négatif) de la lettre sous le bandeau de rabat — assez pour
  * qu'elle semble sortir de sous la pointe du rabat, jamais flottante. */
 const LETTER_OVERLAP = 26;
+/** Hauteur, tout en haut du rabat, gardée pleine largeur avant que le
+ * triangle ne commence à se resserrer — juste assez pour que l'étiquette
+ * d'état (SCELLÉ, etc.) reste toujours entièrement sur fond foncé, même son
+ * dernier caractère. Sans elle, le triangle seul se resserre trop tôt et le
+ * bout du libellé tombe sur le papier clair de la carte, invisible (le texte
+ * de l'étiquette est clair, prévu pour se lire sur le rabat foncé). */
+const FLAP_LABEL_SAFE_HEIGHT = 28;
 
 function easeInOutQuad(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2;
@@ -100,15 +107,13 @@ function hexToRgba(hex: string, alpha: number): string {
 function EnvelopeFlap({ colors }: { colors: Colors }) {
   return (
     <Svg width="100%" height={FLAP_HEIGHT} viewBox={`0 0 100 ${FLAP_HEIGHT}`} preserveAspectRatio="none">
-      {/* Une seule teinte pleine, pas de dégradé ni de contraste coins/pointe
-          — un rabat suffisamment grand et haut se lit de lui-même comme une
-          enveloppe, sans artifice supplémentaire (voir la maquette « Le
-          pli »). Le petit `Rect` ne sert qu'à garder les tout premiers
-          pixels du haut pleins sur toute la largeur, pour que l'étiquette
-          d'état (SCELLÉ, etc.) reste toujours sur fond foncé même avec un
-          long libellé — invisible en pratique, même teinte que le triangle. */}
-      <Rect x="0" y="0" width="100" height={FLAP_HEIGHT * 0.2} fill={colors.envelopeBody[1]} />
-      <Polygon points={`0,0 100,0 50,${FLAP_HEIGHT}`} fill={colors.envelopeBody[1]} />
+      {/* Une seule forme (pas un rectangle séparé posé derrière un triangle —
+          ça créait une marche visible à son propre bord), teinte unie : pleine
+          largeur jusqu'à `FLAP_LABEL_SAFE_HEIGHT`, puis se resserre en pointe. */}
+      <Polygon
+        points={`0,0 100,0 100,${FLAP_LABEL_SAFE_HEIGHT} 50,${FLAP_HEIGHT} 0,${FLAP_LABEL_SAFE_HEIGHT}`}
+        fill={colors.envelopeBody[1]}
+      />
     </Svg>
   );
 }
