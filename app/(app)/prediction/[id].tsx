@@ -149,7 +149,7 @@ export default function PredictionDetailScreen() {
 
   function handleRevealNow() {
     if (!id) return;
-    const title = isQuestion ? 'Clôturer cette Question maintenant ?' : 'Révéler ce Predict maintenant ?';
+    const title = isQuestion ? 'Clôturer ce Sondage maintenant ?' : 'Révéler ce Predict maintenant ?';
     const message = isQuestion
       ? 'Les réponses deviendront visibles pour tout le monde et tu pourras valider qui a deviné juste. Cette action est irréversible.'
       : 'Le contenu deviendra visible pour tes destinataires et le verdict pourra être donné. Cette action est irréversible.';

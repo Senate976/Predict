@@ -382,7 +382,7 @@ export default function NewPredictionScreen() {
               style={[styles.scopeOption, predictType === 'question' && styles.scopeOptionActive]}
             >
               <Text style={[styles.scopeText, predictType === 'question' && styles.scopeTextActive]}>
-                Question
+                Sondage
               </Text>
             </Pressable>
           </View>

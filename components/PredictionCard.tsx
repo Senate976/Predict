@@ -321,10 +321,10 @@ export function PredictionCard({
   } = isQuestion
     ? revealed
       ? item.my_answer_is_correct === true
-        ? { kind: 'question_correct', label: 'QUESTION · RÉPONSE CORRECTE' }
+        ? { kind: 'question_correct', label: 'SONDAGE · RÉPONSE CORRECTE' }
         : {
             kind: 'question_closed',
-            label: correctAnswerPercent !== null ? `${correctAnswerPercent} % ONT EU RAISON` : 'QUESTION · CLÔTURÉE',
+            label: correctAnswerPercent !== null ? `${correctAnswerPercent} % ONT EU RAISON` : 'SONDAGE · CLÔTURÉE',
           }
       : { kind: 'question_open', label: 'PREDICT PUBLIC' }
     : !revealed
