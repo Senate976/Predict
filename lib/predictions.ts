@@ -92,6 +92,10 @@ export type PredictionFeedItem = {
    * Clôture (contrairement au détail des réponses elles-mêmes, caché
    * jusque-là). Toujours `0` pour une Déclaration. */
   answer_count: number;
+  /** Nombre de réponses validées correctes par l'auteur — toujours `0` avant
+   * toute validation, ou pour une Déclaration. Sert à afficher « xx % ont eu
+   * raison » une fois la Question close (voir `PredictionCard`). */
+  correct_answer_count: number;
   /** La propre réponse de l'appelant à cette Question, si déjà posée — visible
    * avant Clôture (pour se relire/la modifier), `null` pour une Déclaration
    * ou tant qu'aucune réponse n'a été soumise. Exactement l'un des deux
@@ -173,8 +177,8 @@ export function predictionErrorMessage(error: PostgrestError): string {
 const FEED_COLUMNS =
   'id, author_id, teaser, content, audio_path, reveal_at, scope, open_ended, is_immediate, type, answer_format, ' +
   'created_at, is_revealed, final_status, verdict_set_at, is_favorite, is_hidden, is_seen, is_verdict_seen, ' +
-  'emoji_counts, my_emoji_reaction, mentioned_user_ids, answer_count, my_answer_text, my_answer_option_id, ' +
-  'my_answer_is_correct';
+  'emoji_counts, my_emoji_reaction, mentioned_user_ids, answer_count, correct_answer_count, my_answer_text, ' +
+  'my_answer_option_id, my_answer_is_correct';
 
 export async function fetchPredictionsFeed() {
   return supabase

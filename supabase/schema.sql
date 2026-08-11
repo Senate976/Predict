@@ -4625,7 +4625,116 @@ revoke all on function public.submit_prediction_answer(uuid, text, uuid) from pu
 grant execute on function public.submit_prediction_answer(uuid, text, uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 45. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 46. Pourcentage de bonnes réponses, une fois une Question close
+-- ---------------------------------------------------------------------------
+--
+-- `security definer`, comme `get_prediction_answer_count` : le compte doit
+-- porter sur toutes les réponses, pas seulement celles que la RLS de
+-- `prediction_answers` laisserait voir à l'appelant avant Clôture.
+create or replace function public.get_prediction_correct_answer_count(p_prediction_id uuid)
+returns bigint
+language sql
+security definer
+stable
+set search_path = ''
+as $$
+  select count(*) from public.prediction_answers
+  where prediction_id = p_prediction_id and is_correct = true;
+$$;
+
+revoke all on function public.get_prediction_correct_answer_count(uuid) from public;
+grant execute on function public.get_prediction_correct_answer_count(uuid) to authenticated;
+
+drop view if exists public.predictions_feed;
+
+create view public.predictions_feed
+with (security_invoker = true) as
+select
+  p.id,
+  p.author_id,
+  p.teaser,
+  pc.content,
+  pc.audio_path,
+  p.reveal_at,
+  p.scope,
+  p.open_ended,
+  p.is_immediate,
+  p.type,
+  p.answer_format,
+  p.mentioned_user_ids,
+  p.created_at,
+  p.verdict_set_at,
+  (p.reveal_at <= now()) as is_revealed,
+  case
+    when p.reveal_at > now() then 'pending'
+    when p.author_verdict is not null then p.author_verdict
+    else 'pending'
+  end as final_status,
+  coalesce(
+    (
+      select us.favorite from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_favorite,
+  coalesce(
+    (
+      select us.hidden from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_hidden,
+  coalesce(
+    (
+      select us.seen from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_seen,
+  coalesce(
+    (
+      select us.verdict_seen from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_verdict_seen,
+  coalesce(
+    (
+      select jsonb_object_agg(counts.emoji, counts.total)
+      from (
+        select emoji, count(*) as total
+        from public.prediction_emoji_reactions er
+        where er.prediction_id = p.id
+        group by emoji
+      ) counts
+    ),
+    '{}'::jsonb
+  ) as emoji_counts,
+  (
+    select er2.emoji from public.prediction_emoji_reactions er2
+    where er2.prediction_id = p.id and er2.user_id = auth.uid()
+  ) as my_emoji_reaction,
+  public.get_prediction_answer_count(p.id) as answer_count,
+  public.get_prediction_correct_answer_count(p.id) as correct_answer_count,
+  (
+    select pa2.answer_text from public.prediction_answers pa2
+    where pa2.prediction_id = p.id and pa2.user_id = auth.uid()
+  ) as my_answer_text,
+  (
+    select pa3.option_id from public.prediction_answers pa3
+    where pa3.prediction_id = p.id and pa3.user_id = auth.uid()
+  ) as my_answer_option_id,
+  (
+    select pa4.is_correct from public.prediction_answers pa4
+    where pa4.prediction_id = p.id and pa4.user_id = auth.uid()
+  ) as my_answer_is_correct
+from public.predictions p
+left join public.prediction_contents pc on pc.prediction_id = p.id;
+
+grant select on public.predictions_feed to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 47. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une

@@ -18,7 +18,6 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  Dimensions,
   Modal,
   PanResponder,
   Platform,
@@ -26,10 +25,11 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import Svg, { Defs, LinearGradient as SvgLinearGradient, Polygon, Stop } from 'react-native-svg';
+import Svg, { Defs, LinearGradient as SvgLinearGradient, Polygon, Rect, Stop } from 'react-native-svg';
 import { Text } from './Text';
 
 import { fetchCommentCount } from '../lib/comments';
+import { formatCountdown } from '../lib/datetime';
 import {
   castEmojiReaction,
   EMOJI_REACTIONS,
@@ -105,6 +105,10 @@ function EnvelopeFlap({ colors }: { colors: Colors }) {
           <Stop offset="1" stopColor={colors.envelopeBody[1]} />
         </SvgLinearGradient>
       </Defs>
+      {/* Fond plein sur tout le bandeau — sans lui, les deux coins hors du
+          triangle (à gauche et à droite de sa pointe) laissaient voir le
+          papier clair de la carte au lieu de rester dans la partie foncée. */}
+      <Rect x="0" y="0" width="100" height={FLAP_HEIGHT} fill={colors.envelopeBody[1]} />
       <Polygon points={`0,0 100,0 50,${FLAP_HEIGHT}`} fill="url(#flapGradient)" />
     </Svg>
   );
@@ -300,6 +304,13 @@ export function PredictionCard({
    * Réalisé : le succès se lit pareil pour tout le monde. Ne dépend que du
    * point de vue de l'appelant (`my_answer_is_correct`) : une Question où
    * quelqu'un d'autre a deviné juste ne change pas pour moi. */
+  // Une fois Close, remplace le simple repère « QUESTION · CLÔTURÉE » par le
+  // pourcentage de bonnes réponses dès qu'il y en a au moins une à compter —
+  // `correct_answer_count` ne reflète que celles déjà validées par l'auteur,
+  // jamais une estimation sur les réponses encore en attente de verdict.
+  const correctAnswerPercent =
+    item.answer_count > 0 ? Math.round((item.correct_answer_count / item.answer_count) * 100) : null;
+
   const cardState: {
     kind: 'sealed' | 'active' | 'realized' | 'missed' | 'question_open' | 'question_closed' | 'question_correct';
     label?: string;
@@ -307,8 +318,11 @@ export function PredictionCard({
     ? revealed
       ? item.my_answer_is_correct === true
         ? { kind: 'question_correct', label: 'QUESTION · RÉPONSE CORRECTE' }
-        : { kind: 'question_closed', label: 'QUESTION · CLÔTURÉE' }
-      : { kind: 'question_open', label: 'PRÉDICTION GÉNÉRALE' }
+        : {
+            kind: 'question_closed',
+            label: correctAnswerPercent !== null ? `${correctAnswerPercent} % ONT EU RAISON` : 'QUESTION · CLÔTURÉE',
+          }
+      : { kind: 'question_open', label: 'PREDICT PUBLIC' }
     : !revealed
       ? { kind: 'sealed', label: 'SCELLÉ' }
       : verdict === 'realized'
@@ -520,12 +534,6 @@ export function PredictionCard({
   const hoveredIndexRef = useRef<number | null>(null);
   const panelOpenAtGrantRef = useRef(false);
   const scaleAnims = useRef(EMOJI_REACTIONS.map(() => new Animated.Value(1))).current;
-  // La bulle est centrée par défaut sur le pouce (voir `emojiPanel` plus bas),
-  // mais un pouce proche du bord de l'écran la pousserait hors champ — décalage
-  // horizontal calculé après mesure réelle (`onLayout`) pour la ramener dans
-  // l'écran, jamais avant : impossible de connaître sa position tant qu'elle
-  // n'a pas été posée au moins une fois.
-  const [panelOffsetX, setPanelOffsetX] = useState(0);
 
   // Le PanResponder juste en dessous n'est créé qu'une seule fois
   // (`useRef`) : ses callbacks ne doivent donc JAMAIS lire directement
@@ -558,7 +566,6 @@ export function PredictionCard({
       onPanResponderGrant: () => {
         panelOpenAtGrantRef.current = emojiPanelOpenRef.current;
         panelLayoutRef.current = null;
-        setPanelOffsetX(0);
         setEmojiPanelOpen(true);
       },
       onPanResponderMove: (_evt, gesture) => {
@@ -624,39 +631,44 @@ export function PredictionCard({
         },
       ]}
     >
-      {/* Sur sa propre ligne, au-dessus de l'enveloppe plutôt qu'inline dans
-          l'en-tête : le pseudo garde toute la largeur de sa ligne. Absent
-          pour Réalisé/Manqué — le tampon porte seul la réponse. */}
-      {cardState.label && (
-        <View style={styles.stateRow}>
-          {cardState.kind === 'sealed' && <Lock size={12} color={colors.textFaint} strokeWidth={2} />}
-          {(cardState.kind === 'question_open' || cardState.kind === 'question_closed') && (
-            <HelpCircle size={12} color={colors.accent} strokeWidth={2} />
-          )}
-          {cardState.kind === 'question_correct' && <CheckCircle2 size={12} color={colors.accent} strokeWidth={2} />}
-          <Text
-            style={[
-              styles.stateLabel,
-              (cardState.kind === 'question_open' ||
-                cardState.kind === 'question_closed' ||
-                cardState.kind === 'question_correct') &&
-                styles.stateLabelAccent,
-            ]}
-            numberOfLines={1}
-          >
-            {cardState.label}
-          </Text>
-        </View>
-      )}
-
       {/* L'enveloppe : rabat fixe en haut, puis soit le cachet (Scellée),
           soit la lettre qui en sort (tous les autres états) — même
           silhouette partout, voir `EnvelopeFlap`/`WaxSeal` en tête de
           fichier. S'assourdit légèrement une fois Manquée, jamais l'étiquette
-          d'état ci-dessus. */}
+          d'état ci-dessous. */}
       <View style={cardState.kind === 'missed' && styles.cardBodyMissed}>
         <View style={styles.envelope}>
           <EnvelopeFlap colors={colors} />
+
+          {/* Posée en surimpression du rabat plutôt qu'au-dessus, dans une
+              bande à part sur le papier clair de la carte — sans ça, un
+              espace clair restait visible entre le haut de la carte et
+              l'étiquette. Toujours dans la partie foncée, jamais au-dessus. */}
+          {cardState.label && (
+            <View style={styles.envelopeLabelOverlay}>
+              <View style={styles.stateRow}>
+                {cardState.kind === 'sealed' && <Lock size={12} color={colors.textOnAccent} strokeWidth={2} />}
+                {(cardState.kind === 'question_open' || cardState.kind === 'question_closed') && (
+                  <HelpCircle size={12} color={colors.textOnAccent} strokeWidth={2} />
+                )}
+                {cardState.kind === 'question_correct' && (
+                  <CheckCircle2 size={12} color={colors.textOnAccent} strokeWidth={2} />
+                )}
+                <Text style={styles.stateLabel} numberOfLines={1}>
+                  {cardState.label}
+                </Text>
+              </View>
+              {/* Réservé à une carte Scellée : le seul état où la date de
+                  révélation n'est pas encore connue de tous — utile de la
+                  rappeler ici, au même endroit que « SCELLÉ ». */}
+              {cardState.kind === 'sealed' && (
+                <Text style={styles.envelopeRevealText} numberOfLines={1}>
+                  Révélation : {item.open_ended ? 'libre' : formatCountdown(new Date(item.reveal_at), now)}
+                </Text>
+              )}
+            </View>
+          )}
+
           {cardState.kind === 'sealed' && <WaxSeal />}
 
           {cardState.kind !== 'sealed' && (
@@ -826,23 +838,10 @@ export function PredictionCard({
               {emojiPanelOpen && (
                 <View
                   ref={panelRef}
-                  style={[styles.emojiPanel, { transform: [{ translateX: panelOffsetX }] }]}
+                  style={styles.emojiPanel}
                   onLayout={() => {
                     panelRef.current?.measureInWindow((x, y, width, height) => {
-                      // Ramène la bulle dans l'écran si elle en dépasse d'un
-                      // côté — un pouce proche du bord gauche ou droit ne doit
-                      // jamais laisser une partie des emojis hors champ. Le
-                      // décalage est répercuté ici même sur `x` : c'est cette
-                      // position, pas celle mesurée avant correction, que
-                      // `onPanResponderMove` doit comparer à la position du
-                      // doigt pour retrouver l'emoji survolé.
-                      const screenWidth = Dimensions.get('window').width;
-                      const edgeMargin = 8;
-                      let shift = 0;
-                      if (x < edgeMargin) shift = edgeMargin - x;
-                      else if (x + width > screenWidth - edgeMargin) shift = screenWidth - edgeMargin - (x + width);
-                      if (shift !== 0) setPanelOffsetX((prev) => prev + shift);
-                      panelLayoutRef.current = { x: x + shift, y, width, height };
+                      panelLayoutRef.current = { x, y, width, height };
                     });
                   }}
                 >
@@ -1040,26 +1039,37 @@ function createStyles(colors: Colors) {
     borderColor: colors.accent,
     backgroundColor: colors.accentSoft,
   },
-  // Libellé d'état au-dessus de l'enveloppe, dans le padding de la carte —
-  // seul endroit avec le pied de carte à garder un padding horizontal, tout
-  // le reste (rabat, lettre) va bord à bord.
+  // Posé en surimpression du rabat (voir plus haut) — toujours dans sa
+  // partie foncée, jamais dans une bande à part sur le papier clair.
+  envelopeLabelOverlay: {
+    position: 'absolute',
+    top: 10,
+    right: 14,
+    alignItems: 'flex-end',
+    gap: 2,
+    zIndex: 2,
+  },
   stateRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
     gap: 6,
-    paddingHorizontal: 18,
-    paddingTop: 14,
-    paddingBottom: 8,
   },
+  // Crème plutôt que l'encre habituelle : ce libellé se lit désormais sur le
+  // rabat foncé, pas sur le papier clair — un seul ton suffit, il n'y a plus
+  // besoin de distinguer un accent bordeaux dessus.
   stateLabel: {
     fontFamily: fonts.label,
     fontSize: 11,
     letterSpacing: 1.1,
     textTransform: 'uppercase',
-    color: colors.textFaint,
+    color: colors.textOnAccent,
   },
-  stateLabelAccent: { color: colors.accent },
+  envelopeRevealText: {
+    fontFamily: fonts.label,
+    fontSize: 10,
+    color: colors.textOnAccent,
+    opacity: 0.8,
+  },
   // Corps de carte assourdi une fois Manquée — jamais le badge d'état,
   // rendu séparément avant ce conteneur et donc toujours à `opacity: 1`.
   cardBodyMissed: { opacity: 0.85 },
@@ -1102,6 +1112,7 @@ function createStyles(colors: Colors) {
     lineHeight: 20,
     color: colors.textFaint,
     marginTop: 4,
+    textAlign: 'center',
   },
   // La vraie prédiction est le cœur de la lettre : Spectral, semi-gras, bien
   // plus grande que le reste de l'interface — nette dès qu'elle est lisible
@@ -1112,6 +1123,7 @@ function createStyles(colors: Colors) {
     lineHeight: 22,
     color: colors.text,
     marginTop: 4,
+    textAlign: 'center',
   },
   letterContentBlurred: Platform.select({
     web: { filter: 'blur(5px)' } as object,
@@ -1218,8 +1230,12 @@ function createStyles(colors: Colors) {
   emojiPanel: {
     position: 'absolute',
     bottom: '100%',
-    left: '50%',
-    marginLeft: -EMOJI_PANEL_WIDTH / 2,
+    // Ancrage fixe plutôt que centré sur le pouce : le pouce est près du bord
+    // gauche de la carte (après l'icône commentaire), donc un centrage exact
+    // poussait la bulle hors de l'écran à gauche. Un léger débord vers la
+    // gauche seulement (jamais négatif à l'échelle de l'écran, le pouce a
+    // toujours cette marge devant lui).
+    left: -40,
     marginBottom: 10,
     width: EMOJI_PANEL_WIDTH,
     zIndex: 20,
