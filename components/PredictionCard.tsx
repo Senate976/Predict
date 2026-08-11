@@ -43,6 +43,7 @@ import { fonts, radius, type Colors } from '../lib/theme';
 import { useColors } from '../lib/themeMode';
 import { Avatar } from './Avatar';
 import { InlineComments } from './InlineComments';
+import { InlineQuestionAnswer } from './InlineQuestionAnswer';
 
 /** Largeur fixe de la bulle de réactions, ancrée par son bord droit sur le pouce. */
 const EMOJI_PANEL_WIDTH = 272;
@@ -180,7 +181,6 @@ export function PredictionCard({
   const glowShadowRadius = 14 + glowIntensity * (22 - 14);
 
   const isQuestion = item.type === 'question';
-  const hasAnswered = item.my_answer_text !== null || item.my_answer_option_id !== null;
 
   /** Les 4 états visuels d'une Déclaration — un contour néon dédié (voir
    * `styles`) à tous, mais un libellé en haut à droite seulement pour
@@ -652,6 +652,14 @@ export function PredictionCard({
         </View>
       </Pressable>
 
+      {/* Répondre sans quitter le Fil — en dehors du `Pressable` ci-dessus
+          (qui navigue vers le détail) pour que taper dans le champ ou sur
+          une option ne déclenche jamais aussi cette navigation, même
+          principe que `InlineComments`/`footerRow` plus bas. Réservé à une
+          Question encore ouverte : plus rien à répondre une fois close,
+          l'écran détail prend le relais (liste des réponses, validation). */}
+      {isQuestion && !revealed && <InlineQuestionAnswer prediction={item} />}
+
       {/* Fil épuré façon réseau social : plus que les deux interactions
           sociales, alignées à gauche et groupées de près — favoris, masquer
           et supprimer sont désormais des actions de gestion, reléguées au
@@ -727,11 +735,10 @@ export function PredictionCard({
           </Pressable>
         </View>
 
-        {/* Propre à une Question : compteur de réponses (visible même avant
-            Clôture, jamais leur contenu — voir `answer_count`) et invitation
-            à répondre tant que ce n'est pas déjà fait. Le vrai formulaire de
-            réponse vit sur l'écran détail (`QuestionAnswerPanel`) — la carte
-            se contente d'y renvoyer, comme le reste de sa navigation. */}
+        {/* Propre à une Question : compteur de réponses, visible même avant
+            Clôture — jamais leur contenu (voir `answer_count`). Répondre se
+            fait juste au-dessus, directement sur la carte
+            (`InlineQuestionAnswer`), pas depuis ce compteur. */}
         {isQuestion && (
           <View style={styles.answersRow}>
             <View style={styles.iconSlot}>
@@ -744,15 +751,6 @@ export function PredictionCard({
             <Text style={[styles.answersCountText, item.answer_count === 0 && styles.footerCountInactive]}>
               {item.answer_count}
             </Text>
-            {!revealed && (
-              hasAnswered ? (
-                <Text style={styles.answeredText}>Répondu ✓</Text>
-              ) : (
-                <Pressable onPress={() => onPress?.()} style={styles.replyPill} hitSlop={4}>
-                  <Text style={styles.replyPillText}>Répondre</Text>
-                </Pressable>
-              )
-            )}
           </View>
         )}
       </View>
@@ -1094,19 +1092,6 @@ function createStyles(colors: Colors) {
   footerCountInactive: { color: colors.footerIconInactive },
   answersRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   answersCountText: { fontSize: 13, fontWeight: '700', color: colors.text },
-  answeredText: { fontSize: 12, fontWeight: '600', color: colors.textFaint, marginLeft: 4 },
-  // Contour de l'accent Question plutôt qu'un aplat — même registre que les
-  // autres pilules d'action de l'app (Ajouter, Révéler…), jamais de fond
-  // plein hors du jaune (réservé au FAB/CTA principal).
-  replyPill: {
-    marginLeft: 4,
-    borderWidth: 1,
-    borderColor: colors.questionAccent,
-    borderRadius: radius.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  replyPillText: { fontSize: 12, fontWeight: '700', color: colors.questionAccent },
   // Menu ••• de gestion (favoris / masquer / supprimer), ouvert depuis
   // l'en-tête — même registre visuel que `reactorsBox` (boîte centrée sur
   // fond assombri).
