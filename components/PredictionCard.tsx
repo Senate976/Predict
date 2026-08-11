@@ -25,7 +25,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import Svg, { Polygon, Polyline, Rect } from 'react-native-svg';
+import Svg, { Polygon, Rect } from 'react-native-svg';
 import { Text } from './Text';
 
 import { fetchCommentCount } from '../lib/comments';
@@ -70,9 +70,10 @@ const GLOW_PULSE_TOTAL_MS = GLOW_PULSE_CYCLE_MS * 2;
 
 /** Hauteur du bandeau de rabat, en haut de l'enveloppe — fixe plutôt qu'un
  * pourcentage de la hauteur de la carte (qui varie avec le contenu, contrai-
- * rement à la maquette) : assez pour lire un vrai rabat, jamais démesuré sur
- * une carte courte. */
-const FLAP_HEIGHT = 52;
+ * rement à la maquette) : assez grand pour dominer le haut de la carte,
+ * comme sur la maquette « Le pli » — un simple bandeau fin ne se lisait pas
+ * comme un vrai rabat d'enveloppe. */
+const FLAP_HEIGHT = 108;
 /** Décalage (négatif) de la lettre sous le bandeau de rabat — assez pour
  * qu'elle semble sortir de sous la pointe du rabat, jamais flottante. */
 const LETTER_OVERLAP = 26;
@@ -99,27 +100,15 @@ function hexToRgba(hex: string, alpha: number): string {
 function EnvelopeFlap({ colors }: { colors: Colors }) {
   return (
     <Svg width="100%" height={FLAP_HEIGHT} viewBox={`0 0 100 ${FLAP_HEIGHT}`} preserveAspectRatio="none">
-      {/* Fond plein et foncé sur tout le bandeau, jusque dans les deux coins
-          hors du triangle — sans lui, ces coins laissaient voir le papier
-          clair de la carte. Le triangle du rabat se pose dessus dans un ton
-          nettement plus clair, un aplat plutôt qu'un dégradé qui finissait
-          par se fondre avec le fond et effaçait la pointe. */}
-      <Rect x="0" y="0" width="100" height={FLAP_HEIGHT} fill={colors.envelopeBody[1]} />
-      <Polygon points={`0,0 100,0 50,${FLAP_HEIGHT}`} fill={colors.envelopeBody[0]} />
-      {/* Le pli lui-même, tracé comme un vrai trait — la seule différence de
-          teinte entre le fond et le triangle ne suffisait pas à se lire
-          comme une enveloppe, il fallait la ligne. `vectorEffect` garde une
-          épaisseur de trait constante malgré le `viewBox` étiré (X et Y
-          n'ont pas la même échelle), sinon le trait s'épaississait sur les
-          portions presque horizontales et s'amincissait sur les presque
-          verticales. */}
-      <Polyline
-        points={`0,0 50,${FLAP_HEIGHT} 100,0`}
-        fill="none"
-        stroke={colors.accent}
-        strokeWidth={1.5}
-        vectorEffect="non-scaling-stroke"
-      />
+      {/* Une seule teinte pleine, pas de dégradé ni de contraste coins/pointe
+          — un rabat suffisamment grand et haut se lit de lui-même comme une
+          enveloppe, sans artifice supplémentaire (voir la maquette « Le
+          pli »). Le petit `Rect` ne sert qu'à garder les tout premiers
+          pixels du haut pleins sur toute la largeur, pour que l'étiquette
+          d'état (SCELLÉ, etc.) reste toujours sur fond foncé même avec un
+          long libellé — invisible en pratique, même teinte que le triangle. */}
+      <Rect x="0" y="0" width="100" height={FLAP_HEIGHT * 0.2} fill={colors.envelopeBody[1]} />
+      <Polygon points={`0,0 100,0 50,${FLAP_HEIGHT}`} fill={colors.envelopeBody[1]} />
     </Svg>
   );
 }
