@@ -1,5 +1,6 @@
 import type { PostgrestError } from '@supabase/supabase-js';
 
+import type { AnswerFormat, PredictionType } from './questions';
 import { supabase } from './supabase';
 
 export type PredictionScope = 'circle' | 'selected' | 'group';
@@ -60,6 +61,10 @@ export type PredictionFeedItem = {
   /** Révélée dès la création (pas de suspense à lever) : le vote porte alors
    * sur « j'y crois / j'y crois pas », jamais sur « réalisée / manquée ». */
   is_immediate: boolean;
+  /** `declaration` (comportement historique) ou `question` — voir `lib/questions.ts`. */
+  type: PredictionType;
+  /** `null` pour une Déclaration ; format de réponse attendu pour une Question. */
+  answer_format: AnswerFormat | null;
   created_at: string;
   is_revealed: boolean;
   /** `pending` tant que l'auteur n'a pas affirmé le résultat (voir
@@ -83,6 +88,18 @@ export type PredictionFeedItem = {
   my_emoji_reaction: EmojiReaction | null;
   /** Ids des amis explicitement cités via « @pseudo » dans le teaser — voir `extractMentionedUsernames`. */
   mentioned_user_ids: string[];
+  /** Nombre de réponses reçues — pour une Question, visible même avant
+   * Clôture (contrairement au détail des réponses elles-mêmes, caché
+   * jusque-là). Toujours `0` pour une Déclaration. */
+  answer_count: number;
+  /** La propre réponse de l'appelant à cette Question, si déjà posée — visible
+   * avant Clôture (pour se relire/la modifier), `null` pour une Déclaration
+   * ou tant qu'aucune réponse n'a été soumise. Exactement l'un des deux
+   * (`my_answer_text`/`my_answer_option_id`) selon `answer_format`. */
+  my_answer_text: string | null;
+  my_answer_option_id: string | null;
+  /** `null` tant que l'auteur n'a rien validé — voir `setAnswerCorrectness`. */
+  my_answer_is_correct: boolean | null;
 };
 
 /** Doivent rester alignés sur les contraintes `predictions_*_length` du SQL. */
@@ -154,9 +171,10 @@ export function predictionErrorMessage(error: PostgrestError): string {
  * dans lequel les choses ont été publiées, pas celui de leur révélation.
  */
 const FEED_COLUMNS =
-  'id, author_id, teaser, content, audio_path, reveal_at, scope, open_ended, is_immediate, created_at, ' +
-  'is_revealed, final_status, verdict_set_at, is_favorite, is_hidden, is_seen, is_verdict_seen, emoji_counts, ' +
-  'my_emoji_reaction, mentioned_user_ids';
+  'id, author_id, teaser, content, audio_path, reveal_at, scope, open_ended, is_immediate, type, answer_format, ' +
+  'created_at, is_revealed, final_status, verdict_set_at, is_favorite, is_hidden, is_seen, is_verdict_seen, ' +
+  'emoji_counts, my_emoji_reaction, mentioned_user_ids, answer_count, my_answer_text, my_answer_option_id, ' +
+  'my_answer_is_correct';
 
 export async function fetchPredictionsFeed() {
   return supabase
@@ -193,6 +211,13 @@ export async function createPrediction(input: {
    * « j'y crois / j'y crois pas » plutôt qu'en « réalisée / manquée », vu
    * qu'il n'y a rien à constater : seulement une opinion à donner. */
   isImmediate?: boolean;
+  /** `declaration` par défaut côté base si omis. `answerFormat`/`answerOptions`
+   * n'ont de sens que pour `type: 'question'` — voir `lib/questions.ts`. */
+  type?: PredictionType;
+  answerFormat?: AnswerFormat;
+  /** Labels des options, dans l'ordre — requis (au moins deux) si
+   * `answerFormat: 'choice'`, ignoré sinon. */
+  answerOptions?: string[];
 }) {
   const result = await supabase.rpc('create_prediction', {
     p_teaser: input.teaser.trim(),
@@ -204,6 +229,9 @@ export async function createPrediction(input: {
     p_mentioned_ids: input.mentionedFriendIds ?? [],
     p_open_ended: input.openEnded ?? false,
     p_is_immediate: input.isImmediate ?? false,
+    p_type: input.type ?? 'declaration',
+    p_answer_format: input.answerFormat ?? null,
+    p_answer_options: input.answerOptions ?? null,
   });
   return result as { data: string | null; error: PostgrestError | null };
 }

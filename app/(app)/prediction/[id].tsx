@@ -17,6 +17,7 @@ import { Avatar } from '../../../components/Avatar';
 import { CreateFab } from '../../../components/CreateFab';
 import { InlineComments } from '../../../components/InlineComments';
 import { PredictWord } from '../../../components/PredictWord';
+import { QuestionAnswerPanel } from '../../../components/QuestionAnswerPanel';
 import { useAuth } from '../../../lib/auth';
 import { formatAdvance, formatShortDateTime } from '../../../lib/datetime';
 import { fetchFriendships, otherProfile, type FriendProfile } from '../../../lib/friends';
@@ -148,8 +149,10 @@ export default function PredictionDetailScreen() {
 
   function handleRevealNow() {
     if (!id) return;
-    const message =
-      'Le contenu deviendra visible pour tes destinataires et le verdict pourra être donné. Cette action est irréversible.';
+    const title = isQuestion ? 'Clôturer cette Question maintenant ?' : 'Révéler ce Predict maintenant ?';
+    const message = isQuestion
+      ? 'Les réponses deviendront visibles pour tout le monde et tu pourras valider qui a deviné juste. Cette action est irréversible.'
+      : 'Le contenu deviendra visible pour tes destinataires et le verdict pourra être donné. Cette action est irréversible.';
 
     const run = async () => {
       setRevealError(null);
@@ -157,7 +160,7 @@ export default function PredictionDetailScreen() {
       try {
         const { error: revealErr } = await revealPredictionNow(id);
         if (revealErr) {
-          setRevealError(`Révélation impossible : ${revealErr.message}`);
+          setRevealError(`${isQuestion ? 'Clôture' : 'Révélation'} impossible : ${revealErr.message}`);
           return;
         }
         await load();
@@ -167,12 +170,12 @@ export default function PredictionDetailScreen() {
     };
 
     if (Platform.OS === 'web') {
-      if (window.confirm(`Révéler ce Predict maintenant ?\n\n${message}`)) run();
+      if (window.confirm(`${title}\n\n${message}`)) run();
       return;
     }
-    Alert.alert('Révéler ce Predict maintenant ?', message, [
+    Alert.alert(title, message, [
       { text: 'Annuler', style: 'cancel' },
-      { text: 'Révéler', style: 'destructive', onPress: run },
+      { text: isQuestion ? 'Clôturer' : 'Révéler', style: 'destructive', onPress: run },
     ]);
   }
 
@@ -195,6 +198,7 @@ export default function PredictionDetailScreen() {
 
   const isAuthor = prediction && userId && prediction.author_id === userId;
   const revealed = prediction ? isRevealed(prediction, new Date()) : false;
+  const isQuestion = prediction?.type === 'question';
   // Écart entre le scellé et la révélation — juste informatif, pour souligner
   // à quel point la prédiction a été anticipée. Sans objet pour une prédiction
   // « ouverte » : `reveal_at` n'y porte qu'un repère technique lointain.
@@ -236,7 +240,11 @@ export default function PredictionDetailScreen() {
               </Pressable>
             )}
 
-            <Text style={styles.teaser}>{prediction.teaser}</Text>
+            {/* Pas de Teaser pour une Question : `content` (la question
+                elle-même) est déjà visible immédiatement juste en dessous —
+                un Teaser n'y ajouterait qu'un doublon (voir new-prediction.tsx,
+                dérivé du même texte pour satisfaire la contrainte SQL). */}
+            {!isQuestion && <Text style={styles.teaser}>{prediction.teaser}</Text>}
 
             {/* Avant révélation, seul l'écart annoncé compte — les deux dates
                 elles-mêmes n'apportent rien de plus que le teaser et
@@ -260,12 +268,17 @@ export default function PredictionDetailScreen() {
                 L'auteur voit toujours son propre contenu, même avant
                 révélation — seul un destinataire attend l'heure dite. */}
             <View style={styles.contentHero}>
-              {(revealed || isAuthor) && prediction.content ? (
+              {/* Une Question est visible dès la création, jamais scellée —
+                  ce que la Clôture cache, ce sont les réponses des autres
+                  (`QuestionAnswerPanel` plus bas), jamais la question
+                  elle-même (RLS `prediction_contents_select`, schema.sql
+                  section 42). */}
+              {(isQuestion || revealed || isAuthor) && prediction.content ? (
                 <>
-                  {/* Le flou ne concerne que les destinataires (avant
-                      révélation, ils n'ont de toute façon rien à cet endroit
-                      via la RLS) : l'auteur voit toujours son propre texte
-                      net, y compris avant révélation. */}
+                  {/* Le flou ne concerne que les destinataires d'une
+                      Déclaration avant révélation (ils n'ont de toute façon
+                      rien à cet endroit via la RLS) : l'auteur voit toujours
+                      son propre texte net, y compris avant révélation. */}
                   <Text style={styles.contentHeroText}>{prediction.content}</Text>
                   {prediction.audio_path && (
                     <View style={styles.audioRow}>
@@ -291,62 +304,78 @@ export default function PredictionDetailScreen() {
                   style={styles.revealNowButton}
                 >
                   <Text style={styles.revealNowButtonText}>
-                    {revealing ? 'Révélation…' : 'Révéler maintenant'}
+                    {revealing
+                      ? (isQuestion ? 'Clôture…' : 'Révélation…')
+                      : (isQuestion ? 'Clôturer maintenant' : 'Révéler maintenant')}
                   </Text>
                 </Pressable>
               </View>
             )}
 
-            {/* Seul endroit où revenir sur un verdict déjà posé est possible
-                (le Fil, lui, ne propose Réalisé/Manqué qu'une fois, tant que
-                rien n'est encore affirmé) — réservé à l'auteur, une fois la
-                prédiction révélée. */}
-            {isAuthor && revealed && (
-              <View style={styles.sectionSpacing}>
-                <Text style={styles.eyebrow}>Verdict</Text>
-                <View style={styles.verdictChoiceRow}>
-                  <Pressable
-                    onPress={() => handleSetVerdict('realized')}
-                    disabled={verdictPending}
-                    style={[
-                      styles.verdictChoice,
-                      prediction.final_status === 'realized' && styles.verdictChoiceActive,
-                    ]}
-                  >
-                    <Text
+            {/* Pour une Question, remplace entièrement le bloc Verdict :
+                formulaire de réponse (ou lien Modifier) avant Clôture, liste
+                des réponses + validation Correcte/Incorrecte après — voir
+                `QuestionAnswerPanel`. Visible à tout le monde, pas seulement
+                à l'auteur (contrairement au Verdict d'une Déclaration). */}
+            {isQuestion ? (
+              <QuestionAnswerPanel
+                prediction={prediction}
+                isAuthor={!!isAuthor}
+                closed={revealed}
+                onAnswered={load}
+              />
+            ) : (
+              /* Seul endroit où revenir sur un verdict déjà posé est possible
+                 (le Fil, lui, ne propose Réalisé/Manqué qu'une fois, tant que
+                 rien n'est encore affirmé) — réservé à l'auteur, une fois la
+                 prédiction révélée. */
+              isAuthor && revealed && (
+                <View style={styles.sectionSpacing}>
+                  <Text style={styles.eyebrow}>Verdict</Text>
+                  <View style={styles.verdictChoiceRow}>
+                    <Pressable
+                      onPress={() => handleSetVerdict('realized')}
+                      disabled={verdictPending}
                       style={[
-                        styles.verdictChoiceText,
-                        prediction.final_status === 'realized' && styles.verdictChoiceTextActive,
+                        styles.verdictChoice,
+                        prediction.final_status === 'realized' && styles.verdictChoiceActive,
                       ]}
                     >
-                      Réalisé
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => handleSetVerdict('missed')}
-                    disabled={verdictPending}
-                    style={[
-                      styles.verdictChoice,
-                      prediction.final_status === 'missed' && styles.verdictChoiceActive,
-                    ]}
-                  >
-                    <Text
+                      <Text
+                        style={[
+                          styles.verdictChoiceText,
+                          prediction.final_status === 'realized' && styles.verdictChoiceTextActive,
+                        ]}
+                      >
+                        Réalisé
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => handleSetVerdict('missed')}
+                      disabled={verdictPending}
                       style={[
-                        styles.verdictChoiceText,
-                        prediction.final_status === 'missed' && styles.verdictChoiceTextActive,
+                        styles.verdictChoice,
+                        prediction.final_status === 'missed' && styles.verdictChoiceActive,
                       ]}
                     >
-                      Manqué
-                    </Text>
-                  </Pressable>
+                      <Text
+                        style={[
+                          styles.verdictChoiceText,
+                          prediction.final_status === 'missed' && styles.verdictChoiceTextActive,
+                        ]}
+                      >
+                        Manqué
+                      </Text>
+                    </Pressable>
+                  </View>
+                  <Text style={styles.hint}>
+                    {prediction.final_status === 'pending'
+                      ? 'Affirme si cette prédiction s’est réalisée ou a été manquée.'
+                      : 'Tu peux revenir sur ce choix à tout moment.'}
+                  </Text>
+                  {verdictError && <Text style={styles.error}>{verdictError}</Text>}
                 </View>
-                <Text style={styles.hint}>
-                  {prediction.final_status === 'pending'
-                    ? 'Affirme si cette prédiction s’est réalisée ou a été manquée.'
-                    : 'Tu peux revenir sur ce choix à tout moment.'}
-                </Text>
-                {verdictError && <Text style={styles.error}>{verdictError}</Text>}
-              </View>
+              )
             )}
 
             <Pressable

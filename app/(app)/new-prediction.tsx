@@ -36,6 +36,7 @@ import {
   predictionErrorMessage,
   type PredictionScope,
 } from '../../lib/predictions';
+import { type AnswerFormat, type PredictionType } from '../../lib/questions';
 import { fonts, radius, spacing, type Colors } from '../../lib/theme';
 import { useColors } from '../../lib/themeMode';
 
@@ -46,25 +47,22 @@ type ContentMode = 'text' | 'audio';
  * lieu d'attendre ce déclenchement manuel. */
 type RevealTiming = 'scheduled' | 'open_ended';
 
-/** `declaration` : le fonctionnement actuel (une affirmation, un teaser).
- * `question` : l'auteur pose une question, sans teaser — le Cercle répond
- * une fois la Question close plutôt que de deviner un secret. */
-type PredictType = 'declaration' | 'question';
-
-/** Payload envoyé à `createPrediction` — étendu du type de sa propre
- * signature pour rester aligné automatiquement, plus `type` qui distingue
- * Declaration/Question côté formulaire. */
-type NewPredictionPayload = Parameters<typeof createPrediction>[0] & {
-  type: PredictType;
-};
-
 /** Contenu écrit à la place du texte quand la prédiction est uniquement vocale. */
 const AUDIO_PLACEHOLDER = '🎙️ Message vocal';
 
 /** Teaser de repli pour une Question en message vocal : le champ Teaser est
- * masqué en mode Question, mais `create_prediction` l'exige toujours
- * (`predictions_teaser_length`) — rien à en tirer sans texte à résumer. */
+ * masqué en mode Question (rien à teaser, la question est visible dès la
+ * création — voir schema.sql section 42), mais `create_prediction` l'exige
+ * toujours (`predictions_teaser_length`) — rien à en tirer sans texte à
+ * résumer. */
 const AUDIO_QUESTION_TEASER = 'Nouvelle question';
+
+/** Deux options minimum pour qu'un choix multiple ait un sens. */
+const MIN_ANSWER_OPTIONS = 2;
+/** Court, façon sondage — distinct de `MAX_ANSWER_LENGTH` (lib/questions.ts),
+ * qui borne la réponse d'un répondant, pas le libellé d'une option posée par
+ * l'auteur à la création. */
+const MAX_OPTION_LENGTH = 60;
 
 function pad2(value: number): string {
   return String(value).padStart(2, '0');
@@ -89,8 +87,11 @@ export default function NewPredictionScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const userId = session?.user.id;
 
-  const [predictType, setPredictType] = useState<PredictType>('declaration');
+  const [predictType, setPredictType] = useState<PredictionType>('declaration');
   const isQuestion = predictType === 'question';
+  const [answerFormat, setAnswerFormat] = useState<AnswerFormat>('text');
+  const [answerOptions, setAnswerOptions] = useState<string[]>(['', '']);
+  const isChoiceFormat = isQuestion && answerFormat === 'choice';
 
   const [teaser, setTeaser] = useState('');
   const [contentMode, setContentMode] = useState<ContentMode>('text');
@@ -193,6 +194,20 @@ export default function NewPredictionScreen() {
     });
   }
 
+  function updateOption(index: number, value: string) {
+    setAnswerOptions((prev) => prev.map((o, i) => (i === index ? value : o)));
+  }
+
+  function addOption() {
+    setAnswerOptions((prev) => [...prev, '']);
+  }
+
+  /** Toujours au moins `MIN_ANSWER_OPTIONS` champs à l'écran — en dessous, un
+   * choix multiple n'a plus de sens. */
+  function removeOption(index: number) {
+    setAnswerOptions((prev) => (prev.length > MIN_ANSWER_OPTIONS ? prev.filter((_, i) => i !== index) : prev));
+  }
+
   /** Vérifications locales, pour éviter un aller-retour réseau inutile. */
   function validate(): string | null {
     // Pas de Teaser en mode Question : le champ est masqué (voir le JSX),
@@ -214,6 +229,15 @@ export default function NewPredictionScreen() {
       }
     } else if (!audioUri) {
       return isQuestion ? 'Enregistre ta question avant de la publier.' : 'Enregistre ton Predict avant de le sceller.';
+    }
+    if (isChoiceFormat) {
+      const trimmedOptions = answerOptions.map((o) => o.trim()).filter(Boolean);
+      if (trimmedOptions.length < MIN_ANSWER_OPTIONS) {
+        return `Ajoute au moins ${MIN_ANSWER_OPTIONS} options.`;
+      }
+      if (answerOptions.some((o) => o.trim().length > MAX_OPTION_LENGTH)) {
+        return `Une option ne peut pas dépasser ${MAX_OPTION_LENGTH} caractères.`;
+      }
     }
     if (revealTiming === 'scheduled') {
       if (!revealAt) {
@@ -269,7 +293,7 @@ export default function NewPredictionScreen() {
           : AUDIO_QUESTION_TEASER
         : trimmedTeaser;
 
-      const payload: NewPredictionPayload = {
+      const { data: predictionId, error: insertError } = await createPrediction({
         type: predictType,
         teaser: effectiveTeaser,
         content: contentMode === 'text' ? trimmedContent : AUDIO_PLACEHOLDER,
@@ -280,9 +304,9 @@ export default function NewPredictionScreen() {
         mentionedFriendIds,
         openEnded: revealTiming === 'open_ended',
         isImmediate: revealTiming === 'open_ended' && revealNow,
-      };
-
-      const { data: predictionId, error: insertError } = await createPrediction(payload);
+        answerFormat: isQuestion ? answerFormat : undefined,
+        answerOptions: isChoiceFormat ? answerOptions.map((o) => o.trim()).filter(Boolean) : undefined,
+      });
 
       if (insertError) {
         setError(predictionErrorMessage(insertError));
@@ -431,6 +455,63 @@ export default function NewPredictionScreen() {
             <View style={styles.fieldSpacing}>
               <PredictionRecorder uri={audioUri} onChange={setAudioUri} disabled={submitting} />
             </View>
+          )}
+
+          {isQuestion && (
+            <>
+              <Text style={[styles.label, styles.sectionLabel]}>Format de réponse</Text>
+              <View style={styles.scopeRow}>
+                <Pressable
+                  onPress={() => setAnswerFormat('text')}
+                  disabled={submitting}
+                  style={[styles.scopeOption, answerFormat === 'text' && styles.scopeOptionActive]}
+                >
+                  <Text style={[styles.scopeText, answerFormat === 'text' && styles.scopeTextActive]}>
+                    Réponse libre
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setAnswerFormat('choice')}
+                  disabled={submitting}
+                  style={[styles.scopeOption, answerFormat === 'choice' && styles.scopeOptionActive]}
+                >
+                  <Text style={[styles.scopeText, answerFormat === 'choice' && styles.scopeTextActive]}>
+                    Choix multiples
+                  </Text>
+                </Pressable>
+              </View>
+
+              {isChoiceFormat && (
+                <View style={styles.fieldSpacing}>
+                  {answerOptions.map((option, index) => (
+                    <View key={index} style={styles.optionRow}>
+                      <TextInput
+                        value={option}
+                        onChangeText={(value) => updateOption(index, value)}
+                        placeholder={`Option ${index + 1}`}
+                        placeholderTextColor={colors.textFaint}
+                        editable={!submitting}
+                        maxLength={MAX_OPTION_LENGTH}
+                        style={[styles.input, styles.optionInput]}
+                      />
+                      {answerOptions.length > MIN_ANSWER_OPTIONS && (
+                        <Pressable
+                          onPress={() => removeOption(index)}
+                          disabled={submitting}
+                          hitSlop={8}
+                          style={styles.removeOptionButton}
+                        >
+                          <Text style={styles.removeOptionButtonText}>✕</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  ))}
+                  <Pressable onPress={addOption} disabled={submitting} style={styles.addOptionButton}>
+                    <Text style={styles.addOptionButtonText}>+ Ajouter une option</Text>
+                  </Pressable>
+                </View>
+              )}
+            </>
           )}
 
           <Text style={[styles.label, styles.sectionLabel]}>{isQuestion ? 'Clôture' : 'Révélation'}</Text>
@@ -682,6 +763,12 @@ function createStyles(colors: Colors) {
   },
   teaserInput: { minHeight: 60, textAlignVertical: 'top' },
   contentInput: { minHeight: 110, textAlignVertical: 'top' },
+  optionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  optionInput: { flex: 1 },
+  removeOptionButton: { padding: 8 },
+  removeOptionButtonText: { fontSize: 15, color: colors.textFaint, fontWeight: '700' },
+  addOptionButton: { paddingVertical: 8, alignSelf: 'flex-start' },
+  addOptionButtonText: { fontSize: 14, fontWeight: '700', color: colors.gold },
   counter: { fontSize: 12, color: colors.textFaint, marginTop: 6, textAlign: 'right' },
   counterLow: { color: colors.danger },
   hint: { fontSize: 13, color: colors.textMuted, marginTop: 10, lineHeight: 18 },
