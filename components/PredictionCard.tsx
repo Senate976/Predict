@@ -25,7 +25,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import Svg, { Defs, LinearGradient as SvgLinearGradient, Polygon, Rect, Stop } from 'react-native-svg';
+import Svg, { Polygon, Rect } from 'react-native-svg';
 import { Text } from './Text';
 
 import { fetchCommentCount } from '../lib/comments';
@@ -99,17 +99,13 @@ function hexToRgba(hex: string, alpha: number): string {
 function EnvelopeFlap({ colors }: { colors: Colors }) {
   return (
     <Svg width="100%" height={FLAP_HEIGHT} viewBox={`0 0 100 ${FLAP_HEIGHT}`} preserveAspectRatio="none">
-      <Defs>
-        <SvgLinearGradient id="flapGradient" x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0" stopColor={colors.envelopeBody[0]} />
-          <Stop offset="1" stopColor={colors.envelopeBody[1]} />
-        </SvgLinearGradient>
-      </Defs>
-      {/* Fond plein sur tout le bandeau — sans lui, les deux coins hors du
-          triangle (à gauche et à droite de sa pointe) laissaient voir le
-          papier clair de la carte au lieu de rester dans la partie foncée. */}
+      {/* Fond plein et foncé sur tout le bandeau, jusque dans les deux coins
+          hors du triangle — sans lui, ces coins laissaient voir le papier
+          clair de la carte. Le triangle du rabat se pose dessus dans un ton
+          nettement plus clair, un aplat plutôt qu'un dégradé qui finissait
+          par se fondre avec le fond et effaçait la pointe. */}
       <Rect x="0" y="0" width="100" height={FLAP_HEIGHT} fill={colors.envelopeBody[1]} />
-      <Polygon points={`0,0 100,0 50,${FLAP_HEIGHT}`} fill="url(#flapGradient)" />
+      <Polygon points={`0,0 100,0 50,${FLAP_HEIGHT}`} fill={colors.envelopeBody[0]} />
     </Svg>
   );
 }
@@ -658,14 +654,6 @@ export function PredictionCard({
                   {cardState.label}
                 </Text>
               </View>
-              {/* Réservé à une carte Scellée : le seul état où la date de
-                  révélation n'est pas encore connue de tous — utile de la
-                  rappeler ici, au même endroit que « SCELLÉ ». */}
-              {cardState.kind === 'sealed' && (
-                <Text style={styles.envelopeRevealText} numberOfLines={1}>
-                  Révélation : {item.open_ended ? 'libre' : formatCountdown(new Date(item.reveal_at), now)}
-                </Text>
-              )}
             </View>
           )}
 
@@ -748,6 +736,15 @@ export function PredictionCard({
           )}
 
           {!isQuestion && cardState.kind === 'sealed' && <Text style={styles.cardTeaser}>{item.teaser}</Text>}
+
+          {/* Réservé à une carte Scellée : le seul état où la date de
+              révélation n'est pas encore connue de tous — en bas à droite de
+              la carte, pas accolée à l'étiquette « SCELLÉ » tout en haut. */}
+          {cardState.kind === 'sealed' && (
+            <Text style={styles.revealHint} numberOfLines={1}>
+              Révélation : {item.open_ended ? 'libre' : formatCountdown(new Date(item.reveal_at), now)}
+            </Text>
+          )}
         </Pressable>
 
         {/* Bouton « Révéler », réservé à l'auteur d'une carte encore Scellée
@@ -1064,11 +1061,14 @@ function createStyles(colors: Colors) {
     textTransform: 'uppercase',
     color: colors.textOnAccent,
   },
-  envelopeRevealText: {
+  // En bas à droite de la carte (dans le padding du corps, sur le papier
+  // clair) — jamais accolée à l'étiquette « SCELLÉ » tout en haut du rabat.
+  revealHint: {
     fontFamily: fonts.label,
-    fontSize: 10,
-    color: colors.textOnAccent,
-    opacity: 0.8,
+    fontSize: 11,
+    color: colors.textFaint,
+    textAlign: 'right',
+    marginTop: 8,
   },
   // Corps de carte assourdi une fois Manquée — jamais le badge d'état,
   // rendu séparément avant ce conteneur et donc toujours à `opacity: 1`.
