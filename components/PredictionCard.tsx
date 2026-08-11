@@ -1094,9 +1094,12 @@ function createStyles(colors: Colors) {
     shadowRadius: 12,
     elevation: 6,
   },
-  // Un peu plus étroite quand un tampon déborde sur son coin, pour ne jamais
-  // le laisser hors du cadre de la carte.
-  letterWithStamp: { marginRight: 34 },
+  // Réserve la place du tampon par un padding interne plutôt qu'une marge
+  // externe : une marge asymétrique (seulement à droite) décentrait toute la
+  // boîte de la lettre par rapport aux autres cartes — ici, la boîte garde
+  // exactement la même largeur et le même centrage partout, seul le texte
+  // recule pour ne jamais passer sous le tampon.
+  letterWithStamp: { paddingRight: 60 },
   letterHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   letterAuthor: { fontFamily: fonts.label, fontSize: 11, letterSpacing: 0.6, color: colors.textFaint, flexShrink: 1 },
   letterCounter: {
