@@ -46,8 +46,25 @@ type ContentMode = 'text' | 'audio';
  * lieu d'attendre ce déclenchement manuel. */
 type RevealTiming = 'scheduled' | 'open_ended';
 
+/** `declaration` : le fonctionnement actuel (une affirmation, un teaser).
+ * `question` : l'auteur pose une question, sans teaser — le Cercle répond
+ * une fois la Question close plutôt que de deviner un secret. */
+type PredictType = 'declaration' | 'question';
+
+/** Payload envoyé à `createPrediction` — étendu du type de sa propre
+ * signature pour rester aligné automatiquement, plus `type` qui distingue
+ * Declaration/Question côté formulaire. */
+type NewPredictionPayload = Parameters<typeof createPrediction>[0] & {
+  type: PredictType;
+};
+
 /** Contenu écrit à la place du texte quand la prédiction est uniquement vocale. */
 const AUDIO_PLACEHOLDER = '🎙️ Message vocal';
+
+/** Teaser de repli pour une Question en message vocal : le champ Teaser est
+ * masqué en mode Question, mais `create_prediction` l'exige toujours
+ * (`predictions_teaser_length`) — rien à en tirer sans texte à résumer. */
+const AUDIO_QUESTION_TEASER = 'Nouvelle question';
 
 function pad2(value: number): string {
   return String(value).padStart(2, '0');
@@ -71,6 +88,9 @@ export default function NewPredictionScreen() {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const userId = session?.user.id;
+
+  const [predictType, setPredictType] = useState<PredictType>('declaration');
+  const isQuestion = predictType === 'question';
 
   const [teaser, setTeaser] = useState('');
   const [contentMode, setContentMode] = useState<ContentMode>('text');
@@ -175,17 +195,25 @@ export default function NewPredictionScreen() {
 
   /** Vérifications locales, pour éviter un aller-retour réseau inutile. */
   function validate(): string | null {
-    if (!trimmedTeaser) return 'Écris un teaser : l’accroche que verront tes destinataires.';
-    if (trimmedTeaser.length > MAX_TEASER_LENGTH) {
-      return `Le teaser ne peut pas dépasser ${MAX_TEASER_LENGTH} caractères.`;
+    // Pas de Teaser en mode Question : le champ est masqué (voir le JSX),
+    // rien à valider ici pour ce mode.
+    if (!isQuestion) {
+      if (!trimmedTeaser) return 'Écris un teaser : l’accroche que verront tes destinataires.';
+      if (trimmedTeaser.length > MAX_TEASER_LENGTH) {
+        return `Le teaser ne peut pas dépasser ${MAX_TEASER_LENGTH} caractères.`;
+      }
     }
     if (contentMode === 'text') {
-      if (!trimmedContent) return 'Écris le contenu secret de ton Predict.';
+      if (!trimmedContent) {
+        return isQuestion ? 'Écris ta question.' : 'Écris le contenu secret de ton Predict.';
+      }
       if (trimmedContent.length > MAX_CONTENT_LENGTH) {
-        return `Le contenu secret ne peut pas dépasser ${MAX_CONTENT_LENGTH} caractères.`;
+        return isQuestion
+          ? `La question ne peut pas dépasser ${MAX_CONTENT_LENGTH} caractères.`
+          : `Le contenu secret ne peut pas dépasser ${MAX_CONTENT_LENGTH} caractères.`;
       }
     } else if (!audioUri) {
-      return 'Enregistre ton Predict avant de le sceller.';
+      return isQuestion ? 'Enregistre ta question avant de la publier.' : 'Enregistre ton Predict avant de le sceller.';
     }
     if (revealTiming === 'scheduled') {
       if (!revealAt) {
@@ -232,8 +260,18 @@ export default function NewPredictionScreen() {
         .filter((f) => mentionedUsernames.includes(f.username.toLowerCase()))
         .map((f) => f.id);
 
-      const { data: predictionId, error: insertError } = await createPrediction({
-        teaser: trimmedTeaser,
+      // Le Teaser reste requis côté base même en mode Question (où le champ
+      // est masqué) : on en dérive un du texte de la question, faute de mieux
+      // en message vocal.
+      const effectiveTeaser = isQuestion
+        ? contentMode === 'text'
+          ? trimmedContent.slice(0, MAX_TEASER_LENGTH)
+          : AUDIO_QUESTION_TEASER
+        : trimmedTeaser;
+
+      const payload: NewPredictionPayload = {
+        type: predictType,
+        teaser: effectiveTeaser,
         content: contentMode === 'text' ? trimmedContent : AUDIO_PLACEHOLDER,
         revealAt,
         scope,
@@ -242,7 +280,9 @@ export default function NewPredictionScreen() {
         mentionedFriendIds,
         openEnded: revealTiming === 'open_ended',
         isImmediate: revealTiming === 'open_ended' && revealNow,
-      });
+      };
+
+      const { data: predictionId, error: insertError } = await createPrediction(payload);
 
       if (insertError) {
         setError(predictionErrorMessage(insertError));
@@ -300,23 +340,52 @@ export default function NewPredictionScreen() {
           <View style={styles.headerSpacer} />
         </View>
 
+        <View style={styles.predictTypeWrap}>
+          <View style={styles.scopeRow}>
+            <Pressable
+              onPress={() => setPredictType('declaration')}
+              disabled={submitting}
+              style={[styles.scopeOption, predictType === 'declaration' && styles.scopeOptionActive]}
+            >
+              <Text style={[styles.scopeText, predictType === 'declaration' && styles.scopeTextActive]}>
+                Predict
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setPredictType('question')}
+              disabled={submitting}
+              style={[styles.scopeOption, predictType === 'question' && styles.scopeOptionActive]}
+            >
+              <Text style={[styles.scopeText, predictType === 'question' && styles.scopeTextActive]}>
+                Question
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+
         <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.label}>Teaser</Text>
-          <TextInput
-            value={teaser}
-            onChangeText={setTeaser}
-            placeholder="Donnez un indice sur votre Predict"
-            placeholderTextColor={colors.textFaint}
-            multiline
-            editable={!submitting}
-            maxLength={MAX_TEASER_LENGTH}
-            style={[styles.input, styles.teaserInput]}
-          />
+          {!isQuestion && (
+            <>
+              <Text style={styles.label}>Teaser</Text>
+              <TextInput
+                value={teaser}
+                onChangeText={setTeaser}
+                placeholder="Donnez un indice sur votre Predict"
+                placeholderTextColor={colors.textFaint}
+                multiline
+                editable={!submitting}
+                maxLength={MAX_TEASER_LENGTH}
+                style={[styles.input, styles.teaserInput]}
+              />
+            </>
+          )}
 
-          <Text style={[styles.label, styles.sectionLabel]}>Mon Predict</Text>
+          <Text style={[styles.label, styles.sectionLabel]}>
+            {isQuestion ? 'Open Predict' : 'Mon Predict'}
+          </Text>
           <View style={styles.scopeRow}>
             <Pressable
               onPress={() => setContentMode('text')}
@@ -343,7 +412,11 @@ export default function NewPredictionScreen() {
               <TextInput
                 value={content}
                 onChangeText={setContent}
-                placeholder="Écrivez votre Predict ici et prouvez à votre cercle, qu’une fois encore, vous aviez raison"
+                placeholder={
+                  isQuestion
+                    ? 'Posez votre question à votre cercle...'
+                    : 'Écrivez votre Predict ici et prouvez à votre cercle, qu’une fois encore, vous aviez raison'
+                }
                 placeholderTextColor={colors.textFaint}
                 multiline
                 editable={!submitting}
@@ -360,7 +433,7 @@ export default function NewPredictionScreen() {
             </View>
           )}
 
-          <Text style={[styles.label, styles.sectionLabel]}>Révélation</Text>
+          <Text style={[styles.label, styles.sectionLabel]}>{isQuestion ? 'Clôture' : 'Révélation'}</Text>
 
           <View style={styles.scopeRow}>
             <Pressable
@@ -586,6 +659,7 @@ function createStyles(colors: Colors) {
   },
   headerSpacer: { width: 56 },
   cancel: { fontSize: 15, color: colors.text, width: 56 },
+  predictTypeWrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
   scroll: { padding: spacing.lg, paddingBottom: 40 },
   label: {
     fontFamily: fonts.sansBold,
