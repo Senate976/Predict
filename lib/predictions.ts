@@ -4,29 +4,6 @@ import { supabase } from './supabase';
 
 export type PredictionScope = 'circle' | 'selected' | 'group';
 
-export type PredictionCategory =
-  | 'politique'
-  | 'sport'
-  | 'amour'
-  | 'star'
-  | 'business'
-  | 'culture'
-  | 'amis'
-  | 'autre';
-
-export const CATEGORY_LABEL: Record<PredictionCategory, string> = {
-  politique: 'Politique',
-  sport: 'Sport',
-  amour: 'Amour',
-  star: 'Star',
-  business: 'Business',
-  culture: 'Culture',
-  amis: 'Amis',
-  autre: 'Autre',
-};
-
-export const CATEGORIES = Object.keys(CATEGORY_LABEL) as PredictionCategory[];
-
 export type EmojiReaction =
   | '👍'
   | '🖕'
@@ -83,7 +60,6 @@ export type PredictionFeedItem = {
   /** Révélée dès la création (pas de suspense à lever) : le vote porte alors
    * sur « j'y crois / j'y crois pas », jamais sur « réalisée / manquée ». */
   is_immediate: boolean;
-  category: PredictionCategory;
   created_at: string;
   is_revealed: boolean;
   /** `pending` tant que l'auteur n'a pas affirmé le résultat (voir
@@ -178,7 +154,7 @@ export function predictionErrorMessage(error: PostgrestError): string {
  * dans lequel les choses ont été publiées, pas celui de leur révélation.
  */
 const FEED_COLUMNS =
-  'id, author_id, teaser, content, audio_path, reveal_at, scope, open_ended, is_immediate, category, created_at, ' +
+  'id, author_id, teaser, content, audio_path, reveal_at, scope, open_ended, is_immediate, created_at, ' +
   'is_revealed, final_status, verdict_set_at, is_favorite, is_hidden, is_seen, is_verdict_seen, emoji_counts, ' +
   'my_emoji_reaction, mentioned_user_ids';
 
@@ -217,7 +193,6 @@ export async function createPrediction(input: {
    * « j'y crois / j'y crois pas » plutôt qu'en « réalisée / manquée », vu
    * qu'il n'y a rien à constater : seulement une opinion à donner. */
   isImmediate?: boolean;
-  category?: PredictionCategory;
 }) {
   const result = await supabase.rpc('create_prediction', {
     p_teaser: input.teaser.trim(),
@@ -228,7 +203,6 @@ export async function createPrediction(input: {
     p_group_id: input.scope === 'group' ? input.groupId ?? null : null,
     p_mentioned_ids: input.mentionedFriendIds ?? [],
     p_open_ended: input.openEnded ?? false,
-    p_category: input.category ?? 'autre',
     p_is_immediate: input.isImmediate ?? false,
   });
   return result as { data: string | null; error: PostgrestError | null };
