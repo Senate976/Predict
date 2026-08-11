@@ -3374,12 +3374,13 @@ alter table public.profiles add constraint profiles_default_scope_check
   check (default_scope is null or default_scope in ('circle', 'selected'));
 
 -- Nouveau type de notification : rappel avant révélation (section suivante).
-alter table public.notifications drop constraint if exists notifications_type_check;
-alter table public.notifications add constraint notifications_type_check
-  check (type in (
-    'new_teaser', 'prediction_revealed', 'prediction_approved', 'group_invite',
-    'prediction_mentioned', 'prediction_realized', 'prediction_missed', 'reveal_reminder'
-  ));
+--
+-- La règle elle-même n'est (re)posée que plus bas (section « Nouveau type de
+-- notification : l'auteur est prévenu... »), une seule fois, avec la liste
+-- complète et à jour — la reposer ici aussi, avec une liste incomplète pour
+-- l'époque, casse un rejeu du fichier entier dès qu'une vraie notification
+-- `question_answered` existe déjà en base (le rejeu s'arrête ici, avant
+-- d'atteindre la version à jour plus bas).
 
 -- Chaque fonction qui insère une notification se revérifie désormais contre
 -- la préférence du destinataire (`notification_prefs`), `true` par défaut si
