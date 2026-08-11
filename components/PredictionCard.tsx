@@ -1,7 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import {
-  CheckCircle2,
   Eye,
   EyeOff,
   HelpCircle,
@@ -303,29 +302,24 @@ export function PredictionCard({
    *
    * Une Question n'entre jamais dans la machine à états Scellé → Réalisé/
    * Manqué : c'est un objet différent, qui répond « j'ai posé/répondu à une
-   * question » plutôt que « j'ai affirmé un secret » — sauf une fois sa
-   * propre réponse validée correcte, où elle reprend le même accent que
-   * Réalisé : le succès se lit pareil pour tout le monde. Ne dépend que du
-   * point de vue de l'appelant (`my_answer_is_correct`) : une Question où
-   * quelqu'un d'autre a deviné juste ne change pas pour moi. */
-  // Une fois Close, remplace le simple repère « QUESTION · CLÔTURÉE » par le
-  // pourcentage de bonnes réponses dès qu'il y en a au moins une à compter —
-  // `correct_answer_count` ne reflète que celles déjà validées par l'auteur,
-  // jamais une estimation sur les réponses encore en attente de verdict.
+   * question » plutôt que « j'ai affirmé un secret ». Une fois close, le
+   * même repère (le pourcentage de bonnes réponses) s'affiche pour tout le
+   * monde — y compris pour l'auteur d'une réponse correcte : pas de mention
+   * personnelle distincte, jamais de « toi tu as eu juste » séparé. */
+  // `correct_answer_count` ne reflète que les réponses déjà validées par
+  // l'auteur, jamais une estimation sur celles encore en attente de verdict.
   const correctAnswerPercent =
     item.answer_count > 0 ? Math.round((item.correct_answer_count / item.answer_count) * 100) : null;
 
   const cardState: {
-    kind: 'sealed' | 'active' | 'realized' | 'missed' | 'question_open' | 'question_closed' | 'question_correct';
+    kind: 'sealed' | 'active' | 'realized' | 'missed' | 'question_open' | 'question_closed';
     label?: string;
   } = isQuestion
     ? revealed
-      ? item.my_answer_is_correct === true
-        ? { kind: 'question_correct', label: 'SONDAGE · RÉPONSE CORRECTE' }
-        : {
-            kind: 'question_closed',
-            label: correctAnswerPercent !== null ? `${correctAnswerPercent} % ONT EU RAISON` : 'SONDAGE · CLÔTURÉE',
-          }
+      ? {
+          kind: 'question_closed',
+          label: correctAnswerPercent !== null ? `${correctAnswerPercent} % ONT EU RAISON` : 'SONDAGE · CLÔTURÉE',
+        }
       : { kind: 'question_open', label: 'PREDICT PUBLIC' }
     : !revealed
       ? { kind: 'sealed', label: 'SCELLÉ' }
@@ -654,9 +648,6 @@ export function PredictionCard({
                 {cardState.kind === 'sealed' && <Lock size={12} color={colors.textOnAccent} strokeWidth={2} />}
                 {(cardState.kind === 'question_open' || cardState.kind === 'question_closed') && (
                   <HelpCircle size={12} color={colors.textOnAccent} strokeWidth={2} />
-                )}
-                {cardState.kind === 'question_correct' && (
-                  <CheckCircle2 size={12} color={colors.textOnAccent} strokeWidth={2} />
                 )}
                 <Text style={styles.stateLabel} numberOfLines={1}>
                   {cardState.label}
