@@ -108,10 +108,11 @@ export async function fetchPredictionAnswers(predictionId: string) {
 }
 
 /**
- * Répond à une Question, ou change d'avis avant Clôture (upsert côté base).
+ * Répond à une Question — définitif, un seul appel réussi par personne.
  * Fournir `text` ou `optionId` selon le format de la Question —
  * `submit_prediction_answer` (security definer) refuse tout appel qui ne
- * correspond pas au format stocké, refusé après Clôture ou sans accès.
+ * correspond pas au format stocké, arrivé après Clôture, sans accès, ou
+ * qui tenterait de répondre une seconde fois.
  */
 export async function submitPredictionAnswer(
   predictionId: string,
