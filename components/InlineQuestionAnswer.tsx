@@ -194,7 +194,7 @@ function createStyles(colors: Colors) {
     },
     sendButtonDisabled: { opacity: 0.5 },
     sendButtonText: { fontSize: 13, fontWeight: '700', color: colors.accent },
-    optionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    optionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
     optionChoice: {
       borderWidth: 1,
       borderColor: colors.accent,

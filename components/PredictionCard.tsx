@@ -18,6 +18,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Dimensions,
   Modal,
   PanResponder,
   Platform,
@@ -100,8 +101,8 @@ function EnvelopeFlap({ colors }: { colors: Colors }) {
     <Svg width="100%" height={FLAP_HEIGHT} viewBox={`0 0 100 ${FLAP_HEIGHT}`} preserveAspectRatio="none">
       <Defs>
         <SvgLinearGradient id="flapGradient" x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0" stopColor={colors.envelopeFlap[0]} />
-          <Stop offset="1" stopColor={colors.envelopeFlap[1]} />
+          <Stop offset="0" stopColor={colors.envelopeBody[0]} />
+          <Stop offset="1" stopColor={colors.envelopeBody[1]} />
         </SvgLinearGradient>
       </Defs>
       <Polygon points={`0,0 100,0 50,${FLAP_HEIGHT}`} fill="url(#flapGradient)" />
@@ -109,10 +110,10 @@ function EnvelopeFlap({ colors }: { colors: Colors }) {
   );
 }
 
-/** Le cachet de cire, posé pile sur la pointe du rabat — blob irrégulier
- * (coins asymétriques) plutôt qu'un rond plat, monogramme « P » en relief
- * (deux `Text` superposés, l'un en ombre). Uniquement pour une enveloppe
- * Scellée : une fois ouverte, c'est la lettre qui occupe ce même point. */
+/** Le cachet de cire, posé pile sur la pointe du rabat — rond, monogramme
+ * « P » en relief (deux `Text` superposés, l'un en ombre). Uniquement pour
+ * une enveloppe Scellée : une fois ouverte, c'est la lettre qui occupe ce
+ * même point. */
 function WaxSeal({ size = 46 }: { size?: number }) {
   return (
     <View
@@ -125,10 +126,7 @@ function WaxSeal({ size = 46 }: { size?: number }) {
         colors={wax}
         start={{ x: 0.28, y: 0.22 }}
         end={{ x: 0.85, y: 1 }}
-        style={[
-          styles_waxSealBase,
-          { borderTopLeftRadius: size * 0.48, borderBottomRightRadius: size * 0.42 },
-        ]}
+        style={styles_waxSealBase}
       >
         <Text style={[styles_waxSealEmblem, styles_waxSealEmblemShadow, { fontSize: size * 0.42 }]}>P</Text>
         <Text style={[styles_waxSealEmblem, { fontSize: size * 0.42 }]}>P</Text>
@@ -166,7 +164,13 @@ const styles_waxSealEmblemShadow: object = {
 function VerdictStamp({ verdict, colors }: { verdict: 'realized' | 'missed'; colors: Colors }) {
   const tint = verdict === 'realized' ? colors.accent : colors.ink;
   return (
-    <View style={[stampStyles.stamp, { borderColor: tint }]}>
+    <View
+      style={[
+        stampStyles.stamp,
+        verdict === 'realized' ? stampStyles.stampRealized : stampStyles.stampMissed,
+        { borderColor: tint },
+      ]}
+    >
       <Text style={[stampStyles.stampText, { color: tint }]}>
         {verdict === 'realized' ? 'ENCORE\nRAISON' : 'MANQUÉ'}
       </Text>
@@ -304,7 +308,7 @@ export function PredictionCard({
       ? item.my_answer_is_correct === true
         ? { kind: 'question_correct', label: 'QUESTION · RÉPONSE CORRECTE' }
         : { kind: 'question_closed', label: 'QUESTION · CLÔTURÉE' }
-      : { kind: 'question_open', label: 'QUESTION · OUVERTE' }
+      : { kind: 'question_open', label: 'PRÉDICTION GÉNÉRALE' }
     : !revealed
       ? { kind: 'sealed', label: 'SCELLÉ' }
       : verdict === 'realized'
@@ -516,6 +520,12 @@ export function PredictionCard({
   const hoveredIndexRef = useRef<number | null>(null);
   const panelOpenAtGrantRef = useRef(false);
   const scaleAnims = useRef(EMOJI_REACTIONS.map(() => new Animated.Value(1))).current;
+  // La bulle est centrée par défaut sur le pouce (voir `emojiPanel` plus bas),
+  // mais un pouce proche du bord de l'écran la pousserait hors champ — décalage
+  // horizontal calculé après mesure réelle (`onLayout`) pour la ramener dans
+  // l'écran, jamais avant : impossible de connaître sa position tant qu'elle
+  // n'a pas été posée au moins une fois.
+  const [panelOffsetX, setPanelOffsetX] = useState(0);
 
   // Le PanResponder juste en dessous n'est créé qu'une seule fois
   // (`useRef`) : ses callbacks ne doivent donc JAMAIS lire directement
@@ -548,6 +558,7 @@ export function PredictionCard({
       onPanResponderGrant: () => {
         panelOpenAtGrantRef.current = emojiPanelOpenRef.current;
         panelLayoutRef.current = null;
+        setPanelOffsetX(0);
         setEmojiPanelOpen(true);
       },
       onPanResponderMove: (_evt, gesture) => {
@@ -815,10 +826,23 @@ export function PredictionCard({
               {emojiPanelOpen && (
                 <View
                   ref={panelRef}
-                  style={styles.emojiPanel}
+                  style={[styles.emojiPanel, { transform: [{ translateX: panelOffsetX }] }]}
                   onLayout={() => {
                     panelRef.current?.measureInWindow((x, y, width, height) => {
-                      panelLayoutRef.current = { x, y, width, height };
+                      // Ramène la bulle dans l'écran si elle en dépasse d'un
+                      // côté — un pouce proche du bord gauche ou droit ne doit
+                      // jamais laisser une partie des emojis hors champ. Le
+                      // décalage est répercuté ici même sur `x` : c'est cette
+                      // position, pas celle mesurée avant correction, que
+                      // `onPanResponderMove` doit comparer à la position du
+                      // doigt pour retrouver l'emoji survolé.
+                      const screenWidth = Dimensions.get('window').width;
+                      const edgeMargin = 8;
+                      let shift = 0;
+                      if (x < edgeMargin) shift = edgeMargin - x;
+                      else if (x + width > screenWidth - edgeMargin) shift = screenWidth - edgeMargin - (x + width);
+                      if (shift !== 0) setPanelOffsetX((prev) => prev + shift);
+                      panelLayoutRef.current = { x: x + shift, y, width, height };
                     });
                   }}
                 >
@@ -869,13 +893,15 @@ export function PredictionCard({
       </View>
 
       {commentsOpen && (
-        <InlineComments
-          predictionId={item.id}
-          userId={userId}
-          truncate
-          revealed={revealed}
-          isPredictionAuthor={isAuthor}
-        />
+        <View style={styles.commentsWrap}>
+          <InlineComments
+            predictionId={item.id}
+            userId={userId}
+            truncate
+            revealed={revealed}
+            isPredictionAuthor={isAuthor}
+          />
+        </View>
       )}
 
       {/* Menu de gestion (favoris / masquer / supprimer) — ouvert depuis le
@@ -963,9 +989,6 @@ const stampStyles = StyleSheet.create({
     position: 'absolute',
     top: -14,
     right: -6,
-    width: 72,
-    height: 72,
-    borderRadius: 999,
     borderWidth: 3,
     alignItems: 'center',
     justifyContent: 'center',
@@ -973,6 +996,11 @@ const stampStyles = StyleSheet.create({
     opacity: 0.92,
     zIndex: 3,
   },
+  // Réalisé : rond, comme un vrai cachet de cire. Manqué : rectangulaire —
+  // une silhouette différente pour que les deux tampons se distinguent au
+  // premier coup d'œil, jamais seulement par la couleur.
+  stampRealized: { width: 72, height: 72, borderRadius: 999 },
+  stampMissed: { width: 88, height: 48, borderRadius: 4 },
   stampText: {
     fontFamily: fonts.sansBold,
     fontSize: 11,
@@ -1041,7 +1069,7 @@ function createStyles(colors: Colors) {
   envelope: { position: 'relative' },
   letter: {
     alignSelf: 'center',
-    width: '62%',
+    width: '84%',
     marginTop: -LETTER_OVERLAP,
     marginBottom: 4,
     backgroundColor: colors.surfaceRaised,
@@ -1058,7 +1086,7 @@ function createStyles(colors: Colors) {
   },
   // Un peu plus étroite quand un tampon déborde sur son coin, pour ne jamais
   // le laisser hors du cadre de la carte.
-  letterWithStamp: { marginRight: 26 },
+  letterWithStamp: { marginRight: 34 },
   letterHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   letterAuthor: { fontFamily: fonts.label, fontSize: 11, letterSpacing: 0.6, color: colors.textFaint, flexShrink: 1 },
   letterCounter: {
@@ -1091,6 +1119,9 @@ function createStyles(colors: Colors) {
   }),
   // Zone sous l'enveloppe : auteur, mentions, teaser (Scellée uniquement).
   body: { paddingHorizontal: 18, paddingTop: 12 },
+  // Même padding horizontal que `body` — sans lui, les commentaires
+  // s'alignaient pile sur le bord de la carte, trop près de la bordure.
+  commentsWrap: { paddingHorizontal: 18 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerSpacer: { flex: 1, minWidth: 8 },
   headerMenuButton: { padding: 2 },

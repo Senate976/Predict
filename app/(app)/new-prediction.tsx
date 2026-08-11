@@ -791,21 +791,26 @@ function createStyles(colors: Colors) {
   row: { flexDirection: 'row', gap: 12 },
   timeField: { flex: 1 },
   preview: { fontSize: 14, color: colors.textMuted, marginTop: 14 },
-  // Onglets en pilules : le choix actif se remplit du même bordeaux que le
-  // reste de l'identité — jamais une couleur différente par type ou par
-  // groupe de réglages, un seul accent dans toute l'app.
-  scopeRow: { flexDirection: 'row', gap: 6 },
+  // Trait sous le choix plutôt qu'un bouton de couleur — même registre sobre
+  // que les onglets Mon Fil / Mes Predicts du Fil, jamais un aplat plein pour
+  // un simple choix parmi d'autres (réservé au CTA principal).
+  scopeRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
   scopeOption: {
     flex: 1,
     paddingVertical: 10,
-    paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.md,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+    marginBottom: -1,
   },
-  scopeOptionActive: { backgroundColor: colors.accent },
-  scopeText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.textMuted, textAlign: 'center' },
-  scopeTextActive: { color: colors.textOnAccent },
+  scopeOptionActive: { borderBottomColor: colors.accent },
+  scopeText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.textFaint, textAlign: 'center' },
+  scopeTextActive: { color: colors.text },
   predictTypeHint: { fontSize: 12, lineHeight: 17, color: colors.textFaint, marginTop: 10 },
   revealNowRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   checkbox: {
