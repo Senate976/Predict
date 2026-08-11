@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import {
+  CheckCircle2,
   Eye,
   EyeOff,
   HelpCircle,
@@ -189,15 +190,22 @@ export function PredictionCard({
    * répéter en haut de la carte.
    *
    * Une Question n'entre jamais dans cette machine à états : ce n'est pas un
-   * troisième statut de Predict, c'est un objet différent — seulement deux
-   * états à elle (ouverte/close), bordure dédiée en permanence (`cardQuestion`,
-   * jamais neutre → néon comme Scellé → Réalisé/Manqué). */
+   * troisième statut de Predict, c'est un objet différent — trois états à
+   * elle (ouverte/close/réponse correcte), bordure dédiée `cardQuestion`
+   * (jamais neutre → néon comme Scellé → Réalisé/Manqué), sauf une fois sa
+   * propre réponse validée correcte : là, exactement le même vert que
+   * Réalisé (`cardRealizedBorder`) — le succès se lit pareil pour tout le
+   * monde, peu importe le type de carte. Ne dépend que du point de vue de
+   * l'appelant (`my_answer_is_correct`) : une Question où quelqu'un d'autre
+   * a deviné juste ne devient pas verte pour moi. */
   const cardState: {
-    kind: 'sealed' | 'active' | 'realized' | 'missed' | 'question_open' | 'question_closed';
+    kind: 'sealed' | 'active' | 'realized' | 'missed' | 'question_open' | 'question_closed' | 'question_correct';
     label?: string;
   } = isQuestion
     ? revealed
-      ? { kind: 'question_closed', label: 'QUESTION · CLÔTURÉE' }
+      ? item.my_answer_is_correct === true
+        ? { kind: 'question_correct', label: 'QUESTION · RÉPONSE CORRECTE' }
+        : { kind: 'question_closed', label: 'QUESTION · CLÔTURÉE' }
       : { kind: 'question_open', label: 'QUESTION · OUVERTE' }
     : !revealed
       ? { kind: 'sealed', label: 'SCELLÉ' }
@@ -511,6 +519,11 @@ export function PredictionCard({
         },
         cardState.kind === 'missed' && styles.cardMissed,
         (cardState.kind === 'question_open' || cardState.kind === 'question_closed') && styles.cardQuestion,
+        // Réponse validée correcte : exactement le même vert que Réalisé,
+        // jamais le bleu Question — le succès se lit pareil pour tout le
+        // monde. Pas de lueur pulsante ici (réservée à la mise en avant
+        // ponctuelle de `is_verdict_seen`, propre aux Déclarations).
+        cardState.kind === 'question_correct' && styles.cardRealizedBorder,
         unseen && styles.cardUnseen,
       ]}
     >
@@ -524,11 +537,15 @@ export function PredictionCard({
           {(cardState.kind === 'question_open' || cardState.kind === 'question_closed') && (
             <HelpCircle size={12} color={colors.questionAccent} strokeWidth={2} />
           )}
+          {cardState.kind === 'question_correct' && (
+            <CheckCircle2 size={12} color={colors.neonGreen} strokeWidth={2} />
+          )}
           <Text
             style={[
               styles.stateLabel,
               (cardState.kind === 'question_open' || cardState.kind === 'question_closed') &&
                 styles.stateLabelQuestion,
+              cardState.kind === 'question_correct' && styles.stateLabelQuestionCorrect,
             ]}
             numberOfLines={1}
           >
@@ -935,6 +952,7 @@ function createStyles(colors: Colors) {
     color: colors.cardBorderNeutral,
   },
   stateLabelQuestion: { color: colors.questionAccent },
+  stateLabelQuestionCorrect: { color: colors.neonGreen },
   // Corps de carte assourdi une fois Manquée — jamais le badge d'état,
   // rendu séparément avant ce conteneur et donc toujours à `opacity: 1`.
   cardBodyMissed: { opacity: 0.85 },

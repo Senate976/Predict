@@ -164,8 +164,13 @@ function createStyles(colors: Colors) {
     },
     loader: { marginTop: 4 },
     textRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    // `minWidth: 0` : sans lui, un `<input>` web garde sa largeur de
+    // contenu par défaut (`min-width: auto`) et refuse de rétrécir sous
+    // `flex: 1`, poussant `sendButton` hors du cadre de la carte sur un
+    // écran étroit — le bug classique du flexbox web avec un input.
     input: {
       flex: 1,
+      minWidth: 0,
       borderWidth: 1,
       borderColor: colors.border,
       borderRadius: radius.pill,
@@ -177,8 +182,10 @@ function createStyles(colors: Colors) {
     },
     // Contour plutôt qu'aplat, même registre que le reste des actions liées
     // aux Questions : pas de fond plein hors du jaune (réservé au FAB/CTA
-    // principal).
+    // principal). `flexShrink: 0` : garde toujours sa taille pleine, c'est
+    // l'input qui doit céder la place, jamais ce bouton.
     sendButton: {
+      flexShrink: 0,
       borderWidth: 1,
       borderColor: colors.questionAccent,
       borderRadius: radius.pill,
