@@ -36,6 +36,7 @@ import {
   predictionErrorMessage,
   type PredictionScope,
 } from '../../lib/predictions';
+import { type AnswerFormat, type PredictionType } from '../../lib/questions';
 import { fonts, radius, spacing, type Colors } from '../../lib/theme';
 import { useColors } from '../../lib/themeMode';
 
@@ -48,6 +49,20 @@ type RevealTiming = 'scheduled' | 'open_ended';
 
 /** Contenu écrit à la place du texte quand la prédiction est uniquement vocale. */
 const AUDIO_PLACEHOLDER = '🎙️ Message vocal';
+
+/** Teaser de repli pour une Question en message vocal : le champ Teaser est
+ * masqué en mode Question (rien à teaser, la question est visible dès la
+ * création — voir schema.sql section 42), mais `create_prediction` l'exige
+ * toujours (`predictions_teaser_length`) — rien à en tirer sans texte à
+ * résumer. */
+const AUDIO_QUESTION_TEASER = 'Nouvelle question';
+
+/** Deux options minimum pour qu'un choix multiple ait un sens. */
+const MIN_ANSWER_OPTIONS = 2;
+/** Court, façon sondage — distinct de `MAX_ANSWER_LENGTH` (lib/questions.ts),
+ * qui borne la réponse d'un répondant, pas le libellé d'une option posée par
+ * l'auteur à la création. */
+const MAX_OPTION_LENGTH = 60;
 
 function pad2(value: number): string {
   return String(value).padStart(2, '0');
@@ -71,6 +86,12 @@ export default function NewPredictionScreen() {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const userId = session?.user.id;
+
+  const [predictType, setPredictType] = useState<PredictionType>('declaration');
+  const isQuestion = predictType === 'question';
+  const [answerFormat, setAnswerFormat] = useState<AnswerFormat>('text');
+  const [answerOptions, setAnswerOptions] = useState<string[]>(['', '']);
+  const isChoiceFormat = isQuestion && answerFormat === 'choice';
 
   const [teaser, setTeaser] = useState('');
   const [contentMode, setContentMode] = useState<ContentMode>('text');
@@ -173,19 +194,50 @@ export default function NewPredictionScreen() {
     });
   }
 
+  function updateOption(index: number, value: string) {
+    setAnswerOptions((prev) => prev.map((o, i) => (i === index ? value : o)));
+  }
+
+  function addOption() {
+    setAnswerOptions((prev) => [...prev, '']);
+  }
+
+  /** Toujours au moins `MIN_ANSWER_OPTIONS` champs à l'écran — en dessous, un
+   * choix multiple n'a plus de sens. */
+  function removeOption(index: number) {
+    setAnswerOptions((prev) => (prev.length > MIN_ANSWER_OPTIONS ? prev.filter((_, i) => i !== index) : prev));
+  }
+
   /** Vérifications locales, pour éviter un aller-retour réseau inutile. */
   function validate(): string | null {
-    if (!trimmedTeaser) return 'Écris un teaser : l’accroche que verront tes destinataires.';
-    if (trimmedTeaser.length > MAX_TEASER_LENGTH) {
-      return `Le teaser ne peut pas dépasser ${MAX_TEASER_LENGTH} caractères.`;
+    // Pas de Teaser en mode Question : le champ est masqué (voir le JSX),
+    // rien à valider ici pour ce mode.
+    if (!isQuestion) {
+      if (!trimmedTeaser) return 'Écris un teaser : l’accroche que verront tes destinataires.';
+      if (trimmedTeaser.length > MAX_TEASER_LENGTH) {
+        return `Le teaser ne peut pas dépasser ${MAX_TEASER_LENGTH} caractères.`;
+      }
     }
     if (contentMode === 'text') {
-      if (!trimmedContent) return 'Écris le contenu secret de ton Predict.';
+      if (!trimmedContent) {
+        return isQuestion ? 'Écris ta question.' : 'Écris le contenu secret de ton Predict.';
+      }
       if (trimmedContent.length > MAX_CONTENT_LENGTH) {
-        return `Le contenu secret ne peut pas dépasser ${MAX_CONTENT_LENGTH} caractères.`;
+        return isQuestion
+          ? `La question ne peut pas dépasser ${MAX_CONTENT_LENGTH} caractères.`
+          : `Le contenu secret ne peut pas dépasser ${MAX_CONTENT_LENGTH} caractères.`;
       }
     } else if (!audioUri) {
-      return 'Enregistre ton Predict avant de le sceller.';
+      return isQuestion ? 'Enregistre ta question avant de la publier.' : 'Enregistre ton Predict avant de le sceller.';
+    }
+    if (isChoiceFormat) {
+      const trimmedOptions = answerOptions.map((o) => o.trim()).filter(Boolean);
+      if (trimmedOptions.length < MIN_ANSWER_OPTIONS) {
+        return `Ajoute au moins ${MIN_ANSWER_OPTIONS} options.`;
+      }
+      if (answerOptions.some((o) => o.trim().length > MAX_OPTION_LENGTH)) {
+        return `Une option ne peut pas dépasser ${MAX_OPTION_LENGTH} caractères.`;
+      }
     }
     if (revealTiming === 'scheduled') {
       if (!revealAt) {
@@ -232,8 +284,18 @@ export default function NewPredictionScreen() {
         .filter((f) => mentionedUsernames.includes(f.username.toLowerCase()))
         .map((f) => f.id);
 
+      // Le Teaser reste requis côté base même en mode Question (où le champ
+      // est masqué) : on en dérive un du texte de la question, faute de mieux
+      // en message vocal.
+      const effectiveTeaser = isQuestion
+        ? contentMode === 'text'
+          ? trimmedContent.slice(0, MAX_TEASER_LENGTH)
+          : AUDIO_QUESTION_TEASER
+        : trimmedTeaser;
+
       const { data: predictionId, error: insertError } = await createPrediction({
-        teaser: trimmedTeaser,
+        type: predictType,
+        teaser: effectiveTeaser,
         content: contentMode === 'text' ? trimmedContent : AUDIO_PLACEHOLDER,
         revealAt,
         scope,
@@ -242,6 +304,8 @@ export default function NewPredictionScreen() {
         mentionedFriendIds,
         openEnded: revealTiming === 'open_ended',
         isImmediate: revealTiming === 'open_ended' && revealNow,
+        answerFormat: isQuestion ? answerFormat : undefined,
+        answerOptions: isChoiceFormat ? answerOptions.map((o) => o.trim()).filter(Boolean) : undefined,
       });
 
       if (insertError) {
@@ -300,23 +364,52 @@ export default function NewPredictionScreen() {
           <View style={styles.headerSpacer} />
         </View>
 
+        <View style={styles.predictTypeWrap}>
+          <View style={styles.scopeRow}>
+            <Pressable
+              onPress={() => setPredictType('declaration')}
+              disabled={submitting}
+              style={[styles.scopeOption, predictType === 'declaration' && styles.scopeOptionActive]}
+            >
+              <Text style={[styles.scopeText, predictType === 'declaration' && styles.scopeTextActive]}>
+                Predict
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setPredictType('question')}
+              disabled={submitting}
+              style={[styles.scopeOption, predictType === 'question' && styles.scopeOptionActive]}
+            >
+              <Text style={[styles.scopeText, predictType === 'question' && styles.scopeTextActive]}>
+                Question
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+
         <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.label}>Teaser</Text>
-          <TextInput
-            value={teaser}
-            onChangeText={setTeaser}
-            placeholder="Donnez un indice sur votre Predict"
-            placeholderTextColor={colors.textFaint}
-            multiline
-            editable={!submitting}
-            maxLength={MAX_TEASER_LENGTH}
-            style={[styles.input, styles.teaserInput]}
-          />
+          {!isQuestion && (
+            <>
+              <Text style={styles.label}>Teaser</Text>
+              <TextInput
+                value={teaser}
+                onChangeText={setTeaser}
+                placeholder="Donnez un indice sur votre Predict"
+                placeholderTextColor={colors.textFaint}
+                multiline
+                editable={!submitting}
+                maxLength={MAX_TEASER_LENGTH}
+                style={[styles.input, styles.teaserInput]}
+              />
+            </>
+          )}
 
-          <Text style={[styles.label, styles.sectionLabel]}>Mon Predict</Text>
+          <Text style={[styles.label, styles.sectionLabel]}>
+            {isQuestion ? 'Open Predict' : 'Mon Predict'}
+          </Text>
           <View style={styles.scopeRow}>
             <Pressable
               onPress={() => setContentMode('text')}
@@ -343,7 +436,11 @@ export default function NewPredictionScreen() {
               <TextInput
                 value={content}
                 onChangeText={setContent}
-                placeholder="Écrivez votre Predict ici et prouvez à votre cercle, qu’une fois encore, vous aviez raison"
+                placeholder={
+                  isQuestion
+                    ? 'Posez votre question à votre cercle...'
+                    : 'Écrivez votre Predict ici et prouvez à votre cercle, qu’une fois encore, vous aviez raison'
+                }
                 placeholderTextColor={colors.textFaint}
                 multiline
                 editable={!submitting}
@@ -360,7 +457,64 @@ export default function NewPredictionScreen() {
             </View>
           )}
 
-          <Text style={[styles.label, styles.sectionLabel]}>Révélation</Text>
+          {isQuestion && (
+            <>
+              <Text style={[styles.label, styles.sectionLabel]}>Format de réponse</Text>
+              <View style={styles.scopeRow}>
+                <Pressable
+                  onPress={() => setAnswerFormat('text')}
+                  disabled={submitting}
+                  style={[styles.scopeOption, answerFormat === 'text' && styles.scopeOptionActive]}
+                >
+                  <Text style={[styles.scopeText, answerFormat === 'text' && styles.scopeTextActive]}>
+                    Réponse libre
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setAnswerFormat('choice')}
+                  disabled={submitting}
+                  style={[styles.scopeOption, answerFormat === 'choice' && styles.scopeOptionActive]}
+                >
+                  <Text style={[styles.scopeText, answerFormat === 'choice' && styles.scopeTextActive]}>
+                    Choix multiples
+                  </Text>
+                </Pressable>
+              </View>
+
+              {isChoiceFormat && (
+                <View style={styles.fieldSpacing}>
+                  {answerOptions.map((option, index) => (
+                    <View key={index} style={styles.optionRow}>
+                      <TextInput
+                        value={option}
+                        onChangeText={(value) => updateOption(index, value)}
+                        placeholder={`Option ${index + 1}`}
+                        placeholderTextColor={colors.textFaint}
+                        editable={!submitting}
+                        maxLength={MAX_OPTION_LENGTH}
+                        style={[styles.input, styles.optionInput]}
+                      />
+                      {answerOptions.length > MIN_ANSWER_OPTIONS && (
+                        <Pressable
+                          onPress={() => removeOption(index)}
+                          disabled={submitting}
+                          hitSlop={8}
+                          style={styles.removeOptionButton}
+                        >
+                          <Text style={styles.removeOptionButtonText}>✕</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  ))}
+                  <Pressable onPress={addOption} disabled={submitting} style={styles.addOptionButton}>
+                    <Text style={styles.addOptionButtonText}>+ Ajouter une option</Text>
+                  </Pressable>
+                </View>
+              )}
+            </>
+          )}
+
+          <Text style={[styles.label, styles.sectionLabel]}>{isQuestion ? 'Clôture' : 'Révélation'}</Text>
 
           <View style={styles.scopeRow}>
             <Pressable
@@ -586,6 +740,7 @@ function createStyles(colors: Colors) {
   },
   headerSpacer: { width: 56 },
   cancel: { fontSize: 15, color: colors.text, width: 56 },
+  predictTypeWrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
   scroll: { padding: spacing.lg, paddingBottom: 40 },
   label: {
     fontFamily: fonts.sansBold,
@@ -608,6 +763,12 @@ function createStyles(colors: Colors) {
   },
   teaserInput: { minHeight: 60, textAlignVertical: 'top' },
   contentInput: { minHeight: 110, textAlignVertical: 'top' },
+  optionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  optionInput: { flex: 1 },
+  removeOptionButton: { padding: 8 },
+  removeOptionButtonText: { fontSize: 15, color: colors.textFaint, fontWeight: '700' },
+  addOptionButton: { paddingVertical: 8, alignSelf: 'flex-start' },
+  addOptionButtonText: { fontSize: 14, fontWeight: '700', color: colors.gold },
   counter: { fontSize: 12, color: colors.textFaint, marginTop: 6, textAlign: 'right' },
   counterLow: { color: colors.danger },
   hint: { fontSize: 13, color: colors.textMuted, marginTop: 10, lineHeight: 18 },

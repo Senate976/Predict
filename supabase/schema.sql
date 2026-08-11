@@ -3958,7 +3958,512 @@ left join public.prediction_contents pc on pc.prediction_id = p.id;
 grant select on public.predictions_feed to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 42. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 42. Mode Question — réponses de la communauté
+-- ---------------------------------------------------------------------------
+--
+-- Un Predict a jusqu'ici toujours été une affirmation secrète jusqu'à
+-- révélation. Le mode Question inverse ce rapport : l'auteur pose une
+-- question visible immédiatement (texte libre ou choix prédéfinis), et
+-- chaque destinataire y répond individuellement — ce que la Clôture (même
+-- colonne `reveal_at`, même mécanique que la révélation d'une Déclaration)
+-- cache, ce ne sont pas les faits eux-mêmes mais les réponses des autres.
+--
+-- `type` distingue les deux ('declaration' reste le comportement historique,
+-- inchangé). `answer_format` ne s'applique qu'aux Questions.
+alter table public.predictions add column if not exists type text not null default 'declaration';
+alter table public.predictions drop constraint if exists predictions_type_check;
+alter table public.predictions add constraint predictions_type_check
+  check (type in ('declaration', 'question'));
+
+alter table public.predictions add column if not exists answer_format text;
+alter table public.predictions drop constraint if exists predictions_answer_format_check;
+alter table public.predictions add constraint predictions_answer_format_check
+  check (answer_format is null or answer_format in ('text', 'choice'));
+
+alter table public.predictions drop constraint if exists predictions_question_has_format;
+alter table public.predictions add constraint predictions_question_has_format
+  check (type <> 'question' or answer_format is not null);
+
+-- Pour une Déclaration, `prediction_contents.content` est le secret à deviner
+-- — cette policy (section 11) le cachait donc jusqu'à `reveal_at`. Pour une
+-- Question, `content` porte le texte de la question elle-même : il doit être
+-- lisible dès la création, sinon personne ne peut y répondre. Cette
+-- redéfinition ajoute cette branche sans toucher au comportement des
+-- Déclarations.
+drop policy if exists "prediction_contents_select" on public.prediction_contents;
+create policy "prediction_contents_select"
+  on public.prediction_contents
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1 from public.predictions p
+      where p.id = prediction_contents.prediction_id and p.author_id = auth.uid()
+    )
+    or exists (
+      select 1 from public.predictions p
+      join public.prediction_access pa on pa.prediction_id = p.id
+      where p.id = prediction_contents.prediction_id
+        and pa.user_id = auth.uid()
+        and (p.reveal_at <= now() or p.type = 'question')
+    )
+  );
+
+-- Options prédéfinies (format « choix ») — inexistantes pour une Question en
+-- texte libre. Visibles comme la question elle-même (immédiatement, pas de
+-- gate sur reveal_at) : ce ne sont pas un secret, seulement l'énoncé.
+create table if not exists public.prediction_answer_options (
+  id uuid primary key default gen_random_uuid(),
+  prediction_id uuid not null references public.predictions (id) on delete cascade,
+  label text not null,
+  position smallint not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists prediction_answer_options_prediction_idx
+  on public.prediction_answer_options (prediction_id, position);
+
+alter table public.prediction_answer_options enable row level security;
+
+drop policy if exists "prediction_answer_options_select" on public.prediction_answer_options;
+create policy "prediction_answer_options_select"
+  on public.prediction_answer_options
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1 from public.predictions p
+      where p.id = prediction_answer_options.prediction_id and p.author_id = auth.uid()
+    )
+    or public.has_prediction_access(prediction_answer_options.prediction_id, auth.uid())
+  );
+
+-- Écriture réservée à `create_prediction` (elle tourne avec les droits de
+-- l'appelant, donc cette policy s'applique aussi à elle) : seul l'auteur, à
+-- la création — pas d'update/delete, les options sont figées une fois posées
+-- (comme le contenu d'une Déclaration).
+drop policy if exists "prediction_answer_options_insert" on public.prediction_answer_options;
+create policy "prediction_answer_options_insert"
+  on public.prediction_answer_options
+  for insert
+  to authenticated
+  with check (
+    exists (
+      select 1 from public.predictions p
+      where p.id = prediction_answer_options.prediction_id and p.author_id = auth.uid()
+    )
+  );
+
+-- Une réponse par destinataire (comme un vote). Ni policy insert ni update
+-- pour `authenticated` : toute écriture passe par les deux fonctions
+-- `security definer` plus bas, seul endroit où vivent la fenêtre de temps
+-- (pas de réponse après Clôture), la cohérence du format (texte XOR option),
+-- et la protection de `is_correct` (jamais modifiable par le répondant
+-- lui-même).
+create table if not exists public.prediction_answers (
+  id uuid primary key default gen_random_uuid(),
+  prediction_id uuid not null references public.predictions (id) on delete cascade,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  answer_text text,
+  option_id uuid references public.prediction_answer_options (id) on delete cascade,
+  is_correct boolean,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (prediction_id, user_id)
+);
+
+create index if not exists prediction_answers_prediction_idx
+  on public.prediction_answers (prediction_id);
+
+drop trigger if exists prediction_answers_set_updated_at on public.prediction_answers;
+create trigger prediction_answers_set_updated_at
+  before update on public.prediction_answers
+  for each row execute function public.set_updated_at();
+
+alter table public.prediction_answers enable row level security;
+
+-- Caché jusqu'à la Clôture, y compris pour l'auteur (choix produit assumé) :
+-- chacun voit toujours sa propre réponse (pour pouvoir la relire/modifier
+-- avant Clôture), et tout le monde — auteur compris — voit celles des autres
+-- seulement une fois `reveal_at` passé.
+drop policy if exists "prediction_answers_select" on public.prediction_answers;
+create policy "prediction_answers_select"
+  on public.prediction_answers
+  for select
+  to authenticated
+  using (
+    user_id = auth.uid()
+    or exists (
+      select 1 from public.predictions p
+      where p.id = prediction_answers.prediction_id
+        and p.reveal_at <= now()
+        and (
+          p.author_id = auth.uid()
+          or public.has_prediction_access(p.id, auth.uid())
+        )
+    )
+  );
+
+-- Répondre (ou changer d'avis avant Clôture) — `security definer` : la seule
+-- policy select ci-dessus ne suffirait pas à écrire (aucune policy insert
+-- pour `authenticated`), volontairement, pour garder toute la logique
+-- métier ici plutôt que répartie entre policies et contraintes.
+create or replace function public.submit_prediction_answer(
+  p_prediction_id uuid,
+  p_answer_text text default null,
+  p_option_id uuid default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_type text;
+  v_format text;
+  v_reveal_at timestamptz;
+begin
+  select type, answer_format, reveal_at into v_type, v_format, v_reveal_at
+  from public.predictions
+  where id = p_prediction_id;
+
+  if v_type is null then
+    raise exception 'Predict introuvable.';
+  end if;
+  if v_type <> 'question' then
+    raise exception 'Seule une Question accepte une réponse.';
+  end if;
+  if v_reveal_at <= now() then
+    raise exception 'Cette Question est déjà close.';
+  end if;
+  if not public.has_prediction_access(p_prediction_id, auth.uid()) then
+    raise exception 'Accès refusé à cette Question.';
+  end if;
+
+  if v_format = 'text' then
+    if p_answer_text is null or length(trim(p_answer_text)) = 0 then
+      raise exception 'Réponse vide.';
+    end if;
+    if p_option_id is not null then
+      raise exception 'Cette Question attend une réponse libre, pas une option.';
+    end if;
+  elsif v_format = 'choice' then
+    if p_option_id is null then
+      raise exception 'Choisis une option.';
+    end if;
+    if p_answer_text is not null then
+      raise exception 'Cette Question attend une option, pas une réponse libre.';
+    end if;
+    if not exists (
+      select 1 from public.prediction_answer_options
+      where id = p_option_id and prediction_id = p_prediction_id
+    ) then
+      raise exception 'Option invalide.';
+    end if;
+  end if;
+
+  insert into public.prediction_answers (prediction_id, user_id, answer_text, option_id)
+  values (p_prediction_id, auth.uid(), p_answer_text, p_option_id)
+  on conflict (prediction_id, user_id) do update
+  set answer_text = excluded.answer_text,
+      option_id = excluded.option_id;
+end;
+$$;
+
+revoke all on function public.submit_prediction_answer(uuid, text, uuid) from public;
+grant execute on function public.submit_prediction_answer(uuid, text, uuid) to authenticated;
+
+-- L'auteur valide qui a deviné juste, une fois la Question close — jamais
+-- avant (les réponses lui restent cachées jusque-là, comme à tout le monde).
+-- Aucune notion de score/badge ici, volontairement : seule la donnée brute
+-- (`is_correct`) est posée, l'habillage viendra plus tard.
+create or replace function public.set_prediction_answer_correct(
+  p_answer_id uuid,
+  p_is_correct boolean
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  update public.prediction_answers pa
+  set is_correct = p_is_correct
+  from public.predictions p
+  where p.id = pa.prediction_id
+    and pa.id = p_answer_id
+    and p.author_id = auth.uid()
+    and p.reveal_at <= now();
+end;
+$$;
+
+revoke all on function public.set_prediction_answer_correct(uuid, boolean) from public;
+grant execute on function public.set_prediction_answer_correct(uuid, boolean) to authenticated;
+
+-- Compteur de réponses, y compris avant Clôture — volontairement distinct du
+-- contenu des réponses (lui, cf. `prediction_answers_select`, reste caché
+-- jusque-là) : l'auteur voit « X réponses reçues » sans en connaître le
+-- contenu. `security definer`, même principe que `has_prediction_access` :
+-- un simple `count(*)` sur `prediction_answers` respecterait sinon sa RLS et
+-- ne compterait que les lignes déjà visibles à l'appelant (sa propre réponse
+-- seule, avant Clôture) au lieu du vrai total.
+create or replace function public.get_prediction_answer_count(p_prediction_id uuid)
+returns bigint
+language sql
+security definer
+stable
+set search_path = ''
+as $$
+  select count(*) from public.prediction_answers where prediction_id = p_prediction_id;
+$$;
+
+revoke all on function public.get_prediction_answer_count(uuid) from public;
+grant execute on function public.get_prediction_answer_count(uuid) to authenticated;
+
+-- `create_prediction` gagne le mode Question : `p_type`, `p_answer_format`,
+-- et `p_answer_options` (peuplé uniquement si `p_answer_format = 'choice'`)
+-- — dans la même transaction que la création, jamais de Question à moitié
+-- posée (une Question 'choice' sans aucune option, par exemple).
+drop function if exists public.create_prediction(text, text, timestamptz, text, uuid[], uuid, uuid[], boolean, boolean);
+
+create or replace function public.create_prediction(
+  p_teaser text,
+  p_content text,
+  p_reveal_at timestamptz,
+  p_scope text,
+  p_friend_ids uuid[] default array[]::uuid[],
+  p_group_id uuid default null,
+  p_mentioned_ids uuid[] default array[]::uuid[],
+  p_open_ended boolean default false,
+  p_is_immediate boolean default false,
+  p_type text default 'declaration',
+  p_answer_format text default null,
+  p_answer_options text[] default null
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+  v_recipient uuid;
+  v_mentioned_valid uuid[] := array[]::uuid[];
+  v_reveal_at timestamptz := case when p_is_immediate then now() + interval '1 second' else p_reveal_at end;
+  v_option text;
+  v_position smallint := 0;
+begin
+  if p_type = 'question' and p_answer_format = 'choice'
+     and coalesce(array_length(p_answer_options, 1), 0) < 2 then
+    raise exception 'Une Question à choix multiples demande au moins deux options.';
+  end if;
+
+  insert into public.predictions (
+    author_id, teaser, reveal_at, scope, open_ended, is_immediate, group_id, type, answer_format
+  )
+  values (
+    auth.uid(),
+    p_teaser,
+    v_reveal_at,
+    p_scope,
+    p_open_ended,
+    p_is_immediate,
+    case when p_scope = 'group' then p_group_id else null end,
+    p_type,
+    case when p_type = 'question' then p_answer_format else null end
+  )
+  returning id into v_id;
+
+  insert into public.prediction_contents (prediction_id, content)
+  values (v_id, p_content);
+
+  if p_type = 'question' and p_answer_format = 'choice' then
+    foreach v_option in array p_answer_options loop
+      insert into public.prediction_answer_options (prediction_id, label, position)
+      values (v_id, v_option, v_position);
+      v_position := v_position + 1;
+    end loop;
+  end if;
+
+  if p_scope = 'circle' then
+    insert into public.prediction_access (prediction_id, user_id)
+    select
+      v_id,
+      case when f.requester_id = auth.uid() then f.addressee_id else f.requester_id end
+    from public.friendships f
+    where f.status = 'accepted'
+      and (f.requester_id = auth.uid() or f.addressee_id = auth.uid());
+  elsif p_scope = 'group' then
+    insert into public.prediction_access (prediction_id, user_id)
+    select v_id, gm.friend_id
+    from public.group_members gm
+    join public.groups g on g.id = gm.group_id
+    where gm.group_id = p_group_id and g.owner_id = auth.uid() and gm.status = 'accepted';
+  else
+    foreach v_recipient in array coalesce(p_friend_ids, array[]::uuid[]) loop
+      insert into public.prediction_access (prediction_id, user_id)
+      values (v_id, v_recipient)
+      on conflict (prediction_id, user_id) do nothing;
+    end loop;
+  end if;
+
+  foreach v_recipient in array coalesce(p_mentioned_ids, array[]::uuid[]) loop
+    if exists (
+      select 1 from public.friendships f
+      where f.status = 'accepted'
+        and (
+          (f.requester_id = auth.uid() and f.addressee_id = v_recipient)
+          or (f.addressee_id = auth.uid() and f.requester_id = v_recipient)
+        )
+    ) then
+      insert into public.prediction_access (prediction_id, user_id)
+      values (v_id, v_recipient)
+      on conflict (prediction_id, user_id) do nothing;
+
+      v_mentioned_valid := array_append(v_mentioned_valid, v_recipient);
+      perform public.notify_mention(v_id, v_recipient);
+    end if;
+  end loop;
+
+  if array_length(v_mentioned_valid, 1) > 0 then
+    update public.predictions set mentioned_user_ids = v_mentioned_valid where id = v_id;
+  end if;
+
+  return v_id;
+end;
+$$;
+
+revoke all on function public.create_prediction(text, text, timestamptz, text, uuid[], uuid, uuid[], boolean, boolean, text, text, text[]) from public;
+grant execute on function public.create_prediction(text, text, timestamptz, text, uuid[], uuid, uuid[], boolean, boolean, text, text, text[]) to authenticated;
+
+-- Nouveau type de notification : l'auteur est prévenu qu'une réponse est
+-- arrivée sur sa Question (une seule fois par Question, comme `new_teaser`
+-- — la clé unique `notifications_unique_key` s'en charge).
+alter table public.notifications drop constraint if exists notifications_type_check;
+alter table public.notifications add constraint notifications_type_check
+  check (type in (
+    'new_teaser', 'prediction_revealed', 'prediction_approved', 'group_invite',
+    'prediction_mentioned', 'prediction_realized', 'prediction_missed', 'reveal_reminder',
+    'question_answered'
+  ));
+
+create or replace function public.notify_question_answered()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.notifications (user_id, prediction_id, type)
+  select p.author_id, new.prediction_id, 'question_answered'
+  from public.predictions p
+  join public.profiles pr on pr.id = p.author_id
+  where p.id = new.prediction_id
+    and coalesce((pr.notification_prefs->>'question_answered')::boolean, true)
+  on conflict (user_id, prediction_id, type) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists prediction_answers_notify_question_answered on public.prediction_answers;
+create trigger prediction_answers_notify_question_answered
+  after insert on public.prediction_answers
+  for each row execute function public.notify_question_answered();
+
+-- `predictions_feed` expose le mode Question : `type`/`answer_format`, le
+-- nombre de réponses reçues (`get_prediction_answer_count`, visible même
+-- avant Clôture — voir plus haut), et la propre réponse de l'appelant : ces
+-- trois sous-requêtes respectent la RLS de `prediction_answers` grâce à
+-- `security_invoker = true`, exactement comme `is_favorite`/`my_emoji_reaction`.
+drop view if exists public.predictions_feed;
+
+create view public.predictions_feed
+with (security_invoker = true) as
+select
+  p.id,
+  p.author_id,
+  p.teaser,
+  pc.content,
+  pc.audio_path,
+  p.reveal_at,
+  p.scope,
+  p.open_ended,
+  p.is_immediate,
+  p.type,
+  p.answer_format,
+  p.mentioned_user_ids,
+  p.created_at,
+  p.verdict_set_at,
+  (p.reveal_at <= now()) as is_revealed,
+  case
+    when p.reveal_at > now() then 'pending'
+    when p.author_verdict is not null then p.author_verdict
+    else 'pending'
+  end as final_status,
+  coalesce(
+    (
+      select us.favorite from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_favorite,
+  coalesce(
+    (
+      select us.hidden from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_hidden,
+  coalesce(
+    (
+      select us.seen from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_seen,
+  coalesce(
+    (
+      select us.verdict_seen from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_verdict_seen,
+  coalesce(
+    (
+      select jsonb_object_agg(counts.emoji, counts.total)
+      from (
+        select emoji, count(*) as total
+        from public.prediction_emoji_reactions er
+        where er.prediction_id = p.id
+        group by emoji
+      ) counts
+    ),
+    '{}'::jsonb
+  ) as emoji_counts,
+  (
+    select er2.emoji from public.prediction_emoji_reactions er2
+    where er2.prediction_id = p.id and er2.user_id = auth.uid()
+  ) as my_emoji_reaction,
+  public.get_prediction_answer_count(p.id) as answer_count,
+  (
+    select pa2.answer_text from public.prediction_answers pa2
+    where pa2.prediction_id = p.id and pa2.user_id = auth.uid()
+  ) as my_answer_text,
+  (
+    select pa3.option_id from public.prediction_answers pa3
+    where pa3.prediction_id = p.id and pa3.user_id = auth.uid()
+  ) as my_answer_option_id,
+  (
+    select pa4.is_correct from public.prediction_answers pa4
+    where pa4.prediction_id = p.id and pa4.user_id = auth.uid()
+  ) as my_answer_is_correct
+from public.predictions p
+left join public.prediction_contents pc on pc.prediction_id = p.id;
+
+grant select on public.predictions_feed to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 43. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une

@@ -1,5 +1,16 @@
 import { useRouter } from 'expo-router';
-import { Eye, EyeOff, Lock, MessageCircle, MoreHorizontal, Star, ThumbsUp, Trash2 } from 'lucide-react-native';
+import {
+  Eye,
+  EyeOff,
+  HelpCircle,
+  Lock,
+  MessageCircle,
+  MoreHorizontal,
+  Star,
+  ThumbsUp,
+  Trash2,
+  Users,
+} from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -168,17 +179,33 @@ export function PredictionCard({
   const glowShadowOpacity = 0.55 + glowIntensity * (0.85 - 0.55);
   const glowShadowRadius = 14 + glowIntensity * (22 - 14);
 
-  /** Les 4 états visuels de la carte — un contour néon dédié (voir `styles`)
-   * à tous, mais un libellé en haut à droite seulement pour Scellé/En cours :
-   * une fois le verdict affirmé, le tampon en dessous porte seul la réponse,
-   * `label` reste `undefined` plutôt que de la répéter en haut de la carte. */
-  const cardState: { kind: 'sealed' | 'active' | 'realized' | 'missed'; label?: string } = !revealed
-    ? { kind: 'sealed', label: 'SCELLÉ' }
-    : verdict === 'realized'
-      ? { kind: 'realized' }
-      : verdict === 'missed'
-        ? { kind: 'missed' }
-        : { kind: 'active', label: 'EN COURS' };
+  const isQuestion = item.type === 'question';
+  const hasAnswered = item.my_answer_text !== null || item.my_answer_option_id !== null;
+
+  /** Les 4 états visuels d'une Déclaration — un contour néon dédié (voir
+   * `styles`) à tous, mais un libellé en haut à droite seulement pour
+   * Scellé/En cours : une fois le verdict affirmé, le tampon en dessous
+   * porte seul la réponse, `label` reste `undefined` plutôt que de la
+   * répéter en haut de la carte.
+   *
+   * Une Question n'entre jamais dans cette machine à états : ce n'est pas un
+   * troisième statut de Predict, c'est un objet différent — seulement deux
+   * états à elle (ouverte/close), bordure dédiée en permanence (`cardQuestion`,
+   * jamais neutre → néon comme Scellé → Réalisé/Manqué). */
+  const cardState: {
+    kind: 'sealed' | 'active' | 'realized' | 'missed' | 'question_open' | 'question_closed';
+    label?: string;
+  } = isQuestion
+    ? revealed
+      ? { kind: 'question_closed', label: 'QUESTION · CLÔTURÉE' }
+      : { kind: 'question_open', label: 'QUESTION · OUVERTE' }
+    : !revealed
+      ? { kind: 'sealed', label: 'SCELLÉ' }
+      : verdict === 'realized'
+        ? { kind: 'realized' }
+        : verdict === 'missed'
+          ? { kind: 'missed' }
+          : { kind: 'active', label: 'EN COURS' };
 
   useEffect(() => {
     let cancelled = false;
@@ -483,6 +510,7 @@ export function PredictionCard({
           ],
         },
         cardState.kind === 'missed' && styles.cardMissed,
+        (cardState.kind === 'question_open' || cardState.kind === 'question_closed') && styles.cardQuestion,
         unseen && styles.cardUnseen,
       ]}
     >
@@ -493,7 +521,17 @@ export function PredictionCard({
       {cardState.label && (
         <View style={styles.stateRow}>
           {cardState.kind === 'sealed' && <Lock size={12} color={colors.cardBorderNeutral} strokeWidth={2} />}
-          <Text style={styles.stateLabel} numberOfLines={1}>
+          {(cardState.kind === 'question_open' || cardState.kind === 'question_closed') && (
+            <HelpCircle size={12} color={colors.questionAccent} strokeWidth={2} />
+          )}
+          <Text
+            style={[
+              styles.stateLabel,
+              (cardState.kind === 'question_open' || cardState.kind === 'question_closed') &&
+                styles.stateLabelQuestion,
+            ]}
+            numberOfLines={1}
+          >
             {cardState.label}
           </Text>
         </View>
@@ -524,7 +562,7 @@ export function PredictionCard({
           détail. Rien que les deux boutons, aucun texte d'accompagnement —
           une fois posé, revenir dessus n'est plus possible ici, seulement
           depuis l'écran détail (voir `set_prediction_verdict`, section 35). */}
-      {isAuthor && revealed && verdict === null && (
+      {!isQuestion && isAuthor && revealed && verdict === null && (
         <View style={styles.verdictPrompt}>
           <View style={styles.verdictPromptButtons}>
             <Pressable
@@ -587,21 +625,30 @@ export function PredictionCard({
               plusieurs. */}
           {mentionLabel && <Text style={styles.mentionTag} numberOfLines={1}>{mentionLabel}</Text>}
 
-          <Text style={styles.cardTeaser}>{item.teaser}</Text>
+          {isQuestion ? (
+            // Pas de Teaser pour une Question : `content` (la question
+            // elle-même) est visible dès la création, jamais flouté — ce que
+            // la Clôture cache, ce sont les réponses des autres, pas la
+            // question (RLS `prediction_contents_select`, schema.sql section 42).
+            <Text style={styles.cardContent}>{item.content}</Text>
+          ) : (
+            <>
+              <Text style={styles.cardTeaser}>{item.teaser}</Text>
 
-          {/* La RLS ne renvoie `content` que si révélée ou si on en est
-              l'auteur — l'auteur voit donc toujours son propre texte en
-              clair, jamais flouté, y compris avant révélation (le bouton
-              Révéler ci-dessus fait déjà ce travail de signal). Sans lui
-              (destinataire, avant révélation), `SEALED_CONTENT_PLACEHOLDER`
-              prend la même place, floutée : jamais du vrai texte, juste sa
-              silhouette. */}
-          {(item.content || !revealed) && (
-            <Text style={[styles.cardContent, !item.content && styles.cardContentBlurred]}>
-              {item.content ?? SEALED_CONTENT_PLACEHOLDER}
-            </Text>
+              {/* La RLS ne renvoie `content` que si révélée ou si on en est
+                  l'auteur — l'auteur voit donc toujours son propre texte en
+                  clair, jamais flouté, y compris avant révélation (le bouton
+                  Révéler ci-dessus fait déjà ce travail de signal). Sans lui
+                  (destinataire, avant révélation), `SEALED_CONTENT_PLACEHOLDER`
+                  prend la même place, floutée : jamais du vrai texte, juste sa
+                  silhouette. */}
+              {(item.content || !revealed) && (
+                <Text style={[styles.cardContent, !item.content && styles.cardContentBlurred]}>
+                  {item.content ?? SEALED_CONTENT_PLACEHOLDER}
+                </Text>
+              )}
+            </>
           )}
-
         </View>
       </Pressable>
 
@@ -679,6 +726,35 @@ export function PredictionCard({
             </Text>
           </Pressable>
         </View>
+
+        {/* Propre à une Question : compteur de réponses (visible même avant
+            Clôture, jamais leur contenu — voir `answer_count`) et invitation
+            à répondre tant que ce n'est pas déjà fait. Le vrai formulaire de
+            réponse vit sur l'écran détail (`QuestionAnswerPanel`) — la carte
+            se contente d'y renvoyer, comme le reste de sa navigation. */}
+        {isQuestion && (
+          <View style={styles.answersRow}>
+            <View style={styles.iconSlot}>
+              <Users
+                size={18}
+                color={item.answer_count > 0 ? colors.text : colors.footerIconInactive}
+                strokeWidth={1.75}
+              />
+            </View>
+            <Text style={[styles.answersCountText, item.answer_count === 0 && styles.footerCountInactive]}>
+              {item.answer_count}
+            </Text>
+            {!revealed && (
+              hasAnswered ? (
+                <Text style={styles.answeredText}>Répondu ✓</Text>
+              ) : (
+                <Pressable onPress={() => onPress?.()} style={styles.replyPill} hitSlop={4}>
+                  <Text style={styles.replyPillText}>Répondre</Text>
+                </Pressable>
+              )
+            )}
+          </View>
+        )}
       </View>
       </View>
 
@@ -833,6 +909,12 @@ function createStyles(colors: Colors) {
     shadowRadius: 14,
     elevation: 10,
   },
+  // Une Question garde son accent dédié en permanence, ouverte ou close —
+  // contrairement à Scellé → Réalisé/Manqué (neutre puis néon), ce n'est pas
+  // un statut qui évolue mais un type de carte à part entière.
+  cardQuestion: {
+    borderColor: colors.questionAccent,
+  },
   // Non lue : fine bordure lumineuse + fond très légèrement teinté, assez
   // discret pour ne pas jurer avec le reste de la charte sombre/jaune.
   // Toujours appliquée en dernier : elle prime sur la couleur néon de l'état
@@ -854,6 +936,7 @@ function createStyles(colors: Colors) {
     textTransform: 'uppercase',
     color: colors.cardBorderNeutral,
   },
+  stateLabelQuestion: { color: colors.questionAccent },
   // Corps de carte assourdi une fois Manquée — jamais le badge d'état,
   // rendu séparément avant ce conteneur et donc toujours à `opacity: 1`.
   cardBodyMissed: { opacity: 0.85 },
@@ -1009,6 +1092,21 @@ function createStyles(colors: Colors) {
   reactionTriggerEmoji: { fontSize: 17 },
   reactionTriggerCount: { fontSize: 13, fontWeight: '700', color: colors.text },
   footerCountInactive: { color: colors.footerIconInactive },
+  answersRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  answersCountText: { fontSize: 13, fontWeight: '700', color: colors.text },
+  answeredText: { fontSize: 12, fontWeight: '600', color: colors.textFaint, marginLeft: 4 },
+  // Contour de l'accent Question plutôt qu'un aplat — même registre que les
+  // autres pilules d'action de l'app (Ajouter, Révéler…), jamais de fond
+  // plein hors du jaune (réservé au FAB/CTA principal).
+  replyPill: {
+    marginLeft: 4,
+    borderWidth: 1,
+    borderColor: colors.questionAccent,
+    borderRadius: radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  replyPillText: { fontSize: 12, fontWeight: '700', color: colors.questionAccent },
   // Menu ••• de gestion (favoris / masquer / supprimer), ouvert depuis
   // l'en-tête — même registre visuel que `reactorsBox` (boîte centrée sur
   // fond assombri).

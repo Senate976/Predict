@@ -52,6 +52,13 @@ export const darkColors = {
   // au doré (`gold`), voir `cardRealized`.
   neonGreen: '#00E676',
   neonRed: '#FF1744',
+  // Une Question n'est pas un troisième statut de Predict (Scellé/Réalisé/
+  // Manqué) : c'est un objet différent, qui répond « j'ai posé/répondu à une
+  // question » plutôt que « j'ai affirmé un secret ». D'où un accent dédié,
+  // jamais partagé avec le jaune (CTA) ni le vert/rouge (verdict) — seule
+  // couleur de carte permanente (pas de bascule neutre → néon comme
+  // Scellé → Réalisé/Manqué, une Question se reconnaît d'un coup d'œil).
+  questionAccent: '#38BDF8',
   // Contour de carte Scellé/En cours, et libellé assorti (texte + cadenas) —
   // voir `PredictionCard` : gris neutre mais assez clair pour rester bien
   // visible sur le fond anthracite, sans lueur colorée.
@@ -105,6 +112,7 @@ export const lightColors: typeof darkColors = {
   notificationBadge: '#EF4444',
   neonGreen: '#16A34A',
   neonRed: '#DC2626',
+  questionAccent: '#0284C7',
   cardBorderNeutral: '#6B7280',
   icon: '#4B5563',
   footerIconInactive: '#9CA3AF',
