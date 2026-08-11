@@ -133,7 +133,7 @@ function createStyles(colors: Colors) {
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  optionActive: { backgroundColor: colors.goldSoft },
+  optionActive: { backgroundColor: colors.accentSoft },
   optionText: { fontSize: 15, color: colors.text },
   optionTextActive: { color: colors.text, fontWeight: '700' },
   });

@@ -28,7 +28,7 @@ function TabIcon({ focused, children }: { focused: boolean; children: React.Reac
   return (
     <View style={{ alignItems: 'center' }}>
       <View style={styles.iconBox}>{children}</View>
-      <View style={[styles.dot, focused && { backgroundColor: colors.gold }]} />
+      <View style={[styles.dot, focused && { backgroundColor: colors.accent }]} />
     </View>
   );
 }
@@ -156,7 +156,7 @@ function CreateTabButton() {
           {
             backgroundColor: colors.fab,
             borderColor: colors.fabBorder,
-            shadowColor: colors.gold,
+            shadowColor: colors.accent,
           },
           pressed && styles.centerButtonPressed,
         ]}

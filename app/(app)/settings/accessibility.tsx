@@ -35,7 +35,7 @@ export default function AccessibilitySettingsScreen() {
           <Switch
             value={reduceMotion}
             onValueChange={setReduceMotion}
-            trackColor={{ false: colors.border, true: colors.gold }}
+            trackColor={{ false: colors.border, true: colors.accent }}
             thumbColor={colors.surface}
           />
         </View>

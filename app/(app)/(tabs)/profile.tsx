@@ -35,7 +35,7 @@ const FILTER_LABEL: Record<Filter, string> = {
   total: 'Predict',
   realized: 'Réalisés',
   missed: 'Manqués',
-  pending: 'En cours',
+  pending: 'Scellées',
 };
 
 function statusLabel(status: PredictionOutcomeStatus, isRevealed: boolean): string {
@@ -207,7 +207,10 @@ export default function ProfileScreen() {
           </Pressable>
         </Modal>
 
-        <View style={[styles.prediscoreCard, styles.sectionSpacing]}>
+        {/* La barre de Prediscore vient directement sous les infos du profil,
+            à 50% de la largeur — plus de carte séparée autour, elle fait
+            partie du bloc d'identité. */}
+        <View style={[styles.prediscoreWrap, styles.sectionSpacing]}>
           {!prediscoreLoaded ? (
             <ActivityIndicator color={colors.text} style={styles.loader} />
           ) : prediscoreError ? (
@@ -216,10 +219,6 @@ export default function ProfileScreen() {
             <PrediscoreGauge score={prediscore} />
           )}
         </View>
-
-        <Text style={[styles.eyebrow, styles.sectionSpacing]}>
-          <PredictWord />
-        </Text>
 
         {error && <Text style={styles.error}>{error}</Text>}
 
@@ -256,7 +255,7 @@ export default function ProfileScreen() {
                 style={[styles.statCard, filter === 'pending' && styles.statCardActive]}
               >
                 <Text style={styles.statValue}>{pending.length}</Text>
-                <Text style={styles.statLabel}>En cours</Text>
+                <Text style={styles.statLabel}>Scellées</Text>
               </Pressable>
             </View>
 
@@ -362,15 +361,8 @@ function createStyles(colors: Colors) {
   avatarMenuItemLast: { paddingVertical: 16, paddingHorizontal: 20, alignItems: 'center' },
   avatarMenuItemText: { fontSize: 15, fontWeight: '600', color: colors.text },
   avatarMenuItemDanger: { color: colors.danger },
-  prediscoreCard: {
-    paddingVertical: 24,
-    borderRadius: radius.xl,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-  },
-  statsRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  prediscoreWrap: { width: '50%', minWidth: 180, alignSelf: 'center' },
+  statsRow: { flexDirection: 'row', gap: 8, marginTop: spacing.lg },
   statCard: {
     flex: 1,
     paddingVertical: 16,

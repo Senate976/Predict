@@ -1,21 +1,23 @@
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Defs, LinearGradient as SvgLinearGradient, Rect, Stop } from 'react-native-svg';
+import { useMemo, useState } from 'react';
+import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 
-import { eyebrow, fonts, type Colors } from '../lib/theme';
+import { eyebrow, fonts, wax, type Colors } from '../lib/theme';
 import { useColors } from '../lib/themeMode';
 
-const BAR_WIDTH = 260;
-const BAR_HEIGHT = 10;
-const CURSOR_SIZE = 18;
+const BAR_HEIGHT = 6;
+const CURSOR_SIZE = 15;
 
 /**
- * Jauge horizontale du Prediscore — dégradé rouge (« Mytho ») à vert
- * (« J'ai raison. Toujours. »), avec un curseur positionné au score actuel.
- * `score` est `null` tant qu'aucune prédiction révélée n'existe encore :
- * affiche alors un état vide plutôt qu'une jauge à 0%, pour ne pas laisser
- * croire à un mauvais score qui n'existe pas encore.
+ * Jauge horizontale du Prediscore — dégradé parchemin → tan → bordeaux, avec
+ * un curseur en forme de petit cachet de cire positionné au score actuel.
+ * Largeur fluide (mesurée via `onLayout`, pas de valeur fixe) : le Profil
+ * l'affiche sur 50% de la largeur de l'écran, une autre valeur ailleurs
+ * resterait correcte. `score` est `null` tant qu'aucune prédiction révélée
+ * n'existe encore : affiche alors un état vide plutôt qu'une jauge à 0%,
+ * pour ne pas laisser croire à un mauvais score qui n'existe pas encore.
  */
 export function PrediscoreGauge({
   score,
@@ -29,6 +31,11 @@ export function PrediscoreGauge({
 }) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const [barWidth, setBarWidth] = useState(0);
+
+  function handleLayout(e: LayoutChangeEvent) {
+    setBarWidth(e.nativeEvent.layout.width);
+  }
 
   if (score === null) {
     return (
@@ -39,47 +46,45 @@ export function PrediscoreGauge({
   }
 
   const clamped = Math.max(0, Math.min(100, score));
-  const cursorLeft = (clamped / 100) * BAR_WIDTH - CURSOR_SIZE / 2;
+  const cursorLeft = (clamped / 100) * barWidth - CURSOR_SIZE / 2;
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.scoreLabel}>Prediscore</Text>
-      <Text style={styles.scoreValue}>{clamped}%</Text>
-
-      <View style={styles.barBox}>
-        <Svg width={BAR_WIDTH} height={BAR_HEIGHT}>
-          <Defs>
-            {/* Gris sourd → jaune, strictement sur la charte — pas de
-                rouge/vert. Les deux teintes tiennent chacune leur couleur
-                pleine jusqu'à 42%/58% : l'étape ambre qui évite le brun terne
-                d'une interpolation directe ne s'étale plus que sur cette
-                bande étroite du milieu, au lieu de teinter tout le dégradé. */}
-            <LinearGradient id="prediscoreGradient" x1="0" y1="0" x2="1" y2="0">
-              <Stop offset="0" stopColor={colors.textFaint} />
-              <Stop offset="0.42" stopColor={colors.textFaint} />
-              <Stop offset="0.5" stopColor={colors.goldTransition} />
-              <Stop offset="0.58" stopColor={colors.gold} />
-              <Stop offset="1" stopColor={colors.gold} />
-            </LinearGradient>
-          </Defs>
-          <Rect
-            x={0}
-            y={0}
-            width={BAR_WIDTH}
-            height={BAR_HEIGHT}
-            rx={BAR_HEIGHT / 2}
-            fill="url(#prediscoreGradient)"
-          />
-        </Svg>
-        <View style={[styles.cursor, { left: cursorLeft }]} />
+      <View style={styles.headerRow}>
+        <Text style={styles.scoreLabel}>Prediscore</Text>
+        <Text style={styles.scoreValue}>{clamped}%</Text>
       </View>
 
-      <View style={styles.labelsRow}>
-        <Text style={[styles.label, styles.labelLeft]}>Mytho</Text>
-        <View style={styles.labelRightBlock}>
-          <Text style={[styles.label, styles.labelRight]}>J’ai raison.</Text>
-          <Text style={[styles.label, styles.labelRight]}>Toujours.</Text>
-        </View>
+      <View style={styles.barBox} onLayout={handleLayout}>
+        {barWidth > 0 && (
+          <>
+            <Svg width={barWidth} height={BAR_HEIGHT}>
+              <Defs>
+                <SvgLinearGradient id="prediscoreGradient" x1="0" y1="0" x2="1" y2="0">
+                  <Stop offset="0" stopColor="#DCC89B" />
+                  <Stop offset="0.5" stopColor={colors.accentTransition} />
+                  <Stop offset="1" stopColor={colors.accent} />
+                </SvgLinearGradient>
+              </Defs>
+              <Rect
+                x={0}
+                y={0}
+                width={barWidth}
+                height={BAR_HEIGHT}
+                rx={BAR_HEIGHT / 2}
+                fill="url(#prediscoreGradient)"
+              />
+            </Svg>
+            <View style={[styles.cursorWrap, { left: cursorLeft }]}>
+              <LinearGradient
+                colors={wax}
+                start={{ x: 0.25, y: 0.15 }}
+                end={{ x: 0.85, y: 1 }}
+                style={styles.cursor}
+              />
+            </View>
+          </>
+        )}
       </View>
     </View>
   );
@@ -87,41 +92,36 @@ export function PrediscoreGauge({
 
 function createStyles(colors: Colors) {
   return StyleSheet.create({
-  wrap: { alignItems: 'center', width: BAR_WIDTH },
-  emptyText: {
-    fontSize: 13,
-    color: colors.textFaint,
-    textAlign: 'center',
-    lineHeight: 19,
-    paddingVertical: 8,
-  },
-  scoreLabel: { ...eyebrow(colors), marginBottom: 2 },
-  scoreValue: {
-    fontFamily: fonts.body,
-    fontSize: 34,
-    color: colors.text,
-    marginBottom: 10,
-  },
-  barBox: { width: BAR_WIDTH, height: BAR_HEIGHT, justifyContent: 'center' },
-  cursor: {
-    position: 'absolute',
-    top: -(CURSOR_SIZE - BAR_HEIGHT) / 2,
-    width: CURSOR_SIZE,
-    height: CURSOR_SIZE,
-    borderRadius: CURSOR_SIZE / 2,
-    backgroundColor: colors.surface,
-    borderWidth: 3,
-    borderColor: colors.text,
-  },
-  labelsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: BAR_WIDTH,
-    marginTop: 10,
-  },
-  label: { fontSize: 11, fontWeight: '700', color: colors.textFaint },
-  labelLeft: { color: colors.textMuted },
-  labelRightBlock: { alignItems: 'flex-end' },
-  labelRight: { color: colors.text, textAlign: 'right' },
+    wrap: { width: '100%' },
+    emptyText: {
+      fontSize: 13,
+      color: colors.textFaint,
+      textAlign: 'center',
+      lineHeight: 19,
+      paddingVertical: 8,
+    },
+    headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 },
+    scoreLabel: eyebrow(colors),
+    scoreValue: { fontFamily: fonts.bodyEmphasis, fontSize: 16, color: colors.text },
+    barBox: { width: '100%', height: CURSOR_SIZE, justifyContent: 'center' },
+    cursorWrap: {
+      position: 'absolute',
+      width: CURSOR_SIZE,
+      height: CURSOR_SIZE,
+    },
+    cursor: {
+      width: '100%',
+      height: '100%',
+      borderRadius: 999,
+      borderTopLeftRadius: CURSOR_SIZE * 0.4,
+      borderBottomRightRadius: CURSOR_SIZE * 0.42,
+      borderWidth: 2,
+      borderColor: colors.surface,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.3,
+      shadowRadius: 2,
+      elevation: 2,
+    },
   });
 }

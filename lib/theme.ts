@@ -1,142 +1,159 @@
-// Charte graphique : deux palettes (sombre par défaut, claire en option — voir
-// Paramètres > Apparence, `lib/themeMode.tsx`), mêmes tokens des deux côtés
-// pour que chaque écran reste identique dans sa structure quel que soit le
-// thème actif. Base blanc/noir/gris avec le jaune comme unique accent
-// (bordures ciblées, pastilles d'état, boutons d'action), jamais un aplat de
-// couleur vive en fond de carte ou d'en-tête. Un seul endroit à changer si
-// l'une des deux palettes évolue — tous les écrans importent `useColors()`
-// (`lib/themeMode.tsx`) plutôt que de coder leurs propres couleurs.
+// Charte graphique « Le pli » : chaque prédiction est une enveloppe scellée
+// à la cire — fermée tant qu'elle est masquée, ouverte avec la lettre qui en
+// sort une fois révélée. Une seule couleur d'accent (bordeaux) dans toute
+// l'app : plus de vert/rouge/bleu par statut comme dans l'ancienne charte —
+// les verdicts (réalisé/manqué) se distinguent par un tampon encré, pas par
+// la couleur. Deux palettes (claire par défaut, sombre en option — voir
+// Paramètres > Apparence, `lib/themeMode.tsx`) : la claire reprend
+// exactement les tokens du design (parchemin/encre/bordeaux), la sombre en
+// est une variante nocturne qui garde les mêmes rôles de tokens. Un seul
+// endroit à changer si l'une des deux palettes évolue — tous les écrans
+// importent `useColors()` plutôt que de coder leurs propres couleurs.
 
-export const darkColors = {
-  // Fond de page quasi-noir — les cartes (`surface`, plus clair) tranchent
-  // dessus sans jamais atteindre un noir ou un blanc pur.
-  background: '#090A0F',
-  // Anthracite plutôt qu'ardoise bleutée : plus neutre, pour laisser les
-  // contours néon (Sealed/Predict/Réalisé/Manqué) porter seuls la couleur.
-  surface: '#12141A',
-  // Légèrement plus clair que `surface` — modales, panneaux flottants,
-  // tout ce qui doit sembler « au-dessus » d'une carte.
-  surfaceRaised: '#1C232D',
-  // Fine bordure blanche à très faible opacité — tranche juste assez sur le
-  // fond sombre, jamais une ligne dure.
-  border: 'rgba(255, 255, 255, 0.08)',
-  text: '#F2F3F5',
-  textMuted: '#A0A6B0',
-  textFaint: '#6B7280',
-  // Accent jaune — uniquement bordures/pastilles/boutons d'action ciblés,
-  // jamais un aplat de fond de carte ou d'en-tête. Contraste élevé sur fond
-  // sombre : contrairement au mode clair, il reste lisible en texte court.
-  gold: '#FACC15',
-  goldBright: '#EAB308',
-  goldSoft: 'rgba(250, 204, 21, 0.16)',
-  // Texte/icônes posés sur un aplat doré plein (CTA, pastille de coche) —
-  // toujours une teinte sombre : `text` (quasi-blanc en mode sombre) y serait
-  // illisible, l'accent jaune restant clair quel que soit le thème.
-  textOnGold: '#171308',
-  // Étape intermédiaire des dégradés sombre → jaune (Prediscore, jauge de
-  // confiance) : une interpolation RVB directe entre `text` et `gold`
-  // traverse un brun/kaki terne au milieu. Cet ambre chaud comme étape du
-  // milieu donne une transition propre plutôt que ce ventre mou.
-  goldTransition: '#B45309',
+/** Forme commune aux deux palettes — paramètre de toute fonction de style qui
+ * doit réagir au thème (voir `useColors()`, `lib/themeMode.tsx`). Un type
+ * explicite plutôt que `typeof lightColors` : les dégradés (`[start, end]`)
+ * doivent rester deux couleurs quelconques, jamais figés sur les valeurs
+ * littérales de la palette claire. */
+export type Colors = {
+  background: string;
+  backgroundGradient: readonly [string, string];
+  surface: string;
+  surfaceRaised: string;
+  border: string;
+  text: string;
+  textMuted: string;
+  textFaint: string;
+  accent: string;
+  accentBright: string;
+  accentSoft: string;
+  textOnAccent: string;
+  accentTransition: string;
+  danger: string;
+  dangerSoft: string;
+  notificationBadge: string;
+  ink: string;
+  avatarNeutral: string;
+  icon: string;
+  footerIconInactive: string;
+  navBar: string;
+  navBarActive: string;
+  navBarInactive: string;
+  fab: string;
+  fabBorder: string;
+  fabIcon: string;
+  envelopeBody: readonly [string, string];
+  envelopeFlap: readonly [string, string];
+};
+
+export const lightColors: Colors = {
+  // Fond de page : parchemin clair (approximation plate du dégradé
+  // `linear-gradient(160deg, #F1E8D3, #E6D6AC)` du design — la plupart des
+  // écrans posent un aplat de fond, voir `backgroundGradient` ci-dessous pour
+  // les quelques endroits qui peuvent se permettre un vrai dégradé).
+  background: '#ECDFBE',
+  backgroundGradient: ['#F1E8D3', '#E6D6AC'],
+  // Papier — cartes, enveloppes, lettres (`linear-gradient(180deg, #FDFAF0,
+  // #F5EDD8)` dans le design, ici l'aplat du milieu).
+  surface: '#F5EDD8',
+  // Papier plus clair — modales, panneaux flottants, tout ce qui doit
+  // sembler « au-dessus » d'une carte.
+  surfaceRaised: '#FDFAF0',
+  border: 'rgba(36, 26, 18, 0.18)',
+  // Encre.
+  text: '#241A12',
+  textMuted: '#5C4A38',
+  textFaint: '#8A7256',
+  // Accent unique — cire, tampon, CTA. Jamais un aplat de fond de carte ou
+  // d'en-tête, seulement bordures/pastilles/boutons d'action ciblés.
+  accent: '#8B2432',
+  accentBright: '#701C28',
+  accentSoft: 'rgba(139, 36, 50, 0.12)',
+  // Texte/icônes posés sur un aplat d'accent plein (CTA, pastille) — crème,
+  // jamais l'encre (illisible sur bordeaux).
+  textOnAccent: '#F5EDD8',
+  // Étape intermédiaire des dégradés parchemin → bordeaux (Prediscore) —
+  // tan/cuir, pour une transition propre plutôt qu'une interpolation directe
+  // qui traverserait un brun terne.
+  accentTransition: '#B89A66',
   // Rouge fonctionnel, réservé aux erreurs et actions destructrices — pas une
-  // couleur de marque, un signal d'alerte standard. Éclairci pour rester
-  // lisible sur fond sombre.
-  danger: '#F87171',
-  dangerSoft: 'rgba(248, 113, 113, 0.12)',
-  // Pastille de notification (badge de la cloche).
-  notificationBadge: '#EF4444',
-  // Couleurs néon des boutons d'action « Réalisé »/« Manqué » (voir
-  // `verdictPromptButton*`) et du contour de carte une fois Manqué affirmé
-  // (`cardMissed`, avec en plus une lueur externe `shadow*`). `neonGreen` ne
-  // sert plus qu'au bouton d'action — le contour de carte Réalisé est passé
-  // au doré (`gold`), voir `cardRealized`.
-  neonGreen: '#00E676',
-  neonRed: '#FF1744',
-  // Une Question n'est pas un troisième statut de Predict (Scellé/Réalisé/
-  // Manqué) : c'est un objet différent, qui répond « j'ai posé/répondu à une
-  // question » plutôt que « j'ai affirmé un secret ». D'où un accent dédié,
-  // jamais partagé avec le jaune (CTA) ni le vert/rouge (verdict) — seule
-  // couleur de carte permanente (pas de bascule neutre → néon comme
-  // Scellé → Réalisé/Manqué, une Question se reconnaît d'un coup d'œil).
-  questionAccent: '#38BDF8',
-  // Contour de carte Scellé/En cours, et libellé assorti (texte + cadenas) —
-  // voir `PredictionCard` : gris neutre mais assez clair pour rester bien
-  // visible sur le fond anthracite, sans lueur colorée.
-  cardBorderNeutral: '#9CA3AF',
-  // Trait des icônes (Lucide) : gris clair plutôt que blanc pur, pour
-  // qu'elles restent discrètes sans se fondre dans le fond sombre.
-  icon: '#C9CDD3',
-  // Icônes du pied de carte (commentaire, réaction) au repos — un ton plus
-  // sourd que `icon`, pour un rendu fil d'actualité épuré ; `text` dès qu'il
-  // y a au moins une interaction.
-  footerIconInactive: '#6B7280',
-  // Barre de navigation : même noir que le fond de page, tranche seulement
-  // via sa bordure supérieure.
-  navBar: '#090A0F',
-  // Onglet actif en jaune (accent), inactif en gris neutre — l'accent ne sert
-  // qu'à désigner l'état actif, jamais un fond.
-  navBarActive: '#FACC15',
-  navBarInactive: '#6B7280',
-  // Bouton d'action flottant (FAB) : fond ardoise (`surfaceRaised`), bordure
-  // et icône jaunes — plus un cercle jaune plein, une lueur discrète plutôt
-  // qu'un aplat de couleur vive.
-  fab: '#1C232D',
-  fabBorder: '#FACC15',
-  fabIcon: '#FACC15',
+  // couleur de marque, un signal d'alerte standard, teinté pour rester dans
+  // le registre chaud de la charte plutôt qu'un rouge froid générique.
+  danger: '#B3261E',
+  dangerSoft: 'rgba(179, 38, 30, 0.1)',
+  notificationBadge: '#8B2432',
+  // Encre neutre du tampon « Manqué » — un vrai tampon encré, jamais le
+  // bordeaux (réservé à « Encore raison ») : les deux verdicts se distinguent
+  // par leur texte et cette teinte, jamais par un code couleur façon
+  // sémaphore.
+  ink: '#3A2E22',
+  avatarNeutral: '#D9C295',
+  icon: '#5C4A38',
+  footerIconInactive: '#8A7256',
+  navBar: '#F5EDD8',
+  navBarActive: '#8B2432',
+  navBarInactive: '#8A7256',
+  fab: '#F5EDD8',
+  fabBorder: '#8B2432',
+  fabIcon: '#8B2432',
+  // Corps et rabat de l'enveloppe (`PredictionCard`, `PredictionSeal`) —
+  // dégradés tan/cuir, distincts du papier qu'ils encadrent.
+  envelopeBody: ['#D9BE8C', '#B89A66'],
+  envelopeFlap: ['#ECDCB2', '#D4B98A'],
 };
 
 /**
- * Palette claire : mêmes rôles de tokens, fond blanc/gris très clair, texte
- * quasi-noir — le jaune reste le seul accent, juste assombri (`#CA8A04`
- * plutôt que `#FACC15`) pour rester lisible en texte/icône sur fond clair,
- * où le jaune vif de la palette sombre serait trop pâle. `textOnGold`
- * s'inverse en conséquence (blanc, posé sur un aplat doré désormais plus
- * soutenu). Rouge/vert fonctionnels resserrés de même, pour la même raison
- * de contraste sur blanc plutôt que sur fond quasi-noir.
+ * Palette sombre : mêmes rôles de tokens, fond encre profonde, papier assombri
+ * façon parchemin sous chandelle — l'accent bordeaux s'éclaircit pour rester
+ * lisible sur fond sombre (même logique que l'ancien jaune sombre/clair).
  */
-export const lightColors: typeof darkColors = {
-  background: '#FFFFFF',
-  surface: '#F5F5F6',
-  surfaceRaised: '#EBEBEC',
-  border: 'rgba(0, 0, 0, 0.08)',
-  text: '#111114',
-  textMuted: '#5B5F66',
-  textFaint: '#8A8F98',
-  gold: '#CA8A04',
-  goldBright: '#A16207',
-  goldSoft: 'rgba(202, 138, 4, 0.12)',
-  textOnGold: '#FFFFFF',
-  goldTransition: '#92400E',
-  danger: '#DC2626',
-  dangerSoft: 'rgba(220, 38, 38, 0.08)',
-  notificationBadge: '#EF4444',
-  neonGreen: '#16A34A',
-  neonRed: '#DC2626',
-  questionAccent: '#0284C7',
-  cardBorderNeutral: '#6B7280',
-  icon: '#4B5563',
-  footerIconInactive: '#9CA3AF',
-  navBar: '#FFFFFF',
-  navBarActive: '#CA8A04',
-  navBarInactive: '#9CA3AF',
-  fab: '#F5F5F6',
-  fabBorder: '#CA8A04',
-  fabIcon: '#CA8A04',
-} as const;
+export const darkColors: Colors = {
+  background: '#171009',
+  backgroundGradient: ['#1D150C', '#120D07'],
+  surface: '#241A12',
+  surfaceRaised: '#2E2117',
+  border: 'rgba(245, 237, 216, 0.12)',
+  text: '#F5EDD8',
+  textMuted: '#C9B896',
+  textFaint: '#8F7C5F',
+  accent: '#C15866',
+  accentBright: '#D97686',
+  accentSoft: 'rgba(193, 88, 102, 0.18)',
+  textOnAccent: '#241A12',
+  accentTransition: '#8B6B3E',
+  danger: '#E5675F',
+  dangerSoft: 'rgba(229, 103, 95, 0.14)',
+  notificationBadge: '#C15866',
+  ink: '#D8CBB0',
+  avatarNeutral: '#5C4A38',
+  icon: '#C9B896',
+  footerIconInactive: '#8F7C5F',
+  navBar: '#171009',
+  navBarActive: '#C15866',
+  navBarInactive: '#8F7C5F',
+  fab: '#2E2117',
+  fabBorder: '#C15866',
+  fabIcon: '#C15866',
+  envelopeBody: ['#4A3826', '#332415'],
+  envelopeFlap: ['#5C4830', '#3E2C1A'],
+};
 
-/** Forme commune aux deux palettes — paramètre de toute fonction de style
- * qui doit réagir au thème (voir `useColors()`, `lib/themeMode.tsx`). */
-export type Colors = typeof darkColors;
+/** Dégradé de la cire — cachet et curseurs en forme de cachet (Prediscore) :
+ * un objet physique, pas affecté par le thème actif, donc un seul jeu de
+ * teintes pour les deux palettes. */
+export const wax = ['#C15866', '#8B2432', '#5C121C', '#3E0A12'] as const;
 
 export const radius = {
   sm: 8,
   md: 12,
   lg: 18,
-  // Arrondi très généreux (façon `rounded-3xl`) — cartes de prédiction,
-  // cartes d'info, la carte « à sceller » des écrans profil/accueil. `lg`
-  // reste pour les éléments plus petits (chips, champs).
+  // Arrondi très généreux (façon `rounded-3xl`) — cartes d'info, la carte
+  // « à sceller » des écrans profil/accueil, cadre du téléphone.
   xl: 28,
   pill: 999,
+  // Enveloppes et lettres — un rectangle bien plus net que `xl`, pour
+  // ressembler à du courrier plutôt qu'à une carte d'app générique.
+  card: 8,
 } as const;
 
 export const spacing = {
@@ -148,28 +165,28 @@ export const spacing = {
 } as const;
 
 /**
- * Une seule famille pour tout le site — Inter, en 5 graisses — jamais de
- * serif ni de monospace : c'est la police, pas la graisse ou la taille, qui
- * doit rester identique partout pour un rendu fluide façon réseau social
- * (Facebook).
- *
- * `display` (Bold) : logo, mot-symbole « Predict », grands en-têtes de page.
- * `bodyEmphasis` (SemiBold) : gros texte éditorial mis en avant (corps de la
- * prédiction, pseudo de profil, pull-quotes, verdict) — jamais grisé, c'est
- * l'élément qu'on doit remarquer en premier. `sansBold` (Bold) : titres de
- * carte, boutons, onglets. `body` (Regular) : texte courant, police par
- * défaut de `<Text>`/`<TextInput>`. `label` (Medium) : métadonnées et
- * étiquettes d'état — toujours petites, majuscules, trackées, jamais le
- * texte courant. Chaque nom doit correspondre exactement à la clé passée à
- * `useFonts` dans `app/_layout.tsx`, faute de quoi React Native retombe
- * silencieusement sur la police système.
+ * Deux familles : Spectral pour tout ce qui « s'écrit » (titres, corps de
+ * prédiction, teaser) — jamais de l'UI ; Archivo pour l'interface (boutons,
+ * labels, onglets, méta). `display`/`bodyEmphasis`/`serifItalic` sont
+ * Spectral, `body`/`label`/`sansBold` sont Archivo. Chaque nom doit
+ * correspondre exactement à la clé passée à `useFonts` dans
+ * `app/_layout.tsx`, faute de quoi React Native retombe silencieusement sur
+ * la police système.
  */
 export const fonts = {
-  display: 'Inter_700Bold',
-  bodyEmphasis: 'Inter_600SemiBold',
-  sansBold: 'Inter_700Bold',
-  body: 'Inter_400Regular',
-  label: 'Inter_500Medium',
+  // Titres d'écran, mot-symbole « Predict », gros corps de prédiction.
+  display: 'Spectral_700Bold',
+  bodyEmphasis: 'Spectral_600SemiBold',
+  // Teaser et citations — l'italique est une vraie fonte italique chargée à
+  // part, pas un `fontStyle: 'italic'` appliqué à la romaine.
+  serifItalic: 'Spectral_400Regular_Italic',
+  // Interface : titres de carte, boutons, onglets.
+  sansBold: 'Archivo_700Bold',
+  // Texte courant, police par défaut de `<Text>`/`<TextInput>`.
+  body: 'Archivo_400Regular',
+  // Métadonnées et étiquettes d'état — toujours petites, majuscules,
+  // trackées, jamais le texte courant.
+  label: 'Archivo_500Medium',
 } as const;
 
 /**

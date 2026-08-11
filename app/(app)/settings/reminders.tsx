@@ -80,7 +80,7 @@ export default function RemindersSettingsScreen() {
                 onValueChange={(v) => {
                   if (settings) persist({ ...settings, enabled: v });
                 }}
-                trackColor={{ false: colors.border, true: colors.gold }}
+                trackColor={{ false: colors.border, true: colors.accent }}
                 thumbColor={colors.surface}
               />
             </View>
@@ -166,7 +166,7 @@ function createStyles(colors: Colors) {
   },
   optionRowLast: { borderBottomWidth: 0 },
   optionText: { fontSize: 15, color: colors.text, fontWeight: '600' },
-  optionDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.gold },
+  optionDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.accent },
   error: {
     color: colors.danger,
     backgroundColor: colors.dangerSoft,

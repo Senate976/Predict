@@ -102,6 +102,6 @@ function createStyles(colors: Colors) {
   rowText: { flex: 1 },
   rowLabel: { fontSize: 15, fontWeight: '600', color: colors.text },
   rowHint: { fontSize: 12, color: colors.textFaint, marginTop: 2 },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.gold },
+  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.accent },
   });
 }

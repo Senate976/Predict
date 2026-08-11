@@ -592,7 +592,7 @@ function createStyles(colors: Colors) {
     borderBottomColor: 'transparent',
     marginBottom: -1,
   },
-  tabActive: { borderBottomColor: colors.gold },
+  tabActive: { borderBottomColor: colors.accent },
   // Même principe que le badge de la cloche de notifications — rouge plein,
   // texte blanc, taille fixe pour ne pas déplacer le libellé de l'onglet.
   tabBadge: {

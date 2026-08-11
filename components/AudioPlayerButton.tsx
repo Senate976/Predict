@@ -69,7 +69,7 @@ function createStyles(colors: Colors) {
       paddingVertical: 10,
       paddingHorizontal: 16,
       alignSelf: 'flex-start',
-      backgroundColor: colors.goldSoft,
+      backgroundColor: colors.accentSoft,
     },
     text: { fontSize: 13, fontWeight: '600', color: colors.text },
     errorText: { fontSize: 12, color: colors.textFaint },

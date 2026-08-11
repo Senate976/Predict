@@ -44,7 +44,7 @@ function createStyles(colors: Colors) {
       borderColor: colors.fabBorder,
       alignItems: 'center',
       justifyContent: 'center',
-      shadowColor: colors.gold,
+      shadowColor: colors.accent,
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 0.35,
       shadowRadius: 10,

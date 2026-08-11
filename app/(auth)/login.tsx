@@ -376,14 +376,14 @@ function createStyles(colors: Colors) {
   },
   notice: {
     color: colors.text,
-    backgroundColor: colors.goldSoft,
+    backgroundColor: colors.accentSoft,
     borderRadius: radius.sm,
     padding: 12,
     fontSize: 14,
     marginBottom: spacing.sm,
   },
   submit: {
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
     borderRadius: radius.pill,
     paddingVertical: 15,
     alignItems: 'center',
@@ -391,10 +391,10 @@ function createStyles(colors: Colors) {
     minHeight: 52,
     justifyContent: 'center',
   },
-  submitPressed: { backgroundColor: colors.goldBright },
+  submitPressed: { backgroundColor: colors.accentBright },
   submitDisabled: { opacity: 0.6 },
   // Texte sombre sur le bouton jaune — `text` (blanc en mode sombre) y serait peu lisible.
-  submitText: { fontFamily: fonts.sansBold, color: colors.textOnGold, fontSize: 16, textTransform: 'uppercase', letterSpacing: 0.5 },
+  submitText: { fontFamily: fonts.sansBold, color: colors.textOnAccent, fontSize: 16, textTransform: 'uppercase', letterSpacing: 0.5 },
   switch: { marginTop: 18, alignItems: 'center' },
   switchText: { fontFamily: fonts.bodyEmphasis, color: colors.text, fontSize: 14 },
   });

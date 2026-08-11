@@ -1,3 +1,4 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import {
   CheckCircle2,
@@ -24,6 +25,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import Svg, { Defs, LinearGradient as SvgLinearGradient, Polygon, Stop } from 'react-native-svg';
 import { Text } from './Text';
 
 import { fetchCommentCount } from '../lib/comments';
@@ -40,7 +42,7 @@ import {
   type EmojiReactor,
   type PredictionFeedItem,
 } from '../lib/predictions';
-import { fonts, radius, type Colors } from '../lib/theme';
+import { fonts, radius, wax, type Colors } from '../lib/theme';
 import { useColors } from '../lib/themeMode';
 import { Avatar } from './Avatar';
 import { InlineComments } from './InlineComments';
@@ -65,6 +67,15 @@ const SEALED_CONTENT_PLACEHOLDER =
 const GLOW_PULSE_CYCLE_MS = 750;
 const GLOW_PULSE_TOTAL_MS = GLOW_PULSE_CYCLE_MS * 2;
 
+/** Hauteur du bandeau de rabat, en haut de l'enveloppe — fixe plutôt qu'un
+ * pourcentage de la hauteur de la carte (qui varie avec le contenu, contrai-
+ * rement à la maquette) : assez pour lire un vrai rabat, jamais démesuré sur
+ * une carte courte. */
+const FLAP_HEIGHT = 52;
+/** Décalage (négatif) de la lettre sous le bandeau de rabat — assez pour
+ * qu'elle semble sortir de sous la pointe du rabat, jamais flottante. */
+const LETTER_OVERLAP = 26;
+
 function easeInOutQuad(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2;
 }
@@ -80,6 +91,89 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+/** Le rabat triangulaire, en haut de l'enveloppe — un polygone SVG plutôt
+ * qu'un `clip-path` (non disponible sur natif) : `viewBox` non uniforme
+ * (`preserveAspectRatio="none"`) pour rester nette à n'importe quelle largeur
+ * de carte, sans mesurer quoi que ce soit. */
+function EnvelopeFlap({ colors }: { colors: Colors }) {
+  return (
+    <Svg width="100%" height={FLAP_HEIGHT} viewBox={`0 0 100 ${FLAP_HEIGHT}`} preserveAspectRatio="none">
+      <Defs>
+        <SvgLinearGradient id="flapGradient" x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0" stopColor={colors.envelopeFlap[0]} />
+          <Stop offset="1" stopColor={colors.envelopeFlap[1]} />
+        </SvgLinearGradient>
+      </Defs>
+      <Polygon points={`0,0 100,0 50,${FLAP_HEIGHT}`} fill="url(#flapGradient)" />
+    </Svg>
+  );
+}
+
+/** Le cachet de cire, posé pile sur la pointe du rabat — blob irrégulier
+ * (coins asymétriques) plutôt qu'un rond plat, monogramme « P » en relief
+ * (deux `Text` superposés, l'un en ombre). Uniquement pour une enveloppe
+ * Scellée : une fois ouverte, c'est la lettre qui occupe ce même point. */
+function WaxSeal({ size = 46 }: { size?: number }) {
+  return (
+    <View
+      style={[
+        styles_waxSealWrap,
+        { width: size, height: size, top: FLAP_HEIGHT, marginLeft: -size / 2, marginTop: -size / 2 },
+      ]}
+    >
+      <LinearGradient
+        colors={wax}
+        start={{ x: 0.28, y: 0.22 }}
+        end={{ x: 0.85, y: 1 }}
+        style={[
+          styles_waxSealBase,
+          { borderTopLeftRadius: size * 0.48, borderBottomRightRadius: size * 0.42 },
+        ]}
+      >
+        <Text style={[styles_waxSealEmblem, styles_waxSealEmblemShadow, { fontSize: size * 0.42 }]}>P</Text>
+        <Text style={[styles_waxSealEmblem, { fontSize: size * 0.42 }]}>P</Text>
+      </LinearGradient>
+    </View>
+  );
+}
+
+const styles_waxSealWrap: object = { position: 'absolute', left: '50%', alignItems: 'center', justifyContent: 'center' };
+const styles_waxSealBase: object = {
+  width: '100%',
+  height: '100%',
+  borderRadius: 999,
+  alignItems: 'center',
+  justifyContent: 'center',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 3 },
+  shadowOpacity: 0.4,
+  shadowRadius: 5,
+  elevation: 5,
+};
+const styles_waxSealEmblem: object = { fontFamily: fonts.display, color: 'rgba(255, 220, 205, 0.75)' };
+const styles_waxSealEmblemShadow: object = {
+  position: 'absolute',
+  top: 1,
+  left: 0.5,
+  color: 'rgba(0, 0, 0, 0.5)',
+};
+
+/** Le tampon de verdict — encré, oblique, surdimensionné : le seul élément
+ * graphique fort de toute l'app (voir design « Le pli », section 04).
+ * Bordeaux pour « encore raison », encre neutre pour « manqué » — jamais de
+ * vert/rouge. Posé en surimpression du coin de la lettre, il ne bouge
+ * jamais : une contestation ouvre une discussion, jamais ce tampon. */
+function VerdictStamp({ verdict, colors }: { verdict: 'realized' | 'missed'; colors: Colors }) {
+  const tint = verdict === 'realized' ? colors.accent : colors.ink;
+  return (
+    <View style={[stampStyles.stamp, { borderColor: tint }]}>
+      <Text style={[stampStyles.stampText, { color: tint }]}>
+        {verdict === 'realized' ? 'ENCORE\nRAISON' : 'MANQUÉ'}
+      </Text>
+    </View>
+  );
+}
+
 /**
  * Carte d'une prédiction, partagée entre les onglets À venir et Passées du
  * Fil. Toujours dépliée (teaser, puis contenu une fois révélé) ; un tap sur
@@ -87,6 +181,11 @@ function hexToRgba(hex: string, alpha: number): string {
  * destinataires et chacun se prononce une fois révélée. Les commentaires,
  * eux, restent repliés derrière une icône dédiée — pas besoin de quitter le
  * Fil pour les consulter.
+ *
+ * Visuellement, c'est une enveloppe (voir `EnvelopeFlap`/`WaxSeal` ci-dessus)
+ * plutôt qu'une carte à bordure de statut : fermée et scellée de cire tant
+ * qu'elle est masquée, ouverte avec la lettre qui en sort une fois révélée —
+ * voir le handoff de design « Le pli » pour la grammaire complète.
  */
 export function PredictionCard({
   item,
@@ -178,26 +277,25 @@ export function PredictionCard({
   // sur le web, une composition que `Animated` ne recalcule pas à chaque
   // frame — seul un nombre simple, posé via `useState`, s'y reflète correctement.
   const [glowIntensity, setGlowIntensity] = useState(0);
-  const glowShadowOpacity = 0.55 + glowIntensity * (0.85 - 0.55);
-  const glowShadowRadius = 14 + glowIntensity * (22 - 14);
+  const glowShadowOpacity = 0.45 + glowIntensity * (0.75 - 0.45);
+  const glowShadowRadius = 12 + glowIntensity * (20 - 12);
 
   const isQuestion = item.type === 'question';
 
-  /** Les 4 états visuels d'une Déclaration — un contour néon dédié (voir
-   * `styles`) à tous, mais un libellé en haut à droite seulement pour
-   * Scellé/En cours : une fois le verdict affirmé, le tampon en dessous
-   * porte seul la réponse, `label` reste `undefined` plutôt que de la
-   * répéter en haut de la carte.
+  /** Trois états de l'enveloppe (voir `EnvelopeFlap`/`WaxSeal`/`VerdictStamp`
+   * ci-dessus) : Scellée (sealed), Ouverte (tous les autres) — Réalisé/
+   * Manqué s'y distinguent par le tampon, jamais par une couleur de contour.
+   * `label` reste le petit repère textuel au-dessus de l'enveloppe (état
+   * d'attente ou type Question) — absent pour Réalisé/Manqué, où le tampon
+   * porte seul la réponse.
    *
-   * Une Question n'entre jamais dans cette machine à états : ce n'est pas un
-   * troisième statut de Predict, c'est un objet différent — trois états à
-   * elle (ouverte/close/réponse correcte), bordure dédiée `cardQuestion`
-   * (jamais neutre → néon comme Scellé → Réalisé/Manqué), sauf une fois sa
-   * propre réponse validée correcte : là, exactement le même vert que
-   * Réalisé (`cardRealizedBorder`) — le succès se lit pareil pour tout le
-   * monde, peu importe le type de carte. Ne dépend que du point de vue de
-   * l'appelant (`my_answer_is_correct`) : une Question où quelqu'un d'autre
-   * a deviné juste ne devient pas verte pour moi. */
+   * Une Question n'entre jamais dans la machine à états Scellé → Réalisé/
+   * Manqué : c'est un objet différent, qui répond « j'ai posé/répondu à une
+   * question » plutôt que « j'ai affirmé un secret » — sauf une fois sa
+   * propre réponse validée correcte, où elle reprend le même accent que
+   * Réalisé : le succès se lit pareil pour tout le monde. Ne dépend que du
+   * point de vue de l'appelant (`my_answer_is_correct`) : une Question où
+   * quelqu'un d'autre a deviné juste ne change pas pour moi. */
   const cardState: {
     kind: 'sealed' | 'active' | 'realized' | 'missed' | 'question_open' | 'question_closed' | 'question_correct';
     label?: string;
@@ -225,7 +323,7 @@ export function PredictionCard({
     };
   }, [item.id]);
 
-  /** Renforcement visuel du passage à Réalisé : deux pulsations du glow vert
+  /** Renforcement visuel du passage à Réalisé : deux pulsations du glow
    * (0,75 s chacune, 1,5 s au total), jouées une seule fois par utilisateur
    * — auteur compris — puis jamais rejouées, y compris après un rechargement
    * (persistance via `verdict_seen`, voir lib/predictions.ts). */
@@ -501,51 +599,37 @@ export function PredictionCard({
     })
   ).current;
 
+  const showVerdictStamp = cardState.kind === 'realized' || cardState.kind === 'missed';
+
   return (
     <View
       style={[
         styles.card,
-        cardState.kind === 'sealed' && styles.cardSealed,
-        cardState.kind === 'active' && styles.cardActive,
-        cardState.kind === 'realized' && styles.cardRealizedBorder,
-        // `boxShadow` plutôt que `shadow*` (déprécié) : seule cette forme
-        // recompose correctement un glow dont l'opacité et le rayon varient
-        // à chaque frame de la pulsation (`glowIntensity`, piloté par
-        // `requestAnimationFrame` — voir plus haut).
+        unseen && styles.cardUnseen,
         cardState.kind === 'realized' && {
           boxShadow: [
-            { offsetX: 0, offsetY: 0, color: hexToRgba(colors.neonGreen, glowShadowOpacity), blurRadius: glowShadowRadius },
+            { offsetX: 0, offsetY: 0, color: hexToRgba(colors.accent, glowShadowOpacity), blurRadius: glowShadowRadius },
           ],
         },
-        cardState.kind === 'missed' && styles.cardMissed,
-        (cardState.kind === 'question_open' || cardState.kind === 'question_closed') && styles.cardQuestion,
-        // Réponse validée correcte : exactement le même vert que Réalisé,
-        // jamais le bleu Question — le succès se lit pareil pour tout le
-        // monde. Pas de lueur pulsante ici (réservée à la mise en avant
-        // ponctuelle de `is_verdict_seen`, propre aux Déclarations).
-        cardState.kind === 'question_correct' && styles.cardRealizedBorder,
-        unseen && styles.cardUnseen,
       ]}
     >
-      {/* Sur sa propre ligne, au-dessus de [avatar][pseudo] plutôt qu'inline
-          dans l'en-tête : le pseudo garde toute la largeur de sa ligne au
-          lieu de la disputer à ce libellé. Absent pour Réalisé/Manqué — le
-          tampon en dessous porte seul la réponse, plus de titre à répéter. */}
+      {/* Sur sa propre ligne, au-dessus de l'enveloppe plutôt qu'inline dans
+          l'en-tête : le pseudo garde toute la largeur de sa ligne. Absent
+          pour Réalisé/Manqué — le tampon porte seul la réponse. */}
       {cardState.label && (
         <View style={styles.stateRow}>
-          {cardState.kind === 'sealed' && <Lock size={12} color={colors.cardBorderNeutral} strokeWidth={2} />}
+          {cardState.kind === 'sealed' && <Lock size={12} color={colors.textFaint} strokeWidth={2} />}
           {(cardState.kind === 'question_open' || cardState.kind === 'question_closed') && (
-            <HelpCircle size={12} color={colors.questionAccent} strokeWidth={2} />
+            <HelpCircle size={12} color={colors.accent} strokeWidth={2} />
           )}
-          {cardState.kind === 'question_correct' && (
-            <CheckCircle2 size={12} color={colors.neonGreen} strokeWidth={2} />
-          )}
+          {cardState.kind === 'question_correct' && <CheckCircle2 size={12} color={colors.accent} strokeWidth={2} />}
           <Text
             style={[
               styles.stateLabel,
-              (cardState.kind === 'question_open' || cardState.kind === 'question_closed') &&
-                styles.stateLabelQuestion,
-              cardState.kind === 'question_correct' && styles.stateLabelQuestionCorrect,
+              (cardState.kind === 'question_open' ||
+                cardState.kind === 'question_closed' ||
+                cardState.kind === 'question_correct') &&
+                styles.stateLabelAccent,
             ]}
             numberOfLines={1}
           >
@@ -554,223 +638,234 @@ export function PredictionCard({
         </View>
       )}
 
-      {/* Sous l'étiquette, jamais dans la zone tappable (`onPress` de la
-          `Pressable` qui suit) : rend visible qu'un Predict Scellé attend sa
-          révélation, plutôt que de laisser deviner s'il y a simplement une
-          date programmée — réservé à l'auteur, seul habilité par la RLS de
-          `reveal_prediction_now`. */}
-      {isAuthor && cardState.kind === 'sealed' && (
-        <View style={styles.revealRow}>
-          <Pressable
-            onPress={handleRevealNow}
-            disabled={revealPending}
-            style={({ pressed }) => [styles.revealButton, pressed && styles.revealButtonPressed]}
-          >
-            <Text style={styles.revealButtonText}>{revealPending ? 'Révélation…' : 'Révéler'}</Text>
-          </Pressable>
-          {revealError && <Text style={styles.revealErrorText}>{revealError}</Text>}
-        </View>
-      )}
+      {/* L'enveloppe : rabat fixe en haut, puis soit le cachet (Scellée),
+          soit la lettre qui en sort (tous les autres états) — même
+          silhouette partout, voir `EnvelopeFlap`/`WaxSeal` en tête de
+          fichier. S'assourdit légèrement une fois Manquée, jamais l'étiquette
+          d'état ci-dessus. */}
+      <View style={cardState.kind === 'missed' && styles.cardBodyMissed}>
+        <View style={styles.envelope}>
+          <EnvelopeFlap colors={colors} />
+          {cardState.kind === 'sealed' && <WaxSeal />}
 
-      {/* Invite l'auteur à trancher dès que sa prédiction est révélée mais
-          encore en attente de verdict — nulle part ailleurs que sur sa propre
-          carte, en dehors de la zone tappable (`onPress` navigue vers le
-          détail) : un tap sur un bouton ne doit jamais aussi ouvrir l'écran
-          détail. Rien que les deux boutons, aucun texte d'accompagnement —
-          une fois posé, revenir dessus n'est plus possible ici, seulement
-          depuis l'écran détail (voir `set_prediction_verdict`, section 35). */}
-      {!isQuestion && isAuthor && revealed && verdict === null && (
-        <View style={styles.verdictPrompt}>
-          <View style={styles.verdictPromptButtons}>
-            <Pressable
-              onPress={() => handleSetVerdict('realized')}
-              disabled={verdictPending}
-              style={[styles.verdictPromptButton, styles.verdictPromptButtonRealized]}
-            >
-              <Text style={styles.verdictPromptButtonText}>Réalisé</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => handleSetVerdict('missed')}
-              disabled={verdictPending}
-              style={[styles.verdictPromptButton, styles.verdictPromptButtonMissed]}
-            >
-              <Text style={styles.verdictPromptButtonText}>Manqué</Text>
+          {cardState.kind !== 'sealed' && (
+            <View style={[styles.letter, showVerdictStamp && styles.letterWithStamp]}>
+              {showVerdictStamp && <VerdictStamp verdict={cardState.kind as 'realized' | 'missed'} colors={colors} />}
+
+              {isQuestion ? (
+                <>
+                  <View style={styles.letterHeaderRow}>
+                    <Text style={styles.letterAuthor} numberOfLines={1}>
+                      {(authorLabel ?? '').toUpperCase()} · À TOUS
+                    </Text>
+                    <View style={styles.letterCounter}>
+                      <Text style={styles.letterCounterText}>{item.answer_count}</Text>
+                    </View>
+                  </View>
+                  {/* Pas de Teaser pour une Question : `content` (la question
+                      elle-même) est visible dès la création, jamais flouté —
+                      ce que la Clôture cache, ce sont les réponses des
+                      autres, pas la question. */}
+                  <Text style={styles.letterQuestionText}>{item.content}</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.letterAuthor} numberOfLines={1}>
+                    {(authorLabel ?? '').toUpperCase()}
+                  </Text>
+                  {/* La RLS ne renvoie `content` que si révélée ou si on en
+                      est l'auteur — l'auteur voit donc toujours son propre
+                      texte en clair, jamais flouté. Sans lui (destinataire),
+                      `SEALED_CONTENT_PLACEHOLDER` prend la même place,
+                      floutée : jamais du vrai texte, juste sa silhouette. */}
+                  <Text style={[styles.letterContent, !item.content && styles.letterContentBlurred]}>
+                    {item.content ?? SEALED_CONTENT_PLACEHOLDER}
+                  </Text>
+                </>
+              )}
+            </View>
+          )}
+        </View>
+
+        {/* Sous l'enveloppe : bloc auteur, pseudos cités, teaser (Scellée
+            uniquement — la vraie prédiction vit dans la lettre une fois
+            ouverte), boutons d'action. */}
+        <Pressable onPress={() => onPress?.()} style={({ pressed }) => [styles.body, pressed && styles.cardPressed]}>
+          <View style={styles.cardHeader}>
+            {authorLabel && (
+              <Pressable
+                onPress={() => authorId && router.push(`/profile/${authorId}`)}
+                style={styles.authorBlock}
+                hitSlop={4}
+              >
+                <Avatar url={authorAvatarUrl} username={authorLabel} size={32} />
+                <Text style={styles.authorName} numberOfLines={1}>
+                  {authorLabel}
+                </Text>
+              </Pressable>
+            )}
+
+            <View style={styles.headerSpacer} />
+
+            {/* Favoris, masquer, supprimer : des actions de gestion, pas des
+                réactions sociales — regroupées ici plutôt que dans le pied de
+                carte, qui ne garde que commentaire et réaction. */}
+            <Pressable onPress={() => setMenuOpen(true)} hitSlop={8} style={styles.headerMenuButton}>
+              <MoreHorizontal size={18} color={colors.icon} strokeWidth={1.75} />
             </Pressable>
           </View>
-          {verdictError && <Text style={styles.verdictPromptError}>{verdictError}</Text>}
-        </View>
-      )}
 
-      {/* Le corps de la carte (avatar, pseudo, texte, réactions) — jamais le
-          badge d'état ci-dessus — s'assourdit légèrement une fois Manquée :
-          la carte reste lisible, mais se lit d'emblée comme secondaire par
-          rapport à un Predict Réalisé. Scellée reste à pleine opacité — la
-          lisibilité prime, seul le contour néon doré marque son statut. */}
-      <View style={[cardState.kind === 'missed' && styles.cardBodyMissed]}>
-        <Pressable onPress={() => onPress?.()} style={({ pressed }) => pressed && styles.cardPressed}>
-        {/* Une seule ligne : [avatar][pseudo] ...espace flexible... [bulle de
-            révélation (si programmée et pas encore révélée) ou tampon de
-            verdict (une fois affirmé par l'auteur) — jamais les deux à la
-            fois, les deux conditions s'excluent]. */}
-        <View style={styles.cardHeader}>
-          {authorLabel && (
-            <Pressable
-              onPress={() => authorId && router.push(`/profile/${authorId}`)}
-              style={styles.authorBlock}
-              hitSlop={4}
-            >
-              <Avatar url={authorAvatarUrl} username={authorLabel} size={32} />
-              <Text style={styles.authorName} numberOfLines={1}>
-                {authorLabel}
-              </Text>
-            </Pressable>
-          )}
-
-          <View style={styles.headerSpacer} />
-
-          {/* Favoris, masquer, supprimer : des actions de gestion, pas des
-              réactions sociales — regroupées ici plutôt que dans le pied de
-              carte, qui ne garde que commentaire et réaction. */}
-          <Pressable onPress={() => setMenuOpen(true)} hitSlop={8} style={styles.headerMenuButton}>
-            <MoreHorizontal size={18} color={colors.icon} strokeWidth={1.75} />
-          </Pressable>
-        </View>
-
-        <View>
           {/* Sur sa propre ligne, jamais accolée au pseudo — la liste
               complète des personnes citées y empiétait dès qu'il y en avait
               plusieurs. */}
-          {mentionLabel && <Text style={styles.mentionTag} numberOfLines={1}>{mentionLabel}</Text>}
-
-          {isQuestion ? (
-            // Pas de Teaser pour une Question : `content` (la question
-            // elle-même) est visible dès la création, jamais flouté — ce que
-            // la Clôture cache, ce sont les réponses des autres, pas la
-            // question (RLS `prediction_contents_select`, schema.sql section 42).
-            <Text style={styles.cardContent}>{item.content}</Text>
-          ) : (
-            <>
-              <Text style={styles.cardTeaser}>{item.teaser}</Text>
-
-              {/* La RLS ne renvoie `content` que si révélée ou si on en est
-                  l'auteur — l'auteur voit donc toujours son propre texte en
-                  clair, jamais flouté, y compris avant révélation (le bouton
-                  Révéler ci-dessus fait déjà ce travail de signal). Sans lui
-                  (destinataire, avant révélation), `SEALED_CONTENT_PLACEHOLDER`
-                  prend la même place, floutée : jamais du vrai texte, juste sa
-                  silhouette. */}
-              {(item.content || !revealed) && (
-                <Text style={[styles.cardContent, !item.content && styles.cardContentBlurred]}>
-                  {item.content ?? SEALED_CONTENT_PLACEHOLDER}
-                </Text>
-              )}
-            </>
+          {mentionLabel && (
+            <Text style={styles.mentionTag} numberOfLines={1}>
+              {mentionLabel}
+            </Text>
           )}
-        </View>
-      </Pressable>
 
-      {/* Répondre sans quitter le Fil — en dehors du `Pressable` ci-dessus
-          (qui navigue vers le détail) pour que taper dans le champ ou sur
-          une option ne déclenche jamais aussi cette navigation, même
-          principe que `InlineComments`/`footerRow` plus bas. Réservé à une
-          Question encore ouverte : plus rien à répondre une fois close,
-          l'écran détail prend le relais (liste des réponses, validation). */}
-      {isQuestion && !revealed && <InlineQuestionAnswer prediction={item} />}
-
-      {/* Fil épuré façon réseau social : plus que les deux interactions
-          sociales, alignées à gauche et groupées de près — favoris, masquer
-          et supprimer sont désormais des actions de gestion, reléguées au
-          menu ••• de l'en-tête. Le chiffre s'affiche toujours (y compris à
-          zéro), pas seulement dès la première interaction. */}
-      <View style={styles.footerRow}>
-        <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
-          <View style={styles.iconSlot}>
-            <MessageCircle
-              size={18}
-              color={(commentCount ?? 0) > 0 ? colors.text : colors.footerIconInactive}
-              strokeWidth={1.75}
-              fill={commentsOpen ? colors.text : 'none'}
-            />
-          </View>
-          <Text style={[styles.commentsToggleText, (commentCount ?? 0) === 0 && styles.footerCountInactive]}>
-            {commentCount ?? 0}
-          </Text>
+          {!isQuestion && cardState.kind === 'sealed' && <Text style={styles.cardTeaser}>{item.teaser}</Text>}
         </Pressable>
 
-        {/* Discret, façon Facebook : un pouce en filigrane (ou l'emoji déjà
-            choisi) — maintenir le doigt fait apparaître la bulle de
-            réactions au-dessus, la faire glisser dessus en sélectionne une.
-            Le chiffre est un bouton à part : un tap dessus ouvre le détail
-            de qui a réagi avec quoi, sans interférer avec le geste du pouce. */}
-        <View style={styles.reactionTriggerRow}>
-          <View style={styles.reactionTriggerWrap}>
-            <View style={[styles.reactionTrigger, styles.iconSlot]} hitSlop={8} {...panResponder.panHandlers}>
-              {myEmoji ? (
-                <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
-              ) : (
-                <ThumbsUp
-                  size={18}
-                  color={totalReactions > 0 ? colors.text : colors.footerIconInactive}
-                  strokeWidth={1.75}
-                />
-              )}
-            </View>
-
-            {emojiPanelOpen && (
-              <View
-                ref={panelRef}
-                style={styles.emojiPanel}
-                onLayout={() => {
-                  panelRef.current?.measureInWindow((x, y, width, height) => {
-                    panelLayoutRef.current = { x, y, width, height };
-                  });
-                }}
-              >
-                {EMOJI_REACTIONS.map((emoji, i) => (
-                  <Animated.View key={emoji} style={{ transform: [{ scale: scaleAnims[i] }] }}>
-                    {/* Un tap direct sur un emoji le sélectionne toujours,
-                        indépendamment du glissé : sans ça, un utilisateur qui
-                        relâche le pouce puis tape un emoji comme un bouton
-                        normal (au lieu de glisser sans relâcher, à la
-                        Facebook) ne déclenchait jamais rien. */}
-                    <Pressable
-                      onPress={() => handleEmojiPress(emoji)}
-                      style={[styles.emojiBubbleItem, myEmoji === emoji && styles.emojiBubbleItemActive]}
-                      hitSlop={4}
-                    >
-                      <Text style={styles.emojiButtonText}>{emoji}</Text>
-                    </Pressable>
-                  </Animated.View>
-                ))}
-              </View>
-            )}
-          </View>
-          <Pressable onPress={openReactors} hitSlop={8}>
-            <Text style={[styles.reactionTriggerCount, totalReactions === 0 && styles.footerCountInactive]}>
-              {totalReactions}
-            </Text>
-          </Pressable>
-        </View>
-
-        {/* Propre à une Question : compteur de réponses, visible même avant
-            Clôture — jamais leur contenu (voir `answer_count`). Répondre se
-            fait juste au-dessus, directement sur la carte
-            (`InlineQuestionAnswer`), pas depuis ce compteur. */}
-        {isQuestion && (
-          <View style={styles.answersRow}>
-            <View style={styles.iconSlot}>
-              <Users
-                size={18}
-                color={item.answer_count > 0 ? colors.text : colors.footerIconInactive}
-                strokeWidth={1.75}
-              />
-            </View>
-            <Text style={[styles.answersCountText, item.answer_count === 0 && styles.footerCountInactive]}>
-              {item.answer_count}
-            </Text>
+        {/* Bouton « Révéler », réservé à l'auteur d'une carte encore Scellée
+            — rend visible qu'un Predict attend sa révélation. */}
+        {isAuthor && cardState.kind === 'sealed' && (
+          <View style={styles.revealRow}>
+            <Pressable
+              onPress={handleRevealNow}
+              disabled={revealPending}
+              style={({ pressed }) => [styles.revealButton, pressed && styles.revealButtonPressed]}
+            >
+              <Text style={styles.revealButtonText}>{revealPending ? 'Révélation…' : 'Révéler'}</Text>
+            </Pressable>
+            {revealError && <Text style={styles.revealErrorText}>{revealError}</Text>}
           </View>
         )}
-      </View>
+
+        {/* Invite l'auteur à trancher dès que sa prédiction est révélée mais
+            encore en attente de verdict — rien que les deux boutons, aucun
+            texte d'accompagnement : une fois posé, revenir dessus n'est plus
+            possible ici, seulement depuis l'écran détail. Réalisé en accent
+            plein, Manqué en contour neutre — même registre que le tampon,
+            jamais de vert/rouge. */}
+        {!isQuestion && isAuthor && revealed && verdict === null && (
+          <View style={styles.verdictPrompt}>
+            <View style={styles.verdictPromptButtons}>
+              <Pressable
+                onPress={() => handleSetVerdict('realized')}
+                disabled={verdictPending}
+                style={[styles.verdictPromptButton, styles.verdictPromptButtonRealized]}
+              >
+                <Text style={styles.verdictPromptButtonTextOnAccent}>Réalisé</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => handleSetVerdict('missed')}
+                disabled={verdictPending}
+                style={[styles.verdictPromptButton, styles.verdictPromptButtonMissed]}
+              >
+                <Text style={styles.verdictPromptButtonText}>Manqué</Text>
+              </Pressable>
+            </View>
+            {verdictError && <Text style={styles.verdictPromptError}>{verdictError}</Text>}
+          </View>
+        )}
+
+        {/* Répondre sans quitter le Fil — réservé à une Question encore
+            ouverte : plus rien à répondre une fois close, l'écran détail
+            prend le relais (liste des réponses, validation). */}
+        {isQuestion && !revealed && <InlineQuestionAnswer prediction={item} />}
+
+        {/* Fil épuré façon réseau social : les deux interactions sociales,
+            alignées à gauche. Le chiffre s'affiche toujours (y compris à
+            zéro), pas seulement dès la première interaction. */}
+        <View style={styles.footerRow}>
+          <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
+            <View style={styles.iconSlot}>
+              <MessageCircle
+                size={18}
+                color={(commentCount ?? 0) > 0 ? colors.text : colors.footerIconInactive}
+                strokeWidth={1.75}
+                fill={commentsOpen ? colors.text : 'none'}
+              />
+            </View>
+            <Text style={[styles.commentsToggleText, (commentCount ?? 0) === 0 && styles.footerCountInactive]}>
+              {commentCount ?? 0}
+            </Text>
+          </Pressable>
+
+          {/* Discret, façon Facebook : un pouce en filigrane (ou l'emoji déjà
+              choisi) — maintenir le doigt fait apparaître la bulle de
+              réactions au-dessus, la faire glisser dessus en sélectionne une.
+              Le chiffre est un bouton à part : un tap dessus ouvre le détail
+              de qui a réagi avec quoi, sans interférer avec le geste du pouce. */}
+          <View style={styles.reactionTriggerRow}>
+            <View style={styles.reactionTriggerWrap}>
+              <View style={[styles.reactionTrigger, styles.iconSlot]} hitSlop={8} {...panResponder.panHandlers}>
+                {myEmoji ? (
+                  <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
+                ) : (
+                  <ThumbsUp
+                    size={18}
+                    color={totalReactions > 0 ? colors.text : colors.footerIconInactive}
+                    strokeWidth={1.75}
+                  />
+                )}
+              </View>
+
+              {emojiPanelOpen && (
+                <View
+                  ref={panelRef}
+                  style={styles.emojiPanel}
+                  onLayout={() => {
+                    panelRef.current?.measureInWindow((x, y, width, height) => {
+                      panelLayoutRef.current = { x, y, width, height };
+                    });
+                  }}
+                >
+                  {EMOJI_REACTIONS.map((emoji, i) => (
+                    <Animated.View key={emoji} style={{ transform: [{ scale: scaleAnims[i] }] }}>
+                      {/* Un tap direct sur un emoji le sélectionne toujours,
+                          indépendamment du glissé : sans ça, un utilisateur qui
+                          relâche le pouce puis tape un emoji comme un bouton
+                          normal (au lieu de glisser sans relâcher, à la
+                          Facebook) ne déclenchait jamais rien. */}
+                      <Pressable
+                        onPress={() => handleEmojiPress(emoji)}
+                        style={[styles.emojiBubbleItem, myEmoji === emoji && styles.emojiBubbleItemActive]}
+                        hitSlop={4}
+                      >
+                        <Text style={styles.emojiButtonText}>{emoji}</Text>
+                      </Pressable>
+                    </Animated.View>
+                  ))}
+                </View>
+              )}
+            </View>
+            <Pressable onPress={openReactors} hitSlop={8}>
+              <Text style={[styles.reactionTriggerCount, totalReactions === 0 && styles.footerCountInactive]}>
+                {totalReactions}
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Propre à une Question : compteur de réponses, visible même avant
+              Clôture — jamais leur contenu. Répondre se fait juste au-dessus,
+              directement sur la carte (`InlineQuestionAnswer`). */}
+          {isQuestion && (
+            <View style={styles.answersRow}>
+              <View style={styles.iconSlot}>
+                <Users
+                  size={18}
+                  color={item.answer_count > 0 ? colors.text : colors.footerIconInactive}
+                  strokeWidth={1.75}
+                />
+              </View>
+              <Text style={[styles.answersCountText, item.answer_count === 0 && styles.footerCountInactive]}>
+                {item.answer_count}
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
 
       {commentsOpen && (
@@ -783,15 +878,9 @@ export function PredictionCard({
         />
       )}
 
-      {/* Menu de gestion (favoris / masquer / supprimer) — déplacé ici
-          depuis le pied de carte, qui ne garde plus que les réactions
-          sociales. Ouvert depuis le bouton ••• de l'en-tête. */}
-      <Modal
-        visible={menuOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setMenuOpen(false)}
-      >
+      {/* Menu de gestion (favoris / masquer / supprimer) — ouvert depuis le
+          bouton ••• de l'en-tête. */}
+      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
         <Pressable style={styles.modalOverlay} onPress={() => setMenuOpen(false)}>
           <Pressable style={styles.cardMenuBox} onPress={() => {}}>
             <Pressable
@@ -803,13 +892,11 @@ export function PredictionCard({
             >
               <Star
                 size={18}
-                color={isFavorite ? colors.gold : colors.icon}
-                fill={isFavorite ? colors.gold : 'none'}
+                color={isFavorite ? colors.accent : colors.icon}
+                fill={isFavorite ? colors.accent : 'none'}
                 strokeWidth={1.75}
               />
-              <Text style={styles.cardMenuRowText}>
-                {isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
-              </Text>
+              <Text style={styles.cardMenuRowText}>{isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}</Text>
             </Pressable>
 
             <Pressable
@@ -843,12 +930,7 @@ export function PredictionCard({
         </Pressable>
       </Modal>
 
-      <Modal
-        visible={reactorsOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setReactorsOpen(false)}
-      >
+      <Modal visible={reactorsOpen} transparent animationType="fade" onRequestClose={() => setReactorsOpen(false)}>
         <Pressable style={styles.modalOverlay} onPress={() => setReactorsOpen(false)}>
           <Pressable style={styles.reactorsBox} onPress={() => {}}>
             <Text style={styles.reactorsTitle}>Réactions</Text>
@@ -876,165 +958,158 @@ export function PredictionCard({
   );
 }
 
+const stampStyles = StyleSheet.create({
+  stamp: {
+    position: 'absolute',
+    top: -14,
+    right: -6,
+    width: 72,
+    height: 72,
+    borderRadius: 999,
+    borderWidth: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '-14deg' }],
+    opacity: 0.92,
+    zIndex: 3,
+  },
+  stampText: {
+    fontFamily: fonts.sansBold,
+    fontSize: 11,
+    letterSpacing: 0.4,
+    textAlign: 'center',
+    lineHeight: 13,
+  },
+});
+
 function createStyles(colors: Colors) {
   return StyleSheet.create({
   cardPressed: { opacity: 0.85 },
-  // Fond anthracite distinct du fond de page quasi-noir, fine bordure
-  // blanche à faible opacité par défaut (état Scellé) — Predict/Réalisé/
-  // Manqué reprennent cette même bordure en néon (`cardActive`/`cardRealized`
-  // /`cardMissed`) plutôt qu'un aplat de couleur vive en fond ou en en-tête.
+  // Papier, fine bordure encre à faible opacité — l'enveloppe (rabat + cachet
+  // ou lettre) porte tout le langage visuel de statut, plus aucun contour de
+  // couleur par état.
   card: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.xl,
-    padding: 18,
+    borderRadius: radius.card,
     marginBottom: 12,
     backgroundColor: colors.surface,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 14,
+    elevation: 3,
     // Web uniquement : sans ça, glisser le pouce vers un emoji du panneau
     // sélectionne le texte de la carte au passage, ce qui coupe le geste
     // (`onPanResponderTerminate`) au lieu de faire glisser la sélection
     // d'emoji comme sur Facebook.
     ...(Platform.OS === 'web' ? { userSelect: 'none' } : null),
   },
-  // Scellé et En cours : plus de bordure ni de lueur dorées — un contour
-  // gris neutre, sans glow, tout comme l'étiquette elle-même (texte +
-  // cadenas, voir `stateLabel`/`Lock` plus bas) : ces deux états d'attente
-  // ne portent plus aucune couleur vive, réservée aux deux verdicts.
-  cardSealed: {
-    borderColor: colors.cardBorderNeutral,
-  },
-  cardActive: {
-    borderColor: colors.cardBorderNeutral,
-  },
-  // Réalisé : bordure verte néon — la lueur (shadow*) est appliquée à part,
-  // dans le composant, colocalisée avec les valeurs animées de la pulsation
-  // de renforcement (react-native-web recompose mal un `box-shadow` dont
-  // les quatre propriétés viendraient de deux styles différents).
-  cardRealizedBorder: {
-    borderColor: colors.neonGreen,
-  },
-  // Manqué, l'élément clé du site, garde son contour néon + lueur externe
-  // (`shadow*` — se traduit en `box-shadow` sur le web, `elevation` sur
-  // Android n'en reprend que l'ombre portée, sans teinte colorée).
-  cardMissed: {
-    borderColor: colors.neonRed,
-    shadowColor: colors.neonRed,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.55,
-    shadowRadius: 14,
-    elevation: 10,
-  },
-  // Une Question garde son accent dédié en permanence, ouverte ou close —
-  // contrairement à Scellé → Réalisé/Manqué (neutre puis néon), ce n'est pas
-  // un statut qui évolue mais un type de carte à part entière.
-  cardQuestion: {
-    borderColor: colors.questionAccent,
-  },
-  // Non lue : fine bordure lumineuse + fond très légèrement teinté, assez
-  // discret pour ne pas jurer avec le reste de la charte sombre/jaune.
-  // Toujours appliquée en dernier : elle prime sur la couleur néon de l'état
-  // — signaler « pas encore vue » reste plus urgent que le statut lui-même.
+  // Non lue : liseré d'accent + fond très légèrement teinté, assez discret
+  // pour ne pas jurer avec le reste de la charte parchemin/bordeaux.
   cardUnseen: {
-    borderColor: colors.gold,
-    backgroundColor: colors.goldSoft,
+    borderColor: colors.accent,
+    backgroundColor: colors.accentSoft,
   },
-  // Libellé d'état sur sa propre ligne, au-dessus de [avatar][pseudo] —
-  // jamais inline dans l'en-tête, où il disputerait la largeur au pseudo.
-  stateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6, marginBottom: 10 },
-  // Scellé et En cours partagent le même libellé gris neutre, assorti au
-  // contour de la carte (voir `cardSealed`/`cardActive`) — plus aucune
-  // couleur vive pour ces deux états d'attente.
+  // Libellé d'état au-dessus de l'enveloppe, dans le padding de la carte —
+  // seul endroit avec le pied de carte à garder un padding horizontal, tout
+  // le reste (rabat, lettre) va bord à bord.
+  stateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 6,
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 8,
+  },
   stateLabel: {
     fontFamily: fonts.label,
     fontSize: 11,
-    letterSpacing: 1.2,
+    letterSpacing: 1.1,
     textTransform: 'uppercase',
-    color: colors.cardBorderNeutral,
+    color: colors.textFaint,
   },
-  stateLabelQuestion: { color: colors.questionAccent },
-  stateLabelQuestionCorrect: { color: colors.neonGreen },
+  stateLabelAccent: { color: colors.accent },
   // Corps de carte assourdi une fois Manquée — jamais le badge d'état,
   // rendu séparément avant ce conteneur et donc toujours à `opacity: 1`.
   cardBodyMissed: { opacity: 0.85 },
-  headerMenuButton: { padding: 2 },
-  // Bouton « Révéler », sous l'étiquette « Scellé » — même registre que les
-  // boutons Réalisé/Manqué proposés plus bas (contour fin, pas un aplat),
-  // en jaune plutôt qu'en vert/rouge puisque rien n'est encore tranché.
-  revealRow: { alignItems: 'flex-end', marginBottom: 10 },
-  revealButton: {
-    borderWidth: 1,
-    borderColor: colors.gold,
-    borderRadius: radius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: colors.goldSoft,
-  },
-  revealButtonPressed: { opacity: 0.7 },
-  revealButtonText: { fontFamily: fonts.label, fontSize: 12, fontWeight: '700', color: colors.gold },
-  revealErrorText: { fontSize: 11, color: colors.danger, marginTop: 6, textAlign: 'right' },
-  // Invite l'auteur à trancher — au-dessus de la carte tappable, jamais
-  // dedans, pour qu'un tap sur un bouton ne navigue jamais aussi vers le
-  // détail (`onPress` de la `Pressable` qui suit). Rien que les deux
-  // boutons, alignés à droite comme le reste des compléments de carte
-  // (bulle de révélation, tampon) — aucun texte d'accompagnement.
-  verdictPrompt: { marginBottom: 12 },
-  verdictPromptButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
-  verdictPromptButton: {
-    borderWidth: 1,
-    borderRadius: radius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  // Vert/rouge conservés ici (boutons d'action, distincts du contour de
-  // carte une fois le verdict posé — voir `cardRealized`/`cardMissed`) : le
-  // choix à trancher doit rester net.
-  verdictPromptButtonRealized: {
-    borderColor: colors.neonGreen,
-    backgroundColor: 'rgba(0, 230, 118, 0.12)',
-  },
-  verdictPromptButtonMissed: {
-    borderColor: colors.neonRed,
-    backgroundColor: 'rgba(255, 23, 68, 0.12)',
-  },
-  verdictPromptButtonText: { fontFamily: fonts.label, fontSize: 12, fontWeight: '700', color: colors.text },
-  verdictPromptError: { fontSize: 11, color: colors.danger, marginTop: 6, textAlign: 'right' },
-  // Tout sur une seule ligne : [avatar 32][pseudo] ...espace flexible...
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
-  headerSpacer: { flex: 1, minWidth: 8 },
-  // `flexShrink` sur le bloc auteur ET sur le pseudo : c'est le pseudo qui se
-  // tronque avec ellipse si la place manque.
-  authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, minWidth: 0 },
-  authorName: { fontFamily: fonts.bodyEmphasis, fontSize: 16, color: colors.icon, flexShrink: 1, minWidth: 0 },
-  // Sur sa propre ligne, sous l'en-tête — jamais accolée au pseudo.
-  mentionTag: { fontSize: 12, fontWeight: '500', color: colors.textMuted, marginTop: -4, marginBottom: 10 },
-  // Secondaire : simple amorce au-dessus de la vraie prédiction, jamais
-  // l'élément qu'on retient de la carte — même registre mono/tracké que la
-  // signalétique d'état, pour rester discret. `letterSpacing` + majuscules
-  // plutôt que la graisse : c'est ce qui la distingue du corps, pas son poids.
-  cardTeaser: {
-    fontFamily: fonts.label,
-    fontSize: 15,
-    color: colors.textFaint,
+  // L'enveloppe : rabat (SVG) + soit le cachet, soit la lettre qui en sort.
+  // `position: relative` pour que le cachet (absolu) se positionne par
+  // rapport à ce conteneur, pas par rapport à toute la carte.
+  envelope: { position: 'relative' },
+  letter: {
+    alignSelf: 'center',
+    width: '62%',
+    marginTop: -LETTER_OVERLAP,
     marginBottom: 4,
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+    gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    elevation: 6,
   },
-  // La vraie prédiction est le cœur de la carte : plus grande, plus foncée,
-  // en gras marqué — nette dès qu'elle est lisible (`cardContentBlurred` la
-  // couvre d'un flou tant que ce n'est pas le cas).
-  cardContent: {
+  // Un peu plus étroite quand un tampon déborde sur son coin, pour ne jamais
+  // le laisser hors du cadre de la carte.
+  letterWithStamp: { marginRight: 26 },
+  letterHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  letterAuthor: { fontFamily: fonts.label, fontSize: 11, letterSpacing: 0.6, color: colors.textFaint, flexShrink: 1 },
+  letterCounter: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+    backgroundColor: colors.border,
+  },
+  letterCounterText: { fontFamily: fonts.sansBold, fontSize: 10, color: colors.textMuted },
+  letterQuestionText: {
+    fontFamily: fonts.serifItalic,
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.textFaint,
+    marginTop: 4,
+  },
+  // La vraie prédiction est le cœur de la lettre : Spectral, semi-gras, bien
+  // plus grande que le reste de l'interface — nette dès qu'elle est lisible
+  // (`letterContentBlurred` la couvre d'un flou tant que ce n'est pas le cas).
+  letterContent: {
     fontFamily: fonts.bodyEmphasis,
-    fontSize: 18,
+    fontSize: 16,
+    lineHeight: 22,
     color: colors.text,
-    lineHeight: 25,
+    marginTop: 4,
   },
-  // Le texte reste bien affiché (jamais remplacé par un faux contenu), mais
-  // flouté tant que non révélée — matérialise le secret sans le masquer.
-  // `filter` n'existe que sur le web (RN Web le laisse passer tel quel vers
-  // le CSS) ; à défaut sur natif, une opacité très faible approche le même
-  // effet d'illisibilité.
-  cardContentBlurred: Platform.select({
+  letterContentBlurred: Platform.select({
     web: { filter: 'blur(5px)' } as object,
     default: { opacity: 0.15 },
   }),
+  // Zone sous l'enveloppe : auteur, mentions, teaser (Scellée uniquement).
+  body: { paddingHorizontal: 18, paddingTop: 12 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerSpacer: { flex: 1, minWidth: 8 },
+  headerMenuButton: { padding: 2 },
+  // `flexShrink` sur le bloc auteur ET sur le pseudo : c'est le pseudo qui se
+  // tronque avec ellipse si la place manque.
+  authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, minWidth: 0 },
+  authorName: { fontFamily: fonts.bodyEmphasis, fontSize: 16, color: colors.text, flexShrink: 1, minWidth: 0 },
+  // Sur sa propre ligne, sous l'en-tête — jamais accolée au pseudo.
+  mentionTag: { fontSize: 12, fontWeight: '500', color: colors.textMuted, marginTop: 6 },
+  // Secondaire, à l'italique — c'est tout ce qu'affiche l'enveloppe scellée
+  // dans le fil, avant révélation (la vraie prédiction n'apparaît que dans
+  // la lettre, une fois ouverte).
+  cardTeaser: {
+    fontFamily: fonts.serifItalic,
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.textFaint,
+    marginTop: 6,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
@@ -1042,13 +1117,71 @@ function createStyles(colors: Colors) {
     alignItems: 'center',
     padding: 24,
   },
+  // Bouton « Révéler », sous l'enveloppe Scellée — contour fin, pas un aplat,
+  // même registre que le bouton Manqué proposé plus bas.
+  revealRow: { alignItems: 'flex-end', paddingHorizontal: 18, marginTop: 10 },
+  revealButton: {
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: radius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: colors.accentSoft,
+  },
+  revealButtonPressed: { opacity: 0.7 },
+  revealButtonText: { fontFamily: fonts.label, fontSize: 12, fontWeight: '700', color: colors.accent },
+  revealErrorText: { fontSize: 11, color: colors.danger, marginTop: 6, textAlign: 'right' },
+  // Invite l'auteur à trancher — rien que les deux boutons, alignés à droite.
+  // Réalisé en accent plein (comme le bouton « Sceller »), Manqué en contour
+  // neutre — le choix à trancher doit rester net, sans code couleur vert/rouge.
+  verdictPrompt: { paddingHorizontal: 18, marginTop: 10 },
+  verdictPromptButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
+  verdictPromptButton: {
+    borderWidth: 1,
+    borderRadius: radius.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  verdictPromptButtonRealized: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accent,
+  },
+  verdictPromptButtonMissed: {
+    borderColor: colors.border,
+    backgroundColor: 'transparent',
+  },
+  verdictPromptButtonText: { fontFamily: fonts.label, fontSize: 12, fontWeight: '700', color: colors.text },
+  verdictPromptButtonTextOnAccent: { fontFamily: fonts.label, fontSize: 12, fontWeight: '700', color: colors.textOnAccent },
+  verdictPromptError: { fontSize: 11, color: colors.danger, marginTop: 6, textAlign: 'right' },
+  // Fil épuré façon réseau social : les deux blocs restants (commentaire,
+  // réaction) packés à gauche avec un espacement modeste.
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 20,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 16,
+  },
+  // Boîte identique (taille + centrage) pour les icônes du pied de carte.
+  iconSlot: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
+  commentsToggle: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  // Toujours affiché, y compris à zéro — encre dès qu'il y a au moins une
+  // interaction, teinte discrète sinon (voir `footerCountInactive`).
+  commentsToggleText: { fontSize: 13, fontWeight: '700', color: colors.text },
+  reactionTriggerWrap: { position: 'relative' },
+  reactionTriggerRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  reactionTrigger: { flexDirection: 'row', alignItems: 'center' },
+  reactionTriggerEmoji: { fontSize: 17 },
+  reactionTriggerCount: { fontSize: 13, fontWeight: '700', color: colors.text },
+  footerCountInactive: { color: colors.footerIconInactive },
+  answersRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  answersCountText: { fontSize: 13, fontWeight: '700', color: colors.text },
   // Une seule « grande bulle », façon Facebook — flottante au-dessus du
   // pouce (pas en dessous) pour ne pas être masquée par le doigt qui la
   // fait glisser, et pas des puces séparées.
-  // Centrée sur le pouce lui-même (`reactionTriggerWrap` ne contient plus que
-  // l'icône, plus le compteur) : un ancrage par le bord droit débordait hors
-  // du cadre à gauche, le pouce étant au centre de la carte.
-  // 12 réactions ne tiennent plus sur une seule rangée : `flexWrap` bascule
+  // 12 réactions ne tiennent pas sur une seule rangée : `flexWrap` bascule
   // sur 2 rangées de `EMOJI_COLUMNS`, un rectangle arrondi plutôt qu'une
   // pilule (qui n'a de sens que sur une seule ligne).
   emojiPanel: {
@@ -1064,7 +1197,7 @@ function createStyles(colors: Colors) {
     alignItems: 'center',
     justifyContent: 'space-between',
     rowGap: 6,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceRaised,
     borderRadius: radius.xl,
     borderWidth: 1,
     borderColor: colors.border,
@@ -1083,33 +1216,8 @@ function createStyles(colors: Colors) {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emojiBubbleItemActive: { backgroundColor: colors.goldSoft },
+  emojiBubbleItemActive: { backgroundColor: colors.accentSoft },
   emojiButtonText: { fontSize: 20 },
-  // Fil épuré façon réseau social : les deux blocs restants (commentaire,
-  // réaction) packés à gauche avec un espacement modeste, plus le
-  // `space-between` sur toute la largeur qui n'a plus lieu d'être une fois
-  // favoris/masquer/supprimer partis dans le menu ••• de l'en-tête.
-  footerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: 20,
-    marginTop: 10,
-  },
-  // Boîte identique (taille + centrage) pour les icônes du pied de carte.
-  iconSlot: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
-  commentsToggle: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  // Toujours affiché, y compris à zéro — noir dès qu'il y a au moins une
-  // interaction, zinc discret sinon (voir `footerCountInactive`).
-  commentsToggleText: { fontSize: 13, fontWeight: '700', color: colors.text },
-  reactionTriggerWrap: { position: 'relative' },
-  reactionTriggerRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  reactionTrigger: { flexDirection: 'row', alignItems: 'center' },
-  reactionTriggerEmoji: { fontSize: 17 },
-  reactionTriggerCount: { fontSize: 13, fontWeight: '700', color: colors.text },
-  footerCountInactive: { color: colors.footerIconInactive },
-  answersRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  answersCountText: { fontSize: 13, fontWeight: '700', color: colors.text },
   // Menu ••• de gestion (favoris / masquer / supprimer), ouvert depuis
   // l'en-tête — même registre visuel que `reactorsBox` (boîte centrée sur
   // fond assombri).
@@ -1117,7 +1225,7 @@ function createStyles(colors: Colors) {
     width: '100%',
     maxWidth: 260,
     borderRadius: 16,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceRaised,
     borderWidth: 1,
     borderColor: colors.border,
     paddingVertical: 6,
@@ -1141,7 +1249,7 @@ function createStyles(colors: Colors) {
     width: '100%',
     maxWidth: 320,
     borderRadius: 16,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceRaised,
     borderWidth: 1,
     borderColor: colors.border,
     paddingVertical: 14,

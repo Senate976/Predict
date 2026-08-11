@@ -693,7 +693,7 @@ function createStyles(colors: Colors) {
     borderBottomColor: 'transparent',
     marginBottom: -1,
   },
-  tabActive: { borderBottomColor: colors.gold },
+  tabActive: { borderBottomColor: colors.accent },
   tabText: {
     fontFamily: fonts.sansBold,
     fontSize: 12,

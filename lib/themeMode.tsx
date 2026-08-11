@@ -19,7 +19,10 @@ const ThemeModeContext = createContext<{
 } | null>(null);
 
 export function ThemeModeProvider({ children }: PropsWithChildren) {
-  const [mode, setModeState] = useState<ThemeMode>('dark');
+  // « Le pli » est d'abord une identité claire (parchemin/encre/cire) — la
+  // sombre reste une option dans Paramètres > Apparence, mais n'est plus la
+  // valeur par défaut à la première ouverture.
+  const [mode, setModeState] = useState<ThemeMode>('light');
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((stored) => {

@@ -108,7 +108,9 @@ export default function FriendProfileScreen() {
               <Text style={styles.username}>{profile.username}</Text>
             </View>
 
-            <View style={[styles.prediscoreCard, styles.sectionSpacing]}>
+            {/* La barre de Prediscore vient directement sous les infos du
+                profil, à 50% de la largeur — plus de carte séparée autour. */}
+            <View style={[styles.prediscoreWrap, styles.sectionSpacing]}>
               {!prediscoreLoaded ? (
                 <ActivityIndicator color={colors.text} style={styles.loader} />
               ) : prediscoreError ? (
@@ -121,9 +123,6 @@ export default function FriendProfileScreen() {
               )}
             </View>
 
-            <Text style={[styles.eyebrow, styles.sectionSpacing]}>
-              <PredictWord />
-            </Text>
             {stats === null ? (
               <ActivityIndicator color={colors.text} style={styles.loader} />
             ) : (
@@ -144,7 +143,7 @@ export default function FriendProfileScreen() {
                 </View>
                 <View style={styles.statCard}>
                   <Text style={styles.statValue}>{stats.pending}</Text>
-                  <Text style={styles.statLabel}>En cours</Text>
+                  <Text style={styles.statLabel}>Scellées</Text>
                 </View>
               </View>
             )}
@@ -207,15 +206,8 @@ function createStyles(colors: Colors) {
     alignItems: 'center',
   },
   username: { fontFamily: fonts.bodyEmphasis, fontSize: 22, color: colors.text, marginTop: 10 },
-  prediscoreCard: {
-    paddingVertical: 24,
-    borderRadius: radius.xl,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-  },
-  statsRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  prediscoreWrap: { width: '50%', minWidth: 180, alignSelf: 'center' },
+  statsRow: { flexDirection: 'row', gap: 8, marginTop: spacing.lg },
   statCard: {
     flex: 1,
     paddingVertical: 16,

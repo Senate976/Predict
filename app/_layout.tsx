@@ -1,9 +1,10 @@
+import { Archivo_400Regular, Archivo_500Medium, Archivo_600SemiBold, Archivo_700Bold } from '@expo-google-fonts/archivo';
 import {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-} from '@expo-google-fonts/inter';
+  Spectral_400Regular,
+  Spectral_400Regular_Italic,
+  Spectral_600SemiBold,
+  Spectral_700Bold,
+} from '@expo-google-fonts/spectral';
 import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -11,7 +12,7 @@ import { useEffect, useMemo } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { AuthProvider, useAuth } from '../lib/auth';
-import { darkColors, type Colors } from '../lib/theme';
+import { lightColors, type Colors } from '../lib/theme';
 import { ThemeModeProvider, useColors, useThemeMode } from '../lib/themeMode';
 
 function RootNavigator() {
@@ -56,25 +57,29 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
-  // Chargée ici, une fois : le nom de police passé à useFonts (la clé de cet
-  // objet) doit correspondre exactement à `fonts.body` dans lib/theme.ts,
-  // sinon React Native retombe silencieusement sur la police système sans
-  // avertir. Une seule famille (Inter) en 4 graisses — plus aucune serif ni
-  // monospace à charger.
+  // Chargée ici, une fois : chaque nom de police passé à useFonts (la clé de
+  // cet objet) doit correspondre exactement à une valeur de `fonts` dans
+  // lib/theme.ts, sinon React Native retombe silencieusement sur la police
+  // système sans avertir. Deux familles : Spectral (écrit — titres, corps de
+  // prédiction) et Archivo (interface — boutons, labels, onglets).
   const [fontsLoaded] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
+    Spectral_400Regular,
+    Spectral_400Regular_Italic,
+    Spectral_600SemiBold,
+    Spectral_700Bold,
+    Archivo_400Regular,
+    Archivo_500Medium,
+    Archivo_600SemiBold,
+    Archivo_700Bold,
   });
 
   if (!fontsLoaded) {
     // Rendu avant même `ThemeModeProvider` (la préférence n'est pas encore
-    // chargée) — palette sombre fixe pour cette brève amorce, pas de
-    // `useColors()` possible ici.
+    // chargée) — palette claire fixe pour cette brève amorce (c'est la
+    // palette par défaut de l'app), pas de `useColors()` possible ici.
     return (
       <View style={splashStyles.loader}>
-        <ActivityIndicator size="large" color={darkColors.text} />
+        <ActivityIndicator size="large" color={lightColors.text} />
       </View>
     );
   }
@@ -89,7 +94,7 @@ export default function RootLayout() {
 }
 
 const splashStyles = StyleSheet.create({
-  loader: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: darkColors.background },
+  loader: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: lightColors.background },
 });
 
 function createStyles(colors: Colors) {

@@ -14,6 +14,7 @@ import { Text } from '../../../components/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
+import { EnvelopeIcon, envelopeVariantForNotificationType } from '../../../components/EnvelopeIcon';
 import { PredictWord } from '../../../components/PredictWord';
 import { useAuth } from '../../../lib/auth';
 import { formatTimeAgo } from '../../../lib/datetime';
@@ -292,7 +293,9 @@ export default function NotificationsScreen() {
                     {selected && <Check size={12} color={colors.background} strokeWidth={2.5} />}
                   </View>
                 ) : (
-                  !notification.is_read && <View style={styles.dot} />
+                  <View style={styles.iconSlot}>
+                    <EnvelopeIcon variant={envelopeVariantForNotificationType(notification.type)} />
+                  </View>
                 )}
                 <View style={styles.rowText}>
                   <Text style={styles.label}>{notificationLabel(notification)}</Text>
@@ -400,15 +403,9 @@ function createStyles(colors: Colors) {
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  rowUnread: { backgroundColor: colors.goldSoft },
+  rowUnread: { backgroundColor: colors.accentSoft },
   rowPressed: { opacity: 0.7 },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.gold,
-    marginTop: 6,
-  },
+  iconSlot: { marginTop: 1 },
   checkbox: {
     width: 20,
     height: 20,
@@ -419,7 +416,7 @@ function createStyles(colors: Colors) {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxChecked: { backgroundColor: colors.gold, borderColor: colors.gold },
+  checkboxChecked: { backgroundColor: colors.accent, borderColor: colors.accent },
   rowText: { flex: 1, paddingRight: 26 },
   deleteButton: { position: 'absolute', right: 14, bottom: 14 },
   label: { fontSize: 14, fontWeight: '600', color: colors.text },

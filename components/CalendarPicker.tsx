@@ -210,12 +210,12 @@ function createStyles(colors: Colors) {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cellSelected: { backgroundColor: colors.gold, borderRadius: 999 },
+  cellSelected: { backgroundColor: colors.accent, borderRadius: 999 },
   cellText: { fontSize: 14, color: colors.text },
   cellTextMuted: { color: colors.border },
   cellTextDisabled: { color: colors.border },
   cellTextToday: { color: colors.text, fontWeight: '700', textDecorationLine: 'underline' },
   // Texte noir sur la pastille jaune du jour sélectionné — du blanc y serait peu lisible.
-  cellTextSelected: { color: colors.textOnGold, fontWeight: '700' },
+  cellTextSelected: { color: colors.textOnAccent, fontWeight: '700' },
   });
 }

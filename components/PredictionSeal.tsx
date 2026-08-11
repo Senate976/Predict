@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import { Animated, Modal, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 
-import { fonts } from '../lib/theme';
+import { fonts, wax } from '../lib/theme';
 import { PredictWord } from './PredictWord';
 
 type Props = {
@@ -121,7 +121,7 @@ export function PredictionSeal({ visible, onFinish }: Props) {
             <View style={[styles.drip, styles.drip3]} />
 
             <LinearGradient
-              colors={['#A63A4C', '#5C1420', '#3D0D16']}
+              colors={wax}
               start={{ x: 0.22, y: 0.1 }}
               end={{ x: 0.85, y: 1 }}
               style={styles.sealBase}
@@ -188,13 +188,13 @@ const styles = StyleSheet.create({
     width: SEAL_SIZE + 8,
     height: SEAL_SIZE + 8,
     borderRadius: (SEAL_SIZE + 8) / 2,
-    backgroundColor: '#26060B',
+    backgroundColor: wax[3],
     top: 5,
   },
   drip: {
     position: 'absolute',
     borderRadius: 999,
-    backgroundColor: '#5C1420',
+    backgroundColor: wax[2],
   },
   drip1: { width: 18, height: 16, bottom: -6, left: 12 },
   drip2: { width: 13, height: 12, bottom: -8, left: 42 },
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
   ornamentLeft: { left: 8, top: '48%' },
   ornamentRight: { right: 8, top: '48%' },
   emblem: {
-    fontFamily: fonts.body,
+    fontFamily: fonts.display,
     fontSize: 34,
     color: '#C9A66B',
   },

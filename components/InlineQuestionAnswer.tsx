@@ -181,28 +181,28 @@ function createStyles(colors: Colors) {
       backgroundColor: colors.surfaceRaised,
     },
     // Contour plutôt qu'aplat, même registre que le reste des actions liées
-    // aux Questions : pas de fond plein hors du jaune (réservé au FAB/CTA
-    // principal). `flexShrink: 0` : garde toujours sa taille pleine, c'est
-    // l'input qui doit céder la place, jamais ce bouton.
+    // aux Questions : pas de fond plein hors de l'accent bordeaux (réservé au
+    // FAB/CTA principal). `flexShrink: 0` : garde toujours sa taille pleine,
+    // c'est l'input qui doit céder la place, jamais ce bouton.
     sendButton: {
       flexShrink: 0,
       borderWidth: 1,
-      borderColor: colors.questionAccent,
+      borderColor: colors.accent,
       borderRadius: radius.pill,
       paddingHorizontal: 14,
       paddingVertical: 9,
     },
     sendButtonDisabled: { opacity: 0.5 },
-    sendButtonText: { fontSize: 13, fontWeight: '700', color: colors.questionAccent },
+    sendButtonText: { fontSize: 13, fontWeight: '700', color: colors.accent },
     optionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     optionChoice: {
       borderWidth: 1,
-      borderColor: colors.questionAccent,
+      borderColor: colors.accent,
       borderRadius: radius.pill,
       paddingHorizontal: 12,
       paddingVertical: 7,
     },
-    optionChoiceText: { fontSize: 13, fontWeight: '700', color: colors.questionAccent },
+    optionChoiceText: { fontSize: 13, fontWeight: '700', color: colors.accent },
     answeredLabel: { fontSize: 13, color: colors.textMuted },
     answeredValue: { fontWeight: '700', color: colors.text },
   });

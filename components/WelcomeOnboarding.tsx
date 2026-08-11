@@ -123,12 +123,12 @@ function createStyles(colors: Colors) {
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 1,
   },
-  stepNumberText: { color: colors.textOnGold, fontSize: 13, fontWeight: '700' },
+  stepNumberText: { color: colors.textOnAccent, fontSize: 13, fontWeight: '700' },
   stepText: { flex: 1, fontSize: 15, color: colors.text, lineHeight: 21 },
   body: {
     fontSize: 15,
@@ -144,12 +144,12 @@ function createStyles(colors: Colors) {
     marginBottom: spacing.lg,
   },
   cta: {
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
     borderRadius: radius.sm,
     paddingVertical: 16,
     alignItems: 'center',
   },
-  ctaPressed: { backgroundColor: colors.goldBright },
-  ctaText: { color: colors.textOnGold, fontSize: 16, fontWeight: '700' },
+  ctaPressed: { backgroundColor: colors.accentBright },
+  ctaText: { color: colors.textOnAccent, fontSize: 16, fontWeight: '700' },
   });
 }

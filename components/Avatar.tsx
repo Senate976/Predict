@@ -38,7 +38,7 @@ export function Avatar({
 function createStyles(colors: Colors) {
   return StyleSheet.create({
     image: { backgroundColor: colors.border },
-    fallback: { backgroundColor: colors.goldSoft, alignItems: 'center', justifyContent: 'center' },
+    fallback: { backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
     fallbackText: { color: colors.text, fontWeight: '700' },
   });
 }

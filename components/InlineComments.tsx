@@ -255,7 +255,7 @@ function createStyles(colors: Colors) {
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
-    backgroundColor: colors.goldSoft,
+    backgroundColor: colors.accentSoft,
     borderRadius: radius.sm,
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -277,11 +277,11 @@ function createStyles(colors: Colors) {
     maxHeight: 80,
   },
   send: {
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
     borderRadius: radius.pill,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  sendText: { color: colors.textOnGold, fontSize: 12, fontWeight: '700' },
+  sendText: { color: colors.textOnAccent, fontSize: 12, fontWeight: '700' },
   });
 }

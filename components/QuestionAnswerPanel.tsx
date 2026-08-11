@@ -204,10 +204,14 @@ function createStyles(colors: Colors) {
       paddingHorizontal: 10,
       paddingVertical: 5,
     },
-    gradeButtonCorrectActive: { borderColor: colors.neonGreen, backgroundColor: 'rgba(0, 230, 118, 0.12)' },
-    gradeButtonIncorrectActive: { borderColor: colors.neonRed, backgroundColor: 'rgba(255, 23, 68, 0.12)' },
+    // Même registre que les boutons Réalisé/Manqué d'une Déclaration
+    // (`PredictionCard`) : Correcte en accent plein, Incorrecte en contour
+    // neutre — plus de vert/rouge, une seule couleur d'accent dans toute
+    // l'app.
+    gradeButtonCorrectActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+    gradeButtonIncorrectActive: { borderColor: colors.ink, backgroundColor: colors.border },
     gradeButtonText: { fontSize: 11, fontWeight: '700', color: colors.text },
-    verdictCorrect: { fontSize: 16, fontWeight: '700', color: colors.neonGreen },
-    verdictIncorrect: { fontSize: 16, fontWeight: '700', color: colors.neonRed },
+    verdictCorrect: { fontSize: 16, fontWeight: '700', color: colors.accent },
+    verdictIncorrect: { fontSize: 16, fontWeight: '700', color: colors.ink },
   });
 }

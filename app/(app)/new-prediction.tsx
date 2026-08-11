@@ -1,3 +1,4 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRouter } from 'expo-router';
 import { Check } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
@@ -37,7 +38,7 @@ import {
   type PredictionScope,
 } from '../../lib/predictions';
 import { type AnswerFormat, type PredictionType } from '../../lib/questions';
-import { fonts, radius, spacing, type Colors } from '../../lib/theme';
+import { fonts, radius, spacing, wax, type Colors } from '../../lib/theme';
 import { useColors } from '../../lib/themeMode';
 
 type ContentMode = 'text' | 'audio';
@@ -385,6 +386,13 @@ export default function NewPredictionScreen() {
               </Text>
             </Pressable>
           </View>
+          {/* Rappelle la règle du type choisi, pour rester intuitif sans
+              notice — même sous beaucoup de types de contenu différents. */}
+          <Text style={styles.predictTypeHint}>
+            {isQuestion
+              ? 'Tout le monde peut répondre ; les réponses restent masquées jusqu’à la clôture.'
+              : 'Un secret que tu écris et scelles : tes destinataires ne le liront qu’à la révélation.'}
+          </Text>
         </View>
 
         <ScrollView
@@ -394,6 +402,10 @@ export default function NewPredictionScreen() {
           {!isQuestion && (
             <>
               <Text style={styles.label}>Teaser</Text>
+              <Text style={styles.sectionHint}>
+                Une phrase courte, volontairement tronquée — c’est tout ce qu’affiche l’enveloppe scellée dans le
+                fil, avant révélation.
+              </Text>
               <TextInput
                 value={teaser}
                 onChangeText={setTeaser}
@@ -707,11 +719,14 @@ export default function NewPredictionScreen() {
             ]}
           >
             {submitting ? (
-              <ActivityIndicator color={colors.text} />
+              <ActivityIndicator color={colors.textOnAccent} />
             ) : (
-              <Text style={styles.submitText}>
-                Sceller le <PredictWord />
-              </Text>
+              <View style={styles.submitContent}>
+                <LinearGradient colors={wax} start={{ x: 0.25, y: 0.15 }} end={{ x: 0.85, y: 1 }} style={styles.submitSeal} />
+                <Text style={styles.submitText}>
+                  Sceller le <PredictWord />
+                </Text>
+              </View>
             )}
           </Pressable>
         </ScrollView>
@@ -768,7 +783,7 @@ function createStyles(colors: Colors) {
   removeOptionButton: { padding: 8 },
   removeOptionButtonText: { fontSize: 15, color: colors.textFaint, fontWeight: '700' },
   addOptionButton: { paddingVertical: 8, alignSelf: 'flex-start' },
-  addOptionButtonText: { fontSize: 14, fontWeight: '700', color: colors.gold },
+  addOptionButtonText: { fontSize: 14, fontWeight: '700', color: colors.accent },
   counter: { fontSize: 12, color: colors.textFaint, marginTop: 6, textAlign: 'right' },
   counterLow: { color: colors.danger },
   hint: { fontSize: 13, color: colors.textMuted, marginTop: 10, lineHeight: 18 },
@@ -776,21 +791,22 @@ function createStyles(colors: Colors) {
   row: { flexDirection: 'row', gap: 12 },
   timeField: { flex: 1 },
   preview: { fontSize: 14, color: colors.textMuted, marginTop: 14 },
-  // Plus de pilule : un choix parmi plusieurs se marque comme les onglets
-  // À venir/Révélées — un trait noir sous l'option choisie, rien de coloré.
-  scopeRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border },
+  // Onglets en pilules : le choix actif se remplit du même bordeaux que le
+  // reste de l'identité — jamais une couleur différente par type ou par
+  // groupe de réglages, un seul accent dans toute l'app.
+  scopeRow: { flexDirection: 'row', gap: 6 },
   scopeOption: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-    marginBottom: -1,
+    borderRadius: radius.md,
   },
-  scopeOptionActive: { borderBottomColor: colors.text },
-  scopeText: { fontSize: 13, fontWeight: '600', color: colors.textMuted, textAlign: 'center' },
-  scopeTextActive: { color: colors.text, fontWeight: '700' },
+  scopeOptionActive: { backgroundColor: colors.accent },
+  scopeText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.textMuted, textAlign: 'center' },
+  scopeTextActive: { color: colors.textOnAccent },
+  predictTypeHint: { fontSize: 12, lineHeight: 17, color: colors.textFaint, marginTop: 10 },
   revealNowRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   checkbox: {
     width: 20,
@@ -801,7 +817,7 @@ function createStyles(colors: Colors) {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxChecked: { backgroundColor: colors.gold, borderColor: colors.gold },
+  checkboxChecked: { backgroundColor: colors.accent, borderColor: colors.accent },
   revealNowText: { fontSize: 14, fontWeight: '600', color: colors.text },
   friendsBox: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: spacing.md },
   searchLoader: { marginTop: spacing.sm },
@@ -828,7 +844,7 @@ function createStyles(colors: Colors) {
     marginTop: 14,
   },
   submit: {
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
     borderRadius: radius.sm,
     paddingVertical: 15,
     alignItems: 'center',
@@ -836,8 +852,10 @@ function createStyles(colors: Colors) {
     minHeight: 52,
     justifyContent: 'center',
   },
-  submitPressed: { backgroundColor: colors.goldBright },
+  submitPressed: { backgroundColor: colors.accentBright },
   submitDisabled: { opacity: 0.6 },
-  submitText: { color: colors.textOnGold, fontSize: 16, fontWeight: '700' },
+  submitContent: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  submitSeal: { width: 18, height: 18, borderRadius: 9 },
+  submitText: { color: colors.textOnAccent, fontSize: 16, fontWeight: '700' },
   });
 }
