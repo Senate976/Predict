@@ -313,10 +313,11 @@ export default function PredictionDetailScreen() {
             )}
 
             {/* Pour une Question, remplace entièrement le bloc Verdict :
-                formulaire de réponse (ou lien Modifier) avant Clôture, liste
-                des réponses + validation Correcte/Incorrecte après — voir
-                `QuestionAnswerPanel`. Visible à tout le monde, pas seulement
-                à l'auteur (contrairement au Verdict d'une Déclaration). */}
+                formulaire de réponse (définitive, un seul envoi) avant
+                Clôture, liste des réponses + validation Correcte/Incorrecte
+                après — voir `QuestionAnswerPanel`. Visible à tout le monde,
+                pas seulement à l'auteur (contrairement au Verdict d'une
+                Déclaration). */}
             {isQuestion ? (
               <QuestionAnswerPanel
                 prediction={prediction}

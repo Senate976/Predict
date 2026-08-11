@@ -4463,7 +4463,169 @@ left join public.prediction_contents pc on pc.prediction_id = p.id;
 grant select on public.predictions_feed to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 43. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 43. Question : l'auteur peut aussi répondre à sa propre Question
+-- ---------------------------------------------------------------------------
+--
+-- `submit_prediction_answer` (section 42) réservait la réponse à l'audience
+-- (`has_prediction_access`), sur le même principe que les votes — l'auteur
+-- n'y est jamais. Mais répondre à sa propre Question a du sens (l'auteur
+-- devine comme les autres, la validation de justesse à la Clôture reste
+-- inchangée) : on ajoute donc l'auteur comme cas autorisé supplémentaire.
+create or replace function public.submit_prediction_answer(
+  p_prediction_id uuid,
+  p_answer_text text default null,
+  p_option_id uuid default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_type text;
+  v_format text;
+  v_reveal_at timestamptz;
+  v_author_id uuid;
+begin
+  select type, answer_format, reveal_at, author_id into v_type, v_format, v_reveal_at, v_author_id
+  from public.predictions
+  where id = p_prediction_id;
+
+  if v_type is null then
+    raise exception 'Predict introuvable.';
+  end if;
+  if v_type <> 'question' then
+    raise exception 'Seule une Question accepte une réponse.';
+  end if;
+  if v_reveal_at <= now() then
+    raise exception 'Cette Question est déjà close.';
+  end if;
+  if v_author_id <> auth.uid() and not public.has_prediction_access(p_prediction_id, auth.uid()) then
+    raise exception 'Accès refusé à cette Question.';
+  end if;
+
+  if v_format = 'text' then
+    if p_answer_text is null or length(trim(p_answer_text)) = 0 then
+      raise exception 'Réponse vide.';
+    end if;
+    if p_option_id is not null then
+      raise exception 'Cette Question attend une réponse libre, pas une option.';
+    end if;
+  elsif v_format = 'choice' then
+    if p_option_id is null then
+      raise exception 'Choisis une option.';
+    end if;
+    if p_answer_text is not null then
+      raise exception 'Cette Question attend une option, pas une réponse libre.';
+    end if;
+    if not exists (
+      select 1 from public.prediction_answer_options
+      where id = p_option_id and prediction_id = p_prediction_id
+    ) then
+      raise exception 'Option invalide.';
+    end if;
+  end if;
+
+  insert into public.prediction_answers (prediction_id, user_id, answer_text, option_id)
+  values (p_prediction_id, auth.uid(), p_answer_text, p_option_id)
+  on conflict (prediction_id, user_id) do update
+  set answer_text = excluded.answer_text,
+      option_id = excluded.option_id;
+end;
+$$;
+
+-- Signature inchangée (mêmes types de paramètres) : `create or replace`
+-- suffit, pas de `drop function` nécessaire. Revoke/grant réaffirmés par
+-- prudence, sans changement réel.
+revoke all on function public.submit_prediction_answer(uuid, text, uuid) from public;
+grant execute on function public.submit_prediction_answer(uuid, text, uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 44. Une réponse est définitive — ni modification, ni suppression
+-- ---------------------------------------------------------------------------
+--
+-- `submit_prediction_answer` (section 42) faisait un upsert : un second
+-- appel remplaçait la réponse précédente. Ce n'est plus le cas — répondre
+-- une fois de plus sur la même Question est désormais refusé avec un
+-- message clair plutôt qu'un remplacement silencieux. Rien à changer côté
+-- suppression : aucune policy delete n'a jamais existé sur
+-- `prediction_answers` pour `authenticated` (section 42), une réponse n'a
+-- donc jamais pu être supprimée depuis le client.
+create or replace function public.submit_prediction_answer(
+  p_prediction_id uuid,
+  p_answer_text text default null,
+  p_option_id uuid default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_type text;
+  v_format text;
+  v_reveal_at timestamptz;
+  v_author_id uuid;
+begin
+  select type, answer_format, reveal_at, author_id into v_type, v_format, v_reveal_at, v_author_id
+  from public.predictions
+  where id = p_prediction_id;
+
+  if v_type is null then
+    raise exception 'Predict introuvable.';
+  end if;
+  if v_type <> 'question' then
+    raise exception 'Seule une Question accepte une réponse.';
+  end if;
+  if v_reveal_at <= now() then
+    raise exception 'Cette Question est déjà close.';
+  end if;
+  if v_author_id <> auth.uid() and not public.has_prediction_access(p_prediction_id, auth.uid()) then
+    raise exception 'Accès refusé à cette Question.';
+  end if;
+  if exists (
+    select 1 from public.prediction_answers
+    where prediction_id = p_prediction_id and user_id = auth.uid()
+  ) then
+    raise exception 'Tu as déjà répondu à cette Question — une réponse ne peut pas être modifiée.';
+  end if;
+
+  if v_format = 'text' then
+    if p_answer_text is null or length(trim(p_answer_text)) = 0 then
+      raise exception 'Réponse vide.';
+    end if;
+    if p_option_id is not null then
+      raise exception 'Cette Question attend une réponse libre, pas une option.';
+    end if;
+  elsif v_format = 'choice' then
+    if p_option_id is null then
+      raise exception 'Choisis une option.';
+    end if;
+    if p_answer_text is not null then
+      raise exception 'Cette Question attend une option, pas une réponse libre.';
+    end if;
+    if not exists (
+      select 1 from public.prediction_answer_options
+      where id = p_option_id and prediction_id = p_prediction_id
+    ) then
+      raise exception 'Option invalide.';
+    end if;
+  end if;
+
+  -- `on conflict do nothing` reste un filet contre une course improbable
+  -- entre la vérification ci-dessus et cet insert (deux appels quasi
+  -- simultanés) — jamais un mécanisme de mise à jour, désormais.
+  insert into public.prediction_answers (prediction_id, user_id, answer_text, option_id)
+  values (p_prediction_id, auth.uid(), p_answer_text, p_option_id)
+  on conflict (prediction_id, user_id) do nothing;
+end;
+$$;
+
+revoke all on function public.submit_prediction_answer(uuid, text, uuid) from public;
+grant execute on function public.submit_prediction_answer(uuid, text, uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 45. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une

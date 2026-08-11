@@ -1,15 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ActivityIndicator, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
-import { TextInput } from './TextInput';
 
 import {
   fetchAnswerOptions,
   fetchPredictionAnswers,
-  MAX_ANSWER_LENGTH,
-  questionAnswerErrorMessage,
   setAnswerCorrectness,
-  submitPredictionAnswer,
   type PredictionAnswer,
   type PredictionAnswerOption,
 } from '../lib/questions';
@@ -17,15 +13,16 @@ import type { PredictionFeedItem } from '../lib/predictions';
 import { eyebrow, fonts, radius, spacing, type Colors } from '../lib/theme';
 import { useColors } from '../lib/themeMode';
 import { Avatar } from './Avatar';
+import { InlineQuestionAnswer } from './InlineQuestionAnswer';
 
 /**
  * Le cœur d'une carte Question sur l'écran détail — remplace le bloc
  * contenu + Verdict d'une Déclaration (`app/(app)/prediction/[id].tsx`).
  *
- * Avant Clôture : l'auteur ne voit que le compteur (`prediction.answer_count`,
- * jamais le détail des réponses — voir schema.sql section 42) ; un
- * répondant voit un formulaire (texte ou options selon `answer_format`), ou
- * sa propre réponse déjà posée avec un lien pour la modifier.
+ * Avant Clôture : tout le monde peut répondre, auteur inclus
+ * (`InlineQuestionAnswer`) — l'auteur voit en plus le compteur global
+ * (`prediction.answer_count`), jamais le détail des réponses des autres
+ * avant Clôture (voir schema.sql section 42).
  *
  * Après Clôture : tout le monde voit la liste des réponses ; l'auteur y
  * ajoute deux pastilles Correcte/Incorrecte par ligne. Aucun habillage de
@@ -49,14 +46,12 @@ export function QuestionAnswerPanel({
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
+  // Chargées ici (pas dans `InlineQuestionAnswer`, qui n'en a pas besoin
+  // avant Clôture) uniquement pour étiqueter les réponses à choix une fois
+  // la liste affichée ci-dessous.
   const [options, setOptions] = useState<PredictionAnswerOption[] | null>(null);
   const [answers, setAnswers] = useState<PredictionAnswer[] | null>(null);
   const [answersError, setAnswersError] = useState<string | null>(null);
-
-  const [editing, setEditing] = useState(false);
-  const [draftText, setDraftText] = useState(prediction.my_answer_text ?? '');
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
   const [gradingId, setGradingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -87,36 +82,7 @@ export function QuestionAnswerPanel({
     };
   }, [prediction.id, closed]);
 
-  const hasAnswered = prediction.my_answer_text !== null || prediction.my_answer_option_id !== null;
   const optionLabelById = new Map((options ?? []).map((o) => [o.id, o.label]));
-
-  async function handleSubmitText() {
-    const trimmed = draftText.trim();
-    if (!trimmed) return;
-    setSubmitting(true);
-    setSubmitError(null);
-    const { error } = await submitPredictionAnswer(prediction.id, { text: trimmed });
-    setSubmitting(false);
-    if (error) {
-      setSubmitError(questionAnswerErrorMessage(error));
-      return;
-    }
-    setEditing(false);
-    onAnswered?.();
-  }
-
-  async function handleSubmitOption(optionId: string) {
-    setSubmitting(true);
-    setSubmitError(null);
-    const { error } = await submitPredictionAnswer(prediction.id, { optionId });
-    setSubmitting(false);
-    if (error) {
-      setSubmitError(questionAnswerErrorMessage(error));
-      return;
-    }
-    setEditing(false);
-    onAnswered?.();
-  }
 
   async function handleGrade(answerId: string, isCorrect: boolean) {
     setGradingId(answerId);
@@ -182,85 +148,24 @@ export function QuestionAnswerPanel({
     );
   }
 
-  if (isAuthor) {
-    return (
-      <View style={styles.section}>
-        <Text style={styles.eyebrow}>Réponses</Text>
-        <Text style={styles.hint}>
-          {prediction.answer_count === 0
-            ? 'Aucune réponse pour l’instant.'
-            : `${prediction.answer_count} réponse${prediction.answer_count > 1 ? 's' : ''} reçue${prediction.answer_count > 1 ? 's' : ''} pour l’instant — visibles à la Clôture.`}
-        </Text>
-      </View>
-    );
-  }
-
-  if (hasAnswered && !editing) {
-    const label =
-      prediction.my_answer_option_id !== null
-        ? optionLabelById.get(prediction.my_answer_option_id) ?? '…'
-        : prediction.my_answer_text;
-    return (
-      <View style={styles.section}>
-        <Text style={styles.eyebrow}>Ta réponse</Text>
-        <Text style={styles.answerText}>{label}</Text>
-        <Pressable onPress={() => setEditing(true)} hitSlop={4} style={styles.editLink}>
-          <Text style={styles.editLinkText}>Modifier</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.section}>
-      <Text style={styles.eyebrow}>Ta réponse</Text>
-      {submitError && <Text style={styles.error}>{submitError}</Text>}
-      {prediction.answer_format === 'choice' ? (
-        options === null ? (
-          <ActivityIndicator color={colors.text} style={styles.loader} />
-        ) : (
-          options.map((option) => (
-            <Pressable
-              key={option.id}
-              onPress={() => handleSubmitOption(option.id)}
-              disabled={submitting}
-              style={[
-                styles.optionChoice,
-                prediction.my_answer_option_id === option.id && styles.optionChoiceActive,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.optionChoiceText,
-                  prediction.my_answer_option_id === option.id && styles.optionChoiceTextActive,
-                ]}
-              >
-                {option.label}
-              </Text>
-            </Pressable>
-          ))
-        )
-      ) : (
+      {/* L'auteur voit ce compteur global en plus de son propre formulaire
+       * juste en dessous — jamais le détail des réponses des autres avant
+       * Clôture, mais rien ne l'empêche de répondre à sa propre Question
+       * comme n'importe quel destinataire. */}
+      {isAuthor && (
         <>
-          <TextInput
-            value={draftText}
-            onChangeText={setDraftText}
-            placeholder="Ta réponse…"
-            placeholderTextColor={colors.textFaint}
-            multiline
-            editable={!submitting}
-            maxLength={MAX_ANSWER_LENGTH}
-            style={styles.input}
-          />
-          <Pressable
-            onPress={handleSubmitText}
-            disabled={submitting || !draftText.trim()}
-            style={[styles.submitButton, (submitting || !draftText.trim()) && styles.submitButtonDisabled]}
-          >
-            <Text style={styles.submitButtonText}>{submitting ? 'Envoi…' : 'Répondre'}</Text>
-          </Pressable>
+          <Text style={styles.eyebrow}>Réponses</Text>
+          <Text style={styles.hint}>
+            {prediction.answer_count === 0
+              ? 'Aucune réponse pour l’instant.'
+              : `${prediction.answer_count} réponse${prediction.answer_count > 1 ? 's' : ''} reçue${prediction.answer_count > 1 ? 's' : ''} pour l’instant — visibles à la Clôture.`}
+          </Text>
         </>
       )}
+      <Text style={[styles.eyebrow, isAuthor && styles.eyebrowSpaced]}>Ta réponse</Text>
+      <InlineQuestionAnswer prediction={prediction} onAnswered={onAnswered} />
     </View>
   );
 }
@@ -269,6 +174,7 @@ function createStyles(colors: Colors) {
   return StyleSheet.create({
     section: { marginTop: spacing.lg },
     eyebrow: { ...eyebrow(colors), marginBottom: 8 },
+    eyebrowSpaced: { marginTop: spacing.md },
     hint: { fontSize: 14, color: colors.textFaint, lineHeight: 20 },
     loader: { marginTop: 8 },
     error: {
@@ -279,41 +185,6 @@ function createStyles(colors: Colors) {
       fontSize: 14,
       marginBottom: spacing.sm,
     },
-    input: {
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: radius.sm,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-      fontSize: 16,
-      color: colors.text,
-      backgroundColor: colors.surface,
-      minHeight: 60,
-      textAlignVertical: 'top',
-    },
-    submitButton: {
-      backgroundColor: colors.gold,
-      borderRadius: radius.sm,
-      paddingVertical: 12,
-      alignItems: 'center',
-      marginTop: spacing.sm,
-    },
-    submitButtonDisabled: { opacity: 0.5 },
-    submitButtonText: { color: colors.textOnGold, fontSize: 15, fontWeight: '700' },
-    optionChoice: {
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: radius.sm,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-      backgroundColor: colors.surface,
-      marginBottom: 8,
-    },
-    optionChoiceActive: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
-    optionChoiceText: { fontSize: 15, fontWeight: '600', color: colors.text },
-    optionChoiceTextActive: { color: colors.text, fontWeight: '700' },
-    editLink: { marginTop: 8, alignSelf: 'flex-start' },
-    editLinkText: { fontSize: 13, fontWeight: '700', color: colors.gold },
     answerText: { fontFamily: fonts.bodyEmphasis, fontSize: 16, color: colors.text },
     answerRow: {
       flexDirection: 'row',
