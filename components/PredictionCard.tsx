@@ -25,7 +25,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import Svg, { Polygon, Rect } from 'react-native-svg';
+import Svg, { Polygon, Polyline, Rect } from 'react-native-svg';
 import { Text } from './Text';
 
 import { fetchCommentCount } from '../lib/comments';
@@ -106,6 +106,20 @@ function EnvelopeFlap({ colors }: { colors: Colors }) {
           par se fondre avec le fond et effaçait la pointe. */}
       <Rect x="0" y="0" width="100" height={FLAP_HEIGHT} fill={colors.envelopeBody[1]} />
       <Polygon points={`0,0 100,0 50,${FLAP_HEIGHT}`} fill={colors.envelopeBody[0]} />
+      {/* Le pli lui-même, tracé comme un vrai trait — la seule différence de
+          teinte entre le fond et le triangle ne suffisait pas à se lire
+          comme une enveloppe, il fallait la ligne. `vectorEffect` garde une
+          épaisseur de trait constante malgré le `viewBox` étiré (X et Y
+          n'ont pas la même échelle), sinon le trait s'épaississait sur les
+          portions presque horizontales et s'amincissait sur les presque
+          verticales. */}
+      <Polyline
+        points={`0,0 50,${FLAP_HEIGHT} 100,0`}
+        fill="none"
+        stroke={colors.accent}
+        strokeWidth={1.5}
+        vectorEffect="non-scaling-stroke"
+      />
     </Svg>
   );
 }
