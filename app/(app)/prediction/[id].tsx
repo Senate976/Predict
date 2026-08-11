@@ -22,7 +22,6 @@ import { formatAdvance, formatShortDateTime } from '../../../lib/datetime';
 import { fetchFriendships, otherProfile, type FriendProfile } from '../../../lib/friends';
 import {
   addRecipient,
-  CATEGORY_LABEL,
   fetchPrediction,
   fetchPredictionRecipients,
   isRevealed,
@@ -236,10 +235,6 @@ export default function PredictionDetailScreen() {
                 <Text style={styles.authorName}>{author.username}</Text>
               </Pressable>
             )}
-
-            <View style={styles.categoryBadge}>
-              <Text style={styles.categoryBadgeText}>{CATEGORY_LABEL[prediction.category]}</Text>
-            </View>
 
             <Text style={styles.teaser}>{prediction.teaser}</Text>
 
@@ -461,25 +456,6 @@ function createStyles(colors: Colors) {
   eyebrow: { ...eyebrow(colors) },
   authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginBottom: 12 },
   authorName: { fontFamily: fonts.bodyEmphasis, fontSize: 16, color: colors.icon },
-  // La catégorie n'apparaît plus sur la carte du Fil — seulement ici, une
-  // fois le Predict ouvert. Jaune réservé aux éléments interactifs majeurs :
-  // ici, simple étiquette au trait noir.
-  categoryBadge: {
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: colors.text,
-    borderRadius: radius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    marginBottom: 10,
-  },
-  categoryBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: colors.text,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
   teaser: { fontFamily: fonts.sansBold, fontSize: 24, color: colors.text, lineHeight: 30 },
   datesBlock: { marginTop: 10 },
   // Un peu plus marqué que les autres repères secondaires de cet écran :
