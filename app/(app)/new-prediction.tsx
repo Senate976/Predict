@@ -27,8 +27,6 @@ import { formatCountdown, formatRevealAt } from '../../lib/datetime';
 import { fetchFriendships, otherProfile, type FriendProfile } from '../../lib/friends';
 import { fetchGroups, type FriendGroup } from '../../lib/groups';
 import {
-  CATEGORIES,
-  CATEGORY_LABEL,
   MAX_CONTENT_LENGTH,
   MAX_TEASER_LENGTH,
   MIN_REVEAL_DELAY_MS,
@@ -36,7 +34,6 @@ import {
   createPrediction,
   extractMentionedUsernames,
   predictionErrorMessage,
-  type PredictionCategory,
   type PredictionScope,
 } from '../../lib/predictions';
 import { fonts, radius, spacing, type Colors } from '../../lib/theme';
@@ -89,7 +86,6 @@ export default function NewPredictionScreen() {
   // dès sa création plutôt que d'attendre un déclenchement manuel ultérieur.
   const [revealNow, setRevealNow] = useState(false);
 
-  const [category, setCategory] = useState<PredictionCategory>('autre');
   const [scope, setScope] = useState<PredictionScope>('circle');
   // Réglage Confidentialité : pré-sélectionne la portée par défaut de
   // l'auteur, une fois son profil chargé — un seul alignement, pas un
@@ -246,7 +242,6 @@ export default function NewPredictionScreen() {
         mentionedFriendIds,
         openEnded: revealTiming === 'open_ended',
         isImmediate: revealTiming === 'open_ended' && revealNow,
-        category,
       });
 
       if (insertError) {
@@ -364,25 +359,6 @@ export default function NewPredictionScreen() {
               <PredictionRecorder uri={audioUri} onChange={setAudioUri} disabled={submitting} />
             </View>
           )}
-
-          <Text style={[styles.label, styles.sectionLabel]}>Catégorie</Text>
-          <View style={styles.friendsBox}>
-            {CATEGORIES.map((cat) => {
-              const selected = category === cat;
-              return (
-                <Pressable
-                  key={cat}
-                  onPress={() => setCategory(cat)}
-                  disabled={submitting}
-                  style={[styles.friendChip, selected && styles.friendChipActive]}
-                >
-                  <Text style={[styles.friendChipText, selected && styles.friendChipTextActive]}>
-                    {CATEGORY_LABEL[cat]}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
 
           <Text style={[styles.label, styles.sectionLabel]}>Révélation</Text>
 

@@ -3784,7 +3784,181 @@ left join public.prediction_contents pc on pc.prediction_id = p.id;
 grant select on public.predictions_feed to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 41. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 41. Abandon du concept de catégorie
+-- ---------------------------------------------------------------------------
+--
+-- Plus aucun écran ne propose ni n'affiche de catégorie (ajoutée section 7,
+-- exposée section 26) : le concept est abandonné. `create_prediction` perd
+-- `p_category`, `predictions_feed` perd la colonne, et la colonne disparaît
+-- de la table.
+
+drop view if exists public.predictions_feed;
+
+drop function if exists public.create_prediction(text, text, timestamptz, text, uuid[], uuid, uuid[], boolean, text, boolean);
+
+create or replace function public.create_prediction(
+  p_teaser text,
+  p_content text,
+  p_reveal_at timestamptz,
+  p_scope text,
+  p_friend_ids uuid[] default array[]::uuid[],
+  p_group_id uuid default null,
+  p_mentioned_ids uuid[] default array[]::uuid[],
+  p_open_ended boolean default false,
+  p_is_immediate boolean default false
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+  v_recipient uuid;
+  v_mentioned_valid uuid[] := array[]::uuid[];
+  v_reveal_at timestamptz := case when p_is_immediate then now() + interval '1 second' else p_reveal_at end;
+begin
+  insert into public.predictions (author_id, teaser, reveal_at, scope, open_ended, is_immediate, group_id)
+  values (
+    auth.uid(),
+    p_teaser,
+    v_reveal_at,
+    p_scope,
+    p_open_ended,
+    p_is_immediate,
+    case when p_scope = 'group' then p_group_id else null end
+  )
+  returning id into v_id;
+
+  insert into public.prediction_contents (prediction_id, content)
+  values (v_id, p_content);
+
+  if p_scope = 'circle' then
+    insert into public.prediction_access (prediction_id, user_id)
+    select
+      v_id,
+      case when f.requester_id = auth.uid() then f.addressee_id else f.requester_id end
+    from public.friendships f
+    where f.status = 'accepted'
+      and (f.requester_id = auth.uid() or f.addressee_id = auth.uid());
+  elsif p_scope = 'group' then
+    insert into public.prediction_access (prediction_id, user_id)
+    select v_id, gm.friend_id
+    from public.group_members gm
+    join public.groups g on g.id = gm.group_id
+    where gm.group_id = p_group_id and g.owner_id = auth.uid() and gm.status = 'accepted';
+  else
+    foreach v_recipient in array coalesce(p_friend_ids, array[]::uuid[]) loop
+      insert into public.prediction_access (prediction_id, user_id)
+      values (v_id, v_recipient)
+      on conflict (prediction_id, user_id) do nothing;
+    end loop;
+  end if;
+
+  foreach v_recipient in array coalesce(p_mentioned_ids, array[]::uuid[]) loop
+    if exists (
+      select 1 from public.friendships f
+      where f.status = 'accepted'
+        and (
+          (f.requester_id = auth.uid() and f.addressee_id = v_recipient)
+          or (f.addressee_id = auth.uid() and f.requester_id = v_recipient)
+        )
+    ) then
+      insert into public.prediction_access (prediction_id, user_id)
+      values (v_id, v_recipient)
+      on conflict (prediction_id, user_id) do nothing;
+
+      v_mentioned_valid := array_append(v_mentioned_valid, v_recipient);
+      perform public.notify_mention(v_id, v_recipient);
+    end if;
+  end loop;
+
+  if array_length(v_mentioned_valid, 1) > 0 then
+    update public.predictions set mentioned_user_ids = v_mentioned_valid where id = v_id;
+  end if;
+
+  return v_id;
+end;
+$$;
+
+revoke all on function public.create_prediction(text, text, timestamptz, text, uuid[], uuid, uuid[], boolean, boolean) from public;
+grant execute on function public.create_prediction(text, text, timestamptz, text, uuid[], uuid, uuid[], boolean, boolean) to authenticated;
+
+alter table public.predictions drop constraint if exists predictions_category_valid;
+alter table public.predictions drop column if exists category;
+
+create view public.predictions_feed
+with (security_invoker = true) as
+select
+  p.id,
+  p.author_id,
+  p.teaser,
+  pc.content,
+  pc.audio_path,
+  p.reveal_at,
+  p.scope,
+  p.open_ended,
+  p.is_immediate,
+  p.mentioned_user_ids,
+  p.created_at,
+  p.verdict_set_at,
+  (p.reveal_at <= now()) as is_revealed,
+  case
+    when p.reveal_at > now() then 'pending'
+    when p.author_verdict is not null then p.author_verdict
+    else 'pending'
+  end as final_status,
+  coalesce(
+    (
+      select us.favorite from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_favorite,
+  coalesce(
+    (
+      select us.hidden from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_hidden,
+  coalesce(
+    (
+      select us.seen from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_seen,
+  coalesce(
+    (
+      select us.verdict_seen from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_verdict_seen,
+  coalesce(
+    (
+      select jsonb_object_agg(counts.emoji, counts.total)
+      from (
+        select emoji, count(*) as total
+        from public.prediction_emoji_reactions er
+        where er.prediction_id = p.id
+        group by emoji
+      ) counts
+    ),
+    '{}'::jsonb
+  ) as emoji_counts,
+  (
+    select er2.emoji from public.prediction_emoji_reactions er2
+    where er2.prediction_id = p.id and er2.user_id = auth.uid()
+  ) as my_emoji_reaction
+from public.predictions p
+left join public.prediction_contents pc on pc.prediction_id = p.id;
+
+grant select on public.predictions_feed to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 42. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une
