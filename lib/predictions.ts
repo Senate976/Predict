@@ -51,6 +51,14 @@ export type PredictionFeedItem = {
   content: string | null;
   /** Chemin dans le bucket `prediction-audio`, ou `null` sans message vocal. Soumis à la même RLS que `content`. */
   audio_path: string | null;
+  /** Chemin dans le bucket `prediction-photos`, ou `null` sans photo jointe à
+   * la création. Soumis à la même RLS que `content`/`audio_path` : masqué
+   * tant que non révélée pour un destinataire. */
+  photo_path: string | null;
+  /** Chemin dans le bucket `prediction-verdict-photos` — la photo-preuve
+   * posée par l'auteur en même temps que Réalisé/Manqué. `null` tant
+   * qu'aucune n'a été jointe (le verdict peut être posé sans photo). */
+  verdict_photo_path: string | null;
   /** ISO 8601, en UTC. */
   reveal_at: string;
   scope: PredictionScope;
@@ -175,10 +183,10 @@ export function predictionErrorMessage(error: PostgrestError): string {
  * dans lequel les choses ont été publiées, pas celui de leur révélation.
  */
 const FEED_COLUMNS =
-  'id, author_id, teaser, content, audio_path, reveal_at, scope, open_ended, is_immediate, type, answer_format, ' +
-  'created_at, is_revealed, final_status, verdict_set_at, is_favorite, is_hidden, is_seen, is_verdict_seen, ' +
-  'emoji_counts, my_emoji_reaction, mentioned_user_ids, answer_count, correct_answer_count, my_answer_text, ' +
-  'my_answer_option_id, my_answer_is_correct';
+  'id, author_id, teaser, content, audio_path, photo_path, verdict_photo_path, reveal_at, scope, open_ended, ' +
+  'is_immediate, type, answer_format, created_at, is_revealed, final_status, verdict_set_at, is_favorite, ' +
+  'is_hidden, is_seen, is_verdict_seen, emoji_counts, my_emoji_reaction, mentioned_user_ids, answer_count, ' +
+  'correct_answer_count, my_answer_text, my_answer_option_id, my_answer_is_correct';
 
 export async function fetchPredictionsFeed() {
   return supabase
@@ -542,8 +550,16 @@ export async function fetchPredictionOutcomes(authorId: string) {
  * le client qui décide où proposer quoi — le Fil (PredictionCard) tant
  * qu'aucun verdict n'est posé, l'écran détail pour revenir dessus ensuite.
  */
-export async function setPredictionVerdict(predictionId: string, verdict: 'realized' | 'missed') {
-  return supabase.rpc('set_prediction_verdict', { p_prediction_id: predictionId, p_verdict: verdict });
+export async function setPredictionVerdict(
+  predictionId: string,
+  verdict: 'realized' | 'missed',
+  verdictPhotoPath?: string | null
+) {
+  return supabase.rpc('set_prediction_verdict', {
+    p_prediction_id: predictionId,
+    p_verdict: verdict,
+    p_verdict_photo_path: verdictPhotoPath ?? null,
+  });
 }
 
 export type PredictionStats = { total: number; realized: number; missed: number; pending: number };

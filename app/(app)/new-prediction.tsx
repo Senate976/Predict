@@ -18,11 +18,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../components/Avatar';
 import { CalendarPicker } from '../../components/CalendarPicker';
+import { PhotoAttachButton } from '../../components/PhotoAttachButton';
 import { PredictionRecorder } from '../../components/PredictionRecorder';
 import { PredictionSeal } from '../../components/PredictionSeal';
 import { PredictWord } from '../../components/PredictWord';
 import { SelectField, type SelectOption } from '../../components/SelectField';
 import { setPredictionAudioPath, uploadPredictionAudio } from '../../lib/audio';
+import { setPredictionPhotoPath, uploadPredictionPhoto } from '../../lib/photos';
 import { useAuth } from '../../lib/auth';
 import { formatCountdown, formatRevealAt } from '../../lib/datetime';
 import { fetchFriendships, otherProfile, type FriendProfile } from '../../lib/friends';
@@ -98,6 +100,9 @@ export default function NewPredictionScreen() {
   const [contentMode, setContentMode] = useState<ContentMode>('text');
   const [content, setContent] = useState('');
   const [audioUri, setAudioUri] = useState<string | null>(null);
+  // Facultative, quel que soit `contentMode` — une preuve visuelle jointe au
+  // secret, pas un troisième mode de contenu exclusif des deux autres.
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
   // La date reste un choix explicite, mais l'heure est facultative : pré-remplie
   // à midi, l'auteur n'a besoin de la toucher que s'il veut une autre heure.
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -373,6 +378,21 @@ export default function NewPredictionScreen() {
         }
       }
 
+      // Même principe en deux étapes que l'audio — facultative, quel que soit
+      // `contentMode` : une photo peut accompagner un texte ou un message vocal.
+      if (photoUri && predictionId) {
+        const { path, error: uploadError } = await uploadPredictionPhoto(predictionId, photoUri);
+        if (uploadError || !path) {
+          setError(`Predict créé, mais l’envoi de la photo a échoué : ${uploadError?.message ?? 'erreur inconnue'}`);
+          return;
+        }
+        const { error: pathError } = await setPredictionPhotoPath(predictionId, path);
+        if (pathError) {
+          setError(`Predict créé, mais l’association de la photo a échoué : ${pathError.message}`);
+          return;
+        }
+      }
+
       setShowSeal(true);
     } catch (unexpected) {
       const message =
@@ -530,6 +550,13 @@ export default function NewPredictionScreen() {
               <PredictionRecorder uri={audioUri} onChange={setAudioUri} disabled={submitting} />
             </View>
           )}
+
+          {/* Facultative, quel que soit le mode de contenu — une preuve
+              visuelle jointe dès la création, masquée jusqu'à la révélation
+              comme le reste du secret. */}
+          <View style={styles.fieldSpacing}>
+            <PhotoAttachButton uri={photoUri} onChange={setPhotoUri} disabled={submitting} />
+          </View>
 
           {isQuestion && (
             <>

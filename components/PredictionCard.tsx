@@ -28,6 +28,7 @@ import { Text } from './Text';
 
 import { fetchCommentCount } from '../lib/comments';
 import { formatCountdown } from '../lib/datetime';
+import { uploadVerdictPhoto } from '../lib/photos';
 import {
   castEmojiReaction,
   EMOJI_REACTIONS,
@@ -46,6 +47,8 @@ import { useColors } from '../lib/themeMode';
 import { Avatar } from './Avatar';
 import { InlineComments } from './InlineComments';
 import { InlineQuestionAnswer } from './InlineQuestionAnswer';
+import { PhotoAttachButton } from './PhotoAttachButton';
+import { PredictionPhoto } from './PredictionPhoto';
 
 /** Largeur fixe de la bulle de réactions, ancrée par son bord droit sur le pouce. */
 const EMOJI_PANEL_WIDTH = 272;
@@ -263,6 +266,15 @@ export function PredictionCard({
   const [localVerdict, setLocalVerdict] = useState<'realized' | 'missed' | null>(null);
   const [verdictPending, setVerdictPending] = useState(false);
   const [verdictError, setVerdictError] = useState<string | null>(null);
+  // Lequel des deux boutons a été touché — affiche l'étape « photo-preuve
+  // (facultative) » avant d'envoyer réellement le verdict, `null` tant que
+  // l'auteur n'a rien touché ou vient d'annuler cette étape.
+  const [pendingVerdictChoice, setPendingVerdictChoice] = useState<'realized' | 'missed' | null>(null);
+  const [verdictPhotoUri, setVerdictPhotoUri] = useState<string | null>(null);
+  // Écho optimiste du chemin renvoyé par `handleSetVerdict`, affiché tout de
+  // suite sans attendre le prochain chargement du fil.
+  const [localVerdictPhotoPath, setLocalVerdictPhotoPath] = useState<string | null>(null);
+  const verdictPhotoPath = localVerdictPhotoPath ?? item.verdict_photo_path;
   // Écho optimiste de `revealPredictionNow` : une fois l'appel réussi, la
   // carte doit basculer en « En cours » sans attendre le prochain
   // chargement du fil, où `item.reveal_at` (encore dans le futur côté props)
@@ -448,21 +460,38 @@ export function PredictionCard({
     }
   }
 
-  /** Geste unique et définitif — la RPC elle-même refuse un second appel une
-   * fois le verdict posé (voir `set_prediction_verdict`), donc pas de retour
-   * en arrière possible ici non plus si l'appel échoue en cours de route :
-   * on efface simplement l'écho optimiste pour retenter. */
+  /** Envoie d'abord la photo-preuve éventuelle (son propre bucket, voir
+   * lib/photos.ts), puis pose le verdict avec son chemin dans le même geste
+   * — jamais les deux dans des appels indépendants, pour ne jamais afficher
+   * un verdict sans sa preuve si l'envoi de la photo échoue en cours de
+   * route. */
   async function handleSetVerdict(next: 'realized' | 'missed') {
     setVerdictPending(true);
     setVerdictError(null);
     setLocalVerdict(next);
-    const { error } = await setPredictionVerdict(item.id, next);
+
+    let photoPath: string | null = null;
+    if (verdictPhotoUri) {
+      const { path, error: uploadError } = await uploadVerdictPhoto(item.id, verdictPhotoUri);
+      if (uploadError || !path) {
+        setVerdictPending(false);
+        setLocalVerdict(null);
+        setVerdictError('Envoi de la photo impossible.');
+        return;
+      }
+      photoPath = path;
+    }
+
+    const { error } = await setPredictionVerdict(item.id, next, photoPath);
     setVerdictPending(false);
     if (error) {
       setLocalVerdict(null);
       setVerdictError('Action impossible.');
       return;
     }
+    if (photoPath) setLocalVerdictPhotoPath(photoPath);
+    setPendingVerdictChoice(null);
+    setVerdictPhotoUri(null);
     onVerdictChange?.(next);
   }
 
@@ -689,6 +718,24 @@ export function PredictionCard({
                   </Text>
                 </>
               )}
+
+              {/* Photo jointe à la création — mêmes règles de visibilité que
+                  le texte (RLS sur `prediction_contents`) : `photo_path`
+                  n'arrive ici que si la carte a déjà le droit de le voir. */}
+              {item.photo_path && (
+                <View style={styles.letterPhotoWrap}>
+                  <PredictionPhoto bucket="content" path={item.photo_path} />
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Photo-preuve du verdict — sous la lettre, jamais dedans : elle
+              documente le dénouement (Réalisé/Manqué), pas le secret
+              initial. */}
+          {verdictPhotoPath && showVerdictStamp && (
+            <View style={styles.verdictPhotoWrap}>
+              <PredictionPhoto bucket="verdict" path={verdictPhotoPath} />
             </View>
           )}
         </Pressable>
@@ -758,29 +805,76 @@ export function PredictionCard({
         )}
 
         {/* Invite l'auteur à trancher dès que sa prédiction est révélée mais
-            encore en attente de verdict — rien que les deux boutons, aucun
-            texte d'accompagnement : une fois posé, revenir dessus n'est plus
-            possible ici, seulement depuis l'écran détail. Réalisé en accent
-            plein, Manqué en contour neutre — même registre que le tampon,
-            jamais de vert/rouge. */}
+            encore en attente de verdict — Réalisé en accent plein, Manqué en
+            contour neutre, même registre que le tampon, jamais de
+            vert/rouge. Touché, un bouton ouvre une étape intermédiaire
+            (photo-preuve facultative) plutôt que d'envoyer le verdict tout de
+            suite : une fois confirmé, revenir dessus n'est plus possible ici,
+            seulement depuis l'écran détail. */}
         {!isQuestion && isAuthor && revealed && verdict === null && (
           <View style={styles.verdictPrompt}>
-            <View style={styles.verdictPromptButtons}>
-              <Pressable
-                onPress={() => handleSetVerdict('realized')}
-                disabled={verdictPending}
-                style={[styles.verdictPromptButton, styles.verdictPromptButtonRealized]}
-              >
-                <Text style={styles.verdictPromptButtonTextOnAccent}>Réalisé</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => handleSetVerdict('missed')}
-                disabled={verdictPending}
-                style={[styles.verdictPromptButton, styles.verdictPromptButtonMissed]}
-              >
-                <Text style={styles.verdictPromptButtonText}>Manqué</Text>
-              </Pressable>
-            </View>
+            {pendingVerdictChoice === null ? (
+              <View style={styles.verdictPromptButtons}>
+                <Pressable
+                  onPress={() => setPendingVerdictChoice('realized')}
+                  disabled={verdictPending}
+                  style={[styles.verdictPromptButton, styles.verdictPromptButtonRealized]}
+                >
+                  <Text style={styles.verdictPromptButtonTextOnAccent}>Réalisé</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setPendingVerdictChoice('missed')}
+                  disabled={verdictPending}
+                  style={[styles.verdictPromptButton, styles.verdictPromptButtonMissed]}
+                >
+                  <Text style={styles.verdictPromptButtonText}>Manqué</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={styles.verdictPhotoStep}>
+                <Text style={styles.verdictPhotoStepLabel}>
+                  Une preuve visuelle ? (facultatif)
+                </Text>
+                <PhotoAttachButton
+                  uri={verdictPhotoUri}
+                  onChange={setVerdictPhotoUri}
+                  disabled={verdictPending}
+                  label="Joindre une photo"
+                />
+                <View style={styles.verdictPromptButtons}>
+                  <Pressable
+                    onPress={() => {
+                      setPendingVerdictChoice(null);
+                      setVerdictPhotoUri(null);
+                    }}
+                    disabled={verdictPending}
+                    style={[styles.verdictPromptButton, styles.verdictPromptButtonMissed]}
+                  >
+                    <Text style={styles.verdictPromptButtonText}>Annuler</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleSetVerdict(pendingVerdictChoice)}
+                    disabled={verdictPending}
+                    style={[
+                      styles.verdictPromptButton,
+                      pendingVerdictChoice === 'realized'
+                        ? styles.verdictPromptButtonRealized
+                        : styles.verdictPromptButtonMissed,
+                    ]}
+                  >
+                    <Text
+                      style={
+                        pendingVerdictChoice === 'realized'
+                          ? styles.verdictPromptButtonTextOnAccent
+                          : styles.verdictPromptButtonText
+                      }
+                    >
+                      {verdictPending ? 'Confirmation…' : 'Confirmer'}
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
             {verdictError && <Text style={styles.verdictPromptError}>{verdictError}</Text>}
           </View>
         )}
@@ -1127,6 +1221,8 @@ function createStyles(colors: Colors) {
     web: { filter: 'blur(5px)' } as object,
     default: { opacity: 0.15 },
   }),
+  // Photo jointe à la création — dans la lettre, sous le texte de la prédiction.
+  letterPhotoWrap: { marginTop: 10 },
   // Zone sous l'enveloppe : auteur, mentions, teaser (Scellée uniquement).
   body: { paddingHorizontal: 18, paddingTop: 12 },
   // Même padding horizontal que `body` — sans lui, les commentaires
@@ -1194,6 +1290,13 @@ function createStyles(colors: Colors) {
   verdictPromptButtonText: { fontFamily: fonts.label, fontSize: 12, fontWeight: '700', color: colors.text },
   verdictPromptButtonTextOnAccent: { fontFamily: fonts.label, fontSize: 12, fontWeight: '700', color: colors.textOnAccent },
   verdictPromptError: { fontSize: 11, color: colors.danger, marginTop: 6, textAlign: 'right' },
+  // Étape 2 du verdict : preuve photo facultative, avant confirmation.
+  // `alignItems` par défaut (stretch) : `PhotoAttachButton` a besoin de la
+  // pleine largeur pour que son aperçu (width: '100%') ait une base non nulle.
+  verdictPhotoStep: { gap: 8 },
+  verdictPhotoStepLabel: { fontSize: 12, color: colors.textMuted },
+  // Photo-preuve du verdict — sous la lettre, même padding horizontal que le corps.
+  verdictPhotoWrap: { paddingHorizontal: 18, marginTop: 10 },
   // Fil épuré façon réseau social : les deux blocs restants (commentaire,
   // réaction) packés à gauche avec un espacement modeste.
   footerRow: {

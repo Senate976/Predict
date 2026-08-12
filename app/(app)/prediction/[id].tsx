@@ -16,11 +16,14 @@ import { AudioPlayerButton } from '../../../components/AudioPlayerButton';
 import { Avatar } from '../../../components/Avatar';
 import { CreateFab } from '../../../components/CreateFab';
 import { InlineComments } from '../../../components/InlineComments';
+import { PhotoAttachButton } from '../../../components/PhotoAttachButton';
+import { PredictionPhoto } from '../../../components/PredictionPhoto';
 import { PredictWord } from '../../../components/PredictWord';
 import { QuestionAnswerPanel } from '../../../components/QuestionAnswerPanel';
 import { useAuth } from '../../../lib/auth';
 import { formatAdvance, formatShortDateTime } from '../../../lib/datetime';
 import { fetchFriendships, otherProfile, type FriendProfile } from '../../../lib/friends';
+import { uploadVerdictPhoto } from '../../../lib/photos';
 import {
   addRecipient,
   fetchPrediction,
@@ -58,6 +61,12 @@ export default function PredictionDetailScreen() {
   const [revealError, setRevealError] = useState<string | null>(null);
   const [verdictPending, setVerdictPending] = useState(false);
   const [verdictError, setVerdictError] = useState<string | null>(null);
+  // Photo choisie localement, en attente d'envoi — remplace la preuve déjà
+  // posée seulement au prochain geste Réalisé/Manqué (contrairement au Fil,
+  // cet écran permet de revenir sur le verdict à tout moment, donc pas
+  // d'étape de confirmation séparée : la photo suit simplement le prochain
+  // clic).
+  const [verdictPhotoUri, setVerdictPhotoUri] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id || !userId) return;
@@ -187,13 +196,28 @@ export default function PredictionDetailScreen() {
     if (!id) return;
     setVerdictPending(true);
     setVerdictError(null);
-    const { error: verdictErr } = await setPredictionVerdict(id, next);
+
+    let photoPath: string | null = null;
+    if (verdictPhotoUri) {
+      const { path, error: uploadError } = await uploadVerdictPhoto(id, verdictPhotoUri);
+      if (uploadError || !path) {
+        setVerdictPending(false);
+        setVerdictError('Envoi de la photo impossible.');
+        return;
+      }
+      photoPath = path;
+    }
+
+    const { error: verdictErr } = await setPredictionVerdict(id, next, photoPath);
     setVerdictPending(false);
     if (verdictErr) {
       setVerdictError(`Action impossible : ${verdictErr.message}`);
       return;
     }
-    setPrediction((prev) => (prev ? { ...prev, final_status: next } : prev));
+    setVerdictPhotoUri(null);
+    setPrediction((prev) =>
+      prev ? { ...prev, final_status: next, verdict_photo_path: photoPath ?? prev.verdict_photo_path } : prev
+    );
   }
 
   const isAuthor = prediction && userId && prediction.author_id === userId;
@@ -291,6 +315,11 @@ export default function PredictionDetailScreen() {
                       <AudioPlayerButton path={prediction.audio_path} />
                     </View>
                   )}
+                  {prediction.photo_path && (
+                    <View style={styles.photoRow}>
+                      <PredictionPhoto bucket="content" path={prediction.photo_path} />
+                    </View>
+                  )}
                 </>
               ) : (
                 <Text style={styles.sealedHint}>
@@ -380,6 +409,20 @@ export default function PredictionDetailScreen() {
                       ? 'Affirme si cette prédiction s’est réalisée ou a été manquée.'
                       : 'Tu peux revenir sur ce choix à tout moment.'}
                   </Text>
+                  {prediction.verdict_photo_path && (
+                    <View style={styles.photoRow}>
+                      <PredictionPhoto bucket="verdict" path={prediction.verdict_photo_path} />
+                    </View>
+                  )}
+                  <View style={styles.verdictPhotoAttach}>
+                    <Text style={styles.hint}>Preuve visuelle (facultatif)</Text>
+                    <PhotoAttachButton
+                      uri={verdictPhotoUri}
+                      onChange={setVerdictPhotoUri}
+                      disabled={verdictPending}
+                      label={prediction.verdict_photo_path ? 'Remplacer la photo' : 'Joindre une photo'}
+                    />
+                  </View>
                   {verdictError && <Text style={styles.error}>{verdictError}</Text>}
                 </View>
               )
@@ -513,6 +556,7 @@ function createStyles(colors: Colors) {
     textAlign: 'center',
   },
   audioRow: { marginTop: 16 },
+  photoRow: { marginTop: 16, width: '100%' },
   sealedHint: {
     fontSize: 14,
     color: colors.textFaint,
@@ -547,6 +591,7 @@ function createStyles(colors: Colors) {
     backgroundColor: colors.surface,
   },
   verdictChoiceActive: { backgroundColor: colors.text },
+  verdictPhotoAttach: { marginTop: 12, gap: 6 },
   verdictChoiceText: { fontSize: 14, fontWeight: '700', color: colors.text },
   verdictChoiceTextActive: { color: colors.surface },
   chevron: { fontSize: 11, color: colors.textFaint },

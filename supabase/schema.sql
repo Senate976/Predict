@@ -4894,7 +4894,274 @@ create trigger prediction_comments_notify_new_comment
   for each row execute function public.notify_new_comment();
 
 -- ---------------------------------------------------------------------------
--- 50. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 51. Photo à la création, et photo-preuve posée avec le verdict
+-- ---------------------------------------------------------------------------
+--
+-- Deux buckets distincts plutôt qu'un seul avec des sous-dossiers : la photo
+-- de création suit exactement les règles de visibilité du contenu (masquée
+-- avant révélation), la photo-preuve du verdict suit celles d'un geste
+-- possible seulement après révélation — deux jeux de policies différents,
+-- plus simples à lire séparés qu'avec une condition supplémentaire partout.
+insert into storage.buckets (id, name, public)
+values ('prediction-photos', 'prediction-photos', false)
+on conflict (id) do nothing;
+
+insert into storage.buckets (id, name, public)
+values ('prediction-verdict-photos', 'prediction-verdict-photos', false)
+on conflict (id) do nothing;
+
+-- Photo de création — même colonne que `audio_path`, même table.
+alter table public.prediction_contents add column if not exists photo_path text;
+
+-- Photo-preuve posée par l'auteur en même temps que le verdict (Réalisé/
+-- Manqué) — sur `predictions`, pas `prediction_contents` : elle documente le
+-- dénouement, pas le secret initial.
+alter table public.predictions add column if not exists verdict_photo_path text;
+
+-- Chemin attendu : `<prediction_id>/<fichier>` — même principe que
+-- `prediction-audio` (section 18), mêmes policies (auteur ou destinataire
+-- après révélation en lecture, auteur seul en écriture, avant révélation).
+drop policy if exists "prediction_photos_select" on storage.objects;
+create policy "prediction_photos_select"
+  on storage.objects
+  for select
+  to authenticated
+  using (
+    bucket_id = 'prediction-photos'
+    and exists (
+      select 1 from public.predictions p
+      where p.id::text = (storage.foldername(name))[1]
+        and (
+          p.author_id = auth.uid()
+          or exists (
+            select 1 from public.prediction_access pa
+            where pa.prediction_id = p.id
+              and pa.user_id = auth.uid()
+              and p.reveal_at <= now()
+          )
+        )
+    )
+  );
+
+drop policy if exists "prediction_photos_insert" on storage.objects;
+create policy "prediction_photos_insert"
+  on storage.objects
+  for insert
+  to authenticated
+  with check (
+    bucket_id = 'prediction-photos'
+    and exists (
+      select 1 from public.predictions p
+      where p.id::text = (storage.foldername(name))[1]
+        and p.author_id = auth.uid()
+        and p.reveal_at > now()
+    )
+  );
+
+drop policy if exists "prediction_photos_delete" on storage.objects;
+create policy "prediction_photos_delete"
+  on storage.objects
+  for delete
+  to authenticated
+  using (
+    bucket_id = 'prediction-photos'
+    and exists (
+      select 1 from public.predictions p
+      where p.id::text = (storage.foldername(name))[1]
+        and p.author_id = auth.uid()
+    )
+  );
+
+-- Photo-preuve du verdict — visible par l'auteur et tout destinataire, sans
+-- condition de date (poser un verdict n'est possible qu'une fois révélée, la
+-- photo-preuve l'est donc forcément aussi). Écriture réservée à l'auteur,
+-- sans fenêtre de temps non plus : le verdict reste modifiable, la photo qui
+-- l'accompagne aussi.
+drop policy if exists "prediction_verdict_photos_select" on storage.objects;
+create policy "prediction_verdict_photos_select"
+  on storage.objects
+  for select
+  to authenticated
+  using (
+    bucket_id = 'prediction-verdict-photos'
+    and exists (
+      select 1 from public.predictions p
+      where p.id::text = (storage.foldername(name))[1]
+        and (
+          p.author_id = auth.uid()
+          or exists (
+            select 1 from public.prediction_access pa
+            where pa.prediction_id = p.id and pa.user_id = auth.uid()
+          )
+        )
+    )
+  );
+
+drop policy if exists "prediction_verdict_photos_insert" on storage.objects;
+create policy "prediction_verdict_photos_insert"
+  on storage.objects
+  for insert
+  to authenticated
+  with check (
+    bucket_id = 'prediction-verdict-photos'
+    and exists (
+      select 1 from public.predictions p
+      where p.id::text = (storage.foldername(name))[1] and p.author_id = auth.uid()
+    )
+  );
+
+drop policy if exists "prediction_verdict_photos_delete" on storage.objects;
+create policy "prediction_verdict_photos_delete"
+  on storage.objects
+  for delete
+  to authenticated
+  using (
+    bucket_id = 'prediction-verdict-photos'
+    and exists (
+      select 1 from public.predictions p
+      where p.id::text = (storage.foldername(name))[1] and p.author_id = auth.uid()
+    )
+  );
+
+-- `set_prediction_verdict` gagne un troisième paramètre optionnel : le
+-- chemin de la photo-preuve, posé en même temps que le verdict. `coalesce`
+-- avec la valeur déjà en base : rejouer un verdict sans repasser de photo
+-- (ou en repasser une différente) ne doit pas effacer l'existante à tort.
+drop function if exists public.set_prediction_verdict(uuid, text);
+
+create or replace function public.set_prediction_verdict(
+  p_prediction_id uuid,
+  p_verdict text,
+  p_verdict_photo_path text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if p_verdict not in ('realized', 'missed') then
+    raise exception 'Verdict invalide : %', p_verdict;
+  end if;
+
+  update public.predictions
+  set author_verdict = p_verdict,
+      verdict_set_at = now(),
+      verdict_photo_path = coalesce(p_verdict_photo_path, verdict_photo_path)
+  where id = p_prediction_id
+    and author_id = auth.uid()
+    and reveal_at <= now();
+
+  insert into public.notifications (user_id, prediction_id, type)
+  select pa.user_id, p_prediction_id,
+    case p_verdict when 'realized' then 'prediction_realized' else 'prediction_missed' end
+  from public.predictions p
+  join public.prediction_access pa on pa.prediction_id = p.id
+  join public.profiles pr on pr.id = pa.user_id
+  where p.id = p_prediction_id
+    and p.author_verdict = p_verdict
+    and coalesce((pr.notification_prefs->>'prediction_verdict')::boolean, true)
+  on conflict (user_id, prediction_id, type) do nothing;
+end;
+$$;
+
+revoke all on function public.set_prediction_verdict(uuid, text, text) from public;
+grant execute on function public.set_prediction_verdict(uuid, text, text) to authenticated;
+
+-- `predictions_feed` reprend sa définition de la section 46 et ajoute
+-- `photo_path` (création) et `verdict_photo_path` (preuve du verdict).
+drop view if exists public.predictions_feed;
+
+create view public.predictions_feed
+with (security_invoker = true) as
+select
+  p.id,
+  p.author_id,
+  p.teaser,
+  pc.content,
+  pc.audio_path,
+  pc.photo_path,
+  p.verdict_photo_path,
+  p.reveal_at,
+  p.scope,
+  p.open_ended,
+  p.is_immediate,
+  p.type,
+  p.answer_format,
+  p.mentioned_user_ids,
+  p.created_at,
+  p.verdict_set_at,
+  (p.reveal_at <= now()) as is_revealed,
+  case
+    when p.reveal_at > now() then 'pending'
+    when p.author_verdict is not null then p.author_verdict
+    else 'pending'
+  end as final_status,
+  coalesce(
+    (
+      select us.favorite from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_favorite,
+  coalesce(
+    (
+      select us.hidden from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_hidden,
+  coalesce(
+    (
+      select us.seen from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_seen,
+  coalesce(
+    (
+      select us.verdict_seen from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_verdict_seen,
+  coalesce(
+    (
+      select jsonb_object_agg(counts.emoji, counts.total)
+      from (
+        select emoji, count(*) as total
+        from public.prediction_emoji_reactions er
+        where er.prediction_id = p.id
+        group by emoji
+      ) counts
+    ),
+    '{}'::jsonb
+  ) as emoji_counts,
+  (
+    select er2.emoji from public.prediction_emoji_reactions er2
+    where er2.prediction_id = p.id and er2.user_id = auth.uid()
+  ) as my_emoji_reaction,
+  public.get_prediction_answer_count(p.id) as answer_count,
+  public.get_prediction_correct_answer_count(p.id) as correct_answer_count,
+  (
+    select pa2.answer_text from public.prediction_answers pa2
+    where pa2.prediction_id = p.id and pa2.user_id = auth.uid()
+  ) as my_answer_text,
+  (
+    select pa3.option_id from public.prediction_answers pa3
+    where pa3.prediction_id = p.id and pa3.user_id = auth.uid()
+  ) as my_answer_option_id,
+  (
+    select pa4.is_correct from public.prediction_answers pa4
+    where pa4.prediction_id = p.id and pa4.user_id = auth.uid()
+  ) as my_answer_is_correct
+from public.predictions p
+left join public.prediction_contents pc on pc.prediction_id = p.id;
+
+grant select on public.predictions_feed to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 52. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une
