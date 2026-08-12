@@ -4921,6 +4921,10 @@ alter table public.predictions add column if not exists verdict_photo_path text;
 -- Chemin attendu : `<prediction_id>/<fichier>` — même principe que
 -- `prediction-audio` (section 18), mêmes policies (auteur ou destinataire
 -- après révélation en lecture, auteur seul en écriture, avant révélation).
+-- Exception Sondage : comme pour `content` (`prediction_contents_select`
+-- ci-dessus), la question elle-même n'est jamais scellée — sa photo ne doit
+-- donc pas non plus attendre `reveal_at` (la Clôture), sans quoi elle
+-- resterait invisible pour tout destinataire tant que le Sondage est ouvert.
 drop policy if exists "prediction_photos_select" on storage.objects;
 create policy "prediction_photos_select"
   on storage.objects
@@ -4937,7 +4941,7 @@ create policy "prediction_photos_select"
             select 1 from public.prediction_access pa
             where pa.prediction_id = p.id
               and pa.user_id = auth.uid()
-              and p.reveal_at <= now()
+              and (p.reveal_at <= now() or p.type = 'question')
           )
         )
     )
