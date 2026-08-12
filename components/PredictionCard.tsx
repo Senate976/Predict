@@ -275,6 +275,10 @@ export function PredictionCard({
   // suite sans attendre le prochain chargement du fil.
   const [localVerdictPhotoPath, setLocalVerdictPhotoPath] = useState<string | null>(null);
   const verdictPhotoPath = localVerdictPhotoPath ?? item.verdict_photo_path;
+  // Le verdict lui-même reste posé une seule fois (voir plus bas), mais la
+  // photo-preuve qui l'accompagne reste modifiable après coup — bascule
+  // l'étape « choisir/remplacer une photo », affichée sous le tampon.
+  const [editingVerdictPhoto, setEditingVerdictPhoto] = useState(false);
   // Écho optimiste de `revealPredictionNow` : une fois l'appel réussi, la
   // carte doit basculer en « En cours » sans attendre le prochain
   // chargement du fil, où `item.reveal_at` (encore dans le futur côté props)
@@ -879,6 +883,60 @@ export function PredictionCard({
           </View>
         )}
 
+        {/* Une fois le verdict déjà posé, la photo-preuve reste modifiable
+            directement depuis la carte — pas seulement depuis l'écran
+            détail : l'ajouter tout de suite après « Confirmer » ou plus tard
+            doit marcher pareil. */}
+        {!isQuestion && isAuthor && showVerdictStamp && (
+          <View style={styles.verdictPrompt}>
+            {editingVerdictPhoto ? (
+              <View style={styles.verdictPhotoStep}>
+                <Text style={styles.verdictPhotoStepLabel}>
+                  {verdictPhotoPath ? 'Remplacer la photo-preuve' : 'Ajouter une photo-preuve'}
+                </Text>
+                <PhotoAttachButton
+                  uri={verdictPhotoUri}
+                  onChange={setVerdictPhotoUri}
+                  disabled={verdictPending}
+                  label="Joindre une photo"
+                />
+                <View style={styles.verdictPromptButtons}>
+                  <Pressable
+                    onPress={() => {
+                      setEditingVerdictPhoto(false);
+                      setVerdictPhotoUri(null);
+                    }}
+                    disabled={verdictPending}
+                    style={[styles.verdictPromptButton, styles.verdictPromptButtonMissed]}
+                  >
+                    <Text style={styles.verdictPromptButtonText}>Annuler</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={async () => {
+                      if (!verdict) return;
+                      await handleSetVerdict(verdict);
+                      setEditingVerdictPhoto(false);
+                    }}
+                    disabled={verdictPending || !verdictPhotoUri}
+                    style={[styles.verdictPromptButton, styles.verdictPromptButtonRealized]}
+                  >
+                    <Text style={styles.verdictPromptButtonTextOnAccent}>
+                      {verdictPending ? 'Envoi…' : 'Confirmer'}
+                    </Text>
+                  </Pressable>
+                </View>
+                {verdictError && <Text style={styles.verdictPromptError}>{verdictError}</Text>}
+              </View>
+            ) : (
+              <Pressable onPress={() => setEditingVerdictPhoto(true)} style={styles.verdictPhotoEditButton}>
+                <Text style={styles.verdictPhotoEditButtonText}>
+                  {verdictPhotoPath ? 'Remplacer la photo' : 'Ajouter une photo'}
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        )}
+
         {/* Répondre sans quitter le Fil — réservé à une Question encore
             ouverte : plus rien à répondre une fois close, l'écran détail
             prend le relais (liste des réponses, validation). */}
@@ -1295,6 +1353,16 @@ function createStyles(colors: Colors) {
   // pleine largeur pour que son aperçu (width: '100%') ait une base non nulle.
   verdictPhotoStep: { gap: 8 },
   verdictPhotoStepLabel: { fontSize: 12, color: colors.textMuted },
+  // Discret, à droite — ajouter/remplacer la photo-preuve une fois le
+  // verdict déjà posé n'est pas l'action principale de cette zone de la
+  // carte, contrairement aux boutons Réalisé/Manqué eux-mêmes.
+  verdictPhotoEditButton: { alignSelf: 'flex-end', paddingVertical: 4 },
+  verdictPhotoEditButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textMuted,
+    textDecorationLine: 'underline',
+  },
   // Photo-preuve du verdict — sous la lettre, même padding horizontal que le corps.
   verdictPhotoWrap: { paddingHorizontal: 18, marginTop: 10 },
   // Fil épuré façon réseau social : les deux blocs restants (commentaire,
