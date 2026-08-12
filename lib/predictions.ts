@@ -562,6 +562,20 @@ export async function setPredictionVerdict(
   });
 }
 
+/**
+ * Pose ou remplace la photo-preuve d'une prédiction déjà révélée/close, sans
+ * toucher au verdict — indispensable pour un Sondage, qui n'a pas de verdict
+ * Réalisé/Manqué (`setPredictionVerdict` ne s'applique qu'à une Déclaration).
+ * Réservé à l'écran détail (voir photo_path/PredictionCard : cette action
+ * après coup n'apparaît jamais directement dans le Fil).
+ */
+export async function setPredictionResultPhoto(predictionId: string, photoPath: string) {
+  return supabase.rpc('set_prediction_result_photo', {
+    p_prediction_id: predictionId,
+    p_photo_path: photoPath,
+  });
+}
+
 export type PredictionStats = { total: number; realized: number; missed: number; pending: number };
 
 /**

@@ -31,6 +31,7 @@ import {
   isRevealed,
   removeRecipient,
   revealPredictionNow,
+  setPredictionResultPhoto,
   setPredictionVerdict,
   type PredictionFeedItem,
   type PredictionRecipient,
@@ -220,6 +221,29 @@ export default function PredictionDetailScreen() {
     );
   }
 
+  /** Équivalent de `handleSetVerdict` pour un Sondage : pas de Réalisé/Manqué
+   * à poser (voir `set_prediction_result_photo`, schema.sql section 52),
+   * seulement la photo elle-même. */
+  async function handleSaveResultPhoto() {
+    if (!id || !verdictPhotoUri) return;
+    setVerdictPending(true);
+    setVerdictError(null);
+    const { path, error: uploadError } = await uploadVerdictPhoto(id, verdictPhotoUri);
+    if (uploadError || !path) {
+      setVerdictPending(false);
+      setVerdictError('Envoi de la photo impossible.');
+      return;
+    }
+    const { error: photoErr } = await setPredictionResultPhoto(id, path);
+    setVerdictPending(false);
+    if (photoErr) {
+      setVerdictError(`Action impossible : ${photoErr.message}`);
+      return;
+    }
+    setVerdictPhotoUri(null);
+    setPrediction((prev) => (prev ? { ...prev, verdict_photo_path: path } : prev));
+  }
+
   const isAuthor = prediction && userId && prediction.author_id === userId;
   const revealed = prediction ? isRevealed(prediction, new Date()) : false;
   const isQuestion = prediction?.type === 'question';
@@ -354,12 +378,49 @@ export default function PredictionDetailScreen() {
                 pas seulement à l'auteur (contrairement au Verdict d'une
                 Déclaration). */}
             {isQuestion ? (
-              <QuestionAnswerPanel
-                prediction={prediction}
-                isAuthor={!!isAuthor}
-                closed={revealed}
-                onAnswered={load}
-              />
+              <>
+                <QuestionAnswerPanel
+                  prediction={prediction}
+                  isAuthor={!!isAuthor}
+                  closed={revealed}
+                  onAnswered={load}
+                />
+                {/* Un Sondage n'a pas de verdict Réalisé/Manqué, mais peut
+                    tout de même recevoir une photo une fois clos — même
+                    principe que la preuve visuelle d'une Déclaration, sans
+                    le choix qui n'a pas de sens ici. */}
+                {isAuthor && revealed && (
+                  <View style={styles.sectionSpacing}>
+                    <Text style={styles.eyebrow}>Photo</Text>
+                    {prediction.verdict_photo_path && (
+                      <View style={styles.photoRow}>
+                        <PredictionPhoto bucket="verdict" path={prediction.verdict_photo_path} />
+                      </View>
+                    )}
+                    <View style={styles.verdictPhotoAttach}>
+                      <Text style={styles.hint}>Illustre le résultat de ce Sondage (facultatif)</Text>
+                      <PhotoAttachButton
+                        uri={verdictPhotoUri}
+                        onChange={setVerdictPhotoUri}
+                        disabled={verdictPending}
+                        label={prediction.verdict_photo_path ? 'Remplacer la photo' : 'Joindre une photo'}
+                      />
+                      {verdictPhotoUri && (
+                        <Pressable
+                          onPress={handleSaveResultPhoto}
+                          disabled={verdictPending}
+                          style={styles.revealNowButton}
+                        >
+                          <Text style={styles.revealNowButtonText}>
+                            {verdictPending ? 'Envoi…' : 'Enregistrer la photo'}
+                          </Text>
+                        </Pressable>
+                      )}
+                    </View>
+                    {verdictError && <Text style={styles.error}>{verdictError}</Text>}
+                  </View>
+                )}
+              </>
             ) : (
               /* Seul endroit où revenir sur un verdict déjà posé est possible
                  (le Fil, lui, ne propose Réalisé/Manqué qu'une fois, tant que

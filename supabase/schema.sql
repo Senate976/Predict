@@ -5165,7 +5165,38 @@ left join public.prediction_contents pc on pc.prediction_id = p.id;
 grant select on public.predictions_feed to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 52. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 52. Photo-preuve posée après coup, y compris pour un Sondage
+-- ---------------------------------------------------------------------------
+-- `set_prediction_verdict` (section 51) exige un verdict Réalisé/Manqué,
+-- sans objet pour un Sondage (pas de verdict, seulement des réponses
+-- validées une à une — voir `QuestionAnswerPanel`). Cette fonction ne pose
+-- que la photo, pour n'importe quel type de prédiction déjà révélée/close,
+-- réservée à son auteur — c'est ce qui permet à l'écran détail de proposer
+-- une photo après coup sur un Sondage clos, pas seulement sur une
+-- Déclaration.
+create or replace function public.set_prediction_result_photo(
+  p_prediction_id uuid,
+  p_photo_path text
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  update public.predictions
+  set verdict_photo_path = p_photo_path
+  where id = p_prediction_id
+    and author_id = auth.uid()
+    and reveal_at <= now();
+end;
+$$;
+
+revoke all on function public.set_prediction_result_photo(uuid, text) from public;
+grant execute on function public.set_prediction_result_photo(uuid, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 53. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une
