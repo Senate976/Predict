@@ -64,7 +64,6 @@ export function InlineQuestionAnswer({
   const myAnswerText = localAnswer ? localAnswer.text : prediction.my_answer_text;
   const myAnswerOptionId = localAnswer ? localAnswer.optionId : prediction.my_answer_option_id;
   const hasAnswered = myAnswerText !== null || myAnswerOptionId !== null;
-  const optionLabelById = new Map((options ?? []).map((o) => [o.id, o.label]));
 
   async function handleSubmitText() {
     const trimmed = draftText.trim();
@@ -95,13 +94,41 @@ export function InlineQuestionAnswer({
   }
 
   // Définitif : une fois répondu, plus aucun moyen de revenir dessus depuis
-  // ce composant — ni lien Modifier, ni bouton Supprimer.
+  // ce composant — ni lien Modifier, ni bouton Supprimer. À choix multiple,
+  // les propositions restent visibles (celle choisie mise en avant) plutôt
+  // que de disparaître derrière un simple « Ta réponse : X » — utile pour se
+  // rappeler des autres options, sans pouvoir en resélectionner une.
   if (hasAnswered) {
-    const label = myAnswerOptionId !== null ? optionLabelById.get(myAnswerOptionId) ?? '…' : myAnswerText;
+    if (prediction.answer_format === 'choice') {
+      return (
+        <View style={styles.wrap}>
+          <Text style={styles.answeredLabel}>Ta réponse :</Text>
+          {options === null ? (
+            <ActivityIndicator color={colors.text} style={styles.loader} />
+          ) : (
+            <View style={styles.optionsRow}>
+              {options.map((option) => {
+                const selected = option.id === myAnswerOptionId;
+                return (
+                  <View
+                    key={option.id}
+                    style={[styles.optionChoice, selected && styles.optionChoiceSelected]}
+                  >
+                    <Text style={[styles.optionChoiceText, selected && styles.optionChoiceTextSelected]}>
+                      {option.label}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </View>
+      );
+    }
     return (
       <View style={styles.wrap}>
         <Text style={styles.answeredLabel}>
-          Ta réponse : <Text style={styles.answeredValue}>{label}</Text>
+          Ta réponse : <Text style={styles.answeredValue}>{myAnswerText}</Text>
         </Text>
       </View>
     );
@@ -203,7 +230,11 @@ function createStyles(colors: Colors) {
       paddingVertical: 7,
     },
     optionChoiceText: { fontSize: 13, fontWeight: '700', color: colors.accent },
-    answeredLabel: { fontSize: 13, color: colors.textMuted },
+    // Option choisie, une fois répondu — plein plutôt que contour, même
+    // registre que les autres choix affirmés dans l'app (Réalisé, Correcte).
+    optionChoiceSelected: { backgroundColor: colors.accent },
+    optionChoiceTextSelected: { color: colors.textOnAccent },
+    answeredLabel: { fontSize: 13, color: colors.textMuted, marginBottom: 6 },
     answeredValue: { fontWeight: '700', color: colors.text },
   });
 }

@@ -77,6 +77,14 @@ function notificationLabel(notification: Notification) {
           Un <PredictWord /> se révèle bientôt
         </>
       );
+    case 'question_answered':
+      return 'Quelqu’un a répondu à ton Sondage';
+    case 'new_comment':
+      return (
+        <>
+          Nouveau commentaire sur un <PredictWord />
+        </>
+      );
     case 'group_invite':
       return notification.group?.owner
         ? `${notification.group.owner.username} t’invite dans un groupe`

@@ -102,6 +102,8 @@ export function envelopeVariantForNotificationType(type: NotificationType): Enve
     case 'prediction_revealed':
     case 'prediction_realized':
     case 'prediction_missed':
+    case 'question_answered':
+    case 'new_comment':
       return 'revealed';
     case 'reveal_reminder':
       return 'awaiting';

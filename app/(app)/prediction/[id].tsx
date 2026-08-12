@@ -200,15 +200,21 @@ export default function PredictionDetailScreen() {
   const revealed = prediction ? isRevealed(prediction, new Date()) : false;
   const isQuestion = prediction?.type === 'question';
   // Écart entre le scellé et la révélation — juste informatif, pour souligner
-  // à quel point la prédiction a été anticipée. Sans objet pour une prédiction
-  // « ouverte » : `reveal_at` n'y porte qu'un repère technique lointain.
-  const advanceLabel = prediction
-    ? prediction.is_immediate
-      ? 'Révélée immédiatement'
-      : prediction.open_ended && !revealed
-        ? 'Révélation laissée à la discrétion de l’auteur'
-        : formatAdvance(new Date(prediction.created_at), new Date(prediction.reveal_at))
-    : '';
+  // à quel point la prédiction a été anticipée. Sans objet pour un Sondage
+  // (l'écart importe peu pour une question) ni pour une prédiction « ouverte » :
+  // `reveal_at` n'y porte qu'un repère technique lointain tant qu'elle n'est
+  // pas révélée. Une révélation immédiate n'affiche l'écart qu'une fois
+  // effectivement révélée (quasi instantané), jamais avant.
+  const advanceLabel =
+    prediction && !isQuestion
+      ? prediction.is_immediate
+        ? revealed
+          ? formatAdvance(new Date(prediction.created_at), new Date(prediction.reveal_at))
+          : ''
+        : prediction.open_ended && !revealed
+          ? 'Révélation laissée à la discrétion de l’auteur'
+          : formatAdvance(new Date(prediction.created_at), new Date(prediction.reveal_at))
+      : '';
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -255,10 +261,10 @@ export default function PredictionDetailScreen() {
                 <Text style={styles.sealedDate}>
                   Scellé le {formatShortDateTime(new Date(prediction.created_at))}
                 </Text>
-                <Text style={styles.daysAdvance}>{advanceLabel}</Text>
+                {!!advanceLabel && <Text style={styles.daysAdvance}>{advanceLabel}</Text>}
               </View>
             ) : (
-              <Text style={styles.daysAdvanceCentered}>{advanceLabel}</Text>
+              !!advanceLabel && <Text style={styles.daysAdvanceCentered}>{advanceLabel}</Text>
             )}
 
             {/* Le cœur de l'écran : le contenu de la prédiction prime sur tout

@@ -3,7 +3,6 @@ import { useRouter } from 'expo-router';
 import {
   Eye,
   EyeOff,
-  HelpCircle,
   Lock,
   MessageCircle,
   MoreHorizontal,
@@ -635,7 +634,7 @@ export function PredictionCard({
           fichier. S'assourdit légèrement une fois Manquée, jamais l'étiquette
           d'état ci-dessous. */}
       <View style={cardState.kind === 'missed' && styles.cardBodyMissed}>
-        <View style={styles.envelope}>
+        <Pressable onPress={() => onPress?.()} style={styles.envelope}>
           <EnvelopeFlap colors={colors} />
 
           {/* Posée en surimpression du rabat plutôt qu'au-dessus, dans une
@@ -646,9 +645,6 @@ export function PredictionCard({
             <View style={styles.envelopeLabelOverlay}>
               <View style={styles.stateRow}>
                 {cardState.kind === 'sealed' && <Lock size={12} color={colors.textOnAccent} strokeWidth={2} />}
-                {(cardState.kind === 'question_open' || cardState.kind === 'question_closed') && (
-                  <HelpCircle size={12} color={colors.textOnAccent} strokeWidth={2} />
-                )}
                 <Text style={styles.stateLabel} numberOfLines={1}>
                   {cardState.label}
                 </Text>
@@ -695,7 +691,7 @@ export function PredictionCard({
               )}
             </View>
           )}
-        </View>
+        </Pressable>
 
         {/* Sous l'enveloppe : bloc auteur, pseudos cités, teaser (Scellée
             uniquement — la vraie prédiction vit dans la lettre une fois

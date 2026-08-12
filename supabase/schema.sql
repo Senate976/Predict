@@ -4735,7 +4735,166 @@ left join public.prediction_contents pc on pc.prediction_id = p.id;
 grant select on public.predictions_feed to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 47. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 48. Réactions emoji sur un commentaire
+-- ---------------------------------------------------------------------------
+--
+-- Même principe que `prediction_emoji_reactions` (section 21), mais rattaché
+-- à un commentaire plutôt qu'à la prédiction entière — l'accès se vérifie donc
+-- en passant par `prediction_comments` pour retrouver la prédiction.
+create table if not exists public.prediction_comment_reactions (
+  comment_id uuid not null references public.prediction_comments (id) on delete cascade,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  emoji text not null check (emoji in ('👍', '🖕', '❤️', '👎', '😊', '😮', '😢', '🫣', '😬', '🤣', '💀', '🔮')),
+  created_at timestamptz not null default now(),
+  primary key (comment_id, user_id)
+);
+
+alter table public.prediction_comment_reactions enable row level security;
+
+drop policy if exists "prediction_comment_reactions_select" on public.prediction_comment_reactions;
+create policy "prediction_comment_reactions_select"
+  on public.prediction_comment_reactions
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1 from public.prediction_comments pc
+      join public.prediction_access pa on pa.prediction_id = pc.prediction_id and pa.user_id = auth.uid()
+      where pc.id = prediction_comment_reactions.comment_id
+    )
+    or exists (
+      select 1 from public.prediction_comments pc
+      join public.predictions p on p.id = pc.prediction_id and p.author_id = auth.uid()
+      where pc.id = prediction_comment_reactions.comment_id
+    )
+  );
+
+drop policy if exists "prediction_comment_reactions_insert" on public.prediction_comment_reactions;
+create policy "prediction_comment_reactions_insert"
+  on public.prediction_comment_reactions
+  for insert
+  to authenticated
+  with check (
+    user_id = auth.uid()
+    and (
+      exists (
+        select 1 from public.prediction_comments pc
+        join public.prediction_access pa on pa.prediction_id = pc.prediction_id and pa.user_id = auth.uid()
+        where pc.id = prediction_comment_reactions.comment_id
+      )
+      or exists (
+        select 1 from public.prediction_comments pc
+        join public.predictions p on p.id = pc.prediction_id and p.author_id = auth.uid()
+        where pc.id = prediction_comment_reactions.comment_id
+      )
+    )
+  );
+
+drop policy if exists "prediction_comment_reactions_update_own" on public.prediction_comment_reactions;
+create policy "prediction_comment_reactions_update_own"
+  on public.prediction_comment_reactions
+  for update
+  to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+drop policy if exists "prediction_comment_reactions_delete_own" on public.prediction_comment_reactions;
+create policy "prediction_comment_reactions_delete_own"
+  on public.prediction_comment_reactions
+  for delete
+  to authenticated
+  using (user_id = auth.uid());
+
+grant select, insert, update, delete on public.prediction_comment_reactions to authenticated;
+
+-- Vue qui ajoute le bilan des réactions à chaque commentaire — même schéma
+-- que `prediction_comments`, `security_invoker = true` pour que la RLS de
+-- `prediction_comments`/`prediction_comment_reactions` s'applique normalement
+-- à travers la vue, exactement comme `predictions_feed`.
+drop view if exists public.prediction_comments_feed;
+
+create view public.prediction_comments_feed
+with (security_invoker = true) as
+select
+  pc.id,
+  pc.prediction_id,
+  pc.author_id,
+  pc.content,
+  pc.created_at,
+  pc.reply_to_id,
+  coalesce(
+    (
+      select jsonb_object_agg(counts.emoji, counts.total)
+      from (
+        select emoji, count(*) as total
+        from public.prediction_comment_reactions cr
+        where cr.comment_id = pc.id
+        group by emoji
+      ) counts
+    ),
+    '{}'::jsonb
+  ) as emoji_counts,
+  (
+    select cr2.emoji from public.prediction_comment_reactions cr2
+    where cr2.comment_id = pc.id and cr2.user_id = auth.uid()
+  ) as my_emoji_reaction
+from public.prediction_comments pc;
+
+grant select on public.prediction_comments_feed to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 49. Notification à l'auteur quand un commentaire arrive
+-- ---------------------------------------------------------------------------
+--
+-- `comment_id` (nouvelle colonne, nullable pour les autres types de
+-- notification déjà existants) permet une notification par commentaire —
+-- contrairement à `notifications_unique_key` (section 13, sur
+-- `user_id, prediction_id, type`), qui ne pose ce type de notification
+-- qu'une seule fois pour toute la vie de la prédiction. Un index unique
+-- partiel séparé, plutôt que d'élargir celui-là : les autres types ne posent
+-- jamais `comment_id`, donc ce nouvel index ne les concerne pas.
+alter table public.notifications add column if not exists comment_id uuid references public.prediction_comments (id) on delete cascade;
+
+create unique index if not exists notifications_comment_unique_key
+  on public.notifications (user_id, comment_id, type)
+  where comment_id is not null;
+
+alter table public.notifications drop constraint if exists notifications_type_check;
+alter table public.notifications add constraint notifications_type_check
+  check (type in (
+    'new_teaser', 'prediction_revealed', 'prediction_approved', 'group_invite',
+    'prediction_mentioned', 'prediction_realized', 'prediction_missed', 'reveal_reminder',
+    'question_answered', 'new_comment'
+  ));
+
+-- Jamais pour son propre commentaire (`author_id <> new.author_id`) — écrire
+-- sur son propre Predict n'a rien à notifier.
+create or replace function public.notify_new_comment()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.notifications (user_id, prediction_id, comment_id, type)
+  select p.author_id, new.prediction_id, new.id, 'new_comment'
+  from public.predictions p
+  join public.profiles pr on pr.id = p.author_id
+  where p.id = new.prediction_id
+    and p.author_id <> new.author_id
+    and coalesce((pr.notification_prefs->>'new_comment')::boolean, true)
+  on conflict (user_id, comment_id, type) where comment_id is not null do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists prediction_comments_notify_new_comment on public.prediction_comments;
+create trigger prediction_comments_notify_new_comment
+  after insert on public.prediction_comments
+  for each row execute function public.notify_new_comment();
+
+-- ---------------------------------------------------------------------------
+-- 50. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une

@@ -10,7 +10,9 @@ export type NotificationType =
   | 'prediction_mentioned'
   | 'prediction_realized'
   | 'prediction_missed'
-  | 'reveal_reminder';
+  | 'reveal_reminder'
+  | 'question_answered'
+  | 'new_comment';
 
 /**
  * Une notification telle que renvoyée par `public.notifications`. Selon le

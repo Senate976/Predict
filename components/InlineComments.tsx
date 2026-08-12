@@ -7,13 +7,16 @@ import { TextInput } from './TextInput';
 
 import {
   addComment,
+  castCommentEmojiReaction,
   commentErrorMessage,
   deleteComment,
   fetchComments,
   MAX_COMMENT_LENGTH,
+  removeCommentEmojiReaction,
   type Comment,
 } from '../lib/comments';
 import { formatTimeAgo } from '../lib/datetime';
+import { EMOJI_REACTIONS, type EmojiReaction } from '../lib/predictions';
 import { fonts, radius, type Colors } from '../lib/theme';
 import { useColors } from '../lib/themeMode';
 import { Avatar } from './Avatar';
@@ -26,6 +29,10 @@ import { Avatar } from './Avatar';
  * cas (auteur ou destinataire), sans condition de date.
  */
 const TRUNCATED_COUNT = 2;
+
+function commentTotalReactions(comment: Comment): number {
+  return Object.values(comment.emoji_counts).reduce((sum: number, count) => sum + (count ?? 0), 0);
+}
 
 export function InlineComments({
   predictionId,
@@ -56,6 +63,9 @@ export function InlineComments({
   const [replyingTo, setReplyingTo] = useState<{ id: string; username: string; preview: string } | null>(
     null
   );
+  // Un seul picker ouvert à la fois, identifié par l'id du commentaire visé —
+  // jamais deux bulles de réactions ouvertes en même temps sur le même fil.
+  const [reactingTo, setReactingTo] = useState<string | null>(null);
   const router = useRouter();
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -87,6 +97,46 @@ export function InlineComments({
       setComments(data ?? []);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  function adjustCounts(
+    counts: Partial<Record<EmojiReaction, number>>,
+    remove: EmojiReaction | null,
+    add: EmojiReaction | null
+  ): Partial<Record<EmojiReaction, number>> {
+    const next = { ...counts };
+    if (remove) next[remove] = Math.max(0, (next[remove] ?? 0) - 1);
+    if (add) next[add] = (next[add] ?? 0) + 1;
+    return next;
+  }
+
+  /** Même logique optimiste que la réaction sur la prédiction entière
+   * (`PredictionCard`) : pose/retire tout de suite, revient en arrière si
+   * l'appel échoue. */
+  async function handleCommentEmojiPress(comment: Comment, emoji: EmojiReaction) {
+    setReactingTo(null);
+    const previous = comment.my_emoji_reaction;
+    const next = previous === emoji ? null : emoji;
+    setComments((prev) =>
+      (prev ?? []).map((c) =>
+        c.id === comment.id
+          ? { ...c, my_emoji_reaction: next, emoji_counts: adjustCounts(c.emoji_counts, previous, next) }
+          : c
+      )
+    );
+    const { error: reactError } =
+      next === null
+        ? await removeCommentEmojiReaction(comment.id, userId)
+        : await castCommentEmojiReaction(comment.id, userId, next);
+    if (reactError) {
+      setComments((prev) =>
+        (prev ?? []).map((c) =>
+          c.id === comment.id
+            ? { ...c, my_emoji_reaction: previous, emoji_counts: adjustCounts(c.emoji_counts, next, previous) }
+            : c
+        )
+      );
     }
   }
 
@@ -169,19 +219,51 @@ export function InlineComments({
                     )}
                     {comment.content}
                   </Text>
-                  <Pressable
-                    onPress={() =>
-                      setReplyingTo({
-                        id: comment.id,
-                        username: comment.author.username,
-                        preview: comment.content,
-                      })
-                    }
-                    style={styles.replyLink}
-                    hitSlop={4}
-                  >
-                    <Text style={styles.replyLinkText}>Répondre</Text>
-                  </Pressable>
+                  <View style={styles.commentActionsRow}>
+                    <Pressable
+                      onPress={() =>
+                        setReplyingTo({
+                          id: comment.id,
+                          username: comment.author.username,
+                          preview: comment.content,
+                        })
+                      }
+                      style={styles.replyLink}
+                      hitSlop={4}
+                    >
+                      <Text style={styles.replyLinkText}>Répondre</Text>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() => setReactingTo((prev) => (prev === comment.id ? null : comment.id))}
+                      style={styles.reactLink}
+                      hitSlop={4}
+                    >
+                      <Text style={styles.reactLinkText}>
+                        {commentTotalReactions(comment) > 0
+                          ? `${comment.my_emoji_reaction ?? '👍'} ${commentTotalReactions(comment)}`
+                          : 'Réagir'}
+                      </Text>
+                    </Pressable>
+                  </View>
+
+                  {reactingTo === comment.id && (
+                    <View style={styles.commentEmojiPanel}>
+                      {EMOJI_REACTIONS.map((emoji) => (
+                        <Pressable
+                          key={emoji}
+                          onPress={() => handleCommentEmojiPress(comment, emoji)}
+                          style={[
+                            styles.commentEmojiItem,
+                            comment.my_emoji_reaction === emoji && styles.commentEmojiItemActive,
+                          ]}
+                          hitSlop={2}
+                        >
+                          <Text style={styles.commentEmojiItemText}>{emoji}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
                 </View>
               );
             })}
@@ -241,15 +323,41 @@ function createStyles(colors: Colors) {
     borderLeftColor: colors.border,
   },
   showMore: { alignSelf: 'flex-start', marginBottom: 2 },
-  showMoreText: { fontFamily: fonts.bodyEmphasis, fontSize: 12, color: colors.text },
+  showMoreText: { fontFamily: fonts.bodyEmphasis, fontSize: 14, color: colors.text },
   commentTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   commentAuthorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', flexShrink: 1 },
-  commentAuthor: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
-  commentTime: { fontSize: 11, color: colors.textFaint },
-  commentContent: { fontSize: 14, color: colors.text, marginTop: 4, lineHeight: 19 },
+  commentAuthor: { fontSize: 14, fontWeight: '700', color: colors.textMuted },
+  commentTime: { fontSize: 13, color: colors.textFaint },
+  commentContent: { fontSize: 17, color: colors.text, marginTop: 4, lineHeight: 23 },
   replyMention: { fontWeight: '700', color: colors.text },
-  replyLink: { alignSelf: 'flex-start', marginTop: 4 },
-  replyLinkText: { fontFamily: fonts.bodyEmphasis, fontSize: 11, color: colors.text },
+  commentActionsRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 4 },
+  replyLink: { alignSelf: 'flex-start' },
+  replyLinkText: { fontFamily: fonts.bodyEmphasis, fontSize: 13, color: colors.text },
+  reactLink: { alignSelf: 'flex-start' },
+  reactLinkText: { fontFamily: fonts.bodyEmphasis, fontSize: 13, color: colors.text },
+  // Petite bulle inline (pas de geste glissé, contrairement à celle de la
+  // prédiction entière) — un tap ouvre/ferme, un tap sur un emoji réagit.
+  commentEmojiPanel: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 6,
+    padding: 6,
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignSelf: 'flex-start',
+  },
+  commentEmojiItem: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  commentEmojiItemActive: { backgroundColor: colors.accentSoft },
+  commentEmojiItemText: { fontSize: 16 },
   replyingBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -263,25 +371,31 @@ function createStyles(colors: Colors) {
   },
   replyingText: { flex: 1, fontSize: 12, color: colors.textMuted },
   error: { color: colors.danger, fontSize: 12, marginBottom: 6 },
-  inputRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-end' },
+  // `alignItems: 'center'` plutôt que `flex-end` : le bouton Envoyer se
+  // callait sur le bas d'un champ multiligne, ce qui le poussait visiblement
+  // plus bas que le texte de la première ligne au lieu d'être centré dessus.
+  inputRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  // Zones agrandies d'environ 20 % (padding, taille de texte, hauteur max) —
+  // les précédentes se lisaient comme trop petites, y compris pour répondre
+  // à un commentaire (même champ, partagé avec un premier commentaire).
   input: {
     flex: 1,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.sm,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 13,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 16,
     color: colors.text,
     backgroundColor: colors.surface,
-    maxHeight: 80,
+    maxHeight: 96,
   },
   send: {
     backgroundColor: colors.accent,
     borderRadius: radius.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 17,
+    paddingVertical: 12,
   },
-  sendText: { color: colors.textOnAccent, fontSize: 12, fontWeight: '700' },
+  sendText: { color: colors.textOnAccent, fontSize: 14, fontWeight: '700' },
   });
 }

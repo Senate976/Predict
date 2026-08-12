@@ -119,6 +119,14 @@ export default function NewPredictionScreen() {
   const [selectedFriendIds, setSelectedFriendIds] = useState<Set<string>>(new Set());
   const [groups, setGroups] = useState<FriendGroup[] | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  // Filtre la liste de puces « Amis » — recherche simple, pas de suggestion
+  // au fil de la frappe (contrairement à la citation « @ » ci-dessous).
+  const [friendSearchQuery, setFriendSearchQuery] = useState('');
+  // Position du curseur dans le contenu, suivie via `onSelectionChange` —
+  // sert à retrouver le « @pseudo » en cours de frappe (pas forcément en fin
+  // de texte) et à replacer le curseur juste après le pseudo une fois inséré.
+  const [contentSelection, setContentSelection] = useState({ start: 0, end: 0 });
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -138,6 +146,41 @@ export default function NewPredictionScreen() {
   const remaining = MAX_CONTENT_LENGTH - trimmedContent.length;
   const hasUnsavedContent =
     trimmedTeaser.length > 0 || trimmedContent.length > 0 || !!audioUri || !!selectedDate;
+
+  // Repéré juste avant le curseur, jamais ailleurs dans le texte — sinon un
+  // « @ » déjà validé plus haut rouvrirait les suggestions à chaque frappe
+  // suivante. `(?:^|\s)` : le « @ » doit démarrer un mot, pas être collé à
+  // un caractère normal.
+  useEffect(() => {
+    const before = content.slice(0, contentSelection.start);
+    const match = before.match(/(?:^|\s)@([a-zA-Z0-9_]*)$/);
+    setMentionQuery(match ? match[1] : null);
+  }, [content, contentSelection.start]);
+
+  const mentionSuggestions =
+    mentionQuery !== null && friends
+      ? friends.filter((f) => f.username.toLowerCase().startsWith(mentionQuery.toLowerCase())).slice(0, 5)
+      : [];
+
+  /** Remplace le « @partiel » juste avant le curseur par le pseudo complet,
+   * puis replace le curseur juste après (espace inclus, pour enchaîner sur
+   * la suite de la phrase sans y penser). */
+  function insertMention(username: string) {
+    const cursor = contentSelection.start;
+    const before = content.slice(0, cursor);
+    const atIndex = before.lastIndexOf('@');
+    if (atIndex === -1) return;
+    const newBefore = `${content.slice(0, atIndex)}@${username} `;
+    setContent(newBefore + content.slice(cursor));
+    setMentionQuery(null);
+    setContentSelection({ start: newBefore.length, end: newBefore.length });
+  }
+
+  const filteredFriends = friendSearchQuery.trim()
+    ? (friends ?? []).filter((f) =>
+        f.username.toLowerCase().includes(friendSearchQuery.trim().toLowerCase())
+      )
+    : friends;
 
   // Avertit avant d'abandonner une prédiction en cours de rédaction — sans ça,
   // un retour accidentel (bouton « Annuler », geste retour) perdait tout sans
@@ -448,6 +491,8 @@ export default function NewPredictionScreen() {
               <TextInput
                 value={content}
                 onChangeText={setContent}
+                onSelectionChange={(e) => setContentSelection(e.nativeEvent.selection)}
+                selection={contentSelection}
                 placeholder={
                   isQuestion
                     ? 'Posez votre question à votre cercle...'
@@ -459,6 +504,23 @@ export default function NewPredictionScreen() {
                 maxLength={MAX_CONTENT_LENGTH}
                 style={[styles.input, styles.contentInput, styles.fieldSpacing]}
               />
+              {/* Suggestions dès que le texte juste avant le curseur ressemble
+                  à un « @pseudo » en cours de frappe — un tap insère le
+                  pseudo complet et referme la liste. */}
+              {mentionSuggestions.length > 0 && (
+                <View style={styles.mentionSuggestions}>
+                  {mentionSuggestions.map((friend) => (
+                    <Pressable
+                      key={friend.id}
+                      onPress={() => insertMention(friend.username)}
+                      style={styles.mentionSuggestionRow}
+                    >
+                      <Avatar url={friend.avatar_url} username={friend.username} size={22} />
+                      <Text style={styles.mentionSuggestionText}>{friend.username}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
               <Text style={[styles.counter, remaining < 20 && styles.counterLow]}>
                 {remaining} caractères restants
               </Text>
@@ -674,37 +736,51 @@ export default function NewPredictionScreen() {
           )}
 
           {scope === 'selected' && (
-            <View style={styles.friendsBox}>
-              {friends === null ? (
-                <ActivityIndicator color={colors.text} style={styles.searchLoader} />
-              ) : friends.length === 0 ? (
-                <Text style={styles.hint}>
-                  Tu n’as pas encore d’ami accepté dans ton Cercle.
-                </Text>
-              ) : (
-                friends.map((friend) => {
-                  const selected = selectedFriendIds.has(friend.id);
-                  return (
-                    <Pressable
-                      key={friend.id}
-                      onPress={() => toggleFriend(friend.id)}
-                      disabled={submitting}
-                      style={[styles.friendChip, selected && styles.friendChipActive]}
-                    >
-                      <Avatar url={friend.avatar_url} username={friend.username} size={20} />
-                      <Text
-                        style={[
-                          styles.friendChipText,
-                          selected && styles.friendChipTextActive,
-                        ]}
-                      >
-                        {friend.username}
-                      </Text>
-                    </Pressable>
-                  );
-                })
+            <>
+              {friends !== null && friends.length > 0 && (
+                <TextInput
+                  value={friendSearchQuery}
+                  onChangeText={setFriendSearchQuery}
+                  placeholder="Rechercher un ami…"
+                  placeholderTextColor={colors.textFaint}
+                  editable={!submitting}
+                  style={[styles.input, styles.fieldSpacing]}
+                />
               )}
-            </View>
+              <View style={styles.friendsBox}>
+                {friends === null ? (
+                  <ActivityIndicator color={colors.text} style={styles.searchLoader} />
+                ) : friends.length === 0 ? (
+                  <Text style={styles.hint}>
+                    Tu n’as pas encore d’ami accepté dans ton Cercle.
+                  </Text>
+                ) : filteredFriends && filteredFriends.length === 0 ? (
+                  <Text style={styles.hint}>Aucun ami ne correspond à cette recherche.</Text>
+                ) : (
+                  (filteredFriends ?? []).map((friend) => {
+                    const selected = selectedFriendIds.has(friend.id);
+                    return (
+                      <Pressable
+                        key={friend.id}
+                        onPress={() => toggleFriend(friend.id)}
+                        disabled={submitting}
+                        style={[styles.friendChip, selected && styles.friendChipActive]}
+                      >
+                        <Avatar url={friend.avatar_url} username={friend.username} size={20} />
+                        <Text
+                          style={[
+                            styles.friendChipText,
+                            selected && styles.friendChipTextActive,
+                          ]}
+                        >
+                          {friend.username}
+                        </Text>
+                      </Pressable>
+                    );
+                  })
+                )}
+              </View>
+            </>
           )}
 
           {error && <Text style={styles.error}>{error}</Text>}
@@ -786,6 +862,26 @@ function createStyles(colors: Colors) {
   addOptionButtonText: { fontSize: 14, fontWeight: '700', color: colors.accent },
   counter: { fontSize: 12, color: colors.textFaint, marginTop: 6, textAlign: 'right' },
   counterLow: { color: colors.danger },
+  // Liste de suggestions pour une citation « @ » en cours de frappe — sous
+  // le champ de contenu, jamais un menu flottant par-dessus le clavier.
+  mentionSuggestions: {
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceRaised,
+    overflow: 'hidden',
+  },
+  mentionSuggestionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  mentionSuggestionText: { fontSize: 14, fontWeight: '600', color: colors.text },
   hint: { fontSize: 13, color: colors.textMuted, marginTop: 10, lineHeight: 18 },
   sectionHint: { fontSize: 13, color: colors.textMuted, marginBottom: 10, lineHeight: 18 },
   row: { flexDirection: 'row', gap: 12 },
