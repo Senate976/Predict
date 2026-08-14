@@ -915,7 +915,7 @@ function createStyles(colors: Colors) {
   timeField: { flex: 1 },
   preview: { fontSize: 14, color: colors.textMuted, marginTop: 14 },
   // Trait sous le choix plutôt qu'un bouton de couleur — même registre sobre
-  // que les onglets Mon Fil / Mes Predicts du Fil, jamais un aplat plein pour
+  // que les onglets Predict / Révélés du Fil, jamais un aplat plein pour
   // un simple choix parmi d'autres (réservé au CTA principal).
   scopeRow: {
     flexDirection: 'row',

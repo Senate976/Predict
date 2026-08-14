@@ -44,11 +44,12 @@ const TICK_MS = 30_000;
 
 type AuthorInfo = { username: string; avatar_url: string | null };
 type AuthorMap = Record<string, AuthorInfo>;
-/** `feed` : les Predicts des autres (amis, groupes — et de futures
- * suggestions). `mine` : uniquement les siens. Révélés ou non des deux
- * côtés désormais : ce qui distingue les deux onglets, c'est qui a écrit
- * la prédiction, plus son statut de révélation. */
-type Tab = 'feed' | 'mine';
+/** `predict` : tout ce qui n'est pas encore révélé/clos — Scellées et
+ * Sondages encore ouverts. `revealed` : tout ce qui l'est déjà — Révélées et
+ * Sondages clos. Les siennes et celles reçues mélangées dans les deux cas :
+ * ce qui distingue les deux onglets, c'est uniquement le statut de
+ * révélation, jamais qui a écrit la prédiction. */
+type Tab = 'predict' | 'revealed';
 type SortOrder = 'recent' | 'oldest';
 type SortKey = 'default' | 'seal' | 'reveal';
 type MenuView = 'main' | 'author';
@@ -72,14 +73,13 @@ export default function HomeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => new Date());
-  // Le Fil par défaut, à gauche — c'est ce qu'on veut voir en premier en
-  // ouvrant l'app : ce que prédit son Cercle, pas son propre journal.
-  const [tab, setTab] = useState<Tab>('feed');
+  // « Predict » par défaut, à gauche — c'est ce qu'on veut voir en premier en
+  // ouvrant l'app : ce qui reste à découvrir, pas ce qui est déjà joué.
+  const [tab, setTab] = useState<Tab>('predict');
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuView, setMenuView] = useState<MenuView>('main');
   const [authorFilter, setAuthorFilter] = useState<string | null>(null);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
-  const [unrevealedOnly, setUnrevealedOnly] = useState(false);
   // `'default'` : l'ordre de chaque onglet reste celui déjà établi (À venir
   // par publication, Passées par date de révélation) — un tri par date de
   // scellé ou de révélation est une bascule optionnelle, pas un nouveau défaut.
@@ -95,12 +95,11 @@ export default function HomeScreen() {
     }
   }
 
-  const hasActiveFilters = authorFilter !== null || favoritesOnly || unrevealedOnly || sortKey !== 'default';
+  const hasActiveFilters = authorFilter !== null || favoritesOnly || sortKey !== 'default';
 
   function resetFilters() {
     setAuthorFilter(null);
     setFavoritesOnly(false);
-    setUnrevealedOnly(false);
     setSortKey('default');
     setSortOrder('recent');
   }
@@ -261,14 +260,14 @@ export default function HomeScreen() {
   }
 
   const byTab = (feed ?? []).filter((item) =>
-    tab === 'mine' ? item.author_id === userId : item.author_id !== userId
+    tab === 'revealed' ? isRevealed(item, now) : !isRevealed(item, now)
   );
   const hiddenCount = byTab.filter((item) => item.is_hidden).length;
 
-  // Comptés indépendamment de l'onglet actif : le badge de « Mes Predicts »
-  // doit rester juste même quand on regarde « Fil », et inversement.
-  const unreadMine = (feed ?? []).filter((item) => item.author_id === userId && !item.is_seen).length;
-  const unreadFeed = (feed ?? []).filter((item) => item.author_id !== userId && !item.is_seen).length;
+  // Comptés indépendamment de l'onglet actif : le badge de « Révélés »
+  // doit rester juste même quand on regarde « Predict », et inversement.
+  const unreadPredict = (feed ?? []).filter((item) => !isRevealed(item, now) && !item.is_seen).length;
+  const unreadRevealed = (feed ?? []).filter((item) => isRevealed(item, now) && !item.is_seen).length;
 
   const authorEntries = Array.from(new Set(byTab.map((item) => item.author_id))).map((id) => ({
     id,
@@ -278,8 +277,7 @@ export default function HomeScreen() {
   const filtered = byTab
     .filter((item) => !item.is_hidden)
     .filter((item) => !authorFilter || item.author_id === authorFilter)
-    .filter((item) => !favoritesOnly || item.is_favorite)
-    .filter((item) => !unrevealedOnly || !isRevealed(item, now));
+    .filter((item) => !favoritesOnly || item.is_favorite);
 
   const shown = [...filtered].sort((a, b) => {
     if (sortKey === 'seal') {
@@ -290,9 +288,7 @@ export default function HomeScreen() {
       const diff = new Date(b.reveal_at).getTime() - new Date(a.reveal_at).getTime();
       return sortOrder === 'recent' ? -diff : diff;
     }
-    // Défaut : ordre de publication, le plus récent en tête — les deux
-    // onglets mêlent maintenant révélés et non révélés, l'ordre de scellé
-    // reste le seul repère chronologique valable pour les deux à la fois.
+    // Défaut : ordre de publication, le plus récent en tête.
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
@@ -322,19 +318,19 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.tabs}>
-        <Pressable onPress={() => setTab('feed')} style={[styles.tab, tab === 'feed' && styles.tabActive]}>
-          <Text style={[styles.tabText, tab === 'feed' && styles.tabTextActive]}>Mon Fil</Text>
-          {unreadFeed > 0 && (
+        <Pressable onPress={() => setTab('predict')} style={[styles.tab, tab === 'predict' && styles.tabActive]}>
+          <Text style={[styles.tabText, tab === 'predict' && styles.tabTextActive]}>Predict</Text>
+          {unreadPredict > 0 && (
             <View style={styles.tabBadge}>
-              <Text style={styles.tabBadgeText}>{unreadFeed > 99 ? '99+' : unreadFeed}</Text>
+              <Text style={styles.tabBadgeText}>{unreadPredict > 99 ? '99+' : unreadPredict}</Text>
             </View>
           )}
         </Pressable>
-        <Pressable onPress={() => setTab('mine')} style={[styles.tab, tab === 'mine' && styles.tabActive]}>
-          <Text style={[styles.tabText, tab === 'mine' && styles.tabTextActive]}>Mes Predicts</Text>
-          {unreadMine > 0 && (
+        <Pressable onPress={() => setTab('revealed')} style={[styles.tab, tab === 'revealed' && styles.tabActive]}>
+          <Text style={[styles.tabText, tab === 'revealed' && styles.tabTextActive]}>Révélés</Text>
+          {unreadRevealed > 0 && (
             <View style={styles.tabBadge}>
-              <Text style={styles.tabBadgeText}>{unreadMine > 99 ? '99+' : unreadMine}</Text>
+              <Text style={styles.tabBadgeText}>{unreadRevealed > 99 ? '99+' : unreadRevealed}</Text>
             </View>
           )}
         </Pressable>
@@ -405,18 +401,12 @@ export default function HomeScreen() {
                   )}
                 </Pressable>
 
-                <Pressable onPress={() => setFavoritesOnly((o) => !o)} style={styles.menuRow}>
-                  <Text style={[styles.menuRowText, favoritesOnly && styles.menuRowTextActive]}>
-                    ★ Favoris uniquement
-                  </Text>
-                </Pressable>
-
                 <Pressable
-                  onPress={() => setUnrevealedOnly((o) => !o)}
+                  onPress={() => setFavoritesOnly((o) => !o)}
                   style={hiddenCount === 0 && !hasActiveFilters ? styles.menuRowLast : styles.menuRow}
                 >
-                  <Text style={[styles.menuRowText, unrevealedOnly && styles.menuRowTextActive]}>
-                    Non révélés uniquement
+                  <Text style={[styles.menuRowText, favoritesOnly && styles.menuRowTextActive]}>
+                    ★ Favoris uniquement
                   </Text>
                 </Pressable>
 
@@ -492,22 +482,16 @@ export default function HomeScreen() {
         ) : shown.length === 0 ? (
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>
-              {tab === 'mine' ? (
-                <>
-                  Aucun <PredictWord /> écrit pour l’instant.
-                </>
-              ) : (
-                'Rien de ton Cercle pour l’instant.'
-              )}
+              {tab === 'predict' ? 'Rien de scellé ni de Sondage en cours.' : 'Rien de révélé pour l’instant.'}
             </Text>
-            {tab === 'mine' ? (
+            {tab === 'predict' ? (
               <Text style={styles.emptyText}>
-                Écris ce que tu vois venir pour quelqu’un de ton cercle, et choisis
-                quand ça se dévoile.
+                Les <PredictWord /> pas encore révélés et les Sondages pas encore clos apparaîtront ici — les tiens
+                comme ceux de ton Cercle.
               </Text>
             ) : (
               <Text style={styles.emptyText}>
-                Les Predicts de tes amis et de tes groupes apparaîtront ici.
+                Les <PredictWord /> révélés et les Sondages clos apparaîtront ici.
               </Text>
             )}
           </View>
