@@ -2,7 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { radius, wax, type Colors } from '../lib/theme';
+import { radius, type Colors } from '../lib/theme';
 import { useColors } from '../lib/themeMode';
 
 /** Diamètre du curseur — partagé par la carte et l'écran détail, pour un
@@ -10,11 +10,10 @@ import { useColors } from '../lib/themeMode';
 const CURSOR_SIZE = 13;
 
 /**
- * Le trait parchemin → tan → bordeaux surmonté du curseur en forme de petit
- * cachet de cire qui marque le pourcentage de confiance — même rendu que le
- * Prediscore du Profil (`PrediscoreGauge`). Purement visuel : le libellé
- * chiffré reste à la charge de l'appelant (carte et écran détail l'affichent
- * différemment).
+ * Le trait fond → bleu clair → jaune surmonté d'un petit curseur rond doré
+ * qui marque le pourcentage de confiance — même rendu que le Prediscore du
+ * Profil (`PrediscoreGauge`). Purement visuel : le libellé chiffré reste à la
+ * charge de l'appelant (carte et écran détail l'affichent différemment).
  */
 export function ConfidenceGauge({ belief }: { belief: number }) {
   const colors = useColors();
@@ -29,7 +28,7 @@ export function ConfidenceGauge({ belief }: { belief: number }) {
         style={styles.trackLine}
       />
       <View style={[styles.cursorWrap, { left: `${belief}%`, marginLeft: -CURSOR_SIZE / 2 }]}>
-        <LinearGradient colors={wax} start={{ x: 0.25, y: 0.15 }} end={{ x: 0.85, y: 1 }} style={styles.cursor} />
+        <View style={styles.cursor} />
       </View>
     </View>
   );
@@ -44,14 +43,11 @@ function createStyles(colors: Colors) {
       width: CURSOR_SIZE,
       height: CURSOR_SIZE,
     },
-    // Blob irrégulier plutôt qu'un rond plat, comme le cachet principal
-    // (`PredictionSeal`) — même asymétrie de coins, miniaturisée.
     cursor: {
       width: '100%',
       height: '100%',
       borderRadius: 999,
-      borderTopLeftRadius: CURSOR_SIZE * 0.42,
-      borderBottomRightRadius: CURSOR_SIZE * 0.4,
+      backgroundColor: colors.accent,
       borderWidth: 2,
       borderColor: colors.surface,
       shadowColor: '#000',
