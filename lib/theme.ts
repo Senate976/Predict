@@ -1,14 +1,11 @@
-// Charte graphique « Le pli » : chaque prédiction est une enveloppe scellée
-// à la cire — fermée tant qu'elle est masquée, ouverte avec la lettre qui en
-// sort une fois révélée. Une seule couleur d'accent (bordeaux) dans toute
-// l'app : plus de vert/rouge/bleu par statut comme dans l'ancienne charte —
-// les verdicts (réalisé/manqué) se distinguent par un tampon encré, pas par
-// la couleur. Deux palettes (claire par défaut, sombre en option — voir
-// Paramètres > Apparence, `lib/themeMode.tsx`) : la claire reprend
-// exactement les tokens du design (parchemin/encre/bordeaux), la sombre en
-// est une variante nocturne qui garde les mêmes rôles de tokens. Un seul
-// endroit à changer si l'une des deux palettes évolue — tous les écrans
-// importent `useColors()` plutôt que de coder leurs propres couleurs.
+// Nouvelle charte graphique (2026) : fond très clair (mode clair) ou bleu nuit
+// profond (mode sombre), accent jaune unique, enveloppe en bleu clair semi-
+// transparent, lettre couleur papier à bordure jaune. Trois couleurs de marque
+// (jaune, bleu clair, bleu foncé) posées sur les deux fonds de référence —
+// tout le reste de la palette (textes secondaires, bordures, rouge
+// fonctionnel...) est dérivé de ces cinq couleurs pour rester cohérent. Un
+// seul endroit à changer si la palette évolue — tous les écrans importent
+// `useColors()` plutôt que de coder leurs propres couleurs.
 
 /** Forme commune aux deux palettes — paramètre de toute fonction de style qui
  * doit réagir au thème (voir `useColors()`, `lib/themeMode.tsx`). Un type
@@ -42,106 +39,103 @@ export type Colors = {
   fab: string;
   fabBorder: string;
   fabIcon: string;
-  envelopeBody: readonly [string, string];
-  envelopeFlap: readonly [string, string];
+  // Corps/rabat de l'enveloppe (`PredictionCard`) — un seul bleu clair,
+  // posé en semi-transparence à deux niveaux d'opacité (rabat plus marqué
+  // que le corps) plutôt qu'un dégradé : ces deux valeurs sont déjà des
+  // `rgba()`, prêtes à être utilisées telles quelles comme `fill` SVG.
+  envelopeBody: string;
+  envelopeFlap: string;
+  // Papier de la lettre révélée — crème, toujours le même sur les deux
+  // fonds (comme un vrai papier, qui ne s'assombrit pas dans le noir).
+  letterPaper: string;
 };
 
 export const lightColors: Colors = {
-  // Fond de page : parchemin clair (approximation plate du dégradé
-  // `linear-gradient(160deg, #F1E8D3, #E6D6AC)` du design — la plupart des
-  // écrans posent un aplat de fond, voir `backgroundGradient` ci-dessous pour
-  // les quelques endroits qui peuvent se permettre un vrai dégradé).
-  background: '#ECDFBE',
-  backgroundGradient: ['#F1E8D3', '#E6D6AC'],
-  // Papier — cartes, enveloppes, lettres (`linear-gradient(180deg, #FDFAF0,
-  // #F5EDD8)` dans le design, ici l'aplat du milieu).
-  surface: '#F5EDD8',
-  // Papier plus clair — modales, panneaux flottants, tout ce qui doit
-  // sembler « au-dessus » d'une carte.
-  surfaceRaised: '#FDFAF0',
-  border: 'rgba(36, 26, 18, 0.18)',
-  // Encre.
-  text: '#241A12',
-  textMuted: '#5C4A38',
-  textFaint: '#8A7256',
-  // Accent unique — cire, tampon, CTA. Jamais un aplat de fond de carte ou
-  // d'en-tête, seulement bordures/pastilles/boutons d'action ciblés.
-  accent: '#8B2432',
-  accentBright: '#701C28',
-  accentSoft: 'rgba(139, 36, 50, 0.12)',
-  // Texte/icônes posés sur un aplat d'accent plein (CTA, pastille) — crème,
-  // jamais l'encre (illisible sur bordeaux).
-  textOnAccent: '#F5EDD8',
-  // Étape intermédiaire des dégradés parchemin → bordeaux (Prediscore) —
-  // tan/cuir, pour une transition propre plutôt qu'une interpolation directe
-  // qui traverserait un brun terne.
-  accentTransition: '#B89A66',
+  background: '#F9FCFE',
+  backgroundGradient: ['#F9FCFE', '#F9FCFE'],
+  surface: '#FFFFFF',
+  surfaceRaised: '#FFFFFF',
+  border: 'rgba(66, 97, 112, 0.16)',
+  // Bleu foncé de marque — texte, icônes, encre du tampon.
+  text: '#426170',
+  textMuted: '#5C7A8A',
+  textFaint: '#8AA3AF',
+  // Jaune de marque — accent unique, cachet, CTA. Jamais un aplat de fond de
+  // carte ou d'en-tête, seulement bordures/pastilles/boutons d'action ciblés.
+  accent: '#ECA835',
+  accentBright: '#D4901E',
+  accentSoft: 'rgba(236, 168, 53, 0.16)',
+  // Texte/icônes posés sur un aplat d'accent plein (CTA, pastille) — encre
+  // foncée, jamais un clair (illisible sur jaune).
+  textOnAccent: '#2A3B47',
+  // Étape intermédiaire des dégradés (Prediscore) — bleu clair de marque.
+  accentTransition: '#7AB8C2',
   // Rouge fonctionnel, réservé aux erreurs et actions destructrices — pas une
-  // couleur de marque, un signal d'alerte standard, teinté pour rester dans
-  // le registre chaud de la charte plutôt qu'un rouge froid générique.
-  danger: '#B3261E',
-  dangerSoft: 'rgba(179, 38, 30, 0.1)',
-  notificationBadge: '#8B2432',
-  // Encre neutre du tampon « Manqué » — un vrai tampon encré, jamais le
-  // bordeaux (réservé à « Encore raison ») : les deux verdicts se distinguent
-  // par leur texte et cette teinte, jamais par un code couleur façon
-  // sémaphore.
-  ink: '#3A2E22',
-  avatarNeutral: '#D9C295',
-  icon: '#5C4A38',
-  footerIconInactive: '#8A7256',
-  navBar: '#F5EDD8',
-  navBarActive: '#8B2432',
-  navBarInactive: '#8A7256',
-  fab: '#F5EDD8',
-  fabBorder: '#8B2432',
-  fabIcon: '#8B2432',
-  // Corps et rabat de l'enveloppe (`PredictionCard`, `PredictionSeal`) —
-  // dégradés tan/cuir, distincts du papier qu'ils encadrent.
-  envelopeBody: ['#D9BE8C', '#B89A66'],
-  envelopeFlap: ['#ECDCB2', '#D4B98A'],
+  // couleur de marque, un signal d'alerte standard.
+  danger: '#C0392B',
+  dangerSoft: 'rgba(192, 57, 43, 0.1)',
+  notificationBadge: '#C0392B',
+  ink: '#426170',
+  avatarNeutral: '#DCEEF0',
+  icon: '#5C7A8A',
+  footerIconInactive: '#8AA3AF',
+  navBar: '#FFFFFF',
+  navBarActive: '#ECA835',
+  navBarInactive: '#8AA3AF',
+  fab: '#ECA835',
+  fabBorder: '#ECA835',
+  fabIcon: '#2A3B47',
+  // Bleu clair de marque (#7AB8C2) en semi-transparence — voir le commentaire
+  // du type ci-dessus. Composée sur le fond de page, elle donne le bleu pâle
+  // de la maquette sans avoir besoin d'une teinte séparée par thème : sur fond
+  // sombre, la même transparence s'assombrit d'elle-même.
+  envelopeBody: 'rgba(122, 184, 194, 0.30)',
+  envelopeFlap: 'rgba(122, 184, 194, 0.37)',
+  letterPaper: '#F5E6C9',
 };
 
 /**
- * Palette sombre : mêmes rôles de tokens, fond encre profonde, papier assombri
- * façon parchemin sous chandelle — l'accent bordeaux s'éclaircit pour rester
- * lisible sur fond sombre (même logique que l'ancien jaune sombre/clair).
+ * Palette sombre : mêmes rôles de tokens, fond bleu nuit profond — les
+ * couleurs de marque (jaune, bleus) restent identiques, seuls textes/
+ * surfaces/bordures s'inversent pour rester lisibles.
  */
 export const darkColors: Colors = {
-  background: '#171009',
-  backgroundGradient: ['#1D150C', '#120D07'],
-  surface: '#241A12',
-  surfaceRaised: '#2E2117',
-  border: 'rgba(245, 237, 216, 0.12)',
-  text: '#F5EDD8',
-  textMuted: '#C9B896',
-  textFaint: '#8F7C5F',
-  accent: '#C15866',
-  accentBright: '#D97686',
-  accentSoft: 'rgba(193, 88, 102, 0.18)',
-  textOnAccent: '#241A12',
-  accentTransition: '#8B6B3E',
-  danger: '#E5675F',
-  dangerSoft: 'rgba(229, 103, 95, 0.14)',
-  notificationBadge: '#C15866',
-  ink: '#D8CBB0',
-  avatarNeutral: '#5C4A38',
-  icon: '#C9B896',
-  footerIconInactive: '#8F7C5F',
-  navBar: '#171009',
-  navBarActive: '#C15866',
-  navBarInactive: '#8F7C5F',
-  fab: '#2E2117',
-  fabBorder: '#C15866',
-  fabIcon: '#C15866',
-  envelopeBody: ['#4A3826', '#332415'],
-  envelopeFlap: ['#5C4830', '#3E2C1A'],
+  background: '#1C2737',
+  backgroundGradient: ['#1C2737', '#1C2737'],
+  surface: '#243248',
+  surfaceRaised: '#2B3B54',
+  border: 'rgba(220, 234, 240, 0.14)',
+  text: '#DCEAF0',
+  textMuted: '#93AAB6',
+  textFaint: '#647F8C',
+  accent: '#ECA835',
+  accentBright: '#F2BB5C',
+  accentSoft: 'rgba(236, 168, 53, 0.2)',
+  textOnAccent: '#22303B',
+  accentTransition: '#7AB8C2',
+  danger: '#E5695C',
+  dangerSoft: 'rgba(229, 105, 92, 0.16)',
+  notificationBadge: '#E5695C',
+  ink: '#DCEAF0',
+  avatarNeutral: '#2E4257',
+  icon: '#93AAB6',
+  footerIconInactive: '#647F8C',
+  navBar: '#1C2737',
+  navBarActive: '#ECA835',
+  navBarInactive: '#647F8C',
+  fab: '#ECA835',
+  fabBorder: '#ECA835',
+  fabIcon: '#22303B',
+  // Même rgba qu'en clair — voir le commentaire de `lightColors.envelopeBody`.
+  envelopeBody: 'rgba(122, 184, 194, 0.30)',
+  envelopeFlap: 'rgba(122, 184, 194, 0.37)',
+  letterPaper: '#F5E6C9',
 };
 
-/** Dégradé de la cire — cachet et curseurs en forme de cachet (Prediscore) :
- * un objet physique, pas affecté par le thème actif, donc un seul jeu de
- * teintes pour les deux palettes. */
-export const wax = ['#C15866', '#8B2432', '#5C121C', '#3E0A12'] as const;
+/** Dégradé de la cire du cachet — objet physique, pas affecté par le thème
+ * actif, donc un seul jeu de teintes pour les deux palettes. Jaune de marque,
+ * du plus clair (reflet) au plus sombre (ombre portée). */
+export const wax = ['#F2C169', '#ECA835', '#C6841B', '#8F5E10'] as const;
 
 export const radius = {
   sm: 8,
@@ -165,28 +159,24 @@ export const spacing = {
 } as const;
 
 /**
- * Deux familles : Spectral pour tout ce qui « s'écrit » (titres, corps de
- * prédiction, teaser) — jamais de l'UI ; Archivo pour l'interface (boutons,
- * labels, onglets, méta). `display`/`bodyEmphasis`/`serifItalic` sont
- * Spectral, `body`/`label`/`sansBold` sont Archivo. Chaque nom doit
- * correspondre exactement à la clé passée à `useFonts` dans
- * `app/_layout.tsx`, faute de quoi React Native retombe silencieusement sur
- * la police système.
+ * Deux familles : Roboto pour les titres (écrans, mot-symbole « Predict »),
+ * Roboto Mono pour tout le reste (corps de prédiction, boutons, labels,
+ * onglets, méta) — charte 2026. Chaque nom doit correspondre exactement à la
+ * clé passée à `useFonts` dans `app/_layout.tsx`, faute de quoi React Native
+ * retombe silencieusement sur la police système.
  */
 export const fonts = {
-  // Titres d'écran, mot-symbole « Predict », gros corps de prédiction.
-  display: 'Spectral_700Bold',
-  bodyEmphasis: 'Spectral_600SemiBold',
-  // Teaser et citations — l'italique est une vraie fonte italique chargée à
-  // part, pas un `fontStyle: 'italic'` appliqué à la romaine.
-  serifItalic: 'Spectral_400Regular_Italic',
-  // Interface : titres de carte, boutons, onglets.
-  sansBold: 'Archivo_700Bold',
+  // Titres d'écran, mot-symbole « Predict ».
+  display: 'Roboto_700Bold',
+  // Le reste : Roboto Mono, à différents poids selon le rôle.
+  bodyEmphasis: 'RobotoMono_700Bold',
+  serifItalic: 'RobotoMono_400Regular_Italic',
+  sansBold: 'RobotoMono_700Bold',
   // Texte courant, police par défaut de `<Text>`/`<TextInput>`.
-  body: 'Archivo_400Regular',
+  body: 'RobotoMono_400Regular',
   // Métadonnées et étiquettes d'état — toujours petites, majuscules,
   // trackées, jamais le texte courant.
-  label: 'Archivo_500Medium',
+  label: 'RobotoMono_500Medium',
 } as const;
 
 /**

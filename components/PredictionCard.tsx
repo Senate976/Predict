@@ -1,4 +1,3 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import {
   Eye,
@@ -23,7 +22,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import Svg, { Polygon } from 'react-native-svg';
+import Svg, { Circle, Polygon } from 'react-native-svg';
 import { Text } from './Text';
 
 import { fetchCommentCount } from '../lib/comments';
@@ -42,7 +41,7 @@ import {
   type EmojiReactor,
   type PredictionFeedItem,
 } from '../lib/predictions';
-import { fonts, radius, wax, type Colors } from '../lib/theme';
+import { fonts, radius, type Colors } from '../lib/theme';
 import { useColors } from '../lib/themeMode';
 import { Avatar } from './Avatar';
 import { InlineComments } from './InlineComments';
@@ -69,22 +68,30 @@ const SEALED_CONTENT_PLACEHOLDER =
 const GLOW_PULSE_CYCLE_MS = 750;
 const GLOW_PULSE_TOTAL_MS = GLOW_PULSE_CYCLE_MS * 2;
 
-/** Hauteur du bandeau de rabat, en haut de l'enveloppe — fixe plutôt qu'un
- * pourcentage de la hauteur de la carte (qui varie avec le contenu, contrai-
- * rement à la maquette) : assez grand pour dominer le haut de la carte,
- * comme sur la maquette « Le pli » — un simple bandeau fin ne se lisait pas
- * comme un vrai rabat d'enveloppe. */
-const FLAP_HEIGHT = 108;
-/** Décalage (négatif) de la lettre sous le bandeau de rabat — assez pour
- * qu'elle semble sortir de sous la pointe du rabat, jamais flottante. */
-const LETTER_OVERLAP = 26;
-/** Hauteur, tout en haut du rabat, gardée pleine largeur avant que le
- * triangle ne commence à se resserrer — juste assez pour que l'étiquette
- * d'état (SCELLÉ, etc.) reste toujours entièrement sur fond foncé, même son
- * dernier caractère. Sans elle, le triangle seul se resserre trop tôt et le
- * bout du libellé tombe sur le papier clair de la carte, invisible (le texte
- * de l'étiquette est clair, prévu pour se lire sur le rabat foncé). */
-const FLAP_LABEL_SAFE_HEIGHT = 28;
+/** Hauteur du rabat, en haut de l'enveloppe — fixe plutôt qu'un pourcentage
+ * de la hauteur de la carte (qui varie avec le contenu) : calibrée pour
+ * atteindre le ratio de la maquette (≈ 28 % de la largeur de carte) à une
+ * largeur de carte mobile typique, sans avoir à mesurer quoi que ce soit. */
+const FLAP_HEIGHT = 100;
+/** Hauteur visible du rabat « ouvert » qui pointe au-dessus de la lettre une
+ * fois révélée — juste la pointe, le reste est caché derrière la lettre (voir
+ * `EnvelopeFlapOpen`, calibré sur la maquette « predict révélée »). */
+const FLAP_OPEN_PEEK = 11;
+/** Décalage (négatif) de la lettre sous le rabat — assez pour ne laisser
+ * dépasser que `FLAP_OPEN_PEEK` du rabat ouvert derrière elle. */
+const LETTER_OVERLAP = FLAP_HEIGHT - FLAP_OPEN_PEEK;
+/** Diamètre du cachet, en proportion de `FLAP_HEIGHT` — calibré sur la
+ * maquette (le cachet fait ≈ 40 % de la hauteur du rabat). */
+const SEAL_SIZE = Math.round(FLAP_HEIGHT * 0.4);
+/** Cachet « ? » sur la lettre d'un Sondage — plus petit que celui d'une
+ * enveloppe Scellée, un repère décoratif dans le coin plutôt qu'une pièce
+ * maîtresse de la composition. */
+const QUESTION_SEAL_SIZE = Math.round(SEAL_SIZE * 0.85);
+/** Nombre de dents du bord crénelé du cachet — la maquette en compte une
+ * cinquantaine sur un cachet bien plus grand que son rendu réel dans l'app ;
+ * à la taille où `SealBadge` s'affiche ici, autant de dents se brouilleraient
+ * en un bord flou plutôt qu'un vrai crénelage lisible. */
+const SEAL_TEETH = 26;
 
 function easeInOutQuad(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2;
@@ -101,68 +108,78 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+/** Sommets d'un cercle crénelé (bord en dents de scie, alternant rayon plein
+ * et rayon creusé) — le bord du cachet de cire. Un polygone plutôt qu'un
+ * chemin à courbes : à la taille où le cachet s'affiche, l'un et l'autre se
+ * valent, et un polygone reste plus simple à générer. */
+function scallopPoints(size: number, teeth: number, dip: number): string {
+  const cx = size / 2;
+  const cy = size / 2;
+  const rOuter = size / 2;
+  const rInner = rOuter * (1 - dip);
+  const total = teeth * 2;
+  const pts: string[] = [];
+  for (let i = 0; i < total; i++) {
+    const angle = (i / total) * Math.PI * 2 - Math.PI / 2;
+    const r = i % 2 === 0 ? rOuter : rInner;
+    pts.push(`${(cx + r * Math.cos(angle)).toFixed(2)},${(cy + r * Math.sin(angle)).toFixed(2)}`);
+  }
+  return pts.join(' ');
+}
+
 /** Le rabat triangulaire, en haut de l'enveloppe — un polygone SVG plutôt
  * qu'un `clip-path` (non disponible sur natif) : `viewBox` non uniforme
  * (`preserveAspectRatio="none"`) pour rester nette à n'importe quelle largeur
- * de carte, sans mesurer quoi que ce soit. */
+ * de carte, sans mesurer quoi que ce soit. Triangle pur (pointe en bas,
+ * base pleine largeur) — voir la maquette « predict scellé ». */
 function EnvelopeFlap({ colors }: { colors: Colors }) {
   return (
     <Svg width="100%" height={FLAP_HEIGHT} viewBox={`0 0 100 ${FLAP_HEIGHT}`} preserveAspectRatio="none">
-      {/* Une seule forme (pas un rectangle séparé posé derrière un triangle —
-          ça créait une marche visible à son propre bord), teinte unie : pleine
-          largeur jusqu'à `FLAP_LABEL_SAFE_HEIGHT`, puis se resserre en pointe. */}
-      <Polygon
-        points={`0,0 100,0 100,${FLAP_LABEL_SAFE_HEIGHT} 50,${FLAP_HEIGHT} 0,${FLAP_LABEL_SAFE_HEIGHT}`}
-        fill={colors.envelopeBody[1]}
-      />
+      <Polygon points={`0,0 100,0 50,${FLAP_HEIGHT}`} fill={colors.envelopeFlap} />
     </Svg>
   );
 }
 
-/** Le cachet de cire, posé pile sur la pointe du rabat — rond, monogramme
- * « P » en relief (deux `Text` superposés, l'un en ombre). Uniquement pour
- * une enveloppe Scellée : une fois ouverte, c'est la lettre qui occupe ce
- * même point. */
-function WaxSeal({ size = 46 }: { size?: number }) {
+/** Le même rabat, ouvert et rabattu vers l'arrière — pointe en haut plutôt
+ * qu'en bas (voir la maquette « predict révélée »). Posé derrière la lettre,
+ * qui en cache tout sauf la pointe (voir `LETTER_OVERLAP`/`FLAP_OPEN_PEEK`). */
+function EnvelopeFlapOpen({ colors }: { colors: Colors }) {
   return (
-    <View
-      style={[
-        styles_waxSealWrap,
-        { width: size, height: size, top: FLAP_HEIGHT, marginLeft: -size / 2, marginTop: -size / 2 },
-      ]}
-    >
-      <LinearGradient
-        colors={wax}
-        start={{ x: 0.28, y: 0.22 }}
-        end={{ x: 0.85, y: 1 }}
-        style={styles_waxSealBase}
-      >
-        <Text style={[styles_waxSealEmblem, styles_waxSealEmblemShadow, { fontSize: size * 0.42 }]}>P</Text>
-        <Text style={[styles_waxSealEmblem, { fontSize: size * 0.42 }]}>P</Text>
-      </LinearGradient>
+    <Svg width="100%" height={FLAP_HEIGHT} viewBox={`0 0 100 ${FLAP_HEIGHT}`} preserveAspectRatio="none">
+      <Polygon points={`50,0 100,${FLAP_HEIGHT} 0,${FLAP_HEIGHT}`} fill={colors.envelopeFlap} />
+    </Svg>
+  );
+}
+
+/** Le cachet — disque jaune au bord crénelé, double liseré encre, lettre
+ * gravée au centre. Posé pile sur la pointe du rabat pour une enveloppe
+ * Scellée (glyphe « P ») ; réutilisé en petit sur la lettre d'un Sondage
+ * (glyphe « ? », voir plus bas) — même composant, deux tailles/glyphes. */
+function SealBadge({ glyph, size = 46, colors }: { glyph: string; size?: number; colors: Colors }) {
+  const points = scallopPoints(size, SEAL_TEETH, 0.075);
+  const ringRadius = (size / 2) * 0.86;
+  return (
+    <View style={{ width: size, height: size }}>
+      <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={StyleSheet.absoluteFill}>
+        <Polygon points={points} fill={colors.accent} />
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={ringRadius}
+          stroke={colors.text}
+          strokeWidth={Math.max(1, size * 0.045)}
+          fill="none"
+        />
+      </Svg>
+      <Text style={[styles_sealGlyph, { fontSize: size * 0.4, lineHeight: size, color: colors.text }]}>{glyph}</Text>
     </View>
   );
 }
 
-const styles_waxSealWrap: object = { position: 'absolute', left: '50%', alignItems: 'center', justifyContent: 'center' };
-const styles_waxSealBase: object = {
+const styles_sealGlyph: object = {
+  fontFamily: fonts.display,
+  textAlign: 'center',
   width: '100%',
-  height: '100%',
-  borderRadius: 999,
-  alignItems: 'center',
-  justifyContent: 'center',
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 3 },
-  shadowOpacity: 0.4,
-  shadowRadius: 5,
-  elevation: 5,
-};
-const styles_waxSealEmblem: object = { fontFamily: fonts.display, color: 'rgba(255, 220, 205, 0.75)' };
-const styles_waxSealEmblemShadow: object = {
-  position: 'absolute',
-  top: 1,
-  left: 0.5,
-  color: 'rgba(0, 0, 0, 0.5)',
 };
 
 /** Le tampon de verdict — encré, oblique, surdimensionné : le seul élément
@@ -664,16 +681,22 @@ export function PredictionCard({
           d'état ci-dessous. */}
       <View style={cardState.kind === 'missed' && styles.cardBodyMissed}>
         <Pressable onPress={() => onPress?.()} style={styles.envelope}>
-          <EnvelopeFlap colors={colors} />
+          {cardState.kind === 'sealed' ? (
+            <EnvelopeFlap colors={colors} />
+          ) : (
+            <EnvelopeFlapOpen colors={colors} />
+          )}
 
-          {/* Posée en surimpression du rabat plutôt qu'au-dessus, dans une
-              bande à part sur le papier clair de la carte — sans ça, un
-              espace clair restait visible entre le haut de la carte et
-              l'étiquette. Toujours dans la partie foncée, jamais au-dessus. */}
-          {cardState.label && (
+          {/* Posée en surimpression du rabat — seulement pour une enveloppe
+              Scellée : le rabat garde alors sa pleine hauteur (108px) pour
+              l'accueillir. Pour tous les autres états, le rabat n'est plus
+              qu'une pointe qui dépasse à peine derrière la lettre (voir
+              `EnvelopeFlapOpen`) — plus la place d'y poser un libellé, il
+              migre alors en haut de la lettre elle-même (plus bas). */}
+          {cardState.kind === 'sealed' && cardState.label && (
             <View style={styles.envelopeLabelOverlay}>
               <View style={styles.stateRow}>
-                {cardState.kind === 'sealed' && <Lock size={12} color={colors.textOnAccent} strokeWidth={2} />}
+                <Lock size={12} color={colors.text} strokeWidth={2} />
                 <Text style={styles.stateLabel} numberOfLines={1}>
                   {cardState.label}
                 </Text>
@@ -681,11 +704,36 @@ export function PredictionCard({
             </View>
           )}
 
-          {cardState.kind === 'sealed' && <WaxSeal />}
+          {cardState.kind === 'sealed' && (
+            <View
+              style={[
+                styles.sealWrap,
+                { width: SEAL_SIZE, height: SEAL_SIZE, marginLeft: -SEAL_SIZE / 2, marginTop: -SEAL_SIZE / 2 },
+              ]}
+            >
+              <SealBadge glyph="P" size={SEAL_SIZE} colors={colors} />
+            </View>
+          )}
 
           {cardState.kind !== 'sealed' && (
-            <View style={[styles.letter, showVerdictStamp && styles.letterWithStamp]}>
+            <View style={[styles.letter, (showVerdictStamp || isQuestion) && styles.letterWithStamp]}>
               {showVerdictStamp && <VerdictStamp verdict={cardState.kind as 'realized' | 'missed'} colors={colors} />}
+              {cardState.label && (
+                <Text style={styles.letterStateLabel} numberOfLines={1}>
+                  {cardState.label}
+                </Text>
+              )}
+              {/* Cachet « ? », décoratif — un Sondage n'a jamais de verdict
+                  Réalisé/Manqué, mais garde un petit repère visuel sur sa
+                  lettre, ouvert ou clos (voir la maquette « predict sondage » :
+                  même cachet que l'enveloppe Scellée, réutilisé ici en plus
+                  petit plutôt que sur une enveloppe qui n'existe pas pour un
+                  Sondage — la question reste toujours visible en clair). */}
+              {isQuestion && (
+                <View style={styles.questionSealWrap}>
+                  <SealBadge glyph="?" size={QUESTION_SEAL_SIZE} colors={colors} />
+                </View>
+              )}
 
               {isQuestion ? (
                 <>
@@ -1098,15 +1146,18 @@ const stampStyles = StyleSheet.create({
 function createStyles(colors: Colors) {
   return StyleSheet.create({
   cardPressed: { opacity: 0.85 },
-  // Papier, fine bordure encre à faible opacité — l'enveloppe (rabat + cachet
-  // ou lettre) porte tout le langage visuel de statut, plus aucun contour de
-  // couleur par état.
+  // Bleu clair de l'enveloppe sur toute la carte (pas seulement le rabat) —
+  // voir la maquette « predict scellé »/« predict révélée » : le corps de
+  // l'enveloppe est teinté au même titre que le rabat, juste un cran moins
+  // opaque (voir `colors.envelopeBody`/`envelopeFlap`). Plus aucun contour de
+  // couleur par état, tout le langage visuel de statut vit dans l'enveloppe
+  // (rabat + cachet ou lettre).
   card: {
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.card,
     marginBottom: 12,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.envelopeBody,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
@@ -1120,13 +1171,14 @@ function createStyles(colors: Colors) {
     ...(Platform.OS === 'web' ? { userSelect: 'none' } : null),
   },
   // Non lue : liseré d'accent + fond très légèrement teinté, assez discret
-  // pour ne pas jurer avec le reste de la charte parchemin/bordeaux.
+  // Un simple liseré jaune plutôt qu'un fond plein : le fond de la carte
+  // reste toujours le bleu clair de l'enveloppe (voir `card` plus bas), ce
+  // liseré suffit à signaler le non-lu sans le masquer.
   cardUnseen: {
     borderColor: colors.accent,
-    backgroundColor: colors.accentSoft,
+    borderWidth: 2,
   },
-  // Posé en surimpression du rabat (voir plus haut) — toujours dans sa
-  // partie foncée, jamais dans une bande à part sur le papier clair.
+  // Posé en surimpression du rabat (voir plus haut).
   envelopeLabelOverlay: {
     position: 'absolute',
     top: 10,
@@ -1140,15 +1192,33 @@ function createStyles(colors: Colors) {
     alignItems: 'center',
     gap: 6,
   },
-  // Crème plutôt que l'encre habituelle : ce libellé se lit désormais sur le
-  // rabat foncé, pas sur le papier clair — un seul ton suffit, il n'y a plus
-  // besoin de distinguer un accent bordeaux dessus.
+  // Encre — le rabat est maintenant un bleu clair pâle, pas un aplat foncé :
+  // le texte doit rester sombre pour rester lisible dessus.
   stateLabel: {
     fontFamily: fonts.label,
     fontSize: 11,
     letterSpacing: 1.1,
     textTransform: 'uppercase',
-    color: colors.textOnAccent,
+    color: colors.text,
+  },
+  // Cachet de l'enveloppe Scellée — centré sur la pointe du rabat.
+  sealWrap: {
+    position: 'absolute',
+    left: '50%',
+    top: FLAP_HEIGHT,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 5,
+  },
+  // Cachet « ? » d'un Sondage — coin haut-droit de la lettre, même registre
+  // que le tampon de verdict qu'il remplace pour ce type de prédiction.
+  questionSealWrap: {
+    position: 'absolute',
+    top: -10,
+    right: -6,
+    zIndex: 3,
   },
   // En bas à droite de la carte (dans le padding du corps, sur le papier
   // clair) — jamais accolée à l'étiquette « SCELLÉ » tout en haut du rabat.
@@ -1166,15 +1236,18 @@ function createStyles(colors: Colors) {
   // `position: relative` pour que le cachet (absolu) se positionne par
   // rapport à ce conteneur, pas par rapport à toute la carte.
   envelope: { position: 'relative' },
+  // Papier crème, liseré jaune — voir la maquette « predict révélée ».
+  // Largeur et rayon d'angle calibrés sur la maquette (≈ 79 % de la largeur
+  // de l'enveloppe, coin bien plus arrondi qu'un simple `radius.sm`).
   letter: {
     alignSelf: 'center',
-    width: '84%',
+    width: '80%',
     marginTop: -LETTER_OVERLAP,
     marginBottom: 4,
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: colors.letterPaper,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.accent,
     padding: 14,
     gap: 6,
     shadowColor: '#000',
@@ -1189,6 +1262,17 @@ function createStyles(colors: Colors) {
   // exactement la même largeur et le même centrage partout, seul le texte
   // recule pour ne jamais passer sous le tampon.
   letterWithStamp: { paddingRight: 60 },
+  // Libellé d'état (« EN COURS », « PREDICT PUBLIC »...) — en haut de la
+  // lettre plutôt que sur le rabat pour tout état autre que Scellé, faute de
+  // place sur la pointe du rabat ouvert (voir plus haut).
+  letterStateLabel: {
+    fontFamily: fonts.label,
+    fontSize: 10,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: colors.textFaint,
+    marginBottom: 4,
+  },
   letterHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   letterAuthor: { fontFamily: fonts.label, fontSize: 11, letterSpacing: 0.6, color: colors.textFaint, flexShrink: 1 },
   letterCounter: {

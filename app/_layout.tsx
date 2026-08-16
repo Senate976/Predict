@@ -1,10 +1,10 @@
-import { Archivo_400Regular, Archivo_500Medium, Archivo_600SemiBold, Archivo_700Bold } from '@expo-google-fonts/archivo';
+import { Roboto_700Bold } from '@expo-google-fonts/roboto';
 import {
-  Spectral_400Regular,
-  Spectral_400Regular_Italic,
-  Spectral_600SemiBold,
-  Spectral_700Bold,
-} from '@expo-google-fonts/spectral';
+  RobotoMono_400Regular,
+  RobotoMono_400Regular_Italic,
+  RobotoMono_500Medium,
+  RobotoMono_700Bold,
+} from '@expo-google-fonts/roboto-mono';
 import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -60,17 +60,14 @@ export default function RootLayout() {
   // Chargée ici, une fois : chaque nom de police passé à useFonts (la clé de
   // cet objet) doit correspondre exactement à une valeur de `fonts` dans
   // lib/theme.ts, sinon React Native retombe silencieusement sur la police
-  // système sans avertir. Deux familles : Spectral (écrit — titres, corps de
-  // prédiction) et Archivo (interface — boutons, labels, onglets).
+  // système sans avertir. Deux familles : Roboto (titres) et Roboto Mono
+  // (tout le reste — interface, corps de prédiction).
   const [fontsLoaded] = useFonts({
-    Spectral_400Regular,
-    Spectral_400Regular_Italic,
-    Spectral_600SemiBold,
-    Spectral_700Bold,
-    Archivo_400Regular,
-    Archivo_500Medium,
-    Archivo_600SemiBold,
-    Archivo_700Bold,
+    Roboto_700Bold,
+    RobotoMono_400Regular,
+    RobotoMono_400Regular_Italic,
+    RobotoMono_500Medium,
+    RobotoMono_700Bold,
   });
 
   if (!fontsLoaded) {
