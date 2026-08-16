@@ -9,7 +9,7 @@ import { PredictWord } from './PredictWord';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PARTICLE_COUNT = 160;
 const HOLD_MS = 3000;
-const GOLD_TONES = ['#eca835', '#f3be5e', '#7ab8c2'];
+const GOLD_TONES = ['#FACC15', '#EAB308', '#F5F5F0'];
 
 type Particle = {
   left: number;

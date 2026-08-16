@@ -1,22 +1,23 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Rect, Stop } from 'react-native-svg';
 import { useMemo, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 
-import { eyebrow, fonts, type Colors } from '../lib/theme';
+import { eyebrow, fonts, wax, type Colors } from '../lib/theme';
 import { useColors } from '../lib/themeMode';
 
 const BAR_HEIGHT = 6;
 const CURSOR_SIZE = 15;
 
 /**
- * Jauge horizontale du Prediscore — dégradé bleu clair → jaune, avec un
- * curseur rond doré positionné au score actuel. Largeur fluide (mesurée via
- * `onLayout`, pas de valeur fixe) : le Profil l'affiche sur 50% de la largeur
- * de l'écran, une autre valeur ailleurs resterait correcte. `score` est
- * `null` tant qu'aucune prédiction révélée n'existe encore : affiche alors un
- * état vide plutôt qu'une jauge à 0%, pour ne pas laisser croire à un mauvais
- * score qui n'existe pas encore.
+ * Jauge horizontale du Prediscore — dégradé parchemin → tan → bordeaux, avec
+ * un curseur en forme de petit cachet de cire positionné au score actuel.
+ * Largeur fluide (mesurée via `onLayout`, pas de valeur fixe) : le Profil
+ * l'affiche sur 50% de la largeur de l'écran, une autre valeur ailleurs
+ * resterait correcte. `score` est `null` tant qu'aucune prédiction révélée
+ * n'existe encore : affiche alors un état vide plutôt qu'une jauge à 0%,
+ * pour ne pas laisser croire à un mauvais score qui n'existe pas encore.
  */
 export function PrediscoreGauge({
   score,
@@ -60,7 +61,7 @@ export function PrediscoreGauge({
             <Svg width={barWidth} height={BAR_HEIGHT}>
               <Defs>
                 <SvgLinearGradient id="prediscoreGradient" x1="0" y1="0" x2="1" y2="0">
-                  <Stop offset="0" stopColor="#c9dfe3" />
+                  <Stop offset="0" stopColor="#DCC89B" />
                   <Stop offset="0.5" stopColor={colors.accentTransition} />
                   <Stop offset="1" stopColor={colors.accent} />
                 </SvgLinearGradient>
@@ -75,7 +76,12 @@ export function PrediscoreGauge({
               />
             </Svg>
             <View style={[styles.cursorWrap, { left: cursorLeft }]}>
-              <View style={styles.cursor} />
+              <LinearGradient
+                colors={wax}
+                start={{ x: 0.25, y: 0.15 }}
+                end={{ x: 0.85, y: 1 }}
+                style={styles.cursor}
+              />
             </View>
           </>
         )}
@@ -107,7 +113,8 @@ function createStyles(colors: Colors) {
       width: '100%',
       height: '100%',
       borderRadius: 999,
-      backgroundColor: colors.accent,
+      borderTopLeftRadius: CURSOR_SIZE * 0.4,
+      borderBottomRightRadius: CURSOR_SIZE * 0.42,
       borderWidth: 2,
       borderColor: colors.surface,
       shadowColor: '#000',
