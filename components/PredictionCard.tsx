@@ -80,6 +80,16 @@ const FLAP_OPEN_PEEK = 11;
 /** Décalage (négatif) de la lettre sous le rabat — assez pour ne laisser
  * dépasser que `FLAP_OPEN_PEEK` du rabat ouvert derrière elle. */
 const LETTER_OVERLAP = FLAP_HEIGHT - FLAP_OPEN_PEEK;
+/** Hauteur totale de l'enveloppe Scellée (rabat + corps plein, vide de tout
+ * contenu) — sur la maquette, le rabat ne fait que ≈ 56 % de cette hauteur ;
+ * sans le corps qui continue en dessous, le cachet (centré sur l'enveloppe
+ * entière, pas seulement sur le rabat) se serait retrouvé collé à la pointe
+ * plutôt que centré dessus. Le teaser/bouton Révéler restent en dehors, dans
+ * `body` — cette hauteur ne réserve que la place de l'enveloppe elle-même. */
+const SEALED_ENVELOPE_HEIGHT = Math.round(FLAP_HEIGHT * (436 / 244));
+/** Centre vertical du cachet — calibré sur la maquette (≈ 53,6 % de la
+ * hauteur totale de l'enveloppe, pas 50 % pile ni la pointe du rabat). */
+const SEAL_CENTER_Y = Math.round(FLAP_HEIGHT * (233.5 / 244));
 /** Diamètre du cachet, en proportion de `FLAP_HEIGHT` — calibré sur la
  * maquette (le cachet fait ≈ 40 % de la hauteur du rabat). */
 const SEAL_SIZE = Math.round(FLAP_HEIGHT * 0.4);
@@ -682,7 +692,15 @@ export function PredictionCard({
       <View style={cardState.kind === 'missed' && styles.cardBodyMissed}>
         <Pressable onPress={() => onPress?.()} style={styles.envelope}>
           {cardState.kind === 'sealed' ? (
-            <EnvelopeFlap colors={colors} />
+            <>
+              <EnvelopeFlap colors={colors} />
+              {/* Corps plein de l'enveloppe, sous le rabat — sans lui,
+                  l'enveloppe ne ferait que la hauteur du rabat et le cachet
+                  se retrouverait collé à sa pointe plutôt que centré sur
+                  l'enveloppe entière (voir `SEALED_ENVELOPE_HEIGHT`). Vide :
+                  le fond bleu clair vient de `card`, juste en dessous. */}
+              <View style={{ height: SEALED_ENVELOPE_HEIGHT - FLAP_HEIGHT }} />
+            </>
           ) : (
             <EnvelopeFlapOpen colors={colors} />
           )}
@@ -1201,11 +1219,12 @@ function createStyles(colors: Colors) {
     textTransform: 'uppercase',
     color: colors.text,
   },
-  // Cachet de l'enveloppe Scellée — centré sur la pointe du rabat.
+  // Cachet de l'enveloppe Scellée — centré sur l'enveloppe entière (voir
+  // `SEAL_CENTER_Y`), pas seulement sur la pointe du rabat.
   sealWrap: {
     position: 'absolute',
     left: '50%',
-    top: FLAP_HEIGHT,
+    top: SEAL_CENTER_Y,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
