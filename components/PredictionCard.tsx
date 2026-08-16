@@ -649,6 +649,115 @@ export function PredictionCard({
     })
   ).current;
 
+  /* Les boutons d'action. Rendus une seule fois ici puis placés selon
+     l'état : sur l'enveloppe elle-même quand elle est Scellée (elle porte
+     alors tout, il n'y a plus de bandeau sous elle), sous la carte sinon. */
+  /* Fil épuré façon réseau social : les deux interactions sociales, alignées
+     à gauche. Le chiffre s'affiche toujours (y compris à zéro), pas seulement
+     dès la première interaction. */
+  const actionsRow = (
+    <View style={[styles.footerRow, cardState.kind === 'sealed' && styles.footerRowOnEnvelope]}>
+            <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
+              <View style={styles.iconSlot}>
+                <MessageCircle
+                  size={18}
+                  color={(commentCount ?? 0) > 0 ? colors.text : colors.footerIconInactive}
+                  strokeWidth={1.75}
+                  fill={commentsOpen ? colors.text : 'none'}
+                />
+              </View>
+              <Text style={[styles.commentsToggleText, (commentCount ?? 0) === 0 && styles.footerCountInactive]}>
+                {commentCount ?? 0}
+              </Text>
+            </Pressable>
+
+            {/* Discret, façon Facebook : un pouce en filigrane (ou l'emoji déjà
+                choisi) — maintenir le doigt fait apparaître la bulle de
+                réactions au-dessus, la faire glisser dessus en sélectionne une.
+                Le chiffre est un bouton à part : un tap dessus ouvre le détail
+                de qui a réagi avec quoi, sans interférer avec le geste du pouce. */}
+            <View style={styles.reactionTriggerRow}>
+              <View style={styles.reactionTriggerWrap}>
+                <View style={[styles.reactionTrigger, styles.iconSlot]} hitSlop={8} {...panResponder.panHandlers}>
+                  {myEmoji ? (
+                    <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
+                  ) : (
+                    <ThumbsUp
+                      size={18}
+                      color={totalReactions > 0 ? colors.text : colors.footerIconInactive}
+                      strokeWidth={1.75}
+                    />
+                  )}
+                </View>
+
+                {emojiPanelOpen && (
+                  <View
+                    ref={panelRef}
+                    style={styles.emojiPanel}
+                    onLayout={() => {
+                      panelRef.current?.measureInWindow((x, y, width, height) => {
+                        panelLayoutRef.current = { x, y, width, height };
+                      });
+                    }}
+                  >
+                    {EMOJI_REACTIONS.map((emoji, i) => (
+                      <Animated.View key={emoji} style={{ transform: [{ scale: scaleAnims[i] }] }}>
+                        {/* Un tap direct sur un emoji le sélectionne toujours,
+                            indépendamment du glissé : sans ça, un utilisateur qui
+                            relâche le pouce puis tape un emoji comme un bouton
+                            normal (au lieu de glisser sans relâcher, à la
+                            Facebook) ne déclenchait jamais rien. */}
+                        <Pressable
+                          onPress={() => handleEmojiPress(emoji)}
+                          style={[styles.emojiBubbleItem, myEmoji === emoji && styles.emojiBubbleItemActive]}
+                          hitSlop={4}
+                        >
+                          <Text style={styles.emojiButtonText}>{emoji}</Text>
+                        </Pressable>
+                      </Animated.View>
+                    ))}
+                  </View>
+                )}
+              </View>
+              <Pressable onPress={openReactors} hitSlop={8}>
+                <Text style={[styles.reactionTriggerCount, totalReactions === 0 && styles.footerCountInactive]}>
+                  {totalReactions}
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Propre à une Question : compteur de réponses, visible même avant
+                Clôture — jamais leur contenu. Répondre se fait juste au-dessus,
+                directement sur la carte (`InlineQuestionAnswer`). */}
+            {isQuestion && (
+              <View style={styles.answersRow}>
+                <View style={styles.iconSlot}>
+                  <Users
+                    size={18}
+                    color={item.answer_count > 0 ? colors.text : colors.footerIconInactive}
+                    strokeWidth={1.75}
+                  />
+                </View>
+                <Text style={[styles.answersCountText, item.answer_count === 0 && styles.footerCountInactive]}>
+                  {item.answer_count}
+                </Text>
+              </View>
+            )}
+
+            {/* Scellée : l'en-tête au-dessus du pied de carte a disparu (auteur
+                et teaser sont sur l'enveloppe), le menu de gestion rejoint donc
+                les autres boutons d'action, poussé à droite. */}
+            {cardState.kind === 'sealed' && (
+              <>
+                <View style={styles.headerSpacer} />
+                <Pressable onPress={() => setMenuOpen(true)} hitSlop={8} style={styles.headerMenuButton}>
+                  <MoreHorizontal size={18} color={colors.icon} strokeWidth={1.75} />
+                </Pressable>
+              </>
+            )}
+          </View>
+  );
+
   const showVerdictStamp = cardState.kind === 'realized' || cardState.kind === 'missed';
 
   return (
@@ -737,6 +846,23 @@ export function PredictionCard({
               <Text style={styles.sealedRevealHint} numberOfLines={1}>
                 Révélation : {item.open_ended ? 'libre' : formatCountdown(new Date(item.reveal_at), now)}
               </Text>
+
+            {/* Bouton « Révéler », réservé à l'auteur d'une carte encore Scellée
+                — rend visible qu'un Predict attend sa révélation. */}
+            {isAuthor && cardState.kind === 'sealed' && (
+              <View style={styles.revealRow}>
+                <Pressable
+                  onPress={handleRevealNow}
+                  disabled={revealPending}
+                  style={({ pressed }) => [styles.revealButton, pressed && styles.revealButtonPressed]}
+                >
+                  <Text style={styles.revealButtonText}>{revealPending ? 'Révélation…' : 'Révéler'}</Text>
+                </Pressable>
+                {revealError && <Text style={styles.revealErrorText}>{revealError}</Text>}
+              </View>
+            )}
+
+              <View style={styles.sealedActions}>{actionsRow}</View>
             </View>
           ) : (
             <View style={{ paddingTop: env.flapPeek, paddingBottom: env.bodyTail }}>
@@ -871,20 +997,6 @@ export function PredictionCard({
           )}
         </Pressable>
 
-        {/* Bouton « Révéler », réservé à l'auteur d'une carte encore Scellée
-            — rend visible qu'un Predict attend sa révélation. */}
-        {isAuthor && cardState.kind === 'sealed' && (
-          <View style={styles.revealRow}>
-            <Pressable
-              onPress={handleRevealNow}
-              disabled={revealPending}
-              style={({ pressed }) => [styles.revealButton, pressed && styles.revealButtonPressed]}
-            >
-              <Text style={styles.revealButtonText}>{revealPending ? 'Révélation…' : 'Révéler'}</Text>
-            </Pressable>
-            {revealError && <Text style={styles.revealErrorText}>{revealError}</Text>}
-          </View>
-        )}
 
         {/* Invite l'auteur à trancher dès que sa prédiction est révélée mais
             encore en attente de verdict — Réalisé en accent plein, Manqué en
@@ -966,109 +1078,7 @@ export function PredictionCard({
             prend le relais (liste des réponses, validation). */}
         {isQuestion && !revealed && <InlineQuestionAnswer prediction={item} />}
 
-        {/* Fil épuré façon réseau social : les deux interactions sociales,
-            alignées à gauche. Le chiffre s'affiche toujours (y compris à
-            zéro), pas seulement dès la première interaction. */}
-        <View style={styles.footerRow}>
-          <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
-            <View style={styles.iconSlot}>
-              <MessageCircle
-                size={18}
-                color={(commentCount ?? 0) > 0 ? colors.text : colors.footerIconInactive}
-                strokeWidth={1.75}
-                fill={commentsOpen ? colors.text : 'none'}
-              />
-            </View>
-            <Text style={[styles.commentsToggleText, (commentCount ?? 0) === 0 && styles.footerCountInactive]}>
-              {commentCount ?? 0}
-            </Text>
-          </Pressable>
-
-          {/* Discret, façon Facebook : un pouce en filigrane (ou l'emoji déjà
-              choisi) — maintenir le doigt fait apparaître la bulle de
-              réactions au-dessus, la faire glisser dessus en sélectionne une.
-              Le chiffre est un bouton à part : un tap dessus ouvre le détail
-              de qui a réagi avec quoi, sans interférer avec le geste du pouce. */}
-          <View style={styles.reactionTriggerRow}>
-            <View style={styles.reactionTriggerWrap}>
-              <View style={[styles.reactionTrigger, styles.iconSlot]} hitSlop={8} {...panResponder.panHandlers}>
-                {myEmoji ? (
-                  <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
-                ) : (
-                  <ThumbsUp
-                    size={18}
-                    color={totalReactions > 0 ? colors.text : colors.footerIconInactive}
-                    strokeWidth={1.75}
-                  />
-                )}
-              </View>
-
-              {emojiPanelOpen && (
-                <View
-                  ref={panelRef}
-                  style={styles.emojiPanel}
-                  onLayout={() => {
-                    panelRef.current?.measureInWindow((x, y, width, height) => {
-                      panelLayoutRef.current = { x, y, width, height };
-                    });
-                  }}
-                >
-                  {EMOJI_REACTIONS.map((emoji, i) => (
-                    <Animated.View key={emoji} style={{ transform: [{ scale: scaleAnims[i] }] }}>
-                      {/* Un tap direct sur un emoji le sélectionne toujours,
-                          indépendamment du glissé : sans ça, un utilisateur qui
-                          relâche le pouce puis tape un emoji comme un bouton
-                          normal (au lieu de glisser sans relâcher, à la
-                          Facebook) ne déclenchait jamais rien. */}
-                      <Pressable
-                        onPress={() => handleEmojiPress(emoji)}
-                        style={[styles.emojiBubbleItem, myEmoji === emoji && styles.emojiBubbleItemActive]}
-                        hitSlop={4}
-                      >
-                        <Text style={styles.emojiButtonText}>{emoji}</Text>
-                      </Pressable>
-                    </Animated.View>
-                  ))}
-                </View>
-              )}
-            </View>
-            <Pressable onPress={openReactors} hitSlop={8}>
-              <Text style={[styles.reactionTriggerCount, totalReactions === 0 && styles.footerCountInactive]}>
-                {totalReactions}
-              </Text>
-            </Pressable>
-          </View>
-
-          {/* Propre à une Question : compteur de réponses, visible même avant
-              Clôture — jamais leur contenu. Répondre se fait juste au-dessus,
-              directement sur la carte (`InlineQuestionAnswer`). */}
-          {isQuestion && (
-            <View style={styles.answersRow}>
-              <View style={styles.iconSlot}>
-                <Users
-                  size={18}
-                  color={item.answer_count > 0 ? colors.text : colors.footerIconInactive}
-                  strokeWidth={1.75}
-                />
-              </View>
-              <Text style={[styles.answersCountText, item.answer_count === 0 && styles.footerCountInactive]}>
-                {item.answer_count}
-              </Text>
-            </View>
-          )}
-
-          {/* Scellée : l'en-tête au-dessus du pied de carte a disparu (auteur
-              et teaser sont sur l'enveloppe), le menu de gestion rejoint donc
-              les autres boutons d'action, poussé à droite. */}
-          {cardState.kind === 'sealed' && (
-            <>
-              <View style={styles.headerSpacer} />
-              <Pressable onPress={() => setMenuOpen(true)} hitSlop={8} style={styles.headerMenuButton}>
-                <MoreHorizontal size={18} color={colors.icon} strokeWidth={1.75} />
-              </Pressable>
-            </>
-          )}
-        </View>
+        {cardState.kind !== 'sealed' && actionsRow}
       </View>
 
       {commentsOpen && (
@@ -1227,6 +1237,10 @@ function createStyles(colors: Colors) {
     paddingBottom: 12,
   },
   sealedFlapLayer: { position: 'absolute', left: 0, right: 0, top: 0 },
+  // Les boutons d'action, tout en bas de l'enveloppe : plus rien ne vit sous
+  // elle, la carte scellée est entièrement l'enveloppe. Marges négatives pour
+  // annuler le padding de l'enveloppe — le pied de carte pose le sien.
+  sealedActions: { marginHorizontal: -18, marginBottom: -12 },
   sealedBadge: { position: 'absolute', left: '50%', zIndex: 2 },
   // En haut à gauche, sur le rabat. Absolu : le flux de l'enveloppe démarre au
   // bas du sceau (pour le teaser), l'auteur ne doit pas le décaler.
@@ -1421,6 +1435,8 @@ function createStyles(colors: Colors) {
   verdictPhotoWrap: { paddingHorizontal: 18, marginTop: 10 },
   // Fil épuré façon réseau social : les deux blocs restants (commentaire,
   // réaction) packés à gauche avec un espacement modeste.
+  // Sur l'enveloppe scellée : moins d'air en bas, l'enveloppe a déjà le sien.
+  footerRowOnEnvelope: { paddingTop: 6, paddingBottom: 12 },
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
