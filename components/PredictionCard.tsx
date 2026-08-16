@@ -270,7 +270,14 @@ export function PredictionCard({
     const flapPeek = flapH - H * LETTER_RISE;
     // Du bas de la lettre jusqu'au bas du corps de l'enveloppe.
     const bodyTail = H - letterH + H * LETTER_RISE;
+    const badge = W * BADGE_SIZE;
     return {
+      envH: H,
+      badge,
+      badgeTop: H * BADGE_CENTER - badge / 2,
+      // Bas du sceau : c'est là que commence le teaser, pour qu'il s'écrive
+      // sur le corps de l'enveloppe et non en travers du rabat.
+      badgeBottom: H * BADGE_CENTER + badge / 2,
       flapH,
       flapPeek,
       bodyTail,
@@ -670,12 +677,47 @@ export function PredictionCard({
           onLayout={(e) => setEnvelopeWidth(e.nativeEvent.layout.width)}
         >
           {cardState.kind === 'sealed' ? (
-            <>
-              {envelopeWidth > 0 && <SealedEnvelope width={envelopeWidth} glyph="P" />}
+            /* Une enveloppe scellée porte tout ce qui est lisible avant
+               révélation : l'auteur en haut à gauche, le teaser écrit sur le
+               corps (il démarre au bas du sceau pour ne pas courir en travers
+               du rabat), la date de révélation en bas à droite. Sous
+               l'enveloppe, il ne reste que les boutons d'action.
+               `minHeight` plutôt qu'une hauteur fixe : la carte garde le ratio
+               exact de la maquette, mais un teaser long l'allonge au lieu
+               d'être tronqué. */
+            <View style={[styles.sealedEnvelope, { minHeight: env.envH }]}>
+              <View style={styles.sealedFlapLayer} pointerEvents="none">
+                <FlapDown height={env.flapH} />
+              </View>
+              <View
+                style={[styles.sealedBadge, { top: env.badgeTop, marginLeft: -env.badge / 2 }]}
+                pointerEvents="none"
+              >
+                {envelopeWidth > 0 && <PredictBadge glyph="P" size={env.badge} />}
+              </View>
 
-              {/* Posée en surimpression du rabat, en haut à droite — le rabat
-                  y est encore pleine largeur, l'étiquette ne déborde donc
-                  jamais sur le fond de la carte. */}
+              {/* En haut à gauche, sur le rabat. */}
+              {authorLabel && (
+                <View style={styles.sealedAuthorSlot}>
+                  <Pressable
+                    onPress={() => authorId && router.push(`/profile/${authorId}`)}
+                    style={styles.authorBlock}
+                    hitSlop={4}
+                  >
+                    <Avatar url={authorAvatarUrl} username={authorLabel} size={32} />
+                    <Text style={styles.authorName} numberOfLines={1}>
+                      {authorLabel}
+                    </Text>
+                  </Pressable>
+                  {mentionLabel && (
+                    <Text style={styles.sealedMentionTag} numberOfLines={1}>
+                      {mentionLabel}
+                    </Text>
+                  )}
+                </View>
+              )}
+
+              {/* En haut à droite, sur le rabat lui aussi. */}
               {cardState.label && (
                 <View style={styles.envelopeLabelOverlay}>
                   <View style={styles.stateRow}>
@@ -686,7 +728,16 @@ export function PredictionCard({
                   </View>
                 </View>
               )}
-            </>
+
+              {/* Cale le teaser au bas du sceau : tout ce qui suit est dans le
+                  flux, donc l'enveloppe s'allonge si le teaser déborde. */}
+              <View style={{ height: env.badgeBottom }} pointerEvents="none" />
+              {!isQuestion && <Text style={styles.sealedTeaser}>{item.teaser}</Text>}
+
+              <Text style={styles.sealedRevealHint} numberOfLines={1}>
+                Révélation : {item.open_ended ? 'libre' : formatCountdown(new Date(item.reveal_at), now)}
+              </Text>
+            </View>
           ) : (
             <View style={{ paddingTop: env.flapPeek, paddingBottom: env.bodyTail }}>
               {/* Les deux couches de lavis, derrière la lettre : le rabat
@@ -774,52 +825,49 @@ export function PredictionCard({
           )}
         </Pressable>
 
-        {/* Sous l'enveloppe : bloc auteur, pseudos cités, teaser (Scellée
-            uniquement — la vraie prédiction vit dans la lettre une fois
-            ouverte), boutons d'action. */}
-        <Pressable onPress={() => onPress?.()} style={({ pressed }) => [styles.body, pressed && styles.cardPressed]}>
-          <View style={styles.cardHeader}>
-            {authorLabel && (
-              <Pressable
-                onPress={() => authorId && router.push(`/profile/${authorId}`)}
-                style={styles.authorBlock}
-                hitSlop={4}
-              >
-                <Avatar url={authorAvatarUrl} username={authorLabel} size={32} />
-                <Text style={styles.authorName} numberOfLines={1}>
-                  {authorLabel}
+        {/* Sous l'enveloppe : bloc auteur et pseudos cités. Une carte Scellée
+            n'a rien à y mettre — auteur, teaser et date de révélation sont
+            écrits sur l'enveloppe elle-même, il ne lui reste que les boutons
+            d'action du pied de carte. */}
+        <Pressable
+          onPress={() => onPress?.()}
+          style={({ pressed }) => [styles.body, cardState.kind === 'sealed' && styles.bodySealed, pressed && styles.cardPressed]}
+        >
+          {cardState.kind !== 'sealed' && (
+            <>
+              <View style={styles.cardHeader}>
+                {authorLabel && (
+                  <Pressable
+                    onPress={() => authorId && router.push(`/profile/${authorId}`)}
+                    style={styles.authorBlock}
+                    hitSlop={4}
+                  >
+                    <Avatar url={authorAvatarUrl} username={authorLabel} size={32} />
+                    <Text style={styles.authorName} numberOfLines={1}>
+                      {authorLabel}
+                    </Text>
+                  </Pressable>
+                )}
+
+                <View style={styles.headerSpacer} />
+
+                {/* Favoris, masquer, supprimer : des actions de gestion, pas des
+                    réactions sociales — regroupées ici plutôt que dans le pied de
+                    carte, qui ne garde que commentaire et réaction. */}
+                <Pressable onPress={() => setMenuOpen(true)} hitSlop={8} style={styles.headerMenuButton}>
+                  <MoreHorizontal size={18} color={colors.icon} strokeWidth={1.75} />
+                </Pressable>
+              </View>
+
+              {/* Sur sa propre ligne, jamais accolée au pseudo — la liste
+                  complète des personnes citées y empiétait dès qu'il y en avait
+                  plusieurs. */}
+              {mentionLabel && (
+                <Text style={styles.mentionTag} numberOfLines={1}>
+                  {mentionLabel}
                 </Text>
-              </Pressable>
-            )}
-
-            <View style={styles.headerSpacer} />
-
-            {/* Favoris, masquer, supprimer : des actions de gestion, pas des
-                réactions sociales — regroupées ici plutôt que dans le pied de
-                carte, qui ne garde que commentaire et réaction. */}
-            <Pressable onPress={() => setMenuOpen(true)} hitSlop={8} style={styles.headerMenuButton}>
-              <MoreHorizontal size={18} color={colors.icon} strokeWidth={1.75} />
-            </Pressable>
-          </View>
-
-          {/* Sur sa propre ligne, jamais accolée au pseudo — la liste
-              complète des personnes citées y empiétait dès qu'il y en avait
-              plusieurs. */}
-          {mentionLabel && (
-            <Text style={styles.mentionTag} numberOfLines={1}>
-              {mentionLabel}
-            </Text>
-          )}
-
-          {!isQuestion && cardState.kind === 'sealed' && <Text style={styles.cardTeaser}>{item.teaser}</Text>}
-
-          {/* Réservé à une carte Scellée : le seul état où la date de
-              révélation n'est pas encore connue de tous — en bas à droite de
-              la carte, pas accolée à l'étiquette « SCELLÉ » tout en haut. */}
-          {cardState.kind === 'sealed' && (
-            <Text style={styles.revealHint} numberOfLines={1}>
-              Révélation : {item.open_ended ? 'libre' : formatCountdown(new Date(item.reveal_at), now)}
-            </Text>
+              )}
+            </>
           )}
         </Pressable>
 
@@ -1008,6 +1056,18 @@ export function PredictionCard({
               </Text>
             </View>
           )}
+
+          {/* Scellée : l'en-tête au-dessus du pied de carte a disparu (auteur
+              et teaser sont sur l'enveloppe), le menu de gestion rejoint donc
+              les autres boutons d'action, poussé à droite. */}
+          {cardState.kind === 'sealed' && (
+            <>
+              <View style={styles.headerSpacer} />
+              <Pressable onPress={() => setMenuOpen(true)} hitSlop={8} style={styles.headerMenuButton}>
+                <MoreHorizontal size={18} color={colors.icon} strokeWidth={1.75} />
+              </Pressable>
+            </>
+          )}
         </View>
       </View>
 
@@ -1159,6 +1219,38 @@ function createStyles(colors: Colors) {
     borderColor: colors.accent,
     backgroundColor: colors.accentSoft,
   },
+  // L'enveloppe scellée porte elle-même l'auteur, le teaser et la date de
+  // révélation : c'est un conteneur avec du padding, pas un simple aplat.
+  sealedEnvelope: {
+    backgroundColor: WASH.sealedBody,
+    paddingHorizontal: 18,
+    paddingBottom: 12,
+  },
+  sealedFlapLayer: { position: 'absolute', left: 0, right: 0, top: 0 },
+  sealedBadge: { position: 'absolute', left: '50%', zIndex: 2 },
+  // En haut à gauche, sur le rabat. Absolu : le flux de l'enveloppe démarre au
+  // bas du sceau (pour le teaser), l'auteur ne doit pas le décaler.
+  sealedAuthorSlot: { position: 'absolute', top: 10, left: 18, right: 120, gap: 2, zIndex: 2 },
+  sealedMentionTag: { fontSize: 12, color: colors.textMuted },
+  // Écrit sur le corps de l'enveloppe, sous le sceau.
+  sealedTeaser: {
+    fontFamily: fonts.serifItalic,
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.text,
+    marginTop: 8,
+  },
+  // En bas à droite de l'enveloppe. `marginTop: 'auto'` : reste collé au bas
+  // même quand le teaser est court et que l'enveloppe garde sa hauteur de
+  // maquette.
+  sealedRevealHint: {
+    fontFamily: fonts.label,
+    fontSize: 11,
+    color: colors.textMuted,
+    textAlign: 'right',
+    marginTop: 'auto',
+    paddingTop: 8,
+  },
   // Posé en surimpression du rabat scellé, en haut à droite — le rabat y est
   // encore pleine largeur, l'étiquette ne déborde donc jamais.
   envelopeLabelOverlay: {
@@ -1191,15 +1283,6 @@ function createStyles(colors: Colors) {
     letterSpacing: 1.1,
     textTransform: 'uppercase',
     color: letterInk(colors.surface).soft,
-  },
-  // En bas à droite de la carte (dans le padding du corps, sur le papier
-  // clair) — jamais accolée à l'étiquette « SCELLÉ » tout en haut du rabat.
-  revealHint: {
-    fontFamily: fonts.label,
-    fontSize: 11,
-    color: colors.textFaint,
-    textAlign: 'right',
-    marginTop: 8,
   },
   // Corps de carte assourdi une fois Manquée — jamais le badge d'état,
   // rendu séparément avant ce conteneur et donc toujours à `opacity: 1`.
@@ -1269,8 +1352,11 @@ function createStyles(colors: Colors) {
   }),
   // Photo jointe à la création — dans la lettre, sous le texte de la prédiction.
   letterPhotoWrap: { marginTop: 10 },
-  // Zone sous l'enveloppe : auteur, mentions, teaser (Scellée uniquement).
+  // Zone sous l'enveloppe : auteur et mentions.
   body: { paddingHorizontal: 18, paddingTop: 12 },
+  // Scellée : cette zone est vide (tout est sur l'enveloppe), elle ne doit
+  // donc pas ajouter d'espace avant le pied de carte.
+  bodySealed: { paddingTop: 0 },
   // Même padding horizontal que `body` — sans lui, les commentaires
   // s'alignaient pile sur le bord de la carte, trop près de la bordure.
   commentsWrap: { paddingHorizontal: 18 },
@@ -1283,16 +1369,6 @@ function createStyles(colors: Colors) {
   authorName: { fontFamily: fonts.bodyEmphasis, fontSize: 16, color: colors.text, flexShrink: 1, minWidth: 0 },
   // Sur sa propre ligne, sous l'en-tête — jamais accolée au pseudo.
   mentionTag: { fontSize: 12, fontWeight: '500', color: colors.textMuted, marginTop: 6 },
-  // Secondaire, à l'italique — c'est tout ce qu'affiche l'enveloppe scellée
-  // dans le fil, avant révélation (la vraie prédiction n'apparaît que dans
-  // la lettre, une fois ouverte).
-  cardTeaser: {
-    fontFamily: fonts.serifItalic,
-    fontSize: 14,
-    lineHeight: 20,
-    color: colors.textFaint,
-    marginTop: 6,
-  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
