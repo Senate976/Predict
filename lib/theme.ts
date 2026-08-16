@@ -37,8 +37,6 @@ export type Colors = {
   fab: string;
   fabBorder: string;
   fabIcon: string;
-  envelopeBody: readonly [string, string];
-  envelopeFlap: readonly [string, string];
 };
 
 export const lightColors: Colors = {
@@ -78,10 +76,6 @@ export const lightColors: Colors = {
   fab: '#f9fcfe',
   fabBorder: '#eca835',
   fabIcon: '#eca835',
-  // Corps et rabat de l'enveloppe (`PredictionCard`, `PredictionSeal`) — bleu
-  // clair de la charte.
-  envelopeBody: ['#7ab8c2', '#7ab8c2'],
-  envelopeFlap: ['#7ab8c2', '#7ab8c2'],
 };
 
 /**
@@ -114,14 +108,7 @@ export const darkColors: Colors = {
   fab: '#1c2737',
   fabBorder: '#eca835',
   fabIcon: '#eca835',
-  envelopeBody: ['#426170', '#426170'],
-  envelopeFlap: ['#426170', '#426170'],
 };
-
-/** Dégradé de la cire — cachet et curseurs en forme de cachet (Prediscore) :
- * un objet physique, pas affecté par le thème actif, donc un seul jeu de
- * teintes pour les deux palettes. Jaune de la charte. */
-export const wax = ['#eca835', '#eca835', '#eca835', '#eca835'] as const;
 
 export const radius = {
   sm: 8,

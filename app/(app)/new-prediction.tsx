@@ -1,4 +1,3 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRouter } from 'expo-router';
 import { Check } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
@@ -20,6 +19,7 @@ import { Avatar } from '../../components/Avatar';
 import { CalendarPicker } from '../../components/CalendarPicker';
 import { PhotoAttachButton } from '../../components/PhotoAttachButton';
 import { PredictionRecorder } from '../../components/PredictionRecorder';
+import { PredictBadge } from '../../components/EnvelopeArt';
 import { PredictionSeal } from '../../components/PredictionSeal';
 import { PredictWord } from '../../components/PredictWord';
 import { SelectField, type SelectOption } from '../../components/SelectField';
@@ -40,7 +40,7 @@ import {
   type PredictionScope,
 } from '../../lib/predictions';
 import { type AnswerFormat, type PredictionType } from '../../lib/questions';
-import { fonts, radius, spacing, wax, type Colors } from '../../lib/theme';
+import { fonts, radius, spacing, type Colors } from '../../lib/theme';
 import { useColors } from '../../lib/themeMode';
 
 type ContentMode = 'text' | 'audio';
@@ -409,7 +409,7 @@ export default function NewPredictionScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <PredictionSeal visible={showSeal} onFinish={() => router.back()} />
+      <PredictionSeal visible={showSeal} glyph={isQuestion ? '?' : 'P'} onFinish={() => router.back()} />
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -825,7 +825,7 @@ export default function NewPredictionScreen() {
               <ActivityIndicator color={colors.textOnAccent} />
             ) : (
               <View style={styles.submitContent}>
-                <LinearGradient colors={wax} start={{ x: 0.25, y: 0.15 }} end={{ x: 0.85, y: 1 }} style={styles.submitSeal} />
+                <PredictBadge glyph={isQuestion ? '?' : 'P'} size={22} />
                 <Text style={styles.submitText}>
                   Sceller le <PredictWord />
                 </Text>
@@ -983,7 +983,6 @@ function createStyles(colors: Colors) {
   submitPressed: { backgroundColor: colors.accentBright },
   submitDisabled: { opacity: 0.6 },
   submitContent: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  submitSeal: { width: 18, height: 18, borderRadius: 9 },
   submitText: { color: colors.textOnAccent, fontSize: 16, fontWeight: '700' },
   });
 }
