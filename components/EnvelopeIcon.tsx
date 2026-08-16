@@ -1,90 +1,81 @@
-import Svg, { Circle, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, Polygon, Rect } from 'react-native-svg';
 
 import type { NotificationType } from '../lib/notifications';
 import { useColors } from '../lib/themeMode';
+import { BADGE_INK, ENVELOPE_RATIO, FLAP_DEPTH, LETTER_WIDTH, letterPaper, WASH } from './EnvelopeArt';
 
 export type EnvelopeIconVariant = 'sealed' | 'revealed' | 'question' | 'awaiting' | 'multi';
 
+/* La même enveloppe que les cartes du Fil, réduite à une icône : mêmes
+ * proportions (`ENVELOPE_RATIO`), même rabat (`FLAP_DEPTH`), même lavis bleu.
+ * Le `viewBox` fait 100 de large, tout le reste s'en déduit — les cotes
+ * restent donc littéralement celles relevées sur les maquettes. */
+const VB_W = 100;
+const VB_H = VB_W / ENVELOPE_RATIO; // 50.58
+const FLAP_H = VB_H * FLAP_DEPTH; // 28.18
+/** Badge un peu plus gros que sur la maquette (11 % de la largeur) : à cette
+ * taille d'icône, le diamètre exact ne serait qu'un point illisible. */
+const BADGE_R = 9;
+const LETTER_W = VB_W * LETTER_WIDTH;
+
 /**
- * Icône d'enveloppe constante à gauche d'une notification — sa forme seule
- * dit l'état (fermée, ouverte, à plusieurs mains, en attente de réponse),
- * sans dépendre de la couleur ni du texte : reconnaissable d'un coup d'œil,
- * même noyée dans dix notifications différentes (design « Le pli », section
- * 02). `sealed` : enveloppe fermée, cachet plein. `revealed` : enveloppe
- * ouverte, la lettre dépasse. `question` : fermée, deux petites lettres qui
- * dépassent (question posée à plusieurs). `awaiting` : fermée, cachet en
- * anneau avec un « ? » (réponse attendue de ce destinataire-ci). `multi` :
- * ouverte + coche (plusieurs réponses viennent d'être révélées).
+ * Icône d'enveloppe constante à gauche d'une notification — sa forme seule dit
+ * l'état, sans dépendre de la couleur ni du texte. `sealed` : enveloppe
+ * fermée, badge doré plein. `revealed` : enveloppe ouverte, la lettre dépasse.
+ * `question` : fermée, badge cerclé (un Sondage). `awaiting` : fermée, badge
+ * en anneau seul (réponse attendue). `multi` : ouverte, deux lettres.
  */
 export function EnvelopeIcon({ variant, size = 26 }: { variant: EnvelopeIconVariant; size?: number }) {
   const colors = useColors();
-  const paper = colors.surfaceRaised;
-  const ink = colors.text;
+  const closed = variant === 'sealed' || variant === 'question' || variant === 'awaiting';
+
+  // Une enveloppe ouverte est plus haute qu'une fermée : le rabat retourné et
+  // la lettre dépassent par le haut, exactement comme sur `predict révélée`.
+  const top = closed ? 0 : -FLAP_H;
+  const height = VB_H - top;
 
   return (
-    <Svg width={size} height={(size * 24) / 30} viewBox="0 0 30 24">
-      {variant === 'sealed' && (
+    <Svg width={size} height={(size * height) / VB_W} viewBox={`0 ${top} ${VB_W} ${height}`}>
+      {closed ? (
         <>
-          <Rect x={1} y={1} width={28} height={22} rx={2} fill={paper} stroke={ink} strokeWidth={1.4} />
-          <Path d="M1 1 L15 14 L29 1" fill="none" stroke={ink} strokeWidth={1.4} />
-          <Circle cx={15} cy={9} r={4.5} fill={colors.accent} />
-        </>
-      )}
-      {variant === 'revealed' && (
-        <>
-          <Rect x={1} y={8} width={28} height={15} rx={2} fill={paper} stroke={ink} strokeWidth={1.4} />
-          <Rect x={7} y={0} width={16} height={13} rx={1} fill={paper} stroke={ink} strokeWidth={1.2} />
-          <Path d="M1 8 L15 17 L29 8" fill="none" stroke={ink} strokeWidth={1.4} />
-        </>
-      )}
-      {variant === 'question' && (
-        <>
-          <Rect x={1} y={1} width={28} height={22} rx={2} fill={paper} stroke={ink} strokeWidth={1.4} />
-          <Path d="M1 1 L15 14 L29 1" fill="none" stroke={ink} strokeWidth={1.4} />
-          <Rect
-            x={10}
-            y={-2}
-            width={5}
-            height={9}
-            rx={1}
-            fill={paper}
-            stroke={ink}
-            strokeWidth={1}
-            transform="rotate(-10 12 3)"
-          />
-          <Rect
-            x={15}
-            y={-2}
-            width={5}
-            height={9}
-            rx={1}
-            fill={paper}
-            stroke={ink}
-            strokeWidth={1}
-            transform="rotate(10 18 3)"
+          <Rect x={0} y={0} width={VB_W} height={VB_H} fill={WASH.sealedBody} />
+          <Polygon points={`0,0 ${VB_W},0 ${VB_W / 2},${FLAP_H}`} fill={WASH.sealedFlap} />
+          <Circle
+            cx={VB_W / 2}
+            cy={VB_H * 0.5343}
+            r={BADGE_R}
+            fill={variant === 'awaiting' ? 'none' : colors.accent}
+            stroke={variant === 'sealed' ? 'none' : variant === 'awaiting' ? colors.accent : BADGE_INK}
+            strokeWidth={variant === 'sealed' ? 0 : 1.6}
           />
         </>
-      )}
-      {variant === 'awaiting' && (
+      ) : (
         <>
-          <Rect x={1} y={1} width={28} height={22} rx={2} fill={paper} stroke={ink} strokeWidth={1.4} />
-          <Path d="M1 1 L15 14 L29 1" fill="none" stroke={ink} strokeWidth={1.4} />
-          <Circle cx={15} cy={9} r={4.5} fill="none" stroke={ink} strokeWidth={1.3} />
-          <Path d="M15 6.5v3M15 11.5h.01" stroke={ink} strokeWidth={1.3} strokeLinecap="round" />
-        </>
-      )}
-      {variant === 'multi' && (
-        <>
-          <Rect x={1} y={8} width={28} height={15} rx={2} fill={paper} stroke={ink} strokeWidth={1.4} />
-          <Rect x={7} y={0} width={16} height={13} rx={1} fill={paper} stroke={ink} strokeWidth={1.2} />
-          <Path d="M1 8 L15 17 L29 8" fill="none" stroke={ink} strokeWidth={1.4} />
-          <Path
-            d="M11 6.5l3 3 5-5"
-            fill="none"
-            stroke={colors.textMuted}
-            strokeWidth={1.3}
-            strokeLinecap="round"
-            strokeLinejoin="round"
+          {/* Rabat ouvert, pointe en haut — dessiné avant le corps et la
+              lettre : ses bords obliques restent visibles de part et d'autre. */}
+          <Polygon points={`${VB_W / 2},${-FLAP_H} ${VB_W},0 0,0`} fill={WASH.openFlap} />
+          <Rect x={0} y={0} width={VB_W} height={VB_H} fill={WASH.openBody} />
+          {variant === 'multi' && (
+            <Rect
+              x={(VB_W - LETTER_W) / 2 + 6}
+              y={-FLAP_H + 4}
+              width={LETTER_W}
+              height={VB_H}
+              rx={3}
+              fill={letterPaper(colors.surface)}
+              stroke={colors.accent}
+              strokeWidth={1.6}
+            />
+          )}
+          <Rect
+            x={(VB_W - LETTER_W) / 2}
+            y={-FLAP_H}
+            width={LETTER_W}
+            height={VB_H}
+            rx={3}
+            fill={letterPaper(colors.surface)}
+            stroke={colors.accent}
+            strokeWidth={1.6}
           />
         </>
       )}
