@@ -91,7 +91,7 @@ const GLOW_PULSE_TOTAL_MS = GLOW_PULSE_CYCLE_MS * 2;
 /** De combien la photo, glissée derrière la lettre comme une seconde page,
  * dépasse à droite et en bas — assez pour qu'on la reconnaisse, jamais au
  * point de concurrencer la lettre. */
-const PAGE_PEEK = 16;
+const PAGE_PEEK = 26;
 /** L'inclinaison qui lui donne son air de carte mal remise dans le paquet. */
 const PAGE_TILT = 4;
 
@@ -914,6 +914,10 @@ export function PredictionCard({
                     backgroundColor: letterPaper(colors.surface),
                   },
                   showVerdictStamp && styles.letterWithStamp,
+                  // Réserve la bande que la photo laisse dépasser sous la
+                  // lettre : sans elle, le bloc auteur/teaser vient par-dessus
+                  // et capte l'appui à la place de la photo.
+                  item.photo_path ? { marginBottom: PAGE_PEEK } : null,
                 ]}
               >
                 {showVerdictStamp && <VerdictStamp verdict={cardState.kind as 'realized' | 'missed'} colors={colors} />}
@@ -1249,6 +1253,7 @@ function createStyles(colors: Colors) {
     alignSelf: 'center',
     padding: 14,
     gap: 6,
+    zIndex: 2,
   },
   // Réserve la place du tampon par un padding interne plutôt qu'une marge
   // externe : une marge asymétrique (seulement à droite) décentrait toute la
@@ -1299,6 +1304,9 @@ function createStyles(colors: Colors) {
     alignSelf: 'center',
     overflow: 'hidden',
     transform: [{ rotate: `${PAGE_TILT}deg` }],
+    // Au-dessus du bloc auteur/teaser (qui vient après elle dans le rendu),
+    // mais sous la lettre — voir `letter`, qui monte d'un cran de plus.
+    zIndex: 1,
   },
   // Photo ouverte en grand, par-dessus tout l'écran.
   photoOverlay: {
