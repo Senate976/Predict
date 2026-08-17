@@ -88,6 +88,13 @@ const GLOW_PULSE_TOTAL_MS = GLOW_PULSE_CYCLE_MS * 2;
  * ne fait que les composer avec le contenu de la carte — aucune valeur de
  * forme n'est redéfinie dans ce fichier. */
 
+/** De combien la photo, glissée derrière la lettre comme une seconde page,
+ * dépasse à droite et en bas — assez pour qu'on la reconnaisse, jamais au
+ * point de concurrencer la lettre. */
+const PAGE_PEEK = 16;
+/** L'inclinaison qui lui donne son air de carte mal remise dans le paquet. */
+const PAGE_TILT = 4;
+
 function easeInOutQuad(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2;
 }
@@ -226,6 +233,8 @@ export function PredictionCard({
   const [reactors, setReactors] = useState<EmojiReactor[] | null>(null);
   const [reactorsLoading, setReactorsLoading] = useState(false);
   const [reactorsError, setReactorsError] = useState<string | null>(null);
+  // Ouvre la photo jointe en grand — voir la « seconde page » derrière la lettre.
+  const [photoOpen, setPhotoOpen] = useState(false);
   // Écho optimiste de `setPredictionVerdict` : le statut canonique vient de
   // `item.final_status` (props), mais attendre le prochain chargement du fil
   // pour voir le tampon apparaître, après un tap sur Réalisé/Manqué, serait
@@ -866,6 +875,33 @@ export function PredictionCard({
               </View>
               <View style={[styles.openBodyLayer, { top: env.flapH }]} pointerEvents="none" />
 
+              {/* La photo jointe est elle-même la seconde page, glissée
+                  derrière la lettre et légèrement de biais, comme une carte
+                  qu'on aurait mal remise dans le paquet : ce qui dépasse
+                  laisse voir l'image, et un appui dessus l'ouvre en grand.
+                  Rendue avant la lettre pour passer dessous. */}
+              {item.photo_path && (
+                <Pressable
+                  onPress={() => setPhotoOpen(true)}
+                  style={[
+                    styles.secondPage,
+                    {
+                      // Calée sur la lettre (qui commence sous la pointe du
+                      // rabat), puis décalée pour dépasser à droite et en bas.
+                      top: env.flapPeek + PAGE_PEEK,
+                      marginLeft: PAGE_PEEK,
+                      width: env.letterW,
+                      height: env.letterH,
+                      borderRadius: env.letterRadius,
+                      borderWidth: env.letterBorder,
+                      borderColor: colors.accent,
+                    },
+                  ]}
+                >
+                  <PredictionPhoto bucket="content" path={item.photo_path} fill />
+                </Pressable>
+              )}
+
               <View
                 style={[
                   styles.letter,
@@ -886,7 +922,7 @@ export function PredictionCard({
                     garde pour les seuls états qu'elle ne couvre pas, où elle
                     porte une information qu'on ne lit nulle part ailleurs
                     (« EN COURS », « xx % ont eu raison »). */}
-                {cardState.label && cardState.kind !== 'question_open' && (
+                {cardState.label && cardState.kind !== 'question_open' && cardState.kind !== 'question_closed' && (
                   <Text style={styles.letterStateLabel} numberOfLines={1}>
                     {cardState.label}
                   </Text>
@@ -896,7 +932,17 @@ export function PredictionCard({
                 /* Pas de Teaser pour une Question : `content` (la question
                    elle-même) est visible dès la création, jamais flouté — ce
                    que la Clôture cache, ce sont les réponses des autres. */
-                <Text style={styles.letterQuestionText}>{item.content}</Text>
+                <>
+                  <Text style={styles.letterQuestionText}>{item.content}</Text>
+                  {/* Le résultat, une fois le Sondage clos : même police et
+                      même couleur que la question, seulement en gras — pas une
+                      étiquette à part. */}
+                  {cardState.kind === 'question_closed' && correctAnswerPercent !== null && (
+                    <Text style={[styles.letterQuestionText, styles.letterQuestionResult]}>
+                      {correctAnswerPercent} %
+                    </Text>
+                  )}
+                </>
               ) : (
                 /* La RLS ne renvoie `content` que si révélée ou si on en est
                    l'auteur — l'auteur voit donc toujours son propre texte en
@@ -908,18 +954,11 @@ export function PredictionCard({
                 </Text>
               )}
 
-              {/* Photo jointe à la création — mêmes règles de visibilité que
-                  le texte (RLS sur `prediction_contents`) : `photo_path`
-                  n'arrive ici que si la carte a déjà le droit de le voir. */}
-              {item.photo_path && (
-                <View style={styles.letterPhotoWrap}>
-                  <PredictionPhoto bucket="content" path={item.photo_path} />
-                </View>
-              )}
-
-              {/* Répondre sans quitter le Fil — dans la lettre, comme sur la
-                  maquette, et réservé à un Sondage encore ouvert : plus rien à
-                  répondre une fois clos, l'écran détail prend le relais. */}
+              {/* Répondre sans quitter le Fil — dans la lettre, et réservé à
+                  un Sondage encore ouvert : plus rien à répondre une fois clos,
+                  l'écran détail prend le relais. Texte libre comme choix
+                  multiple, `InlineQuestionAnswer` gère les deux. */}
+              {isQuestion && !revealed && <InlineQuestionAnswer prediction={item} />}
                     </View>
 
               {envelopeFooter}
@@ -1081,6 +1120,17 @@ export function PredictionCard({
         </Pressable>
       </Modal>
 
+      {/* La seconde page, ouverte en grand — un appui n'importe où referme. */}
+      {item.photo_path && (
+        <Modal visible={photoOpen} transparent animationType="fade" onRequestClose={() => setPhotoOpen(false)}>
+          <Pressable style={styles.photoOverlay} onPress={() => setPhotoOpen(false)}>
+            <View style={styles.photoOverlayInner}>
+              <PredictionPhoto bucket="content" path={item.photo_path} />
+            </View>
+          </Pressable>
+        </Modal>
+      )}
+
       <Modal visible={reactorsOpen} transparent animationType="fade" onRequestClose={() => setReactorsOpen(false)}>
         <Pressable style={styles.modalOverlay} onPress={() => setReactorsOpen(false)}>
           <Pressable style={styles.reactorsBox} onPress={() => {}}>
@@ -1237,8 +1287,28 @@ function createStyles(colors: Colors) {
     web: { filter: 'blur(5px)' } as object,
     default: { opacity: 0.15 },
   }),
-  // Photo jointe à la création — dans la lettre, sous le texte de la prédiction.
-  letterPhotoWrap: { marginTop: 10 },
+  // Le résultat d'un Sondage clos : la même ligne que la question, en gras.
+  letterQuestionResult: { fontFamily: fonts.sansBold, fontStyle: 'normal', marginTop: 6 },
+  // La photo jointe, glissée derrière la lettre comme une seconde page : même
+  // papier, même liseré, décalée pour que seuls son bord droit et son bord bas
+  // dépassent. Posée avant la lettre dans le rendu, donc dessous.
+  // `overflow: 'hidden'` pour que la photo épouse l'arrondi de la feuille, et
+  // une légère rotation pour l'effet « carte mal rangée ».
+  secondPage: {
+    position: 'absolute',
+    alignSelf: 'center',
+    overflow: 'hidden',
+    transform: [{ rotate: `${PAGE_TILT}deg` }],
+  },
+  // Photo ouverte en grand, par-dessus tout l'écran.
+  photoOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(28, 39, 55, 0.95)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  photoOverlayInner: { width: '100%' },
   // Même padding horizontal que `body` — sans lui, les commentaires
   // s'alignaient pile sur le bord de la carte, trop près de la bordure.
   commentsWrap: { paddingHorizontal: 18 },

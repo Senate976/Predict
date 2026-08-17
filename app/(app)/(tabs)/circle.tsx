@@ -322,7 +322,6 @@ export default function CircleScreen() {
 
         {tab === 'friends' ? (
           <>
-            <Text style={styles.eyebrow}>Ajouter quelqu’un</Text>
             <TextInput
               value={query}
               onChangeText={setQuery}
