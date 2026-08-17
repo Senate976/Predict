@@ -461,7 +461,7 @@ export default function NewPredictionScreen() {
               <TextInput
                 value={teaser}
                 onChangeText={setTeaser}
-                placeholder="Donnez un indice sur votre Predict"
+                placeholder="Un indice ?"
                 placeholderTextColor={colors.textFaint}
                 multiline
                 editable={!submitting}
@@ -504,7 +504,7 @@ export default function NewPredictionScreen() {
                 selection={contentSelection}
                 placeholder={
                   isQuestion
-                    ? 'Posez votre question à votre cercle...'
+                    ? 'Votre question'
                     : 'Écrivez votre Predict ici et prouvez à votre cercle, qu’une fois encore, vous aviez raison'
                 }
                 placeholderTextColor={colors.textFaint}

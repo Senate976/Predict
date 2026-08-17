@@ -1195,7 +1195,7 @@ function createStyles(colors: Colors) {
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.card,
-    marginBottom: 12,
+    marginBottom: 18,
     backgroundColor: colors.surface,
     overflow: 'hidden',
     shadowColor: '#000',

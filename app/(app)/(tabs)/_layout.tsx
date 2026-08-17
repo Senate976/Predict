@@ -80,6 +80,13 @@ const NOTCH_CONTROL_1 = 30;
 /** Même principe pour le second point de contrôle de chaque Bézier, qui
  * partage l'ordonnée de son point d'arrivée. */
 const NOTCH_CONTROL_2 = 40;
+/** Épaisseur du trait. Le tracé est décalé de la moitié de cette valeur vers
+ * le bas (`NOTCH_INSET`) : à Y=0, un trait centré sur la ligne déborderait de
+ * moitié hors du SVG et s'y ferait rogner — les segments droits rendaient donc
+ * deux fois plus fins que la courbe, qui, elle, est bien à l'intérieur. Le
+ * conteneur remonte d'autant pour que la ligne retombe au même pixel. */
+const NOTCH_STROKE = 1.5;
+const NOTCH_INSET = NOTCH_STROKE / 2;
 
 /**
  * Tracé du contour de la découpe, en coordonnées absolues (0..width en X) :
@@ -102,12 +109,15 @@ function buildCradlePath(cx: number, width: number): string {
   const left = cx - H;
   const right = cx + H;
 
+  const y = NOTCH_INSET;
+  const d = D + NOTCH_INSET;
+
   return [
-    `M 0 0`,
-    `L ${left.toFixed(2)} 0`,
-    `C ${(left + a).toFixed(2)} 0, ${(cx - b).toFixed(2)} ${D}, ${cx.toFixed(2)} ${D}`,
-    `C ${(cx + b).toFixed(2)} ${D}, ${(right - a).toFixed(2)} 0, ${right.toFixed(2)} 0`,
-    `L ${width} 0`,
+    `M 0 ${y}`,
+    `L ${left.toFixed(2)} ${y}`,
+    `C ${(left + a).toFixed(2)} ${y}, ${(cx - b).toFixed(2)} ${d}, ${cx.toFixed(2)} ${d}`,
+    `C ${(cx + b).toFixed(2)} ${d}, ${(right - a).toFixed(2)} ${y}, ${right.toFixed(2)} ${y}`,
+    `L ${width} ${y}`,
   ].join(' ');
 }
 
@@ -129,8 +139,13 @@ function TabBarNotchBorder() {
   const d = buildCradlePath(cx, width);
 
   return (
-    <Svg width={width} height={NOTCH_DEPTH + 4} style={styles.notchBorder} pointerEvents="none">
-      <Path d={d} stroke={colors.text} strokeWidth={1.5} fill="none" />
+    <Svg
+      width={width}
+      height={NOTCH_DEPTH + NOTCH_STROKE + 4}
+      style={[styles.notchBorder, { marginTop: -NOTCH_INSET }]}
+      pointerEvents="none"
+    >
+      <Path d={d} stroke={colors.text} strokeWidth={NOTCH_STROKE} fill="none" />
     </Svg>
   );
 }
@@ -315,7 +330,7 @@ const styles = StyleSheet.create({
     width: CENTER_BUTTON_RADIUS * 2,
     height: CENTER_BUTTON_RADIUS * 2,
     borderRadius: CENTER_BUTTON_RADIUS,
-    borderWidth: 1.5,
+    borderWidth: NOTCH_STROKE,
     alignItems: 'center',
     justifyContent: 'center',
     shadowOffset: { width: 0, height: 0 },
