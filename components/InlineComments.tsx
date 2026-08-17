@@ -305,12 +305,10 @@ export function InlineComments({
 
 function createStyles(colors: Colors) {
   return StyleSheet.create({
-  container: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
+  // Aucun trait de séparation : c'est le fond distinct du bloc, posé par
+  // l'appelant, qui le détache de la carte. Un liseré tombait ici pile sur le
+  // bord bas de l'enveloppe et s'y doublait.
+  container: {},
   loader: { marginVertical: 8 },
   list: { gap: 8, marginBottom: 10 },
   comment: {},

@@ -127,10 +127,9 @@ function buildCradlePath(cx: number, width: number): string {
  * bouton central « + », qui déborde déjà au-dessus de la barre. Un seul
  * `Path`, en trait seul (`fill="none"`) — jamais de remplissage : le fond
  * sous la courbe est celui, uni, de `styles.bar`/`colors.navBar`, pas celui
- * de ce SVG. Couleur du trait alignée sur `colors.text` (quasi-blanc en
- * sombre, quasi-noir en clair) plutôt qu'un blanc fixe : à faible opacité
- * ou sur fond clair, un blanc fixe se lirait comme un gris terne ou
- * disparaîtrait complètement.
+ * de ce SVG. Couleur du trait alignée sur celle des icônes inactives de la
+ * barre (`colors.navBarInactive`) : le trait et les icônes qu'il surplombe
+ * forment un même ensemble, un ton plus soutenu le détacherait d'elles.
  */
 function TabBarNotchBorder() {
   const { width } = useWindowDimensions();
@@ -145,7 +144,7 @@ function TabBarNotchBorder() {
       style={[styles.notchBorder, { marginTop: -NOTCH_INSET }]}
       pointerEvents="none"
     >
-      <Path d={d} stroke={colors.text} strokeWidth={NOTCH_STROKE} fill="none" />
+      <Path d={d} stroke={colors.navBarInactive} strokeWidth={NOTCH_STROKE} fill="none" />
     </Svg>
   );
 }

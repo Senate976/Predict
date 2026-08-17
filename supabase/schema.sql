@@ -922,6 +922,21 @@ create policy "notifications_update_own"
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
 
+-- Une notification écartée par son destinataire est marquée, jamais effacée.
+-- Les notifications de révélation et de rappel sont regénérées à chaque
+-- chargement du Fil (`generate_reveal_notifications`,
+-- `generate_reveal_reminders`) et leur garde-fou anti-doublon
+-- (`on conflict do nothing`) s'appuie sur la présence de la ligne : une ligne
+-- réellement supprimée réapparaissait donc à la connexion suivante. Le drapeau
+-- la garde en base, silencieuse, et le conflit continue de jouer son rôle.
+alter table public.notifications add column if not exists is_dismissed boolean not null default false;
+
+-- L'écran ne lit que les notifications non écartées, toujours pour un seul
+-- destinataire : cet index couvre exactement cette lecture.
+create index if not exists notifications_user_active_idx
+  on public.notifications (user_id, created_at desc)
+  where not is_dismissed;
+
 -- Chacun peut supprimer ses propres notifications (bouton poubelle côté UI).
 drop policy if exists "notifications_delete_own" on public.notifications;
 create policy "notifications_delete_own"
