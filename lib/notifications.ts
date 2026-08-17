@@ -85,6 +85,7 @@ export async function fetchNotifications(userId: string) {
         'group:groups(name, owner:profiles!groups_owner_id_fkey(username))'
     )
     .eq('user_id', userId)
+    .eq('is_dismissed', false)
     .order('created_at', { ascending: false })
     .returns<RawNotification[]>();
 
@@ -128,13 +129,21 @@ export async function markNotificationRead(id: string) {
   return supabase.from('notifications').update({ is_read: true }).eq('id', id);
 }
 
+/**
+ * Écarte une notification. On la marque plutôt que de l'effacer : les
+ * notifications de révélation et de rappel sont regénérées à chaque
+ * chargement du Fil (`generate_reveal_notifications`,
+ * `generate_reveal_reminders`), et leur garde-fou anti-doublon s'appuie sur la
+ * présence de la ligne. Une ligne réellement supprimée revenait donc à la
+ * connexion suivante — d'où une suppression qui ne tenait pas.
+ */
 export async function deleteNotification(id: string) {
-  return supabase.from('notifications').delete().eq('id', id);
+  return supabase.from('notifications').update({ is_dismissed: true }).eq('id', id);
 }
 
 /** Supprime plusieurs notifications d'un coup — sélection multiple depuis l'écran. */
 export async function deleteNotifications(ids: string[]) {
-  return supabase.from('notifications').delete().in('id', ids);
+  return supabase.from('notifications').update({ is_dismissed: true }).in('id', ids);
 }
 
 /** Nombre de notifications non lues — pour le badge de l'onglet Notifications. */
@@ -143,6 +152,7 @@ export async function fetchUnreadNotificationCount(userId: string) {
     .from('notifications')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
+    .eq('is_dismissed', false)
     .eq('is_read', false);
   return { count: count ?? 0, error };
 }

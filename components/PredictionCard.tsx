@@ -1317,9 +1317,16 @@ function createStyles(colors: Colors) {
     padding: 20,
   },
   photoOverlayInner: { width: '100%' },
-  // Même padding horizontal que `body` — sans lui, les commentaires
-  // s'alignaient pile sur le bord de la carte, trop près de la bordure.
-  commentsWrap: { paddingHorizontal: 18 },
+  // Les commentaires s'ouvrent sous l'enveloppe, dans un panneau à fond
+  // distinct : sans lui ils se confondaient avec le bas de la carte, et la
+  // zone de saisie passait inaperçue. Le fond, plus clair que l'enveloppe,
+  // suffit à les détacher — pas besoin d'un trait de séparation.
+  commentsWrap: {
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 16,
+    backgroundColor: colors.surface,
+  },
   headerSpacer: { flex: 1, minWidth: 8 },
   headerMenuButton: { padding: 2 },
   // `flexShrink` sur le bloc auteur ET sur le pseudo : c'est le pseudo qui se
