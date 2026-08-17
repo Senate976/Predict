@@ -761,6 +761,10 @@ export function PredictionCard({
      sur une ligne, le teaser dessous, puis les boutons d'action à gauche et la
      date de révélation à droite sur une dernière ligne. Sur une carte Scellée
      il vient sous le badge, sur une carte ouverte sous la lettre. */
+  const revealHintText = revealed
+    ? null
+    : `Révélation : ${item.open_ended ? 'libre' : formatCountdown(new Date(item.reveal_at), now)}`;
+
   const envelopeFooter = (
     <View style={styles.envFooter}>
       <View style={styles.envAuthorRow}>
@@ -797,9 +801,12 @@ export function PredictionCard({
       <View style={styles.envBottomRow}>
         {actionsRow}
         <View style={styles.envBottomRight}>
-          {!revealed && (
+          {/* Sur une enveloppe scellée la date est écrite en haut, sur le
+              rabat : le bas y était trop chargé. Les autres états n'ont pas de
+              rabat à leur disposition, elle reste donc ici. */}
+          {cardState.kind !== 'sealed' && revealHintText && (
             <Text style={styles.envRevealHint} numberOfLines={1}>
-              Révélation : {item.open_ended ? 'libre' : formatCountdown(new Date(item.reveal_at), now)}
+              {revealHintText}
             </Text>
           )}
           {isAuthor && cardState.kind === 'sealed' && (
@@ -869,6 +876,17 @@ export function PredictionCard({
               >
                 {envelopeWidth > 0 && <PredictBadge glyph="P" size={env.badge} />}
               </View>
+
+              {/* Centrée en haut, sur le rabat : c'est le seul endroit de
+                  l'enveloppe scellée qui reste libre, et le regard y tombe
+                  avant le reste. */}
+              {revealHintText && (
+                <View style={styles.sealedRevealHint} pointerEvents="none">
+                  <Text style={styles.envRevealHint} numberOfLines={1}>
+                    {revealHintText}
+                  </Text>
+                </View>
+              )}
 
               {/* Cale le bloc commun au bas du badge : tout ce qui suit est
                   dans le flux, donc l'enveloppe s'allonge s'il déborde. */}
@@ -1244,6 +1262,7 @@ function createStyles(colors: Colors) {
     backgroundColor: colors.accentSoft,
   },
   sealedFlapLayer: { position: 'absolute', left: 0, right: 0, top: 0 },
+  sealedRevealHint: { position: 'absolute', left: 0, right: 0, top: 12, alignItems: 'center', zIndex: 2 },
   // L'enveloppe est la carte : tout tient dedans, plus rien ne vit sous elle.
   envelopeShell: { paddingHorizontal: 16, paddingBottom: 12 },
   // Le bloc commun aux deux enveloppes — même disposition sur l'une et l'autre.
