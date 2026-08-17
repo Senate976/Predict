@@ -1,6 +1,7 @@
 import type { PostgrestError } from '@supabase/supabase-js';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { UserPlus } from 'lucide-react-native';
 import {
   ActivityIndicator,
   Alert,
@@ -16,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
 import { useAuth } from '../../../lib/auth';
+import { supabase } from '../../../lib/supabase';
 import {
   acceptFriendRequest,
   fetchFriendships,
@@ -43,6 +45,7 @@ import {
   type GroupMember,
   type GroupVisibility,
 } from '../../../lib/groups';
+import { inviteFromContacts } from '../../../lib/invite';
 import { eyebrow, fonts, radius, spacing, type Colors } from '../../../lib/theme';
 import { useColors } from '../../../lib/themeMode';
 
@@ -76,6 +79,62 @@ export default function CircleScreen() {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const userId = session?.user.id;
+  // Invitation d'un proche depuis le répertoire (voir `lib/invite.ts`) : le
+  // répertoire ne quitte jamais l'appareil, seule la fiche choisie revient.
+  const [inviting, setInviting] = useState(false);
+  const [inviteNotice, setInviteNotice] = useState<string | null>(null);
+  // Son propre pseudo, glissé dans le message d'invitation : c'est par lui
+  // qu'on s'ajoute une fois l'app installée. `null` tant qu'il n'est pas
+  // chargé — le message se passe alors simplement de la signature.
+  const [myUsername, setMyUsername] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    supabase
+      .from('profiles')
+      .select('username')
+      .eq('id', userId)
+      .maybeSingle<{ username: string }>()
+      .then(({ data }) => {
+        if (!cancelled) setMyUsername(data?.username ?? null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  async function handleInvite() {
+    setInviting(true);
+    setInviteNotice(null);
+    const outcome = await inviteFromContacts(myUsername);
+    setInviting(false);
+    switch (outcome.kind) {
+      case 'sent':
+        setInviteNotice(
+          outcome.contactName ? `Invitation envoyée à ${outcome.contactName}.` : 'Invitation envoyée.'
+        );
+        break;
+      case 'copied':
+        setInviteNotice('Invitation copiée — colle-la où tu veux pour l’envoyer.');
+        break;
+      case 'denied':
+        setInviteNotice('Predict n’a pas accès à tes contacts. Tu peux l’autoriser dans les réglages du téléphone.');
+        break;
+      case 'no-number':
+        setInviteNotice(
+          outcome.contactName
+            ? `${outcome.contactName} n’a pas de numéro enregistré.`
+            : 'Ce contact n’a pas de numéro enregistré.'
+        );
+        break;
+      case 'error':
+        setInviteNotice(`Invitation impossible : ${outcome.message}`);
+        break;
+      case 'cancelled':
+        break;
+    }
+  }
 
   const [tab, setTab] = useState<Tab>('friends');
   const [friendships, setFriendships] = useState<Friendship[] | null>(null);
@@ -331,6 +390,23 @@ export default function CircleScreen() {
               autoCorrect={false}
               style={styles.input}
             />
+
+            {/* Pour quelqu'un qui n'est pas encore sur Predict : plutôt que de
+                lui dicter son pseudo, on lui envoie un SMS depuis le
+                répertoire. Sur le web, faute de répertoire accessible, le
+                message part dans le presse-papier. */}
+            <Pressable
+              onPress={handleInvite}
+              disabled={inviting}
+              style={({ pressed }) => [styles.inviteButton, pressed && styles.invitePressed]}
+            >
+              <UserPlus size={16} color={colors.accent} strokeWidth={1.75} />
+              <Text style={styles.inviteButtonText}>
+                {inviting ? 'Ouverture…' : 'Inviter un contact'}
+              </Text>
+            </Pressable>
+
+            {inviteNotice && <Text style={styles.inviteNotice}>{inviteNotice}</Text>}
 
             {searching && <ActivityIndicator style={styles.searchLoader} color={colors.text} />}
 
@@ -714,6 +790,20 @@ function createStyles(colors: Colors) {
     backgroundColor: colors.surface,
   },
   searchLoader: { marginTop: spacing.md },
+  inviteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: spacing.sm,
+    paddingVertical: 11,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  invitePressed: { opacity: 0.7 },
+  inviteButtonText: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.accent },
+  inviteNotice: { fontSize: 13, lineHeight: 19, color: colors.textMuted, marginTop: spacing.sm },
   muted: { fontSize: 14, color: colors.textFaint, marginTop: spacing.sm, lineHeight: 20 },
   sectionSpacing: { marginTop: spacing.md },
   resultsBox: { marginTop: spacing.sm },
