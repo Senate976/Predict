@@ -118,6 +118,14 @@ export default function NotificationsScreen() {
   // notification — un appui simple bascule alors la sélection au lieu
   // d'ouvrir/répondre à la notification.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // `notifications` peut être `null` tant que rien n'est chargé : sans ce
+  // garde-fou, « tout » cocherait une liste vide et se dirait complète.
+  const allSelected =
+    (notifications?.length ?? 0) > 0 && selectedIds.size === (notifications?.length ?? 0);
+
+  function toggleSelectAll() {
+    setSelectedIds(allSelected ? new Set() : new Set((notifications ?? []).map((n) => n.id)));
+  }
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -255,6 +263,13 @@ export default function NotificationsScreen() {
             <Text style={styles.headerTitle}>
               {selectedIds.size} sélectionnée{selectedIds.size > 1 ? 's' : ''}
             </Text>
+            {/* Tout cocher d'un geste, sans renoncer au choix un par un : la
+                sélection manuelle reste le défaut, ceci n'est qu'un raccourci
+                — et il se retourne en « Tout désélectionner » une fois la
+                liste entièrement cochée. */}
+            <Pressable onPress={toggleSelectAll} hitSlop={8}>
+              <Text style={styles.selectAll}>{allSelected ? 'Aucun' : 'Tout'}</Text>
+            </Pressable>
             <Pressable onPress={handleBulkDelete} hitSlop={8}>
               <Trash2 size={22} color={colors.danger} strokeWidth={1.75} />
             </Pressable>
@@ -391,6 +406,7 @@ function createStyles(colors: Colors) {
     color: colors.text,
   },
   cancelSelection: { fontSize: 15, color: colors.text, fontWeight: '600' },
+  selectAll: { fontFamily: fonts.label, fontSize: 13, color: colors.accent },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   loader: { marginTop: 32 },
   empty: { fontSize: 14, color: colors.textFaint, textAlign: 'center', marginTop: 32 },
@@ -407,7 +423,7 @@ function createStyles(colors: Colors) {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
-    paddingVertical: 14,
+    paddingVertical: 20,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
