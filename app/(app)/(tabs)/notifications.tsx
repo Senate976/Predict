@@ -418,16 +418,21 @@ function createStyles(colors: Colors) {
     fontSize: 14,
     marginBottom: spacing.md,
   },
+  // Une carte par notification, séparée des suivantes par du vide plutôt que
+  // par un filet — même respiration que les cartes du Fil, et même écart.
   row: {
     position: 'relative',
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    padding: 14,
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.card,
+    backgroundColor: colors.surface,
   },
-  rowUnread: { backgroundColor: colors.accentSoft },
+  rowUnread: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
   rowPressed: { opacity: 0.7 },
   iconSlot: { marginTop: 1 },
   checkbox: {
