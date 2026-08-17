@@ -23,7 +23,13 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Predict accède à tes contacts uniquement au moment où tu choisis quelqu'un à inviter. La fiche choisie ne quitte pas ton téléphone."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
