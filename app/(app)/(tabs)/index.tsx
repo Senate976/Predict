@@ -84,6 +84,9 @@ export default function HomeScreen() {
   // propres Predicts scellés est le geste le plus fréquent, il ne mérite pas
   // deux taps de plus.
   const [mineOnly, setMineOnly] = useState(false);
+  // Ne garder que ce qui se révèle d'ici sept jours — repérer d'un coup ce qui
+  // arrive bientôt, sans avoir à lire chaque compte à rebours.
+  const [thisWeekOnly, setThisWeekOnly] = useState(false);
   // `load` est mémoïsé sur `userId` : lire `feed` dedans y figerait sa valeur
   // du premier rendu. Cette ref dit simplement si le fil a déjà été affiché
   // au moins une fois, ce qui suffit à décider si un échec mérite un message.
@@ -103,12 +106,14 @@ export default function HomeScreen() {
     }
   }
 
-  const hasActiveFilters = authorFilter !== null || favoritesOnly || mineOnly || sortKey !== 'default';
+  const hasActiveFilters =
+    authorFilter !== null || favoritesOnly || mineOnly || thisWeekOnly || sortKey !== 'default';
 
   function resetFilters() {
     setAuthorFilter(null);
     setFavoritesOnly(false);
     setMineOnly(false);
+    setThisWeekOnly(false);
     setSortKey('default');
     setSortOrder('recent');
   }
@@ -295,7 +300,15 @@ export default function HomeScreen() {
     .filter((item) => !item.is_hidden)
     .filter((item) => !authorFilter || item.author_id === authorFilter)
     .filter((item) => !favoritesOnly || item.is_favorite)
-    .filter((item) => !mineOnly || item.author_id === userId);
+    .filter((item) => !mineOnly || item.author_id === userId)
+    // Une révélation « libre » n'a pas de date : elle ne peut donc jamais être
+    // annoncée pour cette semaine, et sort du filtre.
+    .filter((item) => {
+      if (!thisWeekOnly) return true;
+      if (item.open_ended || isRevealed(item, now)) return false;
+      const revealAt = new Date(item.reveal_at).getTime();
+      return revealAt <= now.getTime() + 7 * 24 * 60 * 60 * 1000;
+    });
 
   const shown = [...filtered].sort((a, b) => {
     if (sortKey === 'seal') {
@@ -428,6 +441,12 @@ export default function HomeScreen() {
                       {sortOrder === 'recent' ? 'Plus récent' : 'Plus ancien'}
                     </Text>
                   )}
+                </Pressable>
+
+                <Pressable onPress={() => setThisWeekOnly((o) => !o)} style={styles.menuRow}>
+                  <Text style={[styles.menuRowText, thisWeekOnly && styles.menuRowTextActive]}>
+                    Révélations cette semaine
+                  </Text>
                 </Pressable>
 
                 <Pressable
@@ -640,7 +659,7 @@ function createStyles(colors: Colors) {
     borderBottomColor: 'transparent',
   },
   filtersToggleActive: { borderBottomColor: colors.text },
-  filtersToggleText: { fontSize: 13, fontWeight: '700', color: colors.textFaint },
+  filtersToggleText: { fontSize: 15, fontWeight: '700', color: colors.textFaint },
   filtersToggleTextActive: { color: colors.text },
   filtersReset: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   filtersResetText: { fontSize: 13, fontWeight: '600', color: colors.textFaint },
@@ -679,7 +698,7 @@ function createStyles(colors: Colors) {
     gap: 10,
   },
   menuRowRight: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, maxWidth: '70%' },
-  menuRowText: { fontSize: 16, fontWeight: '600', color: colors.textMuted },
+  menuRowText: { fontSize: 17, fontWeight: '600', color: colors.textMuted },
   menuRowTextActive: { color: colors.text, fontWeight: '700' },
   menuRowTextReset: { fontSize: 16, fontWeight: '600', color: colors.danger },
   menuRowValue: { fontSize: 14, color: colors.textFaint, flexShrink: 1 },

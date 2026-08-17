@@ -472,7 +472,7 @@ export default function NewPredictionScreen() {
           )}
 
           <Text style={[styles.label, styles.sectionLabel]}>
-            {isQuestion ? 'Open Predict' : 'Mon Predict'}
+            {isQuestion ? 'Sondage Predict' : 'Mon Predict'}
           </Text>
           <View style={styles.scopeRow}>
             <Pressable
@@ -505,7 +505,7 @@ export default function NewPredictionScreen() {
                 placeholder={
                   isQuestion
                     ? 'Votre question'
-                    : 'Écrivez votre Predict ici et prouvez à votre cercle, qu’une fois encore, vous aviez raison'
+                    : 'Prouvez que vous aviez raison'
                 }
                 placeholderTextColor={colors.textFaint}
                 multiline
