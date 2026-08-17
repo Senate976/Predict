@@ -792,7 +792,10 @@ export function PredictionCard({
         </Text>
       )}
 
-      {!!item.teaser && <Text style={styles.envTeaser}>{item.teaser}</Text>}
+      {/* Un Sondage n'a pas de teaser propre : celui enregistré est un extrait
+          de la question, déjà écrite en entier dans la lettre. L'enveloppe ne
+          porte donc que le teaser d'une Déclaration, quand il y en a un. */}
+      {!isQuestion && !!item.teaser && <Text style={styles.envTeaser}>{item.teaser}</Text>}
 
       {/* Le bouton « Révéler », réservé à l'auteur d'une carte encore Scellée,
           tient sur la ligne du bas plutôt que sur une ligne à lui : sur sa
