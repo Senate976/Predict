@@ -962,7 +962,16 @@ export function PredictionCard({
                   un Sondage encore ouvert : plus rien à répondre une fois clos,
                   l'écran détail prend le relais. Texte libre comme choix
                   multiple, `InlineQuestionAnswer` gère les deux. */}
-              {isQuestion && !revealed && <InlineQuestionAnswer prediction={item} />}
+              {isQuestion && !revealed && (
+                /* `onStartShouldSetResponder` réclame le toucher pour ce
+                   bloc : sans lui, la `Pressable` de l'enveloppe le happe et
+                   ouvre la carte au lieu de laisser écrire. On répond donc
+                   depuis le Fil, et l'écran détail reste disponible pour qui
+                   préfère y aller. */
+                <View onStartShouldSetResponder={() => true}>
+                  <InlineQuestionAnswer prediction={item} />
+                </View>
+              )}
                     </View>
 
               {envelopeFooter}
@@ -1225,9 +1234,9 @@ function createStyles(colors: Colors) {
   // Le bloc commun aux deux enveloppes — même disposition sur l'une et l'autre.
   envFooter: { marginTop: 8 },
   envAuthorRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  envAuthorName: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.text, flexShrink: 1, minWidth: 0 },
+  envAuthorName: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.text, flexShrink: 1, minWidth: 0 },
   envMentionTag: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
-  envTeaser: { fontFamily: fonts.serifItalic, fontSize: 12, lineHeight: 17, color: colors.textMuted, marginTop: 2 },
+  envTeaser: { fontFamily: fonts.serifItalic, fontSize: 14, lineHeight: 20, color: colors.textMuted, marginTop: 3 },
   // Dernière ligne : boutons d'action à gauche, date de révélation à droite.
   envBottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   envRevealHint: { fontFamily: fonts.label, fontSize: 11, color: colors.textMuted, flexShrink: 1 },
