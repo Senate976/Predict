@@ -2,7 +2,6 @@ import { useRouter } from 'expo-router';
 import {
   Eye,
   EyeOff,
-  Image as ImageIcon,
   MessageCircle,
   MoreHorizontal,
   Star,
@@ -90,8 +89,11 @@ const GLOW_PULSE_TOTAL_MS = GLOW_PULSE_CYCLE_MS * 2;
  * forme n'est redéfinie dans ce fichier. */
 
 /** De combien la photo, glissée derrière la lettre comme une seconde page,
- * dépasse à droite et en bas. */
-const PAGE_PEEK = 18;
+ * dépasse à droite et en bas — assez pour qu'on la reconnaisse, jamais au
+ * point de concurrencer la lettre. */
+const PAGE_PEEK = 16;
+/** L'inclinaison qui lui donne son air de carte mal remise dans le paquet. */
+const PAGE_TILT = 4;
 
 function easeInOutQuad(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2;
@@ -873,9 +875,11 @@ export function PredictionCard({
               </View>
               <View style={[styles.openBodyLayer, { top: env.flapH }]} pointerEvents="none" />
 
-              {/* La photo jointe glisse derrière la lettre comme une seconde
-                  page : seul son bord dépasse, et un appui dessus l'ouvre en
-                  grand. Rendue avant la lettre pour passer dessous. */}
+              {/* La photo jointe est elle-même la seconde page, glissée
+                  derrière la lettre et légèrement de biais, comme une carte
+                  qu'on aurait mal remise dans le paquet : ce qui dépasse
+                  laisse voir l'image, et un appui dessus l'ouvre en grand.
+                  Rendue avant la lettre pour passer dessous. */}
               {item.photo_path && (
                 <Pressable
                   onPress={() => setPhotoOpen(true)}
@@ -883,20 +887,18 @@ export function PredictionCard({
                     styles.secondPage,
                     {
                       // Calée sur la lettre (qui commence sous la pointe du
-                      // rabat), puis décalée de PAGE_PEEK pour que ce décalage
-                      // exact dépasse à droite et en bas.
+                      // rabat), puis décalée pour dépasser à droite et en bas.
                       top: env.flapPeek + PAGE_PEEK,
                       marginLeft: PAGE_PEEK,
                       width: env.letterW,
-                      minHeight: env.letterH,
+                      height: env.letterH,
                       borderRadius: env.letterRadius,
                       borderWidth: env.letterBorder,
                       borderColor: colors.accent,
-                      backgroundColor: letterPaper(colors.surface),
                     },
                   ]}
                 >
-                  <ImageIcon size={16} color={colors.accent} strokeWidth={1.75} style={styles.secondPageIcon} />
+                  <PredictionPhoto bucket="content" path={item.photo_path} fill />
                 </Pressable>
               )}
 
@@ -1290,10 +1292,14 @@ function createStyles(colors: Colors) {
   // La photo jointe, glissée derrière la lettre comme une seconde page : même
   // papier, même liseré, décalée pour que seuls son bord droit et son bord bas
   // dépassent. Posée avant la lettre dans le rendu, donc dessous.
-  secondPage: { position: 'absolute', alignSelf: 'center' },
-  // L'icône se pose dans le coin qui dépasse, seul endroit visible de la
-  // seconde page — c'est aussi ce coin qui reçoit l'appui.
-  secondPageIcon: { position: 'absolute', right: 1, bottom: 1 },
+  // `overflow: 'hidden'` pour que la photo épouse l'arrondi de la feuille, et
+  // une légère rotation pour l'effet « carte mal rangée ».
+  secondPage: {
+    position: 'absolute',
+    alignSelf: 'center',
+    overflow: 'hidden',
+    transform: [{ rotate: `${PAGE_TILT}deg` }],
+  },
   // Photo ouverte en grand, par-dessus tout l'écran.
   photoOverlay: {
     flex: 1,

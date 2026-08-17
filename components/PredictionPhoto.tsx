@@ -13,7 +13,18 @@ import { useColors } from '../lib/themeMode';
  * correspondante, pas de vérification de visibilité supplémentaire à faire
  * côté client.
  */
-export function PredictionPhoto({ bucket, path }: { bucket: 'content' | 'verdict'; path: string }) {
+export function PredictionPhoto({
+  bucket,
+  path,
+  fill = false,
+}: {
+  bucket: 'content' | 'verdict';
+  path: string;
+  /** Occupe tout le parent au lieu de garder son ratio 4/3 — pour la photo
+   * glissée derrière la lettre, qui doit épouser la feuille exactement. Le
+   * parent se charge alors de l'arrondi et du rognage. */
+  fill?: boolean;
+}) {
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const colors = useColors();
@@ -42,13 +53,13 @@ export function PredictionPhoto({ bucket, path }: { bucket: 'content' | 'verdict
 
   if (!url) {
     return (
-      <View style={[styles.image, styles.loaderBox]}>
+      <View style={[fill ? styles.fill : styles.image, styles.loaderBox]}>
         <ActivityIndicator size="small" color={colors.text} />
       </View>
     );
   }
 
-  return <Image source={{ uri: url }} style={styles.image} resizeMode="cover" />;
+  return <Image source={{ uri: url }} style={fill ? styles.fill : styles.image} resizeMode="cover" />;
 }
 
 function createStyles(colors: Colors) {
@@ -59,6 +70,7 @@ function createStyles(colors: Colors) {
       borderRadius: radius.sm,
       backgroundColor: colors.border,
     },
+    fill: { ...StyleSheet.absoluteFill, backgroundColor: colors.border },
     loaderBox: { alignItems: 'center', justifyContent: 'center' },
     errorText: { fontSize: 12, color: colors.textFaint },
   });
