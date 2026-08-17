@@ -398,7 +398,7 @@ export default function PredictionDetailScreen() {
                       </View>
                     )}
                     <View style={styles.verdictPhotoAttach}>
-                      <Text style={styles.hint}>Illustre le résultat de ce Sondage (facultatif)</Text>
+                      <Text style={styles.hint}>Insère une preuve (facultatif)</Text>
                       <PhotoAttachButton
                         uri={verdictPhotoUri}
                         onChange={setVerdictPhotoUri}

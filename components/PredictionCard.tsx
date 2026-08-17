@@ -233,8 +233,9 @@ export function PredictionCard({
   const [reactors, setReactors] = useState<EmojiReactor[] | null>(null);
   const [reactorsLoading, setReactorsLoading] = useState(false);
   const [reactorsError, setReactorsError] = useState<string | null>(null);
-  // Ouvre la photo jointe en grand — voir la « seconde page » derrière la lettre.
-  const [photoOpen, setPhotoOpen] = useState(false);
+  // Quelle photo est ouverte en grand, ou `null` — voir les « pages »
+  // glissées derrière la lettre.
+  const [openPhoto, setOpenPhoto] = useState<{ bucket: 'content' | 'verdict'; path: string } | null>(null);
   // Écho optimiste de `setPredictionVerdict` : le statut canonique vient de
   // `item.final_status` (props), mais attendre le prochain chargement du fil
   // pour voir le tampon apparaître, après un tap sur Réalisé/Manqué, serait
@@ -789,33 +790,43 @@ export function PredictionCard({
 
       {!!item.teaser && <Text style={styles.envTeaser}>{item.teaser}</Text>}
 
-      {/* Bouton « Révéler », réservé à l'auteur d'une carte encore Scellée —
-          rend visible qu'un Predict attend sa révélation. */}
-      {isAuthor && cardState.kind === 'sealed' && (
-        <View style={styles.revealRow}>
-          <Pressable
-            onPress={handleRevealNow}
-            disabled={revealPending}
-            style={({ pressed }) => [styles.revealButton, pressed && styles.revealButtonPressed]}
-          >
-            <Text style={styles.revealButtonText}>{revealPending ? 'Révélation…' : 'Révéler'}</Text>
-          </Pressable>
-          {revealError && <Text style={styles.revealErrorText}>{revealError}</Text>}
-        </View>
-      )}
-
+      {/* Le bouton « Révéler », réservé à l'auteur d'une carte encore Scellée,
+          tient sur la ligne du bas plutôt que sur une ligne à lui : sur sa
+          propre ligne il allongeait l'enveloppe, et les cartes de l'auteur ne
+          faisaient plus la même hauteur que les autres. */}
       <View style={styles.envBottomRow}>
         {actionsRow}
-        {!revealed && (
-          <Text style={styles.envRevealHint} numberOfLines={1}>
-            Révélation : {item.open_ended ? 'libre' : formatCountdown(new Date(item.reveal_at), now)}
-          </Text>
-        )}
+        <View style={styles.envBottomRight}>
+          {!revealed && (
+            <Text style={styles.envRevealHint} numberOfLines={1}>
+              Révélation : {item.open_ended ? 'libre' : formatCountdown(new Date(item.reveal_at), now)}
+            </Text>
+          )}
+          {isAuthor && cardState.kind === 'sealed' && (
+            <Pressable
+              onPress={handleRevealNow}
+              disabled={revealPending}
+              style={({ pressed }) => [styles.revealButton, pressed && styles.revealButtonPressed]}
+            >
+              <Text style={styles.revealButtonText}>{revealPending ? 'Révélation…' : 'Révéler'}</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
+
+      {revealError && <Text style={styles.revealErrorText}>{revealError}</Text>}
     </View>
   );
 
   const showVerdictStamp = cardState.kind === 'realized' || cardState.kind === 'missed';
+
+  /* Les photos glissées derrière la lettre, dans l'ordre où elles se sont
+     ajoutées à l'histoire : celle de la création d'abord, la preuve du verdict
+     ensuite. Chacune décale et s'incline un peu plus que la précédente, d'où
+     l'éventail — et chacune reste visible par le bord qu'elle laisse dépasser. */
+  const pages: { bucket: 'content' | 'verdict'; path: string }[] = [];
+  if (item.photo_path) pages.push({ bucket: 'content', path: item.photo_path });
+  if (verdictPhotoPath) pages.push({ bucket: 'verdict', path: verdictPhotoPath });
 
   return (
     <View
@@ -880,27 +891,35 @@ export function PredictionCard({
                   qu'on aurait mal remise dans le paquet : ce qui dépasse
                   laisse voir l'image, et un appui dessus l'ouvre en grand.
                   Rendue avant la lettre pour passer dessous. */}
-              {item.photo_path && (
-                <Pressable
-                  onPress={() => setPhotoOpen(true)}
-                  style={[
-                    styles.secondPage,
-                    {
-                      // Calée sur la lettre (qui commence sous la pointe du
-                      // rabat), puis décalée pour dépasser à droite et en bas.
-                      top: env.flapPeek + PAGE_PEEK,
-                      marginLeft: PAGE_PEEK,
-                      width: env.letterW,
-                      height: env.letterH,
-                      borderRadius: env.letterRadius,
-                      borderWidth: env.letterBorder,
-                      borderColor: colors.accent,
-                    },
-                  ]}
-                >
-                  <PredictionPhoto bucket="content" path={item.photo_path} fill />
-                </Pressable>
-              )}
+              {/* La dernière ajoutée est rendue en premier, donc tout au fond :
+                  l'éventail s'ouvre alors dans l'ordre de l'histoire, la photo
+                  de création juste derrière la lettre. */}
+              {pages
+                .map((page, index) => ({ page, rank: index + 1 }))
+                .reverse()
+                .map(({ page, rank }) => (
+                  <Pressable
+                    key={page.bucket}
+                    onPress={() => setOpenPhoto(page)}
+                    style={[
+                      styles.secondPage,
+                      {
+                        // Calée sur la lettre (qui commence sous la pointe du
+                        // rabat), puis décalée pour dépasser à droite et en bas.
+                        top: env.flapPeek + PAGE_PEEK * rank,
+                        marginLeft: PAGE_PEEK * rank,
+                        width: env.letterW,
+                        height: env.letterH,
+                        borderRadius: env.letterRadius,
+                        borderWidth: env.letterBorder,
+                        borderColor: colors.accent,
+                        transform: [{ rotate: `${PAGE_TILT * rank}deg` }],
+                      },
+                    ]}
+                  >
+                    <PredictionPhoto bucket={page.bucket} path={page.path} fill />
+                  </Pressable>
+                ))}
 
               <View
                 style={[
@@ -914,10 +933,10 @@ export function PredictionCard({
                     backgroundColor: letterPaper(colors.surface),
                   },
                   showVerdictStamp && styles.letterWithStamp,
-                  // Réserve la bande que la photo laisse dépasser sous la
+                  // Réserve la bande que les photos laissent dépasser sous la
                   // lettre : sans elle, le bloc auteur/teaser vient par-dessus
-                  // et capte l'appui à la place de la photo.
-                  item.photo_path ? { marginBottom: PAGE_PEEK } : null,
+                  // et capte l'appui à leur place.
+                  pages.length > 0 ? { marginBottom: PAGE_PEEK * pages.length } : null,
                 ]}
               >
                 {showVerdictStamp && <VerdictStamp verdict={cardState.kind as 'realized' | 'missed'} colors={colors} />}
@@ -981,11 +1000,7 @@ export function PredictionCard({
           {/* Photo-preuve du verdict — sous la lettre, jamais dedans : elle
               documente le dénouement (Réalisé/Manqué), pas le secret
               initial. */}
-          {verdictPhotoPath && showVerdictStamp && (
-            <View style={styles.verdictPhotoWrap}>
-              <PredictionPhoto bucket="verdict" path={verdictPhotoPath} />
-            </View>
-          )}
+
         </Pressable>
 
         {/* Invite l'auteur à trancher dès que sa prédiction est révélée mais
@@ -1133,12 +1148,12 @@ export function PredictionCard({
         </Pressable>
       </Modal>
 
-      {/* La seconde page, ouverte en grand — un appui n'importe où referme. */}
-      {item.photo_path && (
-        <Modal visible={photoOpen} transparent animationType="fade" onRequestClose={() => setPhotoOpen(false)}>
-          <Pressable style={styles.photoOverlay} onPress={() => setPhotoOpen(false)}>
+      {/* La page choisie, ouverte en grand — un appui n'importe où referme. */}
+      {openPhoto && (
+        <Modal visible transparent animationType="fade" onRequestClose={() => setOpenPhoto(null)}>
+          <Pressable style={styles.photoOverlay} onPress={() => setOpenPhoto(null)}>
             <View style={styles.photoOverlayInner}>
-              <PredictionPhoto bucket="content" path={item.photo_path} />
+              <PredictionPhoto bucket={openPhoto.bucket} path={openPhoto.path} />
             </View>
           </Pressable>
         </Modal>
@@ -1238,7 +1253,20 @@ function createStyles(colors: Colors) {
   envMentionTag: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
   envTeaser: { fontFamily: fonts.serifItalic, fontSize: 14, lineHeight: 20, color: colors.textMuted, marginTop: 3 },
   // Dernière ligne : boutons d'action à gauche, date de révélation à droite.
-  envBottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  envBottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  // Date de révélation et bouton « Révéler » côte à côte, à droite de la ligne
+  // du bas : c'est ce qui garde toutes les enveloppes à la même hauteur.
+  // `minHeight` calé sur la hauteur du bouton « Révéler » : la ligne du bas
+  // fait alors la même hauteur qu'il soit présent ou non, et toutes les
+  // enveloppes scellées se retrouvent au même gabarit.
+  envBottomRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flexShrink: 1,
+    minWidth: 0,
+    minHeight: 30,
+  },
   envRevealHint: { fontFamily: fonts.label, fontSize: 11, color: colors.textMuted, flexShrink: 1 },
   sealedBadge: { position: 'absolute', left: '50%', zIndex: 2 },
   // Corps de carte assourdi une fois Manquée — jamais le badge d'état,
@@ -1312,7 +1340,6 @@ function createStyles(colors: Colors) {
     position: 'absolute',
     alignSelf: 'center',
     overflow: 'hidden',
-    transform: [{ rotate: `${PAGE_TILT}deg` }],
     // Au-dessus du bloc auteur/teaser (qui vient après elle dans le rendu),
     // mais sous la lettre — voir `letter`, qui monte d'un cran de plus.
     zIndex: 1,
@@ -1351,8 +1378,8 @@ function createStyles(colors: Colors) {
   },
   // Bouton « Révéler », sous l'enveloppe Scellée — contour fin, pas un aplat,
   // même registre que le bouton Manqué proposé plus bas.
-  revealRow: { alignItems: 'flex-end', marginTop: 8 },
   revealButton: {
+    flexShrink: 0,
     borderWidth: 1,
     borderColor: colors.accent,
     borderRadius: radius.pill,
@@ -1391,7 +1418,6 @@ function createStyles(colors: Colors) {
   verdictPhotoStep: { gap: 8 },
   verdictPhotoStepLabel: { fontSize: 12, color: colors.textMuted },
   // Photo-preuve du verdict — sous la lettre, même padding horizontal que le corps.
-  verdictPhotoWrap: { paddingHorizontal: 18, marginTop: 10 },
   // Fil épuré façon réseau social : les deux blocs restants (commentaire,
   // réaction) packés à gauche avec un espacement modeste.
   // Dans l'enveloppe : c'est elle qui porte les marges, le pied n'ajoute que
