@@ -114,8 +114,11 @@ export type PredictionFeedItem = {
   my_answer_is_correct: boolean | null;
 };
 
-/** Doivent rester alignés sur les contraintes `predictions_*_length` du SQL. */
-export const MAX_TEASER_LENGTH = 160;
+/** Le SQL autorise jusqu'à 160 (contrainte `predictions_teaser_length`) ; on
+ * s'arrête volontairement plus tôt côté app pour que le teaser reste une
+ * accroche d'une ligne sur l'enveloppe. Baisser cette valeur est toujours sûr,
+ * l'augmenter au-delà de 160 ne le serait pas. */
+export const MAX_TEASER_LENGTH = 60;
 export const MAX_CONTENT_LENGTH = 240;
 
 /**

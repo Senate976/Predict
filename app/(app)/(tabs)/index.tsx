@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ChevronLeft, ChevronRight, SlidersHorizontal, XCircle } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { ChevronLeft, ChevronRight, SlidersHorizontal, User, XCircle } from 'lucide-react-native';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -80,6 +80,14 @@ export default function HomeScreen() {
   const [menuView, setMenuView] = useState<MenuView>('main');
   const [authorFilter, setAuthorFilter] = useState<string | null>(null);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  // Raccourci posé à côté de « Tri » plutôt que dans le menu : retrouver ses
+  // propres Predicts scellés est le geste le plus fréquent, il ne mérite pas
+  // deux taps de plus.
+  const [mineOnly, setMineOnly] = useState(false);
+  // `load` est mémoïsé sur `userId` : lire `feed` dedans y figerait sa valeur
+  // du premier rendu. Cette ref dit simplement si le fil a déjà été affiché
+  // au moins une fois, ce qui suffit à décider si un échec mérite un message.
+  const hasLoadedRef = useRef(false);
   // `'default'` : l'ordre de chaque onglet reste celui déjà établi (À venir
   // par publication, Passées par date de révélation) — un tri par date de
   // scellé ou de révélation est une bascule optionnelle, pas un nouveau défaut.
@@ -95,11 +103,12 @@ export default function HomeScreen() {
     }
   }
 
-  const hasActiveFilters = authorFilter !== null || favoritesOnly || sortKey !== 'default';
+  const hasActiveFilters = authorFilter !== null || favoritesOnly || mineOnly || sortKey !== 'default';
 
   function resetFilters() {
     setAuthorFilter(null);
     setFavoritesOnly(false);
+    setMineOnly(false);
     setSortKey('default');
     setSortOrder('recent');
   }
@@ -123,13 +132,21 @@ export default function HomeScreen() {
     const { data, error: fetchError } = await fetchPredictionsFeed();
 
     if (fetchError) {
-      setError(feedErrorMessage(fetchError));
+      // Un rechargement qui échoue alors que le fil est déjà affiché ne dit
+      // rien sur ce qu'on vient de faire : après la création d'un Predict, on
+      // revient sur le Fil et il se recharge, et un simple hoquet réseau
+      // affichait « Chargement impossible… » juste après un enregistrement
+      // pourtant réussi. On ne signale donc l'échec que quand il n'y a
+      // vraiment rien à montrer ; sinon on garde le fil précédent à l'écran,
+      // le prochain rafraîchissement le remettra à jour.
+      if (!hasLoadedRef.current) setError(feedErrorMessage(fetchError));
       return;
     }
 
     setError(null);
     const items = data ?? [];
     setFeed(items);
+    hasLoadedRef.current = true;
 
     // Inclut toujours son propre id, même fil vide : c'est aussi la source
     // de l'avatar affiché dans l'en-tête, à côté de « Predict ». Les ids
@@ -277,7 +294,8 @@ export default function HomeScreen() {
   const filtered = byTab
     .filter((item) => !item.is_hidden)
     .filter((item) => !authorFilter || item.author_id === authorFilter)
-    .filter((item) => !favoritesOnly || item.is_favorite);
+    .filter((item) => !favoritesOnly || item.is_favorite)
+    .filter((item) => !mineOnly || item.author_id === userId);
 
   const shown = [...filtered].sort((a, b) => {
     if (sortKey === 'seal') {
@@ -348,6 +366,17 @@ export default function HomeScreen() {
           <SlidersHorizontal size={14} color={hasActiveFilters ? colors.text : colors.textFaint} strokeWidth={1.75} />
           <Text style={[styles.filtersToggleText, hasActiveFilters && styles.filtersToggleTextActive]}>
             Tri
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => setMineOnly((o) => !o)}
+          style={[styles.filtersToggle, mineOnly && styles.filtersToggleActive]}
+          hitSlop={4}
+        >
+          <User size={14} color={mineOnly ? colors.text : colors.textFaint} strokeWidth={1.75} />
+          <Text style={[styles.filtersToggleText, mineOnly && styles.filtersToggleTextActive]}>
+            Mes predicts
           </Text>
         </Pressable>
 

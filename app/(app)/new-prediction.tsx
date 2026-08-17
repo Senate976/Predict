@@ -449,13 +449,6 @@ export default function NewPredictionScreen() {
               </Text>
             </Pressable>
           </View>
-          {/* Rappelle la règle du type choisi, pour rester intuitif sans
-              notice — même sous beaucoup de types de contenu différents. */}
-          <Text style={styles.predictTypeHint}>
-            {isQuestion
-              ? 'Tout le monde peut répondre ; les réponses restent masquées jusqu’à la clôture.'
-              : 'Un secret que tu écris et scelles : tes destinataires ne le liront qu’à la révélation.'}
-          </Text>
         </View>
 
         <ScrollView
@@ -465,10 +458,6 @@ export default function NewPredictionScreen() {
           {!isQuestion && (
             <>
               <Text style={styles.label}>Teaser</Text>
-              <Text style={styles.sectionHint}>
-                Une phrase courte, volontairement tronquée — c’est tout ce qu’affiche l’enveloppe scellée dans le
-                fil, avant révélation.
-              </Text>
               <TextInput
                 value={teaser}
                 onChangeText={setTeaser}
@@ -560,7 +549,7 @@ export default function NewPredictionScreen() {
 
           {isQuestion && (
             <>
-              <Text style={[styles.label, styles.sectionLabel]}>Format de réponse</Text>
+              <Text style={[styles.label, styles.sectionLabel]}>Format</Text>
               <View style={styles.scopeRow}>
                 <Pressable
                   onPress={() => setAnswerFormat('text')}
@@ -856,8 +845,8 @@ function createStyles(colors: Colors) {
     fontSize: 17,
     color: colors.text,
   },
-  headerSpacer: { width: 56 },
-  cancel: { fontSize: 15, color: colors.text, width: 56 },
+  headerSpacer: { width: 52 },
+  cancel: { fontSize: 13, color: colors.text },
   predictTypeWrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
   scroll: { padding: spacing.lg, paddingBottom: 40 },
   label: {
@@ -934,7 +923,6 @@ function createStyles(colors: Colors) {
   scopeOptionActive: { borderBottomColor: colors.accent },
   scopeText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.textFaint, textAlign: 'center' },
   scopeTextActive: { color: colors.text },
-  predictTypeHint: { fontSize: 12, lineHeight: 17, color: colors.textFaint, marginTop: 10 },
   revealNowRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   checkbox: {
     width: 20,
