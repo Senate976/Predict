@@ -10,7 +10,7 @@ import { Platform } from 'react-native';
  * Réglable par variable d'environnement pour suivre le domaine réel sans
  * toucher au code.
  */
-export const INVITE_URL = process.env.EXPO_PUBLIC_INVITE_URL ?? 'https://predict-app.vercel.app';
+export const INVITE_URL = process.env.EXPO_PUBLIC_INVITE_URL ?? 'https://predict-orpin-five.vercel.app';
 
 /** Le texte envoyé. `username` sert à se retrouver une fois l'app installée :
  * c'est par le pseudo qu'on s'ajoute (voir l'onglet Cercle). */
