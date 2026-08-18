@@ -253,6 +253,16 @@ export function BottomNavBar() {
   const pathname = usePathname();
   const unreadCount = useUnreadCount();
 
+  // L'ordre exact de la rangée : deux onglets, le bouton de création, deux
+  // onglets. Une seule liste, donc un seul endroit où se tromper.
+  const slots: ((typeof TABS)[number] | 'create')[] = [
+    TABS[0],
+    TABS[1],
+    'create',
+    TABS[2],
+    TABS[3],
+  ];
+
   function iconFor(tab: (typeof TABS)[number], color: string) {
     if (tab.icon === 'P') return <PTabIcon size={ICON_SIZE} color={color} />;
     if (tab.icon === 'bell') return <Bell size={ICON_SIZE} color={color} strokeWidth={STROKE} />;
@@ -263,30 +273,33 @@ export function BottomNavBar() {
   return (
     <View style={[styles.standaloneBar, { backgroundColor: colors.navBar }]}>
       <TabBarNotchBorder />
+      {/* CINQ emplacements de largeur égale, pas quatre : le bouton central
+          occupe le sien, exactement comme l'onglet factice `create` dans le
+          vrai navigateur. Le glisser dans l'emplacement d'un onglet le faisait
+          partager un cinquième de rangée avec lui — les deux se chevauchaient
+          et toute la rangée se décalait. */}
       <View style={styles.standaloneRow}>
-        {TABS.map((tab, index) => {
-          // Le bouton central s'intercale au milieu de la rangée, exactement
-          // comme l'onglet factice `create` le fait dans le vrai navigateur.
-          const centerHere = index === 2;
-          const focused = pathname === tab.match;
+        {slots.map((slot, index) => {
+          if (slot === 'create') {
+            return <CreateTabButton key="create" />;
+          }
+          const focused = pathname === slot.match;
           const color = focused ? colors.navBarActive : colors.navBarInactive;
           return (
-            <View key={tab.route} style={styles.standaloneGroup}>
-              {centerHere && <CreateTabButton />}
-              <Pressable
-                onPress={() => router.replace(tab.route as never)}
-                style={styles.standaloneSlot}
-                accessibilityRole="button"
-                accessibilityLabel={tab.label}
-              >
-                <TabIcon focused={focused}>{iconFor(tab, color)}</TabIcon>
-                {tab.icon === 'bell' && unreadCount > 0 && (
-                  <View style={[styles.standaloneBadge, { backgroundColor: colors.notificationBadge }]}>
-                    <Text style={styles.standaloneBadgeText}>{unreadCount}</Text>
-                  </View>
-                )}
-              </Pressable>
-            </View>
+            <Pressable
+              key={slot.route}
+              onPress={() => router.replace(slot.route as never)}
+              style={styles.standaloneSlot}
+              accessibilityRole="button"
+              accessibilityLabel={slot.label}
+            >
+              <TabIcon focused={focused}>{iconFor(slot, color)}</TabIcon>
+              {slot.icon === 'bell' && unreadCount > 0 && (
+                <View style={[styles.standaloneBadge, { backgroundColor: colors.notificationBadge }]}>
+                  <Text style={styles.standaloneBadgeText}>{unreadCount}</Text>
+                </View>
+              )}
+            </Pressable>
           );
         })}
       </View>
@@ -361,9 +374,6 @@ export const styles = StyleSheet.create({
     paddingTop: BAR_PADDING_TOP,
   },
   standaloneRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  // Un groupe par onglet, de largeur égale — c'est ce que React Navigation
-  // fait de son côté avec `flex: 1`, le bouton central compris.
-  standaloneGroup: { flex: 1, flexDirection: 'row', alignItems: 'flex-start' },
   standaloneSlot: { flex: 1, alignItems: 'center' },
   standaloneBadge: {
     position: 'absolute',

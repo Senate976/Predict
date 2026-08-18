@@ -281,6 +281,17 @@ export function PredictionCard({
   // milieu.
   const [letterHeight, setLetterHeight] = useState(0);
   const [reportOpen, setReportOpen] = useState(false);
+  /**
+   * Horodatage du dernier geste de réaction. L'enveloppe s'ouvre au toucher, et
+   * un geste sur le pouce se termine par un relâchement que la `Pressable` de
+   * l'enveloppe interprétait comme un appui — d'où une carte qui s'ouvrait au
+   * lieu de poser une réaction. Neutraliser ce toucher en enveloppant le pouce
+   * d'une `Pressable` marchait, mais tuait le glissé : une `Pressable` réclame
+   * le toucher dès l'appui, et le `PanResponder` ne voyait plus rien bouger.
+   * On laisse donc le geste intact et c'est l'OUVERTURE qui s'abstient, le
+   * temps qu'il se termine.
+   */
+  const reactionGestureRef = useRef(0);
   const env = useMemo(() => {
     const W = envelopeWidth;
     const H = W / ENVELOPE_RATIO;
@@ -664,6 +675,7 @@ export function PredictionCard({
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
+        reactionGestureRef.current = Date.now();
         panelOpenAtGrantRef.current = emojiPanelOpenRef.current;
         setEmojiPanelOpen(true);
         // Si la bulle est déjà ouverte, sa position est mesurable tout de
@@ -674,6 +686,7 @@ export function PredictionCard({
         setHovered(emojiAt(gesture.moveX, gesture.moveY));
       },
       onPanResponderRelease: (_evt, gesture) => {
+        reactionGestureRef.current = Date.now();
         const moved = Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4;
         const hovered = hoveredIndexRef.current;
         setHovered(null);
@@ -732,24 +745,23 @@ export function PredictionCard({
                 de qui a réagi avec quoi, sans interférer avec le geste du pouce. */}
             <View style={styles.reactionTriggerRow}>
               <View style={styles.reactionTriggerWrap}>
-                {/* `Pressable` sans effet propre autour du pouce : le
-                    `PanResponder` seul ne suffit pas à retenir le toucher sur
-                    le web, et celle de l'enveloppe ouvrait la carte au lieu de
-                    laisser réagir. Même parade que pour la photo et le
-                    formulaire de Sondage. */}
-                <Pressable onPress={() => {}} hitSlop={8}>
-                  <View style={[styles.reactionTrigger, styles.iconSlot]} {...panResponder.panHandlers}>
-                    {myEmoji ? (
-                      <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
-                    ) : (
-                      <ThumbsUp
-                        size={21}
-                        color={totalReactions > 0 ? colors.text : colors.footerIconInactive}
-                        strokeWidth={1.75}
-                      />
-                    )}
-                  </View>
-                </Pressable>
+                {/* Aucune `Pressable` ici, volontairement. Une `Pressable`
+                    réclame le toucher dès l'appui : posée autour du pouce, elle
+                    empêchait le `PanResponder` de recevoir le moindre
+                    déplacement — donc plus aucun grossissement au glissé. C'est
+                    `reactionGestureRef` (voir plus haut) qui empêche désormais
+                    l'enveloppe de s'ouvrir, sans toucher au geste. */}
+                <View style={[styles.reactionTrigger, styles.iconSlot]} {...panResponder.panHandlers}>
+                  {myEmoji ? (
+                    <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
+                  ) : (
+                    <ThumbsUp
+                      size={21}
+                      color={totalReactions > 0 ? colors.text : colors.footerIconInactive}
+                      strokeWidth={1.75}
+                    />
+                  )}
+                </View>
 
                 {emojiPanelOpen && (
                   <View ref={panelRef} style={styles.emojiPanel} onLayout={measurePanel}>
@@ -827,7 +839,7 @@ export function PredictionCard({
     : `Révélation : ${item.open_ended ? 'libre' : formatCountdown(new Date(item.reveal_at), now)}`;
 
   const envelopeFooter = (
-    <View style={styles.envFooter}>
+    <View style={[styles.envFooter, emojiPanelOpen && styles.envFooterRaised]}>
       <View style={styles.envAuthorRow}>
         {authorLabel && (
           <Pressable
@@ -924,7 +936,14 @@ export function PredictionCard({
           Manquée, jamais l'étiquette d'état. */}
       <View style={cardState.kind === 'missed' && styles.cardBodyMissed}>
         <Pressable
-          onPress={() => onPress?.()}
+          onPress={() => {
+            // Un relâchement de geste de réaction n'est pas un appui sur la
+            // carte. 400 ms : plus long que le délai entre le relâchement et
+            // l'appui synthétique qui le suit, plus court que le temps qu'il
+            // faut pour viser volontairement l'enveloppe ensuite.
+            if (Date.now() - reactionGestureRef.current < 400) return;
+            onPress?.();
+          }}
           style={styles.envelope}
           onLayout={(e) => setEnvelopeWidth(e.nativeEvent.layout.width)}
         >
@@ -1371,6 +1390,15 @@ function createStyles(colors: Colors) {
   envelopeShell: { paddingHorizontal: 16, paddingBottom: 12 },
   // Le bloc commun aux deux enveloppes — même disposition sur l'une et l'autre.
   envFooter: { marginTop: 8 },
+  /**
+   * La bulle de réactions est posée dans ce bloc, en `position: absolute`
+   * au-dessus du pouce. Son `zIndex: 20` ne vaut QUE dans le contexte
+   * d'empilement de son parent : sans ce relèvement, elle passait derrière la
+   * lettre (zIndex 2), le cachet (2) et le tampon Réalisé/Manqué (3) — le P du
+   * cachet se retrouvant par-dessus certains emojis, qu'on ne pouvait donc plus
+   * choisir. On lève tout le bloc le temps que la bulle soit ouverte.
+   */
+  envFooterRaised: { zIndex: 40 },
   envAuthorRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   envAuthorName: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.text, flexShrink: 1, minWidth: 0 },
   envMentionTag: { fontSize: 13, color: colors.textMuted, marginTop: 2 },

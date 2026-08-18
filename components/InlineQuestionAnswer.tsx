@@ -98,6 +98,34 @@ export function InlineQuestionAnswer({
   // les propositions restent visibles (celle choisie mise en avant) plutôt
   // que de disparaître derrière un simple « Ta réponse : X » — utile pour se
   // rappeler des autres options, sans pouvoir en resélectionner une.
+
+  /**
+   * Taille de police des options, déduite de leur contenu.
+   *
+   * Les choix s'affichent DANS la lettre, dont la largeur est imposée par les
+   * proportions de l'enveloppe (voir `EnvelopeArt`) : on ne peut pas élargir le
+   * cadre pour faire tenir un libellé long. On réduit donc le texte quand il y
+   * a beaucoup d'options ou qu'elles sont longues. Calcul et non mesure :
+   * `adjustsFontSizeToFit` ne fonctionne pas de la même façon sur iOS, Android
+   * et le web, alors qu'une règle explicite donne le même rendu partout.
+   *
+   * Le repli reste garanti par `optionChoice.maxWidth` : même avec un libellé
+   * démesuré, la pastille ne peut pas dépasser la lettre, le texte passe à la
+   * ligne.
+   */
+  const optionFontSize = (() => {
+    const list = options ?? [];
+    if (list.length === 0) return 15;
+    const longest = Math.max(...list.map((o) => o.label.length));
+    // Encombrement approximatif : les pastilles se répartissent sur la largeur,
+    // donc c'est le total des caractères autant que le plus long qui compte.
+    const load = longest + list.length * 2;
+    if (load <= 14) return 15;
+    if (load <= 22) return 14;
+    if (load <= 32) return 13;
+    return 12;
+  })();
+
   if (hasAnswered) {
     if (prediction.answer_format === 'choice') {
       return (
@@ -114,7 +142,13 @@ export function InlineQuestionAnswer({
                     key={option.id}
                     style={[styles.optionChoice, selected && styles.optionChoiceSelected]}
                   >
-                    <Text style={[styles.optionChoiceText, selected && styles.optionChoiceTextSelected]}>
+                    <Text
+                      style={[
+                        styles.optionChoiceText,
+                        { fontSize: optionFontSize },
+                        selected && styles.optionChoiceTextSelected,
+                      ]}
+                    >
                       {option.label}
                     </Text>
                   </View>
@@ -149,7 +183,9 @@ export function InlineQuestionAnswer({
                 disabled={submitting}
                 style={styles.optionChoice}
               >
-                <Text style={styles.optionChoiceText}>{option.label}</Text>
+                <Text style={[styles.optionChoiceText, { fontSize: optionFontSize }]}>
+                  {option.label}
+                </Text>
               </Pressable>
             ))}
           </View>
@@ -228,8 +264,13 @@ function createStyles(colors: Colors) {
       borderRadius: radius.pill,
       paddingHorizontal: 12,
       paddingVertical: 7,
+      // Filet de sécurité indépendant du calcul de taille ci-dessus : quelle
+      // que soit la longueur du libellé, la pastille reste dans la lettre et
+      // le texte passe à la ligne plutôt que de déborder.
+      maxWidth: '100%',
+      flexShrink: 1,
     },
-    optionChoiceText: { fontSize: 15, fontWeight: '700', color: colors.accent },
+    optionChoiceText: { fontSize: 15, fontWeight: '700', color: colors.accent, textAlign: 'center' },
     // Option choisie, une fois répondu — plein plutôt que contour, même
     // registre que les autres choix affirmés dans l'app (Réalisé, Correcte).
     optionChoiceSelected: { backgroundColor: colors.accent },
