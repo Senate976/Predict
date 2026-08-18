@@ -5750,7 +5750,351 @@ exception when others then
 end $$;
 
 -- ---------------------------------------------------------------------------
--- 59. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 59. Paris du Cercle : « j'y crois / j'y crois pas »
+-- ---------------------------------------------------------------------------
+--
+-- Pendant qu'une prédiction est scellée, il ne se passe rien : le Cercle
+-- attend. Le pari donne quelque chose à faire dans cet intervalle, et rend le
+-- Prediscore sensible à la DIFFICULTÉ — avoir raison contre l'avis général vaut
+-- davantage que confirmer ce que tout le monde pensait déjà.
+--
+-- Choix de conception essentiel : le pari n'est JAMAIS une condition du score
+-- de l'auteur. Si personne ne parie, la prédiction compte exactement comme
+-- aujourd'hui. Faire dépendre le score d'une participation obligerait à un
+-- quorum, et un quorum, ça se rate. Le pari ne peut qu'ajouter un bonus.
+--
+-- Une table dédiée plutôt que `prediction_votes` (présente en base mais
+-- inutilisée par l'app) : celle-ci porte des valeurs 'realized'/'missed', qui
+-- signifient « le résultat constaté », pas « ce que je crois avant de savoir ».
+-- Réutiliser la même colonne pour deux sens opposés est le genre de raccourci
+-- qu'on paie six mois plus tard.
+create table if not exists public.prediction_bets (
+  prediction_id uuid not null references public.predictions (id) on delete cascade,
+  bettor_id uuid not null references public.profiles (id) on delete cascade,
+  /** `true` : j'y crois. `false` : je n'y crois pas. */
+  believes boolean not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (prediction_id, bettor_id)
+);
+
+create index if not exists prediction_bets_prediction_idx
+  on public.prediction_bets (prediction_id);
+
+alter table public.prediction_bets enable row level security;
+
+-- Même règle que les réponses de Sondage : avant révélation, chacun ne voit que
+-- son propre pari. C'est indispensable ici, et pas seulement par élégance :
+-- `predictions_update_own_before_reveal` autorise l'auteur à modifier sa
+-- prédiction tant qu'elle est scellée. S'il voyait que personne n'y croit, il
+-- pourrait la réécrire pour se donner raison.
+drop policy if exists "prediction_bets_select" on public.prediction_bets;
+create policy "prediction_bets_select"
+  on public.prediction_bets
+  for select
+  to authenticated
+  using (
+    bettor_id = auth.uid()
+    or exists (
+      select 1 from public.predictions p
+      where p.id = prediction_bets.prediction_id
+        and p.reveal_at <= now()
+        and (p.author_id = auth.uid() or public.has_prediction_access(p.id, auth.uid()))
+    )
+  );
+
+-- Écriture réservée à `place_bet` ci-dessous : aucune policy d'insert ni
+-- d'update directe. Les conditions (scellée, destinataire, pas l'auteur) sont
+-- trop nombreuses pour tenir dans un `with check` lisible, et une fonction
+-- `security definer` les vérifie une seule fois, au même endroit.
+drop policy if exists "prediction_bets_delete_own" on public.prediction_bets;
+create policy "prediction_bets_delete_own"
+  on public.prediction_bets
+  for delete
+  to authenticated
+  using (
+    bettor_id = auth.uid()
+    and exists (
+      select 1 from public.predictions p
+      where p.id = prediction_bets.prediction_id and p.reveal_at > now()
+    )
+  );
+
+/**
+ * Pose ou change son pari. Autorisé tant que la prédiction est scellée : on
+ * peut changer d'avis jusqu'au dernier moment, c'est le sel du jeu. Jamais sur
+ * sa propre prédiction — parier sur soi n'a aucun sens et fausserait le bonus.
+ */
+create or replace function public.place_bet(p_prediction_id uuid, p_believes boolean)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not exists (
+    select 1 from public.predictions p
+    where p.id = p_prediction_id
+      and p.reveal_at > now()
+      and p.author_id <> auth.uid()
+      and public.has_prediction_access(p.id, auth.uid())
+  ) then
+    return;
+  end if;
+
+  insert into public.prediction_bets (prediction_id, bettor_id, believes)
+  values (p_prediction_id, auth.uid(), p_believes)
+  on conflict (prediction_id, bettor_id)
+  do update set believes = excluded.believes, updated_at = now();
+end;
+$$;
+
+revoke all on function public.place_bet(uuid, boolean) from public;
+grant execute on function public.place_bet(uuid, boolean) to authenticated;
+
+/**
+ * Le décompte des paris.
+ *
+ * Avant révélation, `believers` et `doubters` valent `null` : seul le TOTAL est
+ * public. Diffuser la répartition à l'avance créerait un effet de meute (on
+ * parie comme les autres) et renseignerait l'auteur, qui peut encore modifier
+ * sa prédiction. Après révélation, tout s'ouvre — c'est là que se joue
+ * « 7 amis n'y croyaient pas ».
+ */
+create or replace function public.get_bet_counts(p_prediction_id uuid)
+returns table (total bigint, believers bigint, doubters bigint, revealed boolean)
+language sql
+security definer
+stable
+set search_path = ''
+as $$
+  select
+    count(b.*),
+    case when p.reveal_at <= now() then count(b.*) filter (where b.believes) end,
+    case when p.reveal_at <= now() then count(b.*) filter (where not b.believes) end,
+    p.reveal_at <= now()
+  from public.predictions p
+  left join public.prediction_bets b on b.prediction_id = p.id
+  where p.id = p_prediction_id
+    and (p.author_id = auth.uid() or public.has_prediction_access(p.id, auth.uid()))
+  group by p.reveal_at;
+$$;
+
+revoke all on function public.get_bet_counts(uuid) from public;
+grant execute on function public.get_bet_counts(uuid) to authenticated;
+
+
+-- La vue du Fil, redéfinie une dernière fois pour exposer les paris — même
+-- démarche que chaque section précédente ayant ajouté une colonne. Elle doit
+-- venir APRÈS `prediction_bets` : une vue résout ses tables à la création, pas
+-- à l'exécution.
+drop view if exists public.predictions_feed;
+
+create view public.predictions_feed
+with (security_invoker = true) as
+select
+  p.id,
+  p.author_id,
+  p.teaser,
+  pc.content,
+  pc.audio_path,
+  pc.photo_path,
+  p.verdict_photo_path,
+  p.reveal_at,
+  p.scope,
+  p.open_ended,
+  p.is_immediate,
+  p.type,
+  p.answer_format,
+  p.mentioned_user_ids,
+  p.created_at,
+  p.verdict_set_at,
+  (p.reveal_at <= now()) as is_revealed,
+  case
+    when p.reveal_at > now() then 'pending'
+    when p.author_verdict is not null then p.author_verdict
+    else 'pending'
+  end as final_status,
+  coalesce(
+    (
+      select us.favorite from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_favorite,
+  coalesce(
+    (
+      select us.hidden from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_hidden,
+  coalesce(
+    (
+      select us.seen from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_seen,
+  coalesce(
+    (
+      select us.verdict_seen from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_verdict_seen,
+  coalesce(
+    (
+      select jsonb_object_agg(counts.emoji, counts.total)
+      from (
+        select emoji, count(*) as total
+        from public.prediction_emoji_reactions er
+        where er.prediction_id = p.id
+        group by emoji
+      ) counts
+    ),
+    '{}'::jsonb
+  ) as emoji_counts,
+  (
+    select er2.emoji from public.prediction_emoji_reactions er2
+    where er2.prediction_id = p.id and er2.user_id = auth.uid()
+  ) as my_emoji_reaction,
+  public.get_prediction_answer_count(p.id) as answer_count,
+  public.get_prediction_correct_answer_count(p.id) as correct_answer_count,
+  (
+    select pa2.answer_text from public.prediction_answers pa2
+    where pa2.prediction_id = p.id and pa2.user_id = auth.uid()
+  ) as my_answer_text,
+  (
+    select pa3.option_id from public.prediction_answers pa3
+    where pa3.prediction_id = p.id and pa3.user_id = auth.uid()
+  ) as my_answer_option_id,
+  (
+    select pa4.is_correct from public.prediction_answers pa4
+    where pa4.prediction_id = p.id and pa4.user_id = auth.uid()
+  ) as my_answer_is_correct,
+  -- Paris du Cercle. Rendus par la vue plutôt que par un appel dédié à chaque
+  -- carte : le Fil en affiche une vingtaine, ce serait vingt allers-retours
+  -- réseau pour trois chiffres.
+  (
+    select count(*) from public.prediction_bets b1 where b1.prediction_id = p.id
+  ) as bet_count,
+  -- La répartition ne sort qu'une fois la prédiction révélée. Avant, elle
+  -- créerait un effet de meute (chacun parie comme les autres) et renseignerait
+  -- l'auteur, qui peut encore modifier sa prédiction tant qu'elle est scellée
+  -- (`predictions_update_own_before_reveal`).
+  (
+    select count(*) from public.prediction_bets b2
+    where b2.prediction_id = p.id and b2.believes and p.reveal_at <= now()
+  ) as believer_count,
+  (
+    select count(*) from public.prediction_bets b3
+    where b3.prediction_id = p.id and not b3.believes and p.reveal_at <= now()
+  ) as doubter_count,
+  -- Son propre pari, toujours lisible : `null` tant qu'on n'a pas parié.
+  (
+    select b4.believes from public.prediction_bets b4
+    where b4.prediction_id = p.id and b4.bettor_id = auth.uid()
+  ) as my_bet
+from public.predictions p
+left join public.prediction_contents pc on pc.prediction_id = p.id;
+
+-- ---------------------------------------------------------------------------
+-- 60. Le Prediscore tient compte des paris
+-- ---------------------------------------------------------------------------
+--
+-- Deux ajouts au calcul existant, qui reposait uniquement sur les prédictions
+-- de la personne, pondérées par l'avance prise (×1 / ×3 / ×5).
+--
+-- 1. BONUS D'AUDACE, pour l'auteur. Une prédiction réalisée COMPTE DOUBLE si au
+--    moins 3 personnes ont parié et que la majorité n'y croyait pas. Le seuil
+--    de 3 évite qu'un unique ami sceptique ne double une note. Jamais de malus :
+--    une prédiction que tout le monde croyait garde son poids normal, elle ne
+--    perd rien.
+--
+-- 2. LES PARIS DE LA PERSONNE comptent aussi, au poids 1 — bien moins qu'une
+--    prédiction (1 à 5, et jusqu'à 10 avec le bonus). Parier juste, c'est
+--    prédire juste : il n'y a donc aucune raison d'en faire un second score. Et
+--    ça donne au nouvel arrivant de quoi faire monter le sien sans attendre six
+--    mois que sa première prédiction s'ouvre.
+create or replace function public.get_prediscore(target_user uuid)
+returns table (score numeric, weighted_count numeric)
+language sql
+security definer
+stable
+set search_path = ''
+as $$
+  with visible as (
+    -- Le Prediscore n'est lisible que par la personne elle-même ou un ami
+    -- accepté : condition inchangée, simplement isolée ici pour ne pas la
+    -- répéter dans les deux moitiés du calcul.
+    select target_user = auth.uid() or exists (
+      select 1 from public.friendships f
+      where f.status = 'accepted'
+        and (
+          (f.requester_id = auth.uid() and f.addressee_id = target_user)
+          or (f.addressee_id = auth.uid() and f.requester_id = target_user)
+        )
+    ) as allowed
+  ),
+  own_predictions as (
+    select
+      (case
+        when extract(epoch from (p.reveal_at - p.created_at)) / 86400 < 7 then 1
+        when extract(epoch from (p.reveal_at - p.created_at)) / 86400 <= 30 then 3
+        else 5
+      end)
+      * (case
+          when coalesce(p.author_verdict, 'pending') = 'realized'
+            and (select count(*) from public.prediction_bets b where b.prediction_id = p.id) >= 3
+            and (select count(*) from public.prediction_bets b where b.prediction_id = p.id and not b.believes)
+              > (select count(*) from public.prediction_bets b where b.prediction_id = p.id and b.believes)
+          then 2
+          else 1
+        end) as weight,
+      coalesce(p.author_verdict, 'pending') as final_status
+    from public.predictions p, visible
+    where visible.allowed
+      and p.author_id = target_user
+      and p.reveal_at <= now()
+  ),
+  own_bets as (
+    -- Un pari ne compte qu'une fois la prédiction révélée ET tranchée par son
+    -- auteur : sans verdict, il n'y a rien à comparer.
+    select
+      1 as weight,
+      case when b.believes = (p.author_verdict = 'realized') then 'realized' else 'missed' end as final_status
+    from public.prediction_bets b
+    join public.predictions p on p.id = b.prediction_id, visible
+    where visible.allowed
+      and b.bettor_id = target_user
+      and p.reveal_at <= now()
+      and p.author_verdict in ('realized', 'missed')
+  ),
+  everything as (
+    select weight, final_status from own_predictions
+    union all
+    select weight, final_status from own_bets
+  )
+  select
+    case
+      when coalesce(sum(weight) filter (where final_status <> 'pending'), 0) > 0
+        then round(
+          100.0 * sum(weight) filter (where final_status = 'realized')
+            / sum(weight) filter (where final_status <> 'pending'),
+          1
+        )
+      else null
+    end as score,
+    coalesce(sum(weight) filter (where final_status <> 'pending'), 0) as weighted_count
+  from everything;
+$$;
+
+revoke all on function public.get_prediscore(uuid) from public;
+grant execute on function public.get_prediscore(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 61. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une

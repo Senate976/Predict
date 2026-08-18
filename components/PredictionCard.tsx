@@ -60,6 +60,7 @@ import {
   PredictBadge,
   WASH,
 } from './EnvelopeArt';
+import { betOutcomeLabel, placeBet } from '../lib/bets';
 import { InlineComments } from './InlineComments';
 import { InlineQuestionAnswer } from './InlineQuestionAnswer';
 import { PhotoAttachButton } from './PhotoAttachButton';
@@ -281,6 +282,22 @@ export function PredictionCard({
   // milieu.
   const [letterHeight, setLetterHeight] = useState(0);
   const [reportOpen, setReportOpen] = useState(false);
+  /**
+   * Horodatage du dernier geste de réaction. L'enveloppe s'ouvre au toucher, et
+   * un geste sur le pouce se termine par un relâchement que la `Pressable` de
+   * l'enveloppe interprétait comme un appui — d'où une carte qui s'ouvrait au
+   * lieu de poser une réaction. Neutraliser ce toucher en enveloppant le pouce
+   * d'une `Pressable` marchait, mais tuait le glissé : une `Pressable` réclame
+   * le toucher dès l'appui, et le `PanResponder` ne voyait plus rien bouger.
+   * On laisse donc le geste intact et c'est l'OUVERTURE qui s'abstient, le
+   * temps qu'il se termine.
+   */
+  const reactionGestureRef = useRef(0);
+  // Le pari se pose d'un tap : l'affichage bascule immédiatement, sans attendre
+  // la base. C'est un geste léger et réversible — faire patienter un curseur
+  // pour ça casserait la fluidité recherchée.
+  const [myBet, setMyBet] = useState<boolean | null>(item.my_bet);
+  const [betCount, setBetCount] = useState(item.bet_count ?? 0);
   const env = useMemo(() => {
     const W = envelopeWidth;
     const H = W / ENVELOPE_RATIO;
@@ -579,6 +596,36 @@ export function PredictionCard({
 
   const totalReactions = Object.values(emojiCounts).reduce((sum, count) => sum + (count ?? 0), 0);
 
+  /**
+   * Parier, ou changer d'avis. Un second tap sur le même choix ne l'annule
+   * pas : sur une rangée de deux boutons, l'annulation par re-tap se déclenche
+   * surtout par accident. On change d'avis en touchant l'autre, ce qui est le
+   * geste qu'on a en tête.
+   */
+  async function handleBet(believes: boolean) {
+    if (myBet === believes) return;
+    const previous = myBet;
+    setMyBet(believes);
+    if (previous === null) setBetCount((n) => n + 1);
+    const { error } = await placeBet(item.id, believes);
+    if (error) {
+      setMyBet(previous);
+      if (previous === null) setBetCount((n) => Math.max(0, n - 1));
+    }
+  }
+
+  /* Parier n'a de sens que sur la Déclaration d'un autre, encore scellée.
+     Pas sur un Sondage : on y RÉPOND, il n'y a pas de « vrai ou faux » auquel
+     croire — et le Prediscore ne compte de toute façon que les paris tranchés
+     par un verdict, qu'un Sondage n'a pas. Accessoirement, la rangée du bas
+     porte déjà trois icônes sur un Sondage et n'aurait pas la place.
+     La base refuse tout le reste (`place_bet`) ; ici on se contente de ne pas
+     le proposer. */
+  const canBet = !isAuthor && !isQuestion && cardState.kind === 'sealed';
+  const betOutcome = revealed
+    ? betOutcomeLabel(item.believer_count ?? 0, item.doubter_count ?? 0, item.final_status)
+    : null;
+
   // Panneau de réactions façon Facebook : maintenir le doigt sur le pouce
   // fait apparaître la bulle, la faire glisser dessus grossit l'emoji
   // survolé, et relâcher le doigt sur l'un d'eux le valide. Un tap simple
@@ -664,6 +711,7 @@ export function PredictionCard({
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
+        reactionGestureRef.current = Date.now();
         panelOpenAtGrantRef.current = emojiPanelOpenRef.current;
         setEmojiPanelOpen(true);
         // Si la bulle est déjà ouverte, sa position est mesurable tout de
@@ -674,6 +722,7 @@ export function PredictionCard({
         setHovered(emojiAt(gesture.moveX, gesture.moveY));
       },
       onPanResponderRelease: (_evt, gesture) => {
+        reactionGestureRef.current = Date.now();
         const moved = Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4;
         const hovered = hoveredIndexRef.current;
         setHovered(null);
@@ -732,24 +781,23 @@ export function PredictionCard({
                 de qui a réagi avec quoi, sans interférer avec le geste du pouce. */}
             <View style={styles.reactionTriggerRow}>
               <View style={styles.reactionTriggerWrap}>
-                {/* `Pressable` sans effet propre autour du pouce : le
-                    `PanResponder` seul ne suffit pas à retenir le toucher sur
-                    le web, et celle de l'enveloppe ouvrait la carte au lieu de
-                    laisser réagir. Même parade que pour la photo et le
-                    formulaire de Sondage. */}
-                <Pressable onPress={() => {}} hitSlop={8}>
-                  <View style={[styles.reactionTrigger, styles.iconSlot]} {...panResponder.panHandlers}>
-                    {myEmoji ? (
-                      <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
-                    ) : (
-                      <ThumbsUp
-                        size={21}
-                        color={totalReactions > 0 ? colors.text : colors.footerIconInactive}
-                        strokeWidth={1.75}
-                      />
-                    )}
-                  </View>
-                </Pressable>
+                {/* Aucune `Pressable` ici, volontairement. Une `Pressable`
+                    réclame le toucher dès l'appui : posée autour du pouce, elle
+                    empêchait le `PanResponder` de recevoir le moindre
+                    déplacement — donc plus aucun grossissement au glissé. C'est
+                    `reactionGestureRef` (voir plus haut) qui empêche désormais
+                    l'enveloppe de s'ouvrir, sans toucher au geste. */}
+                <View style={[styles.reactionTrigger, styles.iconSlot]} {...panResponder.panHandlers}>
+                  {myEmoji ? (
+                    <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
+                  ) : (
+                    <ThumbsUp
+                      size={21}
+                      color={totalReactions > 0 ? colors.text : colors.footerIconInactive}
+                      strokeWidth={1.75}
+                    />
+                  )}
+                </View>
 
                 {emojiPanelOpen && (
                   <View ref={panelRef} style={styles.emojiPanel} onLayout={measurePanel}>
@@ -827,7 +875,7 @@ export function PredictionCard({
     : `Révélation : ${item.open_ended ? 'libre' : formatCountdown(new Date(item.reveal_at), now)}`;
 
   const envelopeFooter = (
-    <View style={styles.envFooter}>
+    <View style={[styles.envFooter, emojiPanelOpen && styles.envFooterRaised]}>
       <View style={styles.envAuthorRow}>
         {authorLabel && (
           <Pressable
@@ -858,6 +906,17 @@ export function PredictionCard({
           porte donc que le teaser d'une Déclaration, quand il y en a un. */}
       {!isQuestion && !!item.teaser && <Text style={styles.envTeaser}>{item.teaser}</Text>}
 
+      {/* Pendant l'attente, l'auteur ne voit qu'un NOMBRE : la répartition lui
+          dirait si on le croit, or il peut encore modifier sa prédiction. */}
+      {isAuthor && cardState.kind === 'sealed' && betCount > 0 && (
+        <Text style={styles.betNote}>
+          {betCount} pari{betCount > 1 ? 's' : ''} en cours
+        </Text>
+      )}
+
+      {/* Le dénouement — c'est ici que le mécanisme paie. */}
+      {betOutcome && <Text style={styles.betOutcome}>{betOutcome}</Text>}
+
       {/* Le bouton « Révéler », réservé à l'auteur d'une carte encore Scellée,
           tient sur la ligne du bas plutôt que sur une ligne à lui : sur sa
           propre ligne il allongeait l'enveloppe, et les cartes de l'auteur ne
@@ -877,6 +936,33 @@ export function PredictionCard({
               quand son auteur le décide — sinon la date ne veut plus rien
               dire. La fonction SQL `reveal_prediction_now` pose la même
               condition, ce bouton ne fait que ne pas la proposer. */}
+          {/* Les deux paris prennent la place laissée libre à droite sur une
+              enveloppe scellée (la date y est écrite en haut, sur le rabat).
+              Aucune hauteur ajoutée, donc les proportions de l'enveloppe et la
+              position du sceau ne bougent pas d'un pixel. */}
+          {canBet && (
+            <View style={styles.betRow}>
+              <Pressable
+                onPress={() => handleBet(true)}
+                style={[styles.betPill, myBet === true && styles.betPillYes]}
+                hitSlop={6}
+              >
+                <Text style={[styles.betPillText, myBet === true && styles.betPillTextYes]}>
+                  J’y crois
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => handleBet(false)}
+                style={[styles.betPill, myBet === false && styles.betPillNo]}
+                hitSlop={6}
+              >
+                <Text style={[styles.betPillText, myBet === false && styles.betPillTextNo]}>
+                  Non
+                </Text>
+              </Pressable>
+            </View>
+          )}
+
           {isAuthor && cardState.kind === 'sealed' && item.open_ended && (
             <Pressable
               onPress={handleRevealNow}
@@ -924,7 +1010,14 @@ export function PredictionCard({
           Manquée, jamais l'étiquette d'état. */}
       <View style={cardState.kind === 'missed' && styles.cardBodyMissed}>
         <Pressable
-          onPress={() => onPress?.()}
+          onPress={() => {
+            // Un relâchement de geste de réaction n'est pas un appui sur la
+            // carte. 400 ms : plus long que le délai entre le relâchement et
+            // l'appui synthétique qui le suit, plus court que le temps qu'il
+            // faut pour viser volontairement l'enveloppe ensuite.
+            if (Date.now() - reactionGestureRef.current < 400) return;
+            onPress?.();
+          }}
           style={styles.envelope}
           onLayout={(e) => setEnvelopeWidth(e.nativeEvent.layout.width)}
         >
@@ -1371,6 +1464,15 @@ function createStyles(colors: Colors) {
   envelopeShell: { paddingHorizontal: 16, paddingBottom: 12 },
   // Le bloc commun aux deux enveloppes — même disposition sur l'une et l'autre.
   envFooter: { marginTop: 8 },
+  /**
+   * La bulle de réactions est posée dans ce bloc, en `position: absolute`
+   * au-dessus du pouce. Son `zIndex: 20` ne vaut QUE dans le contexte
+   * d'empilement de son parent : sans ce relèvement, elle passait derrière la
+   * lettre (zIndex 2), le cachet (2) et le tampon Réalisé/Manqué (3) — le P du
+   * cachet se retrouvant par-dessus certains emojis, qu'on ne pouvait donc plus
+   * choisir. On lève tout le bloc le temps que la bulle soit ouverte.
+   */
+  envFooterRaised: { zIndex: 40 },
   envAuthorRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   envAuthorName: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.text, flexShrink: 1, minWidth: 0 },
   envMentionTag: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
@@ -1391,6 +1493,31 @@ function createStyles(colors: Colors) {
     minHeight: 30,
   },
   envRevealHint: { fontFamily: fonts.label, fontSize: 13, color: colors.textMuted, flexShrink: 1 },
+  // Compact à dessein : ces deux boutons partagent une rangée avec les icônes
+  // d'action, et ne doivent jamais la faire passer à la ligne.
+  betRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, minWidth: 0 },
+  betPill: {
+    flexShrink: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: colors.surface,
+  },
+  betPillYes: { backgroundColor: colors.accent, borderColor: colors.accent },
+  // Le refus ne se distingue pas par une couleur d'alerte : ce n'est pas une
+  // erreur d'être sceptique. Contour plein, même registre que l'accord.
+  betPillNo: { backgroundColor: colors.text, borderColor: colors.text },
+  betPillText: { fontFamily: fonts.label, fontSize: 13, color: colors.textMuted },
+  // Deux encres distinctes : le jaune demande une encre sombre (`textOnAccent`,
+  // comme sur tous les boutons dorés de l'app), l'aplat d'encre demande la
+  // couleur du fond. Une seule valeur pour les deux aurait donné du presque
+  // blanc sur jaune en mode clair.
+  betPillTextYes: { color: colors.textOnAccent },
+  betPillTextNo: { color: colors.background },
+  betNote: { fontFamily: fonts.label, fontSize: 13, color: colors.textFaint, marginTop: 4 },
+  betOutcome: { fontFamily: fonts.bodyEmphasis, fontSize: 14, color: colors.text, marginTop: 4 },
   sealedBadge: { position: 'absolute', left: '50%', zIndex: 2 },
   // Corps de carte assourdi une fois Manquée — jamais le badge d'état,
   // rendu séparément avant ce conteneur et donc toujours à `opacity: 1`.

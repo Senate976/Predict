@@ -73,6 +73,16 @@ export type PredictionFeedItem = {
   type: PredictionType;
   /** `null` pour une Déclaration ; format de réponse attendu pour une Question. */
   answer_format: AnswerFormat | null;
+  /** Nombre de paris posés (voir `lib/bets.ts`). Visible en permanence. */
+  bet_count: number;
+  /** Répartition des paris — `0` tant que la prédiction n'est pas révélée : la
+   * base ne la transmet pas avant, pour ne pas créer d'effet de meute ni
+   * renseigner l'auteur, qui peut encore modifier sa prédiction. */
+  believer_count: number;
+  doubter_count: number;
+  /** Mon propre pari : `true` j'y crois, `false` je n'y crois pas, `null` pas
+   * encore parié. Toujours lisible, même avant révélation. */
+  my_bet: boolean | null;
   created_at: string;
   is_revealed: boolean;
   /** `pending` tant que l'auteur n'a pas affirmé le résultat (voir
@@ -189,7 +199,8 @@ const FEED_COLUMNS =
   'id, author_id, teaser, content, audio_path, photo_path, verdict_photo_path, reveal_at, scope, open_ended, ' +
   'is_immediate, type, answer_format, created_at, is_revealed, final_status, verdict_set_at, is_favorite, ' +
   'is_hidden, is_seen, is_verdict_seen, emoji_counts, my_emoji_reaction, mentioned_user_ids, answer_count, ' +
-  'correct_answer_count, my_answer_text, my_answer_option_id, my_answer_is_correct';
+  'correct_answer_count, my_answer_text, my_answer_option_id, my_answer_is_correct, ' +
+  'bet_count, believer_count, doubter_count, my_bet';
 
 export async function fetchPredictionsFeed() {
   return supabase
