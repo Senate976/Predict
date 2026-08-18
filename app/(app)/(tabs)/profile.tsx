@@ -216,16 +216,7 @@ export default function ProfileScreen() {
           ) : prediscoreError ? (
             <Text style={styles.error}>{prediscoreError}</Text>
           ) : (
-            <>
-              <PrediscoreGauge score={prediscore} />
-              {/* Le score ne mesure plus seulement « ai-je eu raison ». Sans
-                  cette ligne, on le verrait bouger sans comprendre pourquoi —
-                  et un score qu'on ne s'explique pas ne motive personne. */}
-              <Text style={styles.prediscoreHint}>
-                Compte tes Predicts tranchés et tes paris sur ceux des autres. Une
-                prédiction réalisée alors que ton Cercle n’y croyait pas compte double.
-              </Text>
-            </>
+            <PrediscoreGauge score={prediscore} />
           )}
         </View>
 
@@ -401,7 +392,6 @@ function createStyles(colors: Colors) {
     borderColor: colors.border,
     alignItems: 'center',
   },
-  prediscoreHint: { fontSize: 13, color: colors.textFaint, lineHeight: 19, marginTop: 10 },
   signOutText: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
   hint: { fontSize: 14, color: colors.textFaint, marginTop: 8 },
   historyRow: {

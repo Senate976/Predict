@@ -940,27 +940,32 @@ export function PredictionCard({
               enveloppe scellée (la date y est écrite en haut, sur le rabat).
               Aucune hauteur ajoutée, donc les proportions de l'enveloppe et la
               position du sceau ne bougent pas d'un pixel. */}
-          {canBet && (
+          {canBet && myBet === null && (
             <View style={styles.betRow}>
               <Pressable
                 onPress={() => handleBet(true)}
-                style={[styles.betPill, myBet === true && styles.betPillYes]}
+                style={styles.betPill}
                 hitSlop={6}
               >
-                <Text style={[styles.betPillText, myBet === true && styles.betPillTextYes]}>
-                  J’y crois
-                </Text>
+                <Text style={styles.betPillText}>J’y crois</Text>
               </Pressable>
               <Pressable
                 onPress={() => handleBet(false)}
-                style={[styles.betPill, myBet === false && styles.betPillNo]}
+                style={styles.betPill}
                 hitSlop={6}
               >
-                <Text style={[styles.betPillText, myBet === false && styles.betPillTextNo]}>
-                  Non
-                </Text>
+                <Text style={styles.betPillText}>Non</Text>
               </Pressable>
             </View>
+          )}
+
+          {/* Une fois le pari posé, les deux boutons cèdent la place à ce qu'ils
+              ont produit. Le choix ne se represente pas : c'est un engagement,
+              pas un réglage. */}
+          {canBet && myBet !== null && (
+            <Text style={styles.betPlaced}>
+              {myBet ? 'Tu y crois' : 'Tu n’y crois pas'}
+            </Text>
           )}
 
           {isAuthor && cardState.kind === 'sealed' && item.open_ended && (
@@ -1478,7 +1483,19 @@ function createStyles(colors: Colors) {
   envMentionTag: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
   envTeaser: { fontFamily: fonts.serifItalic, fontSize: 15, lineHeight: 21, color: colors.textMuted, marginTop: 3 },
   // Dernière ligne : boutons d'action à gauche, date de révélation à droite.
-  envBottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  // `flexWrap` : sur un Sondage, la rangée porte TROIS icônes avec leurs
+  // compteurs. Dès qu'un vote arrivait, elle devenait assez large pour écraser
+  // la date de révélation à sa droite, qui disparaissait purement et simplement
+  // (`flexShrink` la réduisait à zéro). Elle passe désormais à la ligne quand
+  // la place manque, au lieu de s'effacer.
+  envBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    rowGap: 6,
+    gap: 10,
+  },
   // Date de révélation et bouton « Révéler » côte à côte, à droite de la ligne
   // du bas : c'est ce qui garde toutes les enveloppes à la même hauteur.
   // `minHeight` calé sur la hauteur du bouton « Révéler » : la ligne du bas
@@ -1492,7 +1509,9 @@ function createStyles(colors: Colors) {
     minWidth: 0,
     minHeight: 30,
   },
-  envRevealHint: { fontFamily: fonts.label, fontSize: 13, color: colors.textMuted, flexShrink: 1 },
+  // Plus de `flexShrink` : c'est lui qui la laissait se réduire à néant. Elle
+  // garde sa largeur, et c'est la rangée qui passe à la ligne si besoin.
+  envRevealHint: { fontFamily: fonts.label, fontSize: 13, color: colors.textMuted },
   // Compact à dessein : ces deux boutons partagent une rangée avec les icônes
   // d'action, et ne doivent jamais la faire passer à la ligne.
   betRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, minWidth: 0 },
@@ -1505,17 +1524,10 @@ function createStyles(colors: Colors) {
     paddingVertical: 5,
     backgroundColor: colors.surface,
   },
-  betPillYes: { backgroundColor: colors.accent, borderColor: colors.accent },
-  // Le refus ne se distingue pas par une couleur d'alerte : ce n'est pas une
-  // erreur d'être sceptique. Contour plein, même registre que l'accord.
-  betPillNo: { backgroundColor: colors.text, borderColor: colors.text },
   betPillText: { fontFamily: fonts.label, fontSize: 13, color: colors.textMuted },
-  // Deux encres distinctes : le jaune demande une encre sombre (`textOnAccent`,
-  // comme sur tous les boutons dorés de l'app), l'aplat d'encre demande la
-  // couleur du fond. Une seule valeur pour les deux aurait donné du presque
-  // blanc sur jaune en mode clair.
-  betPillTextYes: { color: colors.textOnAccent },
-  betPillTextNo: { color: colors.background },
+  // Le pari posé : une affirmation, pas un bouton. Encre pleine pour qu'elle se
+  // lise comme un fait acquis, sans contour qui inviterait à re-toucher.
+  betPlaced: { fontFamily: fonts.bodyEmphasis, fontSize: 13, color: colors.text },
   betNote: { fontFamily: fonts.label, fontSize: 13, color: colors.textFaint, marginTop: 4 },
   betOutcome: { fontFamily: fonts.bodyEmphasis, fontSize: 14, color: colors.text, marginTop: 4 },
   sealedBadge: { position: 'absolute', left: '50%', zIndex: 2 },
@@ -1643,7 +1655,9 @@ function createStyles(colors: Colors) {
   // Invite l'auteur à trancher — rien que les deux boutons, alignés à droite.
   // Réalisé en accent plein (comme le bouton « Sceller »), Manqué en contour
   // neutre — le choix à trancher doit rester net, sans code couleur vert/rouge.
-  verdictPrompt: { paddingHorizontal: 18, marginTop: 10 },
+  // `paddingBottom` : sans lui, les boutons Réalisé/Manqué touchaient le bord
+  // inférieur de la carte, que `overflow: 'hidden'` rognait alors.
+  verdictPrompt: { paddingHorizontal: 18, marginTop: 10, paddingBottom: 14 },
   verdictPromptButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
   verdictPromptButton: {
     borderWidth: 1,
