@@ -195,7 +195,7 @@ function createStyles(colors: Colors) {
       borderBottomColor: colors.border,
     },
     answerBody: { flex: 1, minWidth: 0 },
-    answerAuthor: { fontSize: 12, color: colors.textFaint, marginBottom: 2 },
+    answerAuthor: { fontSize: 14, color: colors.textFaint, marginBottom: 2 },
     gradeButtons: { flexDirection: 'row', gap: 6 },
     gradeButton: {
       borderWidth: 1,
@@ -210,7 +210,7 @@ function createStyles(colors: Colors) {
     // l'app.
     gradeButtonCorrectActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
     gradeButtonIncorrectActive: { borderColor: colors.ink, backgroundColor: colors.border },
-    gradeButtonText: { fontSize: 11, fontWeight: '700', color: colors.text },
+    gradeButtonText: { fontSize: 13, fontWeight: '700', color: colors.text },
     verdictCorrect: { fontSize: 16, fontWeight: '700', color: colors.accent },
     verdictIncorrect: { fontSize: 16, fontWeight: '700', color: colors.ink },
   });

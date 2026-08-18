@@ -71,7 +71,7 @@ function createStyles(colors: Colors) {
       alignSelf: 'flex-start',
       backgroundColor: colors.accentSoft,
     },
-    text: { fontSize: 13, fontWeight: '600', color: colors.text },
-    errorText: { fontSize: 12, color: colors.textFaint },
+    text: { fontSize: 15, fontWeight: '600', color: colors.text },
+    errorText: { fontSize: 14, color: colors.textFaint },
   });
 }

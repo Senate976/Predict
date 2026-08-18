@@ -846,7 +846,7 @@ function createStyles(colors: Colors) {
     color: colors.text,
   },
   headerSpacer: { width: 52 },
-  cancel: { fontSize: 13, color: colors.text },
+  cancel: { fontSize: 15, color: colors.text },
   predictTypeWrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
   scroll: { padding: spacing.lg, paddingBottom: 40 },
   label: {
@@ -857,7 +857,7 @@ function createStyles(colors: Colors) {
   },
   sectionLabel: { marginTop: spacing.lg },
   fieldSpacing: { marginTop: spacing.md },
-  subLabel: { fontSize: 12, color: colors.textFaint, marginBottom: 6 },
+  subLabel: { fontSize: 14, color: colors.textFaint, marginBottom: 6 },
   input: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -876,7 +876,7 @@ function createStyles(colors: Colors) {
   removeOptionButtonText: { fontSize: 15, color: colors.textFaint, fontWeight: '700' },
   addOptionButton: { paddingVertical: 8, alignSelf: 'flex-start' },
   addOptionButtonText: { fontSize: 14, fontWeight: '700', color: colors.accent },
-  counter: { fontSize: 12, color: colors.textFaint, marginTop: 6, textAlign: 'right' },
+  counter: { fontSize: 14, color: colors.textFaint, marginTop: 6, textAlign: 'right' },
   counterLow: { color: colors.danger },
   // Liste de suggestions pour une citation « @ » en cours de frappe — sous
   // le champ de contenu, jamais un menu flottant par-dessus le clavier.
@@ -898,8 +898,8 @@ function createStyles(colors: Colors) {
     borderBottomColor: colors.border,
   },
   mentionSuggestionText: { fontSize: 14, fontWeight: '600', color: colors.text },
-  hint: { fontSize: 13, color: colors.textMuted, marginTop: 10, lineHeight: 18 },
-  sectionHint: { fontSize: 13, color: colors.textMuted, marginBottom: 10, lineHeight: 18 },
+  hint: { fontSize: 15, color: colors.textMuted, marginTop: 10, lineHeight: 20 },
+  sectionHint: { fontSize: 15, color: colors.textMuted, marginBottom: 10, lineHeight: 20 },
   row: { flexDirection: 'row', gap: 12 },
   timeField: { flex: 1 },
   preview: { fontSize: 14, color: colors.textMuted, marginTop: 14 },
@@ -921,7 +921,7 @@ function createStyles(colors: Colors) {
     marginBottom: -1,
   },
   scopeOptionActive: { borderBottomColor: colors.accent },
-  scopeText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.textFaint, textAlign: 'center' },
+  scopeText: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.textFaint, textAlign: 'center' },
   scopeTextActive: { color: colors.text },
   revealNowRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   checkbox: {

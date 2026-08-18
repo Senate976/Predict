@@ -88,10 +88,10 @@ function createStyles(colors: Colors) {
   return StyleSheet.create({
     wrap: { width: '100%' },
     emptyText: {
-      fontSize: 13,
+      fontSize: 15,
       color: colors.textFaint,
       textAlign: 'center',
-      lineHeight: 19,
+      lineHeight: 21,
       paddingVertical: 8,
     },
     headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 },

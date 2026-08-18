@@ -76,7 +76,7 @@ function createStyles(colors: Colors) {
   back: { fontSize: 15, color: colors.text, width: 56 },
   headerSpacer: { width: 56 },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
-  updatedAt: { fontSize: 12, color: colors.textFaint, marginBottom: spacing.md },
+  updatedAt: { fontSize: 14, color: colors.textFaint, marginBottom: spacing.md },
   intro: { fontSize: 14, color: colors.textMuted, lineHeight: 21, marginBottom: spacing.lg },
   section: { marginBottom: spacing.lg },
   heading: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.text, marginBottom: 8 },

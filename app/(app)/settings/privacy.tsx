@@ -80,7 +80,7 @@ function createStyles(colors: Colors) {
   headerSpacer: { width: 56 },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   eyebrow: { ...eyebrow(colors), marginBottom: 8 },
-  description: { fontSize: 13, color: colors.textMuted, lineHeight: 19, marginBottom: spacing.md },
+  description: { fontSize: 15, color: colors.textMuted, lineHeight: 21, marginBottom: spacing.md },
   group: {
     borderRadius: 16,
     backgroundColor: colors.surface,
@@ -101,7 +101,7 @@ function createStyles(colors: Colors) {
   rowLast: { borderBottomWidth: 0 },
   rowText: { flex: 1 },
   rowLabel: { fontSize: 15, fontWeight: '600', color: colors.text },
-  rowHint: { fontSize: 12, color: colors.textFaint, marginTop: 2 },
+  rowHint: { fontSize: 14, color: colors.textFaint, marginTop: 2 },
   dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.accent },
   });
 }

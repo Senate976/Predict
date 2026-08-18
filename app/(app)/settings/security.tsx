@@ -199,10 +199,10 @@ function createStyles(colors: Colors) {
     backgroundColor: colors.dangerSoft,
     borderRadius: radius.sm,
     padding: 10,
-    fontSize: 13,
+    fontSize: 15,
     marginTop: 8,
   },
-  success: { color: colors.textMuted, fontSize: 13, marginTop: 8 },
+  success: { color: colors.textMuted, fontSize: 15, marginTop: 8 },
   button: {
     marginTop: 12,
     alignSelf: 'flex-start',
@@ -231,7 +231,7 @@ function createStyles(colors: Colors) {
     borderColor: colors.danger,
     backgroundColor: colors.dangerSoft,
   },
-  dangerText: { fontSize: 13, color: colors.text, lineHeight: 19 },
+  dangerText: { fontSize: 15, color: colors.text, lineHeight: 21 },
   deleteButton: {
     marginTop: 14,
     alignSelf: 'flex-start',

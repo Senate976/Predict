@@ -131,7 +131,7 @@ function createStyles(colors: Colors) {
   rowLast: { borderBottomWidth: 0 },
   rowText: { flex: 1 },
   rowLabel: { fontSize: 15, fontWeight: '600', color: colors.text },
-  rowHint: { fontSize: 12, color: colors.textFaint, marginTop: 2 },
+  rowHint: { fontSize: 14, color: colors.textFaint, marginTop: 2 },
   error: {
     color: colors.danger,
     backgroundColor: colors.dangerSoft,

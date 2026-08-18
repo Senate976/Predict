@@ -218,7 +218,7 @@ function createStyles(colors: Colors) {
     alignItems: 'center',
   },
   statValue: { fontFamily: fonts.body, fontSize: 26, color: colors.text },
-  statLabel: { fontSize: 11, color: colors.textFaint, marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 },
+  statLabel: { fontSize: 13, color: colors.textFaint, marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 },
   error: {
     color: colors.danger,
     backgroundColor: colors.dangerSoft,

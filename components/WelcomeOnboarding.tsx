@@ -95,7 +95,7 @@ function createStyles(colors: Colors) {
   scroll: { padding: spacing.lg },
   brand: {
     fontFamily: fonts.display,
-    fontSize: 13,
+    fontSize: 15,
     letterSpacing: 4,
     color: colors.text,
     textTransform: 'uppercase',
@@ -128,7 +128,7 @@ function createStyles(colors: Colors) {
     justifyContent: 'center',
     marginTop: 1,
   },
-  stepNumberText: { color: colors.textOnAccent, fontSize: 13, fontWeight: '700' },
+  stepNumberText: { color: colors.textOnAccent, fontSize: 15, fontWeight: '700' },
   stepText: { flex: 1, fontSize: 15, color: colors.text, lineHeight: 21 },
   body: {
     fontSize: 15,

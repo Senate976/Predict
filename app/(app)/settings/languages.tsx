@@ -30,7 +30,7 @@ export default function LanguagesSettingsScreen() {
         <View style={styles.group}>
           <View style={[styles.row, styles.rowLast]}>
             <Text style={styles.rowLabel}>Français</Text>
-            <Check size={18} color={colors.text} strokeWidth={2} />
+            <Check size={21} color={colors.text} strokeWidth={2} />
           </View>
         </View>
         <Text style={styles.hint}>Predict n’est disponible qu’en français pour le moment.</Text>
@@ -73,6 +73,6 @@ function createStyles(colors: Colors) {
   },
   rowLast: { borderBottomWidth: 0 },
   rowLabel: { fontSize: 15, fontWeight: '600', color: colors.text },
-  hint: { fontSize: 12, color: colors.textFaint, marginTop: 10 },
+  hint: { fontSize: 14, color: colors.textFaint, marginTop: 10 },
   });
 }

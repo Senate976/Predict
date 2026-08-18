@@ -72,6 +72,6 @@ function createStyles(colors: Colors) {
     },
     fill: { ...StyleSheet.absoluteFill, backgroundColor: colors.border },
     loaderBox: { alignItems: 'center', justifyContent: 'center' },
-    errorText: { fontSize: 12, color: colors.textFaint },
+    errorText: { fontSize: 14, color: colors.textFaint },
   });
 }

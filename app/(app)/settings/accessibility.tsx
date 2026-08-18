@@ -73,6 +73,6 @@ function createStyles(colors: Colors) {
   },
   rowText: { flex: 1 },
   rowLabel: { fontSize: 15, fontWeight: '600', color: colors.text },
-  rowHint: { fontSize: 12, color: colors.textFaint, marginTop: 4, lineHeight: 17 },
+  rowHint: { fontSize: 14, color: colors.textFaint, marginTop: 4, lineHeight: 19 },
   });
 }

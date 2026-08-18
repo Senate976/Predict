@@ -327,13 +327,13 @@ function createStyles(colors: Colors) {
   avatarEditText: {
     fontFamily: fonts.sansBold,
     color: colors.text,
-    fontSize: 12,
+    fontSize: 14,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
     marginTop: 8,
   },
   username: { fontFamily: fonts.bodyEmphasis, fontSize: 22, color: colors.text, marginTop: 6 },
-  email: { fontSize: 13, color: colors.textFaint, marginTop: 4 },
+  email: { fontSize: 15, color: colors.textFaint, marginTop: 4 },
   loader: { marginTop: 24 },
   modalOverlay: {
     flex: 1,
@@ -378,7 +378,7 @@ function createStyles(colors: Colors) {
   // porte le sens, conformément à la palette stricte noir/blanc/jaune.
   statValue: { fontFamily: fonts.body, fontSize: 26, color: colors.text },
   statLabel: {
-    fontSize: 10,
+    fontSize: 12,
     letterSpacing: 1,
     textTransform: 'uppercase',
     color: colors.textFaint,
@@ -400,7 +400,7 @@ function createStyles(colors: Colors) {
     borderBottomColor: colors.border,
   },
   historyTeaser: { fontFamily: fonts.body, fontSize: 17, color: colors.text },
-  historyMeta: { fontSize: 12, color: colors.textFaint, marginTop: 4 },
+  historyMeta: { fontSize: 14, color: colors.textFaint, marginTop: 4 },
   error: {
     color: colors.danger,
     backgroundColor: colors.dangerSoft,

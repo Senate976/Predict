@@ -204,7 +204,7 @@ export function InlineComments({
                     </Pressable>
                     {canDelete && (
                       <Pressable onPress={() => handleDelete(comment.id)} hitSlop={8}>
-                        <Trash2 size={14} color={colors.icon} strokeWidth={1.75} />
+                        <Trash2 size={17} color={colors.icon} strokeWidth={1.75} />
                       </Pressable>
                     )}
                   </View>
@@ -279,7 +279,7 @@ export function InlineComments({
             Réponse à {replyingTo.username} : « {replyingTo.preview} »
           </Text>
           <Pressable onPress={() => setReplyingTo(null)} hitSlop={8}>
-            <X size={14} color={colors.icon} strokeWidth={1.75} />
+            <X size={17} color={colors.icon} strokeWidth={1.75} />
           </Pressable>
         </View>
       )}
@@ -325,14 +325,14 @@ function createStyles(colors: Colors) {
   commentTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   commentAuthorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', flexShrink: 1 },
   commentAuthor: { fontSize: 14, fontWeight: '700', color: colors.textMuted },
-  commentTime: { fontSize: 13, color: colors.textFaint },
+  commentTime: { fontSize: 15, color: colors.textFaint },
   commentContent: { fontSize: 17, color: colors.text, marginTop: 4, lineHeight: 23 },
   replyMention: { fontWeight: '700', color: colors.text },
   commentActionsRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 4 },
   replyLink: { alignSelf: 'flex-start' },
-  replyLinkText: { fontFamily: fonts.bodyEmphasis, fontSize: 13, color: colors.text },
+  replyLinkText: { fontFamily: fonts.bodyEmphasis, fontSize: 15, color: colors.text },
   reactLink: { alignSelf: 'flex-start' },
-  reactLinkText: { fontFamily: fonts.bodyEmphasis, fontSize: 13, color: colors.text },
+  reactLinkText: { fontFamily: fonts.bodyEmphasis, fontSize: 15, color: colors.text },
   // Petite bulle inline (pas de geste glissé, contrairement à celle de la
   // prédiction entière) — un tap ouvre/ferme, un tap sur un emoji réagit.
   commentEmojiPanel: {
@@ -367,8 +367,8 @@ function createStyles(colors: Colors) {
     paddingVertical: 6,
     marginBottom: 6,
   },
-  replyingText: { flex: 1, fontSize: 12, color: colors.textMuted },
-  error: { color: colors.danger, fontSize: 12, marginBottom: 6 },
+  replyingText: { flex: 1, fontSize: 14, color: colors.textMuted },
+  error: { color: colors.danger, fontSize: 14, marginBottom: 6 },
   // `alignItems: 'center'` plutôt que `flex-end` : le bouton Envoyer se
   // callait sur le bas d'un champ multiligne, ce qui le poussait visiblement
   // plus bas que le texte de la première ligne au lieu d'être centré dessus.

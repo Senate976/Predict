@@ -400,7 +400,7 @@ export default function CircleScreen() {
               disabled={inviting}
               style={({ pressed }) => [styles.inviteButton, pressed && styles.invitePressed]}
             >
-              <UserPlus size={16} color={colors.accent} strokeWidth={1.75} />
+              <UserPlus size={19} color={colors.accent} strokeWidth={1.75} />
               <Text style={styles.inviteButtonText}>
                 {inviting ? 'Ouverture…' : 'Inviter un contact'}
               </Text>
@@ -771,7 +771,7 @@ function createStyles(colors: Colors) {
   tabActive: { borderBottomColor: colors.accent },
   tabText: {
     fontFamily: fonts.sansBold,
-    fontSize: 12,
+    fontSize: 14,
     letterSpacing: 0.5,
     color: colors.textMuted,
     textTransform: 'uppercase',
@@ -803,7 +803,7 @@ function createStyles(colors: Colors) {
   },
   invitePressed: { opacity: 0.7 },
   inviteButtonText: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.accent },
-  inviteNotice: { fontSize: 13, lineHeight: 19, color: colors.textMuted, marginTop: spacing.sm },
+  inviteNotice: { fontSize: 15, lineHeight: 21, color: colors.textMuted, marginTop: spacing.sm },
   muted: { fontSize: 14, color: colors.textFaint, marginTop: spacing.sm, lineHeight: 20 },
   sectionSpacing: { marginTop: spacing.md },
   resultsBox: { marginTop: spacing.sm },
@@ -823,7 +823,7 @@ function createStyles(colors: Colors) {
   },
   username: { fontSize: 15, color: colors.text, fontWeight: '600' },
   usernameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  groupScore: { fontSize: 13, fontWeight: '700', color: colors.text },
+  groupScore: { fontSize: 15, fontWeight: '700', color: colors.text },
   actions: { flexDirection: 'row', gap: 8 },
   // Actions en ligne (Ajouter, Accepter, Créer, gestion des membres) : le
   // jaune plein était trop lourd répété à chaque ligne de liste. Contour noir
@@ -839,7 +839,7 @@ function createStyles(colors: Colors) {
     justifyContent: 'center',
     backgroundColor: colors.surface,
   },
-  pillGoldText: { color: colors.text, fontSize: 13, fontWeight: '700' },
+  pillGoldText: { color: colors.text, fontSize: 15, fontWeight: '700' },
   pillOutline: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -849,7 +849,7 @@ function createStyles(colors: Colors) {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pillOutlineText: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
+  pillOutlineText: { color: colors.textMuted, fontSize: 15, fontWeight: '600' },
   error: {
     color: colors.danger,
     backgroundColor: colors.dangerSoft,
@@ -872,10 +872,10 @@ function createStyles(colors: Colors) {
     marginBottom: -1,
   },
   visibilityOptionActive: { borderBottomColor: colors.text },
-  visibilityText: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
+  visibilityText: { fontSize: 14, fontWeight: '700', color: colors.textMuted },
   visibilityTextActive: { color: colors.text },
-  visibilityHint: { fontSize: 12, color: colors.textFaint, marginTop: 6 },
-  groupMeta: { fontSize: 11, color: colors.textFaint, marginTop: 2 },
+  visibilityHint: { fontSize: 14, color: colors.textFaint, marginTop: 6 },
+  groupMeta: { fontSize: 13, color: colors.textFaint, marginTop: 2 },
   groupBox: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -890,7 +890,7 @@ function createStyles(colors: Colors) {
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  groupChevron: { fontSize: 11, color: colors.textFaint },
+  groupChevron: { fontSize: 13, color: colors.textFaint },
   groupBody: {
     paddingHorizontal: 14,
     paddingBottom: 12,
@@ -898,6 +898,6 @@ function createStyles(colors: Colors) {
     borderTopColor: colors.border,
   },
   deleteGroup: { marginTop: 10, alignSelf: 'flex-start' },
-  deleteGroupText: { fontSize: 12, color: colors.danger, fontWeight: '600' },
+  deleteGroupText: { fontSize: 14, color: colors.danger, fontWeight: '600' },
   });
 }

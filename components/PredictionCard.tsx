@@ -268,6 +268,11 @@ export function PredictionCard({
   // `components/EnvelopeArt.tsx`), donc cette seule mesure suffit à poser
   // toute la forme aux bonnes proportions sur n'importe quel écran.
   const [envelopeWidth, setEnvelopeWidth] = useState(0);
+  // Hauteur réelle de la lettre, mesurée au rendu : elle grandit avec son
+  // contenu (les options d'un Sondage, par exemple), et les photos glissées
+  // derrière doivent la suivre — à hauteur figée, elles s'arrêtaient en plein
+  // milieu.
+  const [letterHeight, setLetterHeight] = useState(0);
   const env = useMemo(() => {
     const W = envelopeWidth;
     const H = W / ENVELOPE_RATIO;
@@ -669,7 +674,7 @@ export function PredictionCard({
             <Pressable onPress={() => setCommentsOpen((o) => !o)} style={styles.commentsToggle} hitSlop={4}>
               <View style={styles.iconSlot}>
                 <MessageCircle
-                  size={18}
+                  size={21}
                   color={(commentCount ?? 0) > 0 ? colors.text : colors.footerIconInactive}
                   strokeWidth={1.75}
                   fill={commentsOpen ? colors.text : 'none'}
@@ -692,7 +697,7 @@ export function PredictionCard({
                     <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
                   ) : (
                     <ThumbsUp
-                      size={18}
+                      size={21}
                       color={totalReactions > 0 ? colors.text : colors.footerIconInactive}
                       strokeWidth={1.75}
                     />
@@ -742,7 +747,7 @@ export function PredictionCard({
               <View style={styles.answersRow}>
                 <View style={styles.iconSlot}>
                   <Users
-                    size={18}
+                    size={21}
                     color={item.answer_count > 0 ? colors.text : colors.footerIconInactive}
                     strokeWidth={1.75}
                   />
@@ -782,7 +787,7 @@ export function PredictionCard({
         )}
         <View style={styles.headerSpacer} />
         <Pressable onPress={() => setMenuOpen(true)} hitSlop={8} style={styles.headerMenuButton}>
-          <MoreHorizontal size={18} color={colors.icon} strokeWidth={1.75} />
+          <MoreHorizontal size={21} color={colors.icon} strokeWidth={1.75} />
         </Pressable>
       </View>
 
@@ -930,7 +935,7 @@ export function PredictionCard({
                         top: env.flapPeek + PAGE_PEEK * rank,
                         marginLeft: PAGE_PEEK * rank,
                         width: env.letterW,
-                        height: env.letterH,
+                        height: Math.max(letterHeight, env.letterH),
                         borderRadius: env.letterRadius,
                         borderWidth: env.letterBorder,
                         borderColor: colors.accent,
@@ -943,6 +948,7 @@ export function PredictionCard({
                 ))}
 
               <View
+                onLayout={(e) => setLetterHeight(e.nativeEvent.layout.height)}
                 style={[
                   styles.letter,
                   {
@@ -1003,14 +1009,13 @@ export function PredictionCard({
                   l'écran détail prend le relais. Texte libre comme choix
                   multiple, `InlineQuestionAnswer` gère les deux. */}
               {isQuestion && !revealed && (
-                /* `onStartShouldSetResponder` réclame le toucher pour ce
-                   bloc : sans lui, la `Pressable` de l'enveloppe le happe et
-                   ouvre la carte au lieu de laisser écrire. On répond donc
-                   depuis le Fil, et l'écran détail reste disponible pour qui
-                   préfère y aller. */
-                <View onStartShouldSetResponder={() => true}>
+                /* Une `Pressable` sans effet, posée autour du formulaire :
+                   c'est le seul moyen fiable — sur mobile comme sur navigateur —
+                   d'empêcher celle de l'enveloppe de happer le toucher et
+                   d'ouvrir la carte au lieu de laisser écrire. */
+                <Pressable onPress={() => {}}>
                   <InlineQuestionAnswer prediction={item} />
-                </View>
+                </Pressable>
               )}
                     </View>
 
@@ -1130,7 +1135,7 @@ export function PredictionCard({
               style={styles.cardMenuRow}
             >
               <Star
-                size={18}
+                size={21}
                 color={isFavorite ? colors.accent : colors.icon}
                 fill={isFavorite ? colors.accent : 'none'}
                 strokeWidth={1.75}
@@ -1146,9 +1151,9 @@ export function PredictionCard({
               style={[styles.cardMenuRow, !(isAuthor && onDelete) && styles.cardMenuRowLast]}
             >
               {isHidden ? (
-                <Eye size={18} color={colors.icon} strokeWidth={1.75} />
+                <Eye size={21} color={colors.icon} strokeWidth={1.75} />
               ) : (
-                <EyeOff size={18} color={colors.icon} strokeWidth={1.75} />
+                <EyeOff size={21} color={colors.icon} strokeWidth={1.75} />
               )}
               <Text style={styles.cardMenuRowText}>{isHidden ? 'Afficher à nouveau' : 'Masquer'}</Text>
             </Pressable>
@@ -1161,7 +1166,7 @@ export function PredictionCard({
                 }}
                 style={[styles.cardMenuRow, styles.cardMenuRowLast]}
               >
-                <Trash2 size={18} color={colors.danger} strokeWidth={1.75} />
+                <Trash2 size={21} color={colors.danger} strokeWidth={1.75} />
                 <Text style={[styles.cardMenuRowText, styles.cardMenuRowTextDanger]}>Supprimer</Text>
               </Pressable>
             )}
@@ -1271,9 +1276,9 @@ function createStyles(colors: Colors) {
   // Le bloc commun aux deux enveloppes — même disposition sur l'une et l'autre.
   envFooter: { marginTop: 8 },
   envAuthorRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  envAuthorName: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.text, flexShrink: 1, minWidth: 0 },
-  envMentionTag: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
-  envTeaser: { fontFamily: fonts.serifItalic, fontSize: 14, lineHeight: 20, color: colors.textMuted, marginTop: 3 },
+  envAuthorName: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.text, flexShrink: 1, minWidth: 0 },
+  envMentionTag: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
+  envTeaser: { fontFamily: fonts.serifItalic, fontSize: 15, lineHeight: 21, color: colors.textMuted, marginTop: 3 },
   // Dernière ligne : boutons d'action à gauche, date de révélation à droite.
   envBottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   // Date de révélation et bouton « Révéler » côte à côte, à droite de la ligne
@@ -1289,7 +1294,7 @@ function createStyles(colors: Colors) {
     minWidth: 0,
     minHeight: 30,
   },
-  envRevealHint: { fontFamily: fonts.label, fontSize: 11, color: colors.textMuted, flexShrink: 1 },
+  envRevealHint: { fontFamily: fonts.label, fontSize: 13, color: colors.textMuted, flexShrink: 1 },
   sealedBadge: { position: 'absolute', left: '50%', zIndex: 2 },
   // Corps de carte assourdi une fois Manquée — jamais le badge d'état,
   // rendu séparément avant ce conteneur et donc toujours à `opacity: 1`.
@@ -1322,7 +1327,7 @@ function createStyles(colors: Colors) {
   letterWithStamp: { paddingRight: 60 },
   letterStateLabel: {
     fontFamily: fonts.label,
-    fontSize: 11,
+    fontSize: 12,
     letterSpacing: 1.1,
     textTransform: 'uppercase',
     color: letterInk(colors.surface).soft,
@@ -1330,8 +1335,8 @@ function createStyles(colors: Colors) {
   },
   letterQuestionText: {
     fontFamily: fonts.serifItalic,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 16,
+    lineHeight: 23,
     color: letterInk(colors.surface).soft,
     marginTop: 4,
     textAlign: 'center',
@@ -1341,8 +1346,8 @@ function createStyles(colors: Colors) {
   // (`letterContentBlurred` la couvre d'un flou tant que ce n'est pas le cas).
   letterContent: {
     fontFamily: fonts.bodyEmphasis,
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 18,
+    lineHeight: 25,
     color: letterInk(colors.surface).strong,
     marginTop: 4,
     textAlign: 'center',
@@ -1410,7 +1415,7 @@ function createStyles(colors: Colors) {
     backgroundColor: colors.accentSoft,
   },
   revealButtonPressed: { opacity: 0.7 },
-  revealButtonText: { fontFamily: fonts.label, fontSize: 12, fontWeight: '700', color: colors.accent },
+  revealButtonText: { fontFamily: fonts.label, fontSize: 14, fontWeight: '700', color: colors.accent },
   revealErrorText: { fontSize: 11, color: colors.danger, marginTop: 6, textAlign: 'right' },
   // Invite l'auteur à trancher — rien que les deux boutons, alignés à droite.
   // Réalisé en accent plein (comme le bouton « Sceller »), Manqué en contour
@@ -1452,19 +1457,22 @@ function createStyles(colors: Colors) {
     paddingTop: 8,
   },
   // Boîte identique (taille + centrage) pour les icônes du pied de carte.
-  iconSlot: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
+  // Gabarit fixe : les trois icônes du pied de carte gardent le même
+  // encombrement, donc le même alignement, quelle que soit leur forme.
+  // Un peu plus large que l'icône (21) pour lui laisser de l'air.
+  iconSlot: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
   commentsToggle: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   // Toujours affiché, y compris à zéro — encre dès qu'il y a au moins une
   // interaction, teinte discrète sinon (voir `footerCountInactive`).
-  commentsToggleText: { fontSize: 13, fontWeight: '700', color: colors.text },
+  commentsToggleText: { fontSize: 15, fontWeight: '700', color: colors.text },
   reactionTriggerWrap: { position: 'relative' },
   reactionTriggerRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   reactionTrigger: { flexDirection: 'row', alignItems: 'center' },
   reactionTriggerEmoji: { fontSize: 17 },
-  reactionTriggerCount: { fontSize: 13, fontWeight: '700', color: colors.text },
+  reactionTriggerCount: { fontSize: 15, fontWeight: '700', color: colors.text },
   footerCountInactive: { color: colors.footerIconInactive },
   answersRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  answersCountText: { fontSize: 13, fontWeight: '700', color: colors.text },
+  answersCountText: { fontSize: 15, fontWeight: '700', color: colors.text },
   // Une seule « grande bulle », façon Facebook — flottante au-dessus du
   // pouce (pas en dessous) pour ne pas être masquée par le doigt qui la
   // fait glisser, et pas des puces séparées.

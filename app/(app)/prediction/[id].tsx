@@ -601,7 +601,7 @@ function createStyles(colors: Colors) {
   // Un peu plus marqué que les autres repères secondaires de cet écran :
   // savoir quand le Predict a été scellé reste une information importante,
   // pas un simple détail à estomper.
-  sealedDate: { fontSize: 13, fontWeight: '700', color: colors.textMuted },
+  sealedDate: { fontSize: 15, fontWeight: '700', color: colors.textMuted },
   daysAdvance: { fontSize: 16, fontWeight: '600', color: colors.textMuted, marginTop: 2 },
   daysAdvanceCentered: { fontSize: 16, fontWeight: '600', color: colors.textMuted, textAlign: 'center', marginTop: 10 },
   contentHero: {
@@ -634,7 +634,7 @@ function createStyles(colors: Colors) {
     paddingVertical: 11,
     backgroundColor: colors.surface,
   },
-  revealNowButtonText: { fontSize: 13, fontWeight: '700', color: colors.text },
+  revealNowButtonText: { fontSize: 15, fontWeight: '700', color: colors.text },
   sectionSpacing: { marginTop: spacing.lg, marginBottom: 8 },
   sectionToggle: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start' },
   verdictChoiceRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
@@ -655,7 +655,7 @@ function createStyles(colors: Colors) {
   verdictPhotoAttach: { marginTop: 12, gap: 6 },
   verdictChoiceText: { fontSize: 14, fontWeight: '700', color: colors.text },
   verdictChoiceTextActive: { color: colors.surface },
-  chevron: { fontSize: 11, color: colors.textFaint },
+  chevron: { fontSize: 13, color: colors.textFaint },
   hint: { fontSize: 14, color: colors.textFaint, lineHeight: 20 },
   row: {
     flexDirection: 'row',
@@ -675,7 +675,7 @@ function createStyles(colors: Colors) {
     paddingVertical: 7,
     backgroundColor: colors.surface,
   },
-  pillGoldText: { color: colors.text, fontSize: 13, fontWeight: '700' },
+  pillGoldText: { color: colors.text, fontSize: 15, fontWeight: '700' },
   pillOutline: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -683,7 +683,7 @@ function createStyles(colors: Colors) {
     paddingHorizontal: 14,
     paddingVertical: 7,
   },
-  pillOutlineText: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
+  pillOutlineText: { color: colors.textMuted, fontSize: 15, fontWeight: '600' },
   error: {
     color: colors.danger,
     backgroundColor: colors.dangerSoft,

@@ -376,7 +376,7 @@ export default function HomeScreen() {
           style={[styles.filtersToggle, hasActiveFilters && styles.filtersToggleActive]}
           hitSlop={4}
         >
-          <SlidersHorizontal size={14} color={hasActiveFilters ? colors.text : colors.textFaint} strokeWidth={1.75} />
+          <SlidersHorizontal size={17} color={hasActiveFilters ? colors.text : colors.textFaint} strokeWidth={1.75} />
           <Text style={[styles.filtersToggleText, hasActiveFilters && styles.filtersToggleTextActive]}>
             Tri
           </Text>
@@ -387,7 +387,7 @@ export default function HomeScreen() {
           style={[styles.filtersToggle, mineOnly && styles.filtersToggleActive]}
           hitSlop={4}
         >
-          <User size={14} color={mineOnly ? colors.text : colors.textFaint} strokeWidth={1.75} />
+          <User size={17} color={mineOnly ? colors.text : colors.textFaint} strokeWidth={1.75} />
           <Text style={[styles.filtersToggleText, mineOnly && styles.filtersToggleTextActive]}>
             Mes predicts
           </Text>
@@ -395,7 +395,7 @@ export default function HomeScreen() {
 
         {hasActiveFilters && (
           <Pressable onPress={resetFilters} style={styles.filtersReset} hitSlop={4}>
-            <XCircle size={14} color={colors.icon} strokeWidth={1.75} />
+            <XCircle size={17} color={colors.icon} strokeWidth={1.75} />
             <Text style={styles.filtersResetText}>Réinitialiser</Text>
           </Pressable>
         )}
@@ -417,7 +417,7 @@ export default function HomeScreen() {
                     <Text style={styles.menuRowValue} numberOfLines={1}>
                       {authorFilter ? authors[authorFilter]?.username ?? '…' : 'Tous'}
                     </Text>
-                    <ChevronRight size={16} color={colors.icon} strokeWidth={1.75} />
+                    <ChevronRight size={19} color={colors.icon} strokeWidth={1.75} />
                   </View>
                 </Pressable>
 
@@ -484,7 +484,7 @@ export default function HomeScreen() {
             ) : (
               <>
                 <Pressable onPress={() => setMenuView('main')} style={styles.menuBack}>
-                  <ChevronLeft size={16} color={colors.text} strokeWidth={1.75} />
+                  <ChevronLeft size={19} color={colors.text} strokeWidth={1.75} />
                   <Text style={styles.menuBackText}>Auteur</Text>
                 </Pressable>
 
@@ -630,13 +630,13 @@ function createStyles(colors: Colors) {
   tabBadge: {
     backgroundColor: colors.notificationBadge,
     borderRadius: radius.pill,
-    minWidth: 18,
-    height: 18,
+    minWidth: 20,
+    height: 20,
     paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tabBadgeText: { fontSize: 10, fontWeight: '700', color: '#FFFFFF' },
+  tabBadgeText: { fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
   tabText: {
     fontFamily: fonts.sansBold,
     fontSize: 17,
@@ -662,7 +662,7 @@ function createStyles(colors: Colors) {
   filtersToggleText: { fontSize: 15, fontWeight: '700', color: colors.textFaint },
   filtersToggleTextActive: { color: colors.text },
   filtersReset: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  filtersResetText: { fontSize: 13, fontWeight: '600', color: colors.textFaint },
+  filtersResetText: { fontSize: 15, fontWeight: '600', color: colors.textFaint },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
