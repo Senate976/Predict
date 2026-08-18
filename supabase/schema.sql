@@ -5211,7 +5211,50 @@ revoke all on function public.set_prediction_result_photo(uuid, text) from publi
 grant execute on function public.set_prediction_result_photo(uuid, text) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 53. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 53. Qui a voté à un Sondage, avant Clôture
+-- ---------------------------------------------------------------------------
+--
+-- L'auteur d'un Sondage doit pouvoir savoir QUI a répondu sans lire QUOI :
+-- `prediction_answers_select` (section 42) masque la ligne entière avant
+-- Clôture, pseudo compris, et il n'est pas question de l'assouplir — c'est
+-- elle qui garantit qu'une réponse reste secrète jusqu'au bout.
+--
+-- D'où cette fonction, sur le même modèle que
+-- `get_prediction_answer_count` : `security definer` pour passer outre la
+-- RLS, mais elle ne sélectionne QUE l'identité du votant. `answer_text`,
+-- `option_id` et `is_correct` ne sortent jamais d'ici, quel que soit
+-- l'appelant — le secret ne dépend donc pas de ce que l'app affiche.
+--
+-- Réservée à ceux qui voient déjà la prédiction (auteur ou destinataire) :
+-- une personne extérieure au Cercle n'apprend rien, pas même la liste des
+-- participants.
+create or replace function public.get_prediction_voters(p_prediction_id uuid)
+returns table (user_id uuid, username text, avatar_url text)
+language sql
+security definer
+stable
+set search_path = ''
+as $$
+  select pa.user_id, pr.username, pr.avatar_url
+  from public.prediction_answers pa
+  join public.profiles pr on pr.id = pa.user_id
+  where pa.prediction_id = p_prediction_id
+    and exists (
+      select 1 from public.predictions p
+      where p.id = p_prediction_id
+        and (
+          p.author_id = auth.uid()
+          or public.has_prediction_access(p.id, auth.uid())
+        )
+    )
+  order by pa.created_at asc;
+$$;
+
+revoke all on function public.get_prediction_voters(uuid) from public;
+grant execute on function public.get_prediction_voters(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 54. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une

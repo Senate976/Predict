@@ -327,7 +327,7 @@ export default function NotificationsScreen() {
                       <Avatar
                         url={notification.prediction.author.avatar_url}
                         username={notification.prediction.author.username}
-                        size={18}
+                        size={21}
                       />
                       <Text style={styles.authorName}>{notification.prediction.author.username}</Text>
                     </View>
@@ -375,7 +375,7 @@ export default function NotificationsScreen() {
                     hitSlop={8}
                     style={styles.deleteButton}
                   >
-                    <Trash2 size={15} color={colors.icon} strokeWidth={1.75} />
+                    <Trash2 size={18} color={colors.icon} strokeWidth={1.75} />
                   </Pressable>
                 )}
               </Pressable>
@@ -406,7 +406,7 @@ function createStyles(colors: Colors) {
     color: colors.text,
   },
   cancelSelection: { fontSize: 15, color: colors.text, fontWeight: '600' },
-  selectAll: { fontFamily: fonts.label, fontSize: 13, color: colors.accent },
+  selectAll: { fontFamily: fonts.label, fontSize: 15, color: colors.accent },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   loader: { marginTop: 32 },
   empty: { fontSize: 14, color: colors.textFaint, textAlign: 'center', marginTop: 32 },
@@ -450,14 +450,14 @@ function createStyles(colors: Colors) {
   deleteButton: { position: 'absolute', right: 14, bottom: 14 },
   label: { fontSize: 14, fontWeight: '600', color: colors.text },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
-  authorName: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
+  authorName: { fontSize: 14, fontWeight: '700', color: colors.textMuted },
   teaser: {
     fontFamily: fonts.sansBold,
     fontSize: 16,
     color: colors.text,
     marginTop: 4,
   },
-  time: { fontSize: 12, color: colors.textFaint, marginTop: 6 },
+  time: { fontSize: 14, color: colors.textFaint, marginTop: 6 },
   inviteActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
   // Même traitement léger que les actions du Cercle (invitations de groupe) :
   // contour plutôt que jaune plein.
@@ -469,7 +469,7 @@ function createStyles(colors: Colors) {
     paddingVertical: 7,
     backgroundColor: colors.surface,
   },
-  pillGoldText: { color: colors.text, fontSize: 13, fontWeight: '700' },
+  pillGoldText: { color: colors.text, fontSize: 15, fontWeight: '700' },
   pillOutline: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -477,7 +477,7 @@ function createStyles(colors: Colors) {
     paddingHorizontal: 14,
     paddingVertical: 7,
   },
-  pillOutlineText: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
-  respondedText: { fontSize: 12, color: colors.textFaint, marginTop: 8 },
+  pillOutlineText: { color: colors.textMuted, fontSize: 15, fontWeight: '600' },
+  respondedText: { fontSize: 14, color: colors.textFaint, marginTop: 8 },
   });
 }

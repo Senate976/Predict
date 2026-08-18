@@ -5,9 +5,11 @@ import { Text } from './Text';
 import {
   fetchAnswerOptions,
   fetchPredictionAnswers,
+  fetchPredictionVoters,
   setAnswerCorrectness,
   type PredictionAnswer,
   type PredictionAnswerOption,
+  type PredictionVoter,
 } from '../lib/questions';
 import type { PredictionFeedItem } from '../lib/predictions';
 import { eyebrow, fonts, radius, spacing, type Colors } from '../lib/theme';
@@ -20,9 +22,9 @@ import { InlineQuestionAnswer } from './InlineQuestionAnswer';
  * contenu + Verdict d'une Déclaration (`app/(app)/prediction/[id].tsx`).
  *
  * Avant Clôture : tout le monde peut répondre, auteur inclus
- * (`InlineQuestionAnswer`) — l'auteur voit en plus le compteur global
- * (`prediction.answer_count`), jamais le détail des réponses des autres
- * avant Clôture (voir schema.sql section 42).
+ * (`InlineQuestionAnswer`) — l'auteur voit en plus QUI a répondu
+ * (`fetchPredictionVoters`), jamais QUOI : le détail des réponses des
+ * autres reste caché jusqu'à la Clôture (voir schema.sql section 42).
  *
  * Après Clôture : tout le monde voit la liste des réponses ; l'auteur y
  * ajoute deux pastilles Correcte/Incorrecte par ligne. Aucun habillage de
@@ -53,6 +55,10 @@ export function QuestionAnswerPanel({
   const [answers, setAnswers] = useState<PredictionAnswer[] | null>(null);
   const [answersError, setAnswersError] = useState<string | null>(null);
   const [gradingId, setGradingId] = useState<string | null>(null);
+  // Les votants — l'identité seule, chargée uniquement pour l'auteur et
+  // uniquement avant Clôture : après, la liste complète des réponses ci-dessous
+  // dit déjà qui a répondu.
+  const [voters, setVoters] = useState<PredictionVoter[] | null>(null);
 
   useEffect(() => {
     if (prediction.answer_format !== 'choice') return;
@@ -64,6 +70,19 @@ export function QuestionAnswerPanel({
       cancelled = true;
     };
   }, [prediction.id, prediction.answer_format]);
+
+  useEffect(() => {
+    if (closed || !isAuthor) return;
+    let cancelled = false;
+    fetchPredictionVoters(prediction.id).then(({ data }) => {
+      if (!cancelled) setVoters(data ?? []);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // `answer_count` en dépendance : quand quelqu'un vient de répondre,
+    // l'écran parent recharge la prédiction et la liste se rafraîchit avec.
+  }, [prediction.id, prediction.answer_count, closed, isAuthor]);
 
   useEffect(() => {
     if (!closed) return;
@@ -162,6 +181,19 @@ export function QuestionAnswerPanel({
               ? 'Aucune réponse pour l’instant.'
               : `${prediction.answer_count} réponse${prediction.answer_count > 1 ? 's' : ''} reçue${prediction.answer_count > 1 ? 's' : ''} pour l’instant — visibles à la Clôture.`}
           </Text>
+          {/* Qui a répondu, sans ce qui a été répondu. */}
+          {!!voters?.length && (
+            <View style={styles.votersRow}>
+              {voters.map((v) => (
+                <View key={v.user_id} style={styles.voterChip}>
+                  <Avatar url={v.avatar_url} username={v.username} size={22} />
+                  <Text style={styles.voterName} numberOfLines={1}>
+                    {v.username}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
         </>
       )}
       <Text style={[styles.eyebrow, isAuthor && styles.eyebrowSpaced]}>Ta réponse</Text>
@@ -177,6 +209,20 @@ function createStyles(colors: Colors) {
     eyebrowSpaced: { marginTop: spacing.md },
     hint: { fontSize: 14, color: colors.textFaint, lineHeight: 20 },
     loader: { marginTop: 8 },
+    votersRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+    voterChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.pill,
+      paddingLeft: 4,
+      paddingRight: 10,
+      paddingVertical: 4,
+      maxWidth: '100%',
+    },
+    voterName: { fontFamily: fonts.bodyEmphasis, fontSize: 14, color: colors.textMuted, flexShrink: 1 },
     error: {
       color: colors.danger,
       backgroundColor: colors.dangerSoft,
@@ -195,7 +241,7 @@ function createStyles(colors: Colors) {
       borderBottomColor: colors.border,
     },
     answerBody: { flex: 1, minWidth: 0 },
-    answerAuthor: { fontSize: 12, color: colors.textFaint, marginBottom: 2 },
+    answerAuthor: { fontSize: 14, color: colors.textFaint, marginBottom: 2 },
     gradeButtons: { flexDirection: 'row', gap: 6 },
     gradeButton: {
       borderWidth: 1,
@@ -210,7 +256,7 @@ function createStyles(colors: Colors) {
     // l'app.
     gradeButtonCorrectActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
     gradeButtonIncorrectActive: { borderColor: colors.ink, backgroundColor: colors.border },
-    gradeButtonText: { fontSize: 11, fontWeight: '700', color: colors.text },
+    gradeButtonText: { fontSize: 13, fontWeight: '700', color: colors.text },
     verdictCorrect: { fontSize: 16, fontWeight: '700', color: colors.accent },
     verdictIncorrect: { fontSize: 16, fontWeight: '700', color: colors.ink },
   });

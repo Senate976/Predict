@@ -126,9 +126,9 @@ function createStyles(colors: Colors) {
   dotSquare: { borderRadius: 3 },
   playButton: { alignSelf: 'flex-start' },
   playButtonText: { fontFamily: fonts.bodyEmphasis, fontSize: 15, color: colors.text },
-  duration: { fontSize: 13, color: colors.textFaint, marginTop: 8 },
+  duration: { fontSize: 15, color: colors.textFaint, marginTop: 8 },
   resetButton: { marginTop: 10, alignSelf: 'flex-start' },
-  resetButtonText: { fontSize: 13, color: colors.textMuted, fontWeight: '600' },
-  errorText: { color: colors.danger, fontSize: 13, marginBottom: 10 },
+  resetButtonText: { fontSize: 15, color: colors.textMuted, fontWeight: '600' },
+  errorText: { color: colors.danger, fontSize: 15, marginBottom: 10 },
   });
 }

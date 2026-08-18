@@ -147,7 +147,7 @@ function createStyles(colors: Colors) {
   },
   rowText: { flex: 1 },
   rowLabel: { fontSize: 15, fontWeight: '600', color: colors.text },
-  rowHint: { fontSize: 12, color: colors.textFaint, marginTop: 2 },
+  rowHint: { fontSize: 14, color: colors.textFaint, marginTop: 2 },
   group: {
     borderRadius: 16,
     backgroundColor: colors.surface,

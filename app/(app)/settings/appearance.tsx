@@ -41,7 +41,7 @@ export default function AppearanceSettingsScreen() {
               style={[styles.row, i === OPTIONS.length - 1 && styles.rowLast]}
             >
               <Text style={styles.rowLabel}>{option.label}</Text>
-              {mode === option.id && <Check size={18} color={colors.text} strokeWidth={2} />}
+              {mode === option.id && <Check size={21} color={colors.text} strokeWidth={2} />}
             </Pressable>
           ))}
         </View>
@@ -85,6 +85,6 @@ function createStyles(colors: Colors) {
   },
   rowLast: { borderBottomWidth: 0 },
   rowLabel: { fontSize: 15, fontWeight: '600', color: colors.text },
-  hint: { fontSize: 12, color: colors.textFaint, marginTop: 10 },
+  hint: { fontSize: 14, color: colors.textFaint, marginTop: 10 },
   });
 }

@@ -58,7 +58,7 @@ function createStyles(colors: Colors) {
     },
     preview: { width: '100%', aspectRatio: 4 / 3, borderRadius: radius.sm },
     resetButton: { marginTop: 8, alignSelf: 'flex-start' },
-    resetButtonText: { fontSize: 13, color: colors.textMuted, fontWeight: '600' },
+    resetButtonText: { fontSize: 15, color: colors.textMuted, fontWeight: '600' },
     pickButton: {
       borderWidth: 1,
       borderColor: colors.border,

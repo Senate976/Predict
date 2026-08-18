@@ -33,7 +33,7 @@ export default function LegalScreen() {
               style={[styles.row, i === LEGAL_DOCS.length - 1 && styles.rowLast]}
             >
               <Text style={styles.rowText}>{doc.label}</Text>
-              <ChevronRight size={16} color={colors.icon} strokeWidth={1.75} />
+              <ChevronRight size={19} color={colors.icon} strokeWidth={1.75} />
             </Pressable>
           ))}
         </View>

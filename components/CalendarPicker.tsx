@@ -156,7 +156,7 @@ const CELL_SIZE = '14.2857%';
 
 function createStyles(colors: Colors) {
   return StyleSheet.create({
-  label: { fontSize: 12, color: colors.textFaint, marginBottom: 6 },
+  label: { fontSize: 14, color: colors.textFaint, marginBottom: 6 },
   field: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -171,7 +171,7 @@ function createStyles(colors: Colors) {
   fieldDisabled: { opacity: 0.6 },
   value: { fontSize: 16, color: colors.text },
   placeholder: { color: colors.textFaint },
-  chevron: { fontSize: 12, color: colors.textFaint, marginLeft: 8 },
+  chevron: { fontSize: 14, color: colors.textFaint, marginLeft: 8 },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(23, 21, 18, 0.4)',
@@ -198,7 +198,7 @@ function createStyles(colors: Colors) {
   weekday: {
     width: CELL_SIZE,
     textAlign: 'center',
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
     color: colors.textFaint,
     marginBottom: 6,

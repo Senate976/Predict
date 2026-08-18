@@ -186,7 +186,7 @@ function createStyles(colors: Colors) {
       backgroundColor: colors.dangerSoft,
       borderRadius: radius.sm,
       padding: 8,
-      fontSize: 12,
+      fontSize: 14,
       marginBottom: 6,
     },
     loader: { marginTop: 4 },
@@ -220,7 +220,7 @@ function createStyles(colors: Colors) {
       paddingVertical: 9,
     },
     sendButtonDisabled: { opacity: 0.5 },
-    sendButtonText: { fontSize: 13, fontWeight: '700', color: colors.accent },
+    sendButtonText: { fontSize: 15, fontWeight: '700', color: colors.accent },
     optionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
     optionChoice: {
       borderWidth: 1,
@@ -229,12 +229,12 @@ function createStyles(colors: Colors) {
       paddingHorizontal: 12,
       paddingVertical: 7,
     },
-    optionChoiceText: { fontSize: 13, fontWeight: '700', color: colors.accent },
+    optionChoiceText: { fontSize: 15, fontWeight: '700', color: colors.accent },
     // Option choisie, une fois répondu — plein plutôt que contour, même
     // registre que les autres choix affirmés dans l'app (Réalisé, Correcte).
     optionChoiceSelected: { backgroundColor: colors.accent },
     optionChoiceTextSelected: { color: colors.textOnAccent },
-    answeredLabel: { fontSize: 13, color: colors.textMuted, marginBottom: 6 },
+    answeredLabel: { fontSize: 15, color: colors.textMuted, marginBottom: 6 },
     answeredValue: { fontWeight: '700', color: colors.text },
   });
 }

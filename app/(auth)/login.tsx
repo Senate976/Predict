@@ -355,7 +355,7 @@ function createStyles(colors: Colors) {
   },
   field: { marginBottom: spacing.md },
   label: { ...eyebrow(colors), marginBottom: 6 },
-  fieldHint: { fontSize: 12, color: colors.textFaint, marginTop: 6 },
+  fieldHint: { fontSize: 14, color: colors.textFaint, marginTop: 6 },
   input: {
     borderWidth: 1,
     borderColor: colors.border,

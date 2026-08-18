@@ -36,7 +36,7 @@ export default function SettingsScreen() {
               style={[styles.row, i === SETTINGS_SECTIONS.length - 1 && styles.rowLast]}
             >
               <Text style={styles.rowText}>{section.label}</Text>
-              <ChevronRight size={16} color={colors.icon} strokeWidth={1.75} />
+              <ChevronRight size={19} color={colors.icon} strokeWidth={1.75} />
             </Pressable>
           ))}
         </View>
@@ -52,7 +52,7 @@ export default function SettingsScreen() {
                 {LEGAL_DOCS.map((d) => d.label).join(' · ')}
               </Text>
             </View>
-            <ChevronRight size={16} color={colors.icon} strokeWidth={1.75} />
+            <ChevronRight size={19} color={colors.icon} strokeWidth={1.75} />
           </Pressable>
         </View>
       </ScrollView>
@@ -96,6 +96,6 @@ function createStyles(colors: Colors) {
   },
   rowLast: { borderBottomWidth: 0 },
   rowText: { fontSize: 15, fontWeight: '600', color: colors.text },
-  rowHint: { fontSize: 12, color: colors.textFaint, marginTop: 2 },
+  rowHint: { fontSize: 14, color: colors.textFaint, marginTop: 2 },
   });
 }

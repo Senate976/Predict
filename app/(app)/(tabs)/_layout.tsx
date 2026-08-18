@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   badge: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
   },
   // Occupe le même emplacement flexible qu'un onglet normal dans la rangée
