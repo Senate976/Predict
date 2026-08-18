@@ -36,6 +36,23 @@ export async function updateEmail(email: string) {
   return supabase.auth.updateUser({ email: email.trim() });
 }
 
+/**
+ * Envoie le lien de réinitialisation. `redirectTo` ramène sur le site, où
+ * `consumeEmailConfirmationFromUrl` (lib/auth.tsx) ouvre une session de
+ * récupération : c'est cette session qui autorise ensuite `updatePassword`.
+ *
+ * Toujours annoncer un succès à l'appelant, même si l'adresse est inconnue —
+ * répondre « ce compte n'existe pas » permettrait à n'importe qui de tester des
+ * adresses pour savoir qui est inscrit. Supabase se comporte déjà ainsi.
+ */
+export async function sendPasswordReset(email: string) {
+  const redirectTo =
+    typeof window !== 'undefined' && window.location
+      ? `${window.location.origin}/reset-password`
+      : undefined;
+  return supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
+}
+
 export async function updatePassword(password: string) {
   return supabase.auth.updateUser({ password });
 }
@@ -64,6 +81,16 @@ export function authErrorMessage(error: AuthError): string {
  * autrement valide jusqu'à son expiration naturelle, alors que le compte
  * n'existe plus côté serveur.
  */
+/**
+ * Export de ses propres données (RGPD art. 20, droit à la portabilité) —
+ * pendant de `deleteOwnAccount`, qui couvrait déjà le droit à l'effacement.
+ * La fonction SQL filtre sur `auth.uid()` : on ne peut exporter que son compte.
+ */
+export async function exportOwnData() {
+  const { data, error } = await supabase.rpc('export_own_data');
+  return { data: data as unknown as Record<string, unknown> | null, error };
+}
+
 export async function deleteOwnAccount() {
   return supabase.rpc('delete_own_account');
 }

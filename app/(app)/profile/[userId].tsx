@@ -13,7 +13,12 @@ import { Text } from '../../../components/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
+import { Ban, Flag } from 'lucide-react-native';
+
 import { BottomNavBar } from '../../../components/BottomNavBar';
+import { ReportDialog } from '../../../components/ReportDialog';
+import { useAuth } from '../../../lib/auth';
+import { blockUser, isBlockedByMe, unblockUser } from '../../../lib/moderation';
 import { PredictWord } from '../../../components/PredictWord';
 import { PrediscoreGauge } from '../../../components/PrediscoreGauge';
 import { fetchProfileById, type FriendProfile } from '../../../lib/friends';
@@ -46,6 +51,11 @@ export default function FriendProfileScreen() {
   const [prediscoreError, setPrediscoreError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [avatarOpen, setAvatarOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [blocked, setBlocked] = useState(false);
+  const [blockPending, setBlockPending] = useState(false);
+  const { session } = useAuth();
+  const myId = session?.user.id;
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -57,6 +67,7 @@ export default function FriendProfileScreen() {
     }
     setError(null);
     setProfile(data);
+    if (myId) setBlocked(await isBlockedByMe(myId, userId));
 
     const [{ data: statsData }, { data: prediscoreData, error: prediscoreFetchError }] = await Promise.all([
       fetchPredictionStats(userId),
@@ -147,6 +158,48 @@ export default function FriendProfileScreen() {
                 </View>
               </View>
             )}
+
+            {/* Signaler et bloquer, en bas et en retrait : ce sont des recours,
+                pas des actions courantes. Jamais sur son propre profil. */}
+            {myId && myId !== userId && (
+              <View style={styles.moderation}>
+                <Pressable onPress={() => setReportOpen(true)} style={styles.moderationRow}>
+                  <Flag size={19} color={colors.icon} strokeWidth={1.75} />
+                  <Text style={styles.moderationText}>Signaler {profile.username}</Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={async () => {
+                    setBlockPending(true);
+                    if (blocked) {
+                      await unblockUser(myId, userId);
+                      setBlocked(false);
+                    } else {
+                      await blockUser(userId);
+                      setBlocked(true);
+                    }
+                    setBlockPending(false);
+                  }}
+                  disabled={blockPending}
+                  style={[styles.moderationRow, styles.moderationRowLast]}
+                >
+                  <Ban size={19} color={blocked ? colors.icon : colors.danger} strokeWidth={1.75} />
+                  <Text style={[styles.moderationText, !blocked && styles.moderationTextDanger]}>
+                    {blockPending
+                      ? 'Un instant…'
+                      : blocked
+                        ? `Débloquer ${profile.username}`
+                        : `Bloquer ${profile.username}`}
+                  </Text>
+                </Pressable>
+
+                <Text style={styles.moderationHint}>
+                  {blocked
+                    ? 'Vous ne voyez plus rien l’un de l’autre. Débloquer rétablit la situation ; il faudra redevenir amis.'
+                    : 'Bloquer coupe le lien des deux côtés : plus aucun Predict ni commentaire, et votre amitié est retirée.'}
+                </Text>
+              </View>
+            )}
           </>
         ) : null}
       </ScrollView>
@@ -167,6 +220,15 @@ export default function FriendProfileScreen() {
           )}
         </Pressable>
       </Modal>
+
+      {userId && myId && (
+        <ReportDialog
+          visible={reportOpen}
+          target={{ kind: 'user', id: userId }}
+          reporterId={myId}
+          onClose={() => setReportOpen(false)}
+        />
+      )}
 
       <BottomNavBar />
     </SafeAreaView>
@@ -217,6 +279,12 @@ function createStyles(colors: Colors) {
     borderColor: colors.border,
     alignItems: 'center',
   },
+  moderation: { marginTop: spacing.xl, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md },
+  moderationRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+  moderationRowLast: { paddingBottom: 6 },
+  moderationText: { fontSize: 16, color: colors.text },
+  moderationTextDanger: { color: colors.danger },
+  moderationHint: { fontSize: 14, color: colors.textFaint, lineHeight: 20, marginTop: 4 },
   statValue: { fontFamily: fonts.body, fontSize: 32, color: colors.text },
   statLabel: { fontSize: 14, color: colors.textFaint, marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 },
   error: {

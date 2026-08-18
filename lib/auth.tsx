@@ -68,6 +68,16 @@ async function consumeEmailConfirmationFromUrl() {
 
 type AuthContextValue = {
   session: Session | null;
+  /**
+   * `true` entre le clic sur un lien « mot de passe oublié » et l'enregistrement
+   * du nouveau mot de passe. Ce lien OUVRE une session : sans ce drapeau, la
+   * redirection normale (« session ⇒ va au Fil ») emmènerait l'utilisateur sur
+   * l'accueil sans jamais lui proposer de changer son mot de passe, et il se
+   * retrouverait connecté avec celui qu'il a précisément oublié.
+   */
+  recovering: boolean;
+  /** Referme la parenthèse de récupération, une fois le mot de passe changé. */
+  endRecovery: () => void;
   /** Username lu dans la table `profiles`, null tant qu'il n'est pas chargé. */
   username: string | null;
   /**
@@ -111,6 +121,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [loading, setLoading] = useState(true);
   const [reduceMotion, setReduceMotionState] = useState(false);
   const [defaultScope, setDefaultScopeState] = useState<PredictionScope | null>(null);
+  const [recovering, setRecovering] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -128,7 +139,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
     // Couvre login, logout, refresh de token et mise à jour utilisateur.
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      // Supabase émet `PASSWORD_RECOVERY` quand la session vient d'un lien de
+      // réinitialisation, et lui seul permet de distinguer ce cas d'une
+      // connexion ordinaire.
+      if (event === 'PASSWORD_RECOVERY') setRecovering(true);
       setSession(nextSession);
     });
 
@@ -209,6 +224,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
     <AuthContext.Provider
       value={{
         session,
+        recovering,
+        endRecovery: () => setRecovering(false),
         username,
         onboarded,
         markOnboarded,
