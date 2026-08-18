@@ -107,6 +107,33 @@ export async function fetchPredictionAnswers(predictionId: string) {
   return { data: answers, error: null };
 }
 
+/** Un votant, sans sa réponse — voir `fetchPredictionVoters`. */
+export type PredictionVoter = {
+  user_id: string;
+  username: string;
+  avatar_url: string | null;
+};
+
+/**
+ * Qui a répondu à un Sondage, avant Clôture — l'identité seule, jamais la
+ * réponse. Passe par la RPC `get_prediction_voters` : la RLS de
+ * `prediction_answers` masque la ligne entière tant que le Sondage n'est pas
+ * clos (pseudo compris), et c'est très bien ainsi — la fonction SQL, elle,
+ * ne sélectionne que `user_id`, `username` et `avatar_url`, si bien que le
+ * contenu des réponses ne peut pas fuiter, quoi qu'affiche l'app.
+ */
+export async function fetchPredictionVoters(predictionId: string) {
+  const { data, error } = await supabase.rpc('get_prediction_voters', {
+    p_prediction_id: predictionId,
+  });
+
+  // `rpc()` type la sortie comme une ligne unique alors que la fonction SQL
+  // en renvoie un ensemble (`returns table`) : sans types générés depuis la
+  // base, TypeScript ne peut pas le deviner. D'où ce recadrage explicite, le
+  // même que pour n'importe quelle liste renvoyée par une RPC.
+  return { data: (data as unknown as PredictionVoter[] | null) ?? null, error };
+}
+
 /**
  * Répond à une Question — définitif, un seul appel réussi par personne.
  * Fournir `text` ou `optionId` selon le format de la Question —

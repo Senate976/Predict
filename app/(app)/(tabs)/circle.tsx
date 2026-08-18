@@ -510,7 +510,7 @@ export default function CircleScreen() {
                       onPress={() => router.push(`/profile/${profile.id}`)}
                       style={styles.usernameRow}
                     >
-                      <Avatar url={profile.avatar_url} username={profile.username} size={28} />
+                      <Avatar url={profile.avatar_url} username={profile.username} size={56} />
                       <Text style={styles.username}>{profile.username}</Text>
                     </Pressable>
                     <Pressable
@@ -640,7 +640,7 @@ export default function CircleScreen() {
                             return (
                               <View key={profile.id} style={styles.row}>
                                 <View style={styles.usernameRow}>
-                                  <Avatar url={profile.avatar_url} username={profile.username} size={28} />
+                                  <Avatar url={profile.avatar_url} username={profile.username} size={56} />
                                   <Text style={styles.username}>{profile.username}</Text>
                                   {member?.status === 'accepted' && (
                                     <Text style={styles.groupScore}>
