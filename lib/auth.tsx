@@ -3,12 +3,14 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type PropsWithChildren,
 } from 'react';
 import { Platform } from 'react-native';
 
 import type { PredictionScope } from './predictions';
+import { registerForPush, unregisterPush } from './push';
 import { supabase } from './supabase';
 
 const VALID_OTP_TYPES = new Set([
@@ -68,6 +70,16 @@ async function consumeEmailConfirmationFromUrl() {
 
 type AuthContextValue = {
   session: Session | null;
+  /**
+   * `true` entre le clic sur un lien « mot de passe oublié » et l'enregistrement
+   * du nouveau mot de passe. Ce lien OUVRE une session : sans ce drapeau, la
+   * redirection normale (« session ⇒ va au Fil ») emmènerait l'utilisateur sur
+   * l'accueil sans jamais lui proposer de changer son mot de passe, et il se
+   * retrouverait connecté avec celui qu'il a précisément oublié.
+   */
+  recovering: boolean;
+  /** Referme la parenthèse de récupération, une fois le mot de passe changé. */
+  endRecovery: () => void;
   /** Username lu dans la table `profiles`, null tant qu'il n'est pas chargé. */
   username: string | null;
   /**
@@ -111,6 +123,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [loading, setLoading] = useState(true);
   const [reduceMotion, setReduceMotionState] = useState(false);
   const [defaultScope, setDefaultScopeState] = useState<PredictionScope | null>(null);
+  const [recovering, setRecovering] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -128,7 +141,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
     // Couvre login, logout, refresh de token et mise à jour utilisateur.
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      // Supabase émet `PASSWORD_RECOVERY` quand la session vient d'un lien de
+      // réinitialisation, et lui seul permet de distinguer ce cas d'une
+      // connexion ordinaire.
+      if (event === 'PASSWORD_RECOVERY') setRecovering(true);
       setSession(nextSession);
     });
 
@@ -179,7 +196,36 @@ export function AuthProvider({ children }: PropsWithChildren) {
     };
   }, [userId]);
 
+  /**
+   * Enregistre l'appareil pour les notifications push, une fois connecté.
+   *
+   * Le jeton est conservé ici pour pouvoir le retirer à la déconnexion : sans
+   * ça, l'appareil continuerait de recevoir les notifications du compte
+   * précédent — y compris si quelqu'un d'autre se connecte dessus.
+   */
+  const pushTokenRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    registerForPush(userId).then((result) => {
+      if (cancelled) return;
+      if (result.status === 'ok') pushTokenRef.current = result.token;
+      // Un refus ou un environnement sans push (web, simulateur, projet EAS pas
+      // encore lié) n'est pas une anomalie : l'app fonctionne sans, les
+      // notifications restent visibles dans l'onglet dédié.
+      else if (result.status === 'error') console.warn('Notifications push :', result.message);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
   const signOut = async () => {
+    if (pushTokenRef.current) {
+      await unregisterPush(pushTokenRef.current);
+      pushTokenRef.current = null;
+    }
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   };
@@ -209,6 +255,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
     <AuthContext.Provider
       value={{
         session,
+        recovering,
+        endRecovery: () => setRecovering(false),
         username,
         onboarded,
         markOnboarded,

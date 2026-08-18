@@ -17,7 +17,7 @@ import { lightColors, type Colors } from '../lib/theme';
 import { ThemeModeProvider, useColors, useThemeMode } from '../lib/themeMode';
 
 function RootNavigator() {
-  const { session, loading } = useAuth();
+  const { session, loading, recovering } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   const { mode } = useThemeMode();
@@ -31,12 +31,21 @@ function RootNavigator() {
 
     const inAuthGroup = segments[0] === '(auth)';
 
+    // Récupération de mot de passe : le lien reçu par email ouvre une vraie
+    // session, mais l'utilisateur ne connaît toujours pas son mot de passe. On
+    // l'envoie donc choisir le nouveau AVANT toute autre chose, au lieu de le
+    // déposer sur le Fil comme n'importe quelle connexion.
+    if (recovering) {
+      if (segments[1] !== 'reset-password') router.replace('/reset-password');
+      return;
+    }
+
     if (!session && !inAuthGroup) {
       router.replace('/login');
     } else if (session && inAuthGroup) {
       router.replace('/');
     }
-  }, [session, loading, segments, router]);
+  }, [session, loading, recovering, segments, router]);
 
   if (loading) {
     return (

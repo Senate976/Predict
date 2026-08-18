@@ -1,5 +1,6 @@
 import type { AuthError, PostgrestError } from '@supabase/supabase-js';
 import { Check, Eye, EyeOff, X } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -17,6 +18,7 @@ import { PredictWord } from '../../components/PredictWord';
 import { Text } from '../../components/Text';
 import { TextInput } from '../../components/TextInput';
 import { LEGAL_CONTENT } from '../../lib/legalContent';
+import { MIN_PASSWORD_LENGTH, PASSWORD_RULES, passwordIssues } from '../../lib/password';
 import { DEFAULT_NOTIFICATION_PREFS } from '../../lib/settings';
 import type { LegalDocId } from '../../lib/settingsSections';
 import { supabase } from '../../lib/supabase';
@@ -25,25 +27,8 @@ import { useColors } from '../../lib/themeMode';
 
 type Mode = 'signIn' | 'signUp';
 
-const MIN_PASSWORD_LENGTH = 8;
 const MIN_USERNAME_LENGTH = 3;
 const MAX_USERNAME_LENGTH = 20;
-
-/**
- * Les exigences du mot de passe, énoncées une seule fois et vérifiées à
- * l'affichage comme à la validation. Une seule liste : impossible d'afficher
- * une règle que le code ne contrôle pas, ou l'inverse.
- */
-const PASSWORD_RULES: { label: string; test: (value: string) => boolean }[] = [
-  { label: `${MIN_PASSWORD_LENGTH} caractères minimum`, test: (v) => v.length >= MIN_PASSWORD_LENGTH },
-  { label: 'Une lettre', test: (v) => /[a-zA-Z]/.test(v) },
-  { label: 'Un chiffre', test: (v) => /[0-9]/.test(v) },
-  { label: 'Un signe (! ? * - … )', test: (v) => /[^a-zA-Z0-9]/.test(v) },
-];
-
-function passwordIssues(value: string): string[] {
-  return PASSWORD_RULES.filter((rule) => !rule.test(value)).map((rule) => rule.label);
-}
 
 /** Détecte les échecs réseau, qui remontent en anglais depuis fetch. */
 function isNetworkFailure(message: string): boolean {
@@ -127,6 +112,7 @@ function Checkbox({ checked }: { checked: boolean }) {
 }
 
 export default function LoginScreen() {
+  const router = useRouter();
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [mode, setMode] = useState<Mode>('signUp');
@@ -481,6 +467,18 @@ export default function LoginScreen() {
               )}
             </Pressable>
 
+            {/* Uniquement en mode connexion : à l'inscription, il n'y a pas
+                encore de mot de passe à oublier. */}
+            {!isSignUp && (
+              <Pressable
+                onPress={() => router.push('/forgot-password')}
+                disabled={submitting}
+                style={styles.forgot}
+              >
+                <Text style={styles.forgotText}>Mot de passe oublié ?</Text>
+              </Pressable>
+            )}
+
             <Pressable onPress={switchMode} disabled={submitting} style={styles.switch}>
               <Text style={styles.switchText}>
                 {isSignUp
@@ -649,6 +647,8 @@ function createStyles(colors: Colors) {
   submitDisabled: { opacity: 0.6 },
   // Texte sombre sur le bouton jaune — `text` (blanc en mode sombre) y serait peu lisible.
   submitText: { fontFamily: fonts.sansBold, color: colors.textOnAccent, fontSize: 16, textTransform: 'uppercase', letterSpacing: 0.5 },
+  forgot: { marginTop: 16, alignItems: 'center' },
+  forgotText: { fontSize: 15, color: colors.textMuted, textDecorationLine: 'underline' },
   switch: { marginTop: 18, alignItems: 'center' },
   switchText: { fontFamily: fonts.bodyEmphasis, color: colors.text, fontSize: 15 },
   legalFootnote: {

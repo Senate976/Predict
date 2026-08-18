@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import {
   Eye,
   EyeOff,
+  Flag,
   MessageCircle,
   MoreHorizontal,
   Star,
@@ -63,6 +64,7 @@ import { InlineComments } from './InlineComments';
 import { InlineQuestionAnswer } from './InlineQuestionAnswer';
 import { PhotoAttachButton } from './PhotoAttachButton';
 import { PredictionPhoto } from './PredictionPhoto';
+import { ReportDialog } from './ReportDialog';
 
 /** Géométrie de la bulle de réactions : 12 emojis sur 2 rangées de 6 plutôt
  * qu'une seule rangée trop dense. La largeur est DÉDUITE du reste plutôt que
@@ -278,6 +280,7 @@ export function PredictionCard({
   // derrière doivent la suivre — à hauteur figée, elles s'arrêtaient en plein
   // milieu.
   const [letterHeight, setLetterHeight] = useState(0);
+  const [reportOpen, setReportOpen] = useState(false);
   const env = useMemo(() => {
     const W = envelopeWidth;
     const H = W / ENVELOPE_RATIO;
@@ -1215,6 +1218,19 @@ export function PredictionCard({
               <Text style={styles.cardMenuRowText}>{isHidden ? 'Afficher à nouveau' : 'Masquer'}</Text>
             </Pressable>
 
+            {!isAuthor && (
+              <Pressable
+                onPress={() => {
+                  setMenuOpen(false);
+                  setReportOpen(true);
+                }}
+                style={styles.cardMenuRow}
+              >
+                <Flag size={21} color={colors.icon} strokeWidth={1.75} />
+                <Text style={styles.cardMenuRowText}>Signaler</Text>
+              </Pressable>
+            )}
+
             {isAuthor && onDelete && (
               <Pressable
                 onPress={() => {
@@ -1266,6 +1282,15 @@ export function PredictionCard({
           </Pressable>
         </Pressable>
       </Modal>
+
+      {userId && (
+        <ReportDialog
+          visible={reportOpen}
+          target={{ kind: 'prediction', id: item.id }}
+          reporterId={userId}
+          onClose={() => setReportOpen(false)}
+        />
+      )}
     </View>
   );
 }

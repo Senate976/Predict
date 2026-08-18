@@ -1,3 +1,4 @@
+import { PUBLISHER, publisherLine } from './publisherIdentity';
 import type { LegalDocId } from './settingsSections';
 
 export type LegalSection = { heading: string; paragraphs: string[] };
@@ -6,11 +7,13 @@ export type LegalDocContent = { updatedAt: string; intro?: string; sections: Leg
 /**
  * Contenu des 3 documents légaux — un premier jet complet et cohérent avec
  * le fonctionnement réel de l'app, PAS une version validée par un juriste.
- * Les passages entre crochets (ex. `[Nom de l'éditeur]`) sont des
- * informations que seul l'exploitant de l'app peut fournir (identité,
- * adresse, hébergeur, contact) — à remplacer avant toute mise en production,
- * les Mentions légales notamment étant une obligation légale (LCEN art. 6-III)
- * qu'aucun texte générique ne peut satisfaire à la place de ces informations.
+ *
+ * Les informations propres à l'exploitant (identité, adresse, hébergeur,
+ * contact) ne sont plus écrites en dur ici : elles viennent toutes de
+ * `lib/publisherIdentity.ts`, seul fichier à remplir. Tant qu'il ne l'est pas,
+ * l'écran des documents légaux affiche un avertissement bien visible — les
+ * Mentions légales sont une obligation (LCEN art. 6-III) qu'aucun texte
+ * générique ne peut satisfaire à la place de ces informations.
  */
 export const LEGAL_CONTENT: Record<LegalDocId, LegalDocContent> = {
   mentions: {
@@ -19,16 +22,16 @@ export const LEGAL_CONTENT: Record<LegalDocId, LegalDocContent> = {
       {
         heading: 'Éditeur de l’application',
         paragraphs: [
-          'L’application Predict est éditée par [Nom de l’éditeur — personne physique ou raison sociale], [forme juridique le cas échéant], au capital de [montant] €, immatriculée sous le numéro SIRET [numéro], dont le siège est situé [adresse complète].',
-          'Directeur de la publication : [Nom, prénom].',
-          'Contact : [adresse email de contact].',
+          `L’application Predict est éditée par ${publisherLine()}, immatriculée sous le numéro SIRET ${PUBLISHER.siret}, dont le siège est situé ${PUBLISHER.address}.`,
+          `Directeur de la publication : ${PUBLISHER.publicationDirector}.`,
+          `Contact : ${PUBLISHER.contactEmail}.`,
         ],
       },
       {
         heading: 'Hébergement',
         paragraphs: [
           'Les données de l’application (comptes, prédictions, commentaires, notifications) sont hébergées et gérées via Supabase (base de données PostgreSQL et authentification), fourni par Supabase Inc.',
-          'L’application elle-même (site web et/ou distribution mobile) est hébergée par [nom et adresse de l’hébergeur].',
+          `L’application elle-même (site web et/ou distribution mobile) est hébergée par ${PUBLISHER.host}.`,
         ],
       },
       {
@@ -46,7 +49,7 @@ export const LEGAL_CONTENT: Record<LegalDocId, LegalDocContent> = {
       },
       {
         heading: 'Contact',
-        paragraphs: ['Pour toute question relative à ces mentions légales : [adresse email de contact].'],
+        paragraphs: [`Pour toute question relative à ces mentions légales : ${PUBLISHER.contactEmail}.`],
       },
     ],
   },
@@ -114,12 +117,12 @@ export const LEGAL_CONTENT: Record<LegalDocId, LegalDocContent> = {
       {
         heading: '9. Droit applicable',
         paragraphs: [
-          'Les présentes CGU sont soumises au droit français. Tout litige relève, à défaut de résolution amiable, des tribunaux compétents du ressort de [ville, à préciser selon le siège de l’éditeur].',
+          `Les présentes CGU sont soumises au droit français. Tout litige relève, à défaut de résolution amiable, des tribunaux compétents du ressort de ${PUBLISHER.jurisdictionCity}.`,
         ],
       },
       {
         heading: '10. Contact',
-        paragraphs: ['Pour toute question relative aux présentes CGU : [adresse email de contact].'],
+        paragraphs: [`Pour toute question relative aux présentes CGU : ${PUBLISHER.contactEmail}.`],
       },
     ],
   },
@@ -131,7 +134,7 @@ export const LEGAL_CONTENT: Record<LegalDocId, LegalDocContent> = {
       {
         heading: '1. Responsable du traitement',
         paragraphs: [
-          '[Nom de l’éditeur], dont les coordonnées figurent dans les Mentions légales, est responsable du traitement des données décrites ici.',
+          `${publisherLine()}, dont les coordonnées figurent dans les Mentions légales, est responsable du traitement des données décrites ici.`,
         ],
       },
       {
@@ -175,13 +178,13 @@ export const LEGAL_CONTENT: Record<LegalDocId, LegalDocContent> = {
         paragraphs: [
           'Conformément au RGPD, tu disposes d’un droit d’accès, de rectification, d’effacement, de portabilité et d’opposition sur tes données personnelles.',
           'Le pseudo, l’email, la photo de profil et les préférences se modifient directement depuis Paramètres > Compte. La suppression complète du compte (droit à l’effacement) se fait depuis Paramètres > Sécurité.',
-          'Pour toute autre demande relative à tes droits, contacte [adresse email de contact]. Tu disposes aussi du droit d’introduire une réclamation auprès de la CNIL (www.cnil.fr).',
+          `Pour toute autre demande relative à tes droits, contacte ${PUBLISHER.contactEmail}. Tu disposes aussi du droit d’introduire une réclamation auprès de la CNIL (www.cnil.fr).`,
         ],
       },
       {
         heading: '8. Transferts hors Union européenne',
         paragraphs: [
-          '[À préciser selon la région d’hébergement choisie dans Supabase : si les données sont hébergées hors de l’Union européenne, les garanties mises en place (clauses contractuelles types ou équivalent) doivent être indiquées ici.]',
+          `Région d’hébergement : ${PUBLISHER.dataRegion}. Si elle se situe hors de l’Union européenne, les garanties de transfert (clauses contractuelles types ou équivalent) doivent être précisées ici.`,
         ],
       },
       {

@@ -5,8 +5,9 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '../../../../components/Text';
 
+import { isPublisherIdentityComplete, missingPublisherFields } from '../../../../lib/publisherIdentity';
 import { LEGAL_DOCS } from '../../../../lib/settingsSections';
-import { fonts, spacing, type Colors } from '../../../../lib/theme';
+import { fonts, radius, spacing, type Colors } from '../../../../lib/theme';
 import { useColors } from '../../../../lib/themeMode';
 
 export default function LegalScreen() {
@@ -25,6 +26,18 @@ export default function LegalScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
+        {/* Visible tant que `lib/publisherIdentity.ts` n'est pas rempli. Mieux
+            vaut un avertissement gênant en développement qu'une mention légale
+            à trous découverte une fois l'app publique. */}
+        {!isPublisherIdentityComplete() && (
+          <Text style={styles.incomplete}>
+            Ces documents sont incomplets : {missingPublisherFields().length} information(s)
+            d’identité de l’éditeur restent à renseigner dans{' '}
+            <Text style={styles.mono}>lib/publisherIdentity.ts</Text>. Les mentions légales
+            sont une obligation avant toute mise en ligne publique.
+          </Text>
+        )}
+
         <View style={styles.group}>
           {LEGAL_DOCS.map((doc, i) => (
             <Pressable
@@ -58,6 +71,18 @@ function createStyles(colors: Colors) {
   back: { fontSize: 15, color: colors.text, width: 56 },
   headerSpacer: { width: 56 },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
+  incomplete: {
+    color: colors.text,
+    backgroundColor: colors.dangerSoft,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.danger,
+    borderRadius: radius.sm,
+    padding: 14,
+    fontSize: 14,
+    lineHeight: 21,
+    marginBottom: spacing.md,
+  },
+  mono: { fontFamily: fonts.label },
   group: {
     borderRadius: 16,
     backgroundColor: colors.surface,

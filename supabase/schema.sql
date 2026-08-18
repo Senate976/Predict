@@ -5360,7 +5360,397 @@ alter table public.notifications add constraint notifications_type_check
   ));
 
 -- ---------------------------------------------------------------------------
--- 55. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 55. Blocage entre utilisateurs
+-- ---------------------------------------------------------------------------
+--
+-- Bloquer quelqu'un doit couper le lien DANS LES DEUX SENS, sans quoi le
+-- blocage n'est qu'un filtre d'affichage : la personne bloquée continuerait de
+-- voir vos prédictions et de vous écrire. Une seule ligne (bloqueur, bloqué)
+-- suffit donc à rendre les deux invisibles l'un à l'autre — c'est
+-- `is_blocked_pair` ci-dessous qui teste la paire, quel que soit le sens.
+--
+-- Le blocage ne supprime rien : les prédictions et commentaires existants
+-- restent en base (ils appartiennent à leur auteur), ils cessent simplement
+-- d'être visibles de l'autre côté. Débloquer les fait donc réapparaître.
+create table if not exists public.blocked_users (
+  blocker_id uuid not null references public.profiles (id) on delete cascade,
+  blocked_id uuid not null references public.profiles (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (blocker_id, blocked_id),
+  constraint blocked_users_not_self check (blocker_id <> blocked_id)
+);
+
+-- Index dans l'autre sens : `is_blocked_pair` interroge la table par l'un ou
+-- l'autre des deux identifiants, la clé primaire ne couvre que le premier.
+create index if not exists blocked_users_blocked_idx
+  on public.blocked_users (blocked_id);
+
+alter table public.blocked_users enable row level security;
+
+-- Chacun gère sa propre liste, et ne voit qu'elle : savoir qui vous a bloqué
+-- n'apporte rien et attise les conflits.
+drop policy if exists "blocked_users_select_own" on public.blocked_users;
+create policy "blocked_users_select_own"
+  on public.blocked_users for select to authenticated
+  using (blocker_id = auth.uid());
+
+drop policy if exists "blocked_users_insert_own" on public.blocked_users;
+create policy "blocked_users_insert_own"
+  on public.blocked_users for insert to authenticated
+  with check (blocker_id = auth.uid());
+
+drop policy if exists "blocked_users_delete_own" on public.blocked_users;
+create policy "blocked_users_delete_own"
+  on public.blocked_users for delete to authenticated
+  using (blocker_id = auth.uid());
+
+-- `security definer` : appelée depuis les policies de `predictions` et
+-- `prediction_comments`. Sans ça, son propre select redéclencherait la RLS de
+-- `blocked_users` (qui ne rend que les lignes du bloqueur), et un blocage ne
+-- fonctionnerait donc que dans un seul sens.
+create or replace function public.is_blocked_pair(p_a uuid, p_b uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.blocked_users
+    where (blocker_id = p_a and blocked_id = p_b)
+       or (blocker_id = p_b and blocked_id = p_a)
+  );
+$$;
+
+revoke all on function public.is_blocked_pair(uuid, uuid) from public;
+grant execute on function public.is_blocked_pair(uuid, uuid) to authenticated;
+
+-- La policy de lecture des prédictions intègre désormais le blocage. On la
+-- repose en entier (plutôt qu'en ajouter une seconde) : deux policies SELECT
+-- sur une même table se combinent avec OU, ce qui laisserait passer tout ce
+-- que l'ancienne autorisait — l'exclusion doit être dans la même expression.
+drop policy if exists "predictions_select_visible" on public.predictions;
+create policy "predictions_select_visible"
+  on public.predictions
+  for select
+  to authenticated
+  using (
+    (
+      author_id = auth.uid()
+      or public.has_prediction_access(id, auth.uid())
+    )
+    and not public.is_blocked_pair(author_id, auth.uid())
+  );
+
+-- Même chose pour les commentaires : bloquer quelqu'un doit aussi faire taire
+-- ses commentaires sous une prédiction qu'on partage encore.
+drop policy if exists "prediction_comments_select" on public.prediction_comments;
+create policy "prediction_comments_select"
+  on public.prediction_comments
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1 from public.predictions p
+      where p.id = prediction_comments.prediction_id
+        and (p.author_id = auth.uid() or public.has_prediction_access(p.id, auth.uid()))
+    )
+    and not public.is_blocked_pair(author_id, auth.uid())
+  );
+
+-- Bloquer défait aussi le lien d'amitié et retire les accès déjà accordés :
+-- laisser la relation en place rendrait le blocage réversible à l'insu du
+-- bloqueur (une prédiction créée « pour mes amis » ré-inclurait la personne).
+create or replace function public.block_user(p_target uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if p_target = auth.uid() then
+    return;
+  end if;
+
+  insert into public.blocked_users (blocker_id, blocked_id)
+  values (auth.uid(), p_target)
+  on conflict do nothing;
+
+  delete from public.friendships
+  where (requester_id = auth.uid() and addressee_id = p_target)
+     or (requester_id = p_target and addressee_id = auth.uid());
+
+  -- Accès déjà accordés, dans les deux sens.
+  delete from public.prediction_access pa
+  using public.predictions p
+  where pa.prediction_id = p.id
+    and (
+      (p.author_id = auth.uid() and pa.user_id = p_target)
+      or (p.author_id = p_target and pa.user_id = auth.uid())
+    );
+end;
+$$;
+
+revoke all on function public.block_user(uuid) from public;
+grant execute on function public.block_user(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 56. Signalement de contenu
+-- ---------------------------------------------------------------------------
+--
+-- Obligation des magasins d'applications dès lors que des utilisateurs
+-- publient du contenu (App Store, règle 1.2) : il doit exister un moyen de
+-- signaler un abus. Au-delà de la règle, c'est le seul outil qui permette de
+-- réagir à un usage malveillant.
+--
+-- `resolved_at` reste `null` tant que personne n'a traité le signalement. La
+-- modération se fait pour l'instant depuis le dashboard Supabase — pas
+-- d'interface dédiée, ce serait prématuré, mais la donnée est là et propre.
+create table if not exists public.reports (
+  id uuid primary key default gen_random_uuid(),
+  reporter_id uuid not null references public.profiles (id) on delete cascade,
+  -- Exactement l'un des trois, selon ce qui est signalé.
+  prediction_id uuid references public.predictions (id) on delete cascade,
+  comment_id uuid references public.prediction_comments (id) on delete cascade,
+  reported_user_id uuid references public.profiles (id) on delete cascade,
+  reason text not null,
+  details text,
+  created_at timestamptz not null default now(),
+  resolved_at timestamptz,
+  constraint reports_reason_valid check (reason in (
+    'harcelement', 'haine', 'sexuel', 'violence', 'spam', 'usurpation', 'autre'
+  )),
+  constraint reports_details_length check (details is null or length(details) <= 500),
+  constraint reports_one_target check (
+    (prediction_id is not null)::int
+    + (comment_id is not null)::int
+    + (reported_user_id is not null)::int = 1
+  )
+);
+
+-- Un même contenu ne peut être signalé qu'une fois par la même personne :
+-- signaler dix fois n'ajoute aucune information et fausserait tout comptage.
+create unique index if not exists reports_unique_prediction
+  on public.reports (reporter_id, prediction_id) where prediction_id is not null;
+create unique index if not exists reports_unique_comment
+  on public.reports (reporter_id, comment_id) where comment_id is not null;
+create unique index if not exists reports_unique_user
+  on public.reports (reporter_id, reported_user_id) where reported_user_id is not null;
+
+alter table public.reports enable row level security;
+
+-- On signale, on ne relit pas : aucune policy de select pour les utilisateurs.
+-- Laisser quelqu'un consulter ses signalements n'apporte rien et exposerait
+-- l'état de traitement, qui ne le regarde pas.
+drop policy if exists "reports_insert_own" on public.reports;
+create policy "reports_insert_own"
+  on public.reports for insert to authenticated
+  with check (reporter_id = auth.uid());
+
+-- ---------------------------------------------------------------------------
+-- 57. Export de ses propres données (RGPD art. 20)
+-- ---------------------------------------------------------------------------
+--
+-- Pendant de `delete_own_account` : le droit à l'effacement était couvert, pas
+-- celui à la portabilité. Renvoie tout ce que l'utilisateur a produit, dans un
+-- seul JSON lisible et réutilisable.
+--
+-- `security definer` pour rassembler des lignes que la RLS disperse (ses
+-- réponses à des Sondages non clos, par exemple, qu'il a pourtant bien
+-- écrites) — mais chaque requête est filtrée sur `auth.uid()`, jamais sur un
+-- identifiant fourni par l'appelant : impossible d'exporter le compte d'un
+-- autre.
+create or replace function public.export_own_data()
+returns jsonb
+language sql
+security definer
+stable
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'exporte_le', now(),
+    'profil', (
+      select to_jsonb(p) - 'id'
+      from public.profiles p where p.id = auth.uid()
+    ),
+    'predictions', coalesce((
+      select jsonb_agg(to_jsonb(p) order by p.created_at)
+      from public.predictions p where p.author_id = auth.uid()
+    ), '[]'::jsonb),
+    'commentaires', coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'prediction_id', c.prediction_id, 'contenu', c.content, 'ecrit_le', c.created_at
+      ) order by c.created_at)
+      from public.prediction_comments c where c.author_id = auth.uid()
+    ), '[]'::jsonb),
+    'reponses_aux_sondages', coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'prediction_id', a.prediction_id, 'reponse', a.answer_text,
+        'option_id', a.option_id, 'repondu_le', a.created_at
+      ) order by a.created_at)
+      from public.prediction_answers a where a.user_id = auth.uid()
+    ), '[]'::jsonb),
+    'reactions', coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'prediction_id', r.prediction_id, 'emoji', r.emoji
+      ))
+      from public.prediction_emoji_reactions r where r.user_id = auth.uid()
+    ), '[]'::jsonb),
+    'amis', coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'pseudo', pr.username, 'statut', f.status, 'depuis', f.created_at
+      ))
+      from public.friendships f
+      join public.profiles pr
+        on pr.id = case when f.requester_id = auth.uid() then f.addressee_id else f.requester_id end
+      where f.requester_id = auth.uid() or f.addressee_id = auth.uid()
+    ), '[]'::jsonb)
+  );
+$$;
+
+revoke all on function public.export_own_data() from public;
+grant execute on function public.export_own_data() to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 58. Notifications push : jetons d'appareil et déclenchement planifié
+-- ---------------------------------------------------------------------------
+--
+-- Jusqu'ici, une « notification » était une ligne de table, créée seulement
+-- quand quelqu'un ouvrait le Fil (`generate_reveal_notifications` &co. sont
+-- appelées par le client). Deux conséquences : rien n'arrivait jamais sur un
+-- téléphone verrouillé, et si personne n'ouvrait l'app pendant une semaine,
+-- aucune révélation n'était constatée pendant une semaine — alors que toute la
+-- promesse du produit est « le 12 mars, tu sauras ».
+--
+-- Cette section corrige la cause : les jetons d'appareil sont stockés, et la
+-- génération est planifiée côté serveur.
+
+create table if not exists public.push_tokens (
+  -- Le jeton lui-même est la clé : un même appareil réinstallé en reçoit un
+  -- nouveau, et un jeton ne peut appartenir qu'à un compte à la fois (se
+  -- déconnecter puis reconnecter avec un autre compte doit le réattribuer,
+  -- pas le dupliquer — d'où l'upsert côté app).
+  token text primary key,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  platform text not null check (platform in ('ios', 'android', 'web')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists push_tokens_user_idx on public.push_tokens (user_id);
+
+alter table public.push_tokens enable row level security;
+
+drop policy if exists "push_tokens_select_own" on public.push_tokens;
+create policy "push_tokens_select_own"
+  on public.push_tokens for select to authenticated
+  using (user_id = auth.uid());
+
+drop policy if exists "push_tokens_insert_own" on public.push_tokens;
+create policy "push_tokens_insert_own"
+  on public.push_tokens for insert to authenticated
+  with check (user_id = auth.uid());
+
+drop policy if exists "push_tokens_update_own" on public.push_tokens;
+create policy "push_tokens_update_own"
+  on public.push_tokens for update to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+drop policy if exists "push_tokens_delete_own" on public.push_tokens;
+create policy "push_tokens_delete_own"
+  on public.push_tokens for delete to authenticated
+  using (user_id = auth.uid());
+
+-- Marque qu'une notification a été poussée, pour ne pas la renvoyer à chaque
+-- passage de la tâche planifiée. `null` = jamais poussée.
+alter table public.notifications add column if not exists pushed_at timestamptz;
+
+-- Ce que la fonction d'envoi doit expédier : les notifications jamais poussées,
+-- avec le jeton de chaque appareil du destinataire. Récente uniquement (24 h) :
+-- réveiller quelqu'un pour une révélation d'il y a trois jours n'a pas de sens,
+-- et évite un envoi massif au premier déploiement.
+create or replace function public.pending_push_notifications()
+returns table (
+  notification_id uuid,
+  token text,
+  platform text,
+  type text,
+  teaser text,
+  author_username text
+)
+language sql
+security definer
+stable
+set search_path = ''
+as $$
+  select n.id, t.token, t.platform, n.type, p.teaser, pr.username
+  from public.notifications n
+  join public.push_tokens t on t.user_id = n.user_id
+  left join public.predictions p on p.id = n.prediction_id
+  left join public.profiles pr on pr.id = p.author_id
+  where n.pushed_at is null
+    and not n.is_dismissed
+    and n.created_at > now() - interval '24 hours'
+  order by n.created_at;
+$$;
+
+revoke all on function public.pending_push_notifications() from public;
+grant execute on function public.pending_push_notifications() to service_role;
+
+create or replace function public.mark_notifications_pushed(p_ids uuid[])
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  update public.notifications set pushed_at = now() where id = any(p_ids);
+$$;
+
+revoke all on function public.mark_notifications_pushed(uuid[]) from public;
+grant execute on function public.mark_notifications_pushed(uuid[]) to service_role;
+
+-- Regroupe les trois générateurs, pour n'avoir qu'un seul appel à planifier.
+create or replace function public.generate_all_notifications()
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform public.generate_reveal_notifications();
+  perform public.generate_reveal_reminders();
+  perform public.generate_open_reminders();
+end;
+$$;
+
+revoke all on function public.generate_all_notifications() from public;
+grant execute on function public.generate_all_notifications() to authenticated, service_role;
+
+-- Planification côté serveur, indépendante de qui ouvre l'app. `pg_cron` n'est
+-- pas activé par défaut sur tous les plans Supabase : le bloc échoue en silence
+-- plutôt que d'interrompre tout le script, et un message explique quoi faire.
+-- Sans lui, l'app continue de fonctionner exactement comme avant (génération au
+-- chargement du Fil) — c'est une amélioration, pas une dépendance.
+do $$
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.unschedule('predict_generate_notifications')
+      where exists (select 1 from cron.job where jobname = 'predict_generate_notifications');
+    perform cron.schedule(
+      'predict_generate_notifications',
+      '*/5 * * * *',
+      $cron$ select public.generate_all_notifications(); $cron$
+    );
+    raise notice 'pg_cron : generation des notifications planifiee toutes les 5 minutes.';
+  else
+    raise notice 'pg_cron absent : les notifications restent generees a l ouverture du Fil. Pour les planifier, activer l extension pg_cron (Database > Extensions) puis rejouer ce fichier.';
+  end if;
+exception when others then
+  raise notice 'pg_cron non configurable ici (%). Les notifications restent generees a l ouverture du Fil.', sqlerrm;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 59. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une
