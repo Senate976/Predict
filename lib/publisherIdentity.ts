@@ -46,10 +46,10 @@ export const PUBLISHER: { kind: PublisherKind } & Record<string, string> = {
 
   // --- Requis dans tous les cas ------------------------------------------
   /** Adresse de contact, réellement relevée. Sert aussi aux demandes RGPD. */
-  contactEmail: 'À COMPLÉTER — email de contact',
+  contactEmail: 'vverbeke40@gmail.com',
   /** Hébergeur (nom + adresse). Pour Vercel :
    * « Vercel Inc., 440 N Barranca Ave #4133, Covina, CA 91723, États-Unis ». */
-  host: 'À COMPLÉTER — nom et adresse de l’hébergeur',
+  host: 'Vercel Inc., 440 N Barranca Ave #4133, Covina, CA 91723, États-Unis',
   /** Région Supabase où sont stockées les données (Project Settings → General).
    * Si elle est hors Union européenne, les garanties de transfert doivent être
    * décrites dans la Politique de confidentialité. */
@@ -69,18 +69,11 @@ export const PUBLISHER: { kind: PublisherKind } & Record<string, string> = {
   address: '',
   /** Directeur de la publication. */
   publicationDirector: '',
-  /** Ville du tribunal compétent. À défaut, celle du domicile de l'éditeur. */
-  jurisdictionCity: 'À COMPLÉTER — ville du tribunal compétent',
 };
 
 /** Les champs à renseigner selon le régime choisi. */
 function requiredFields(): string[] {
-  const always = [
-    'contactEmail',
-    'host',
-    'dataRegion',
-    'jurisdictionCity',
-  ];
+  const always = ['contactEmail', 'host', 'dataRegion'];
   if (PUBLISHER.kind === 'individual') return always;
   return [...always, 'name', 'siret', 'address', 'publicationDirector'];
 }
