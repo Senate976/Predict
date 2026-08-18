@@ -16,6 +16,7 @@ import { AudioPlayerButton } from '../../../components/AudioPlayerButton';
 import { Avatar } from '../../../components/Avatar';
 import { BottomNavBar } from '../../../components/BottomNavBar';
 import { InlineComments } from '../../../components/InlineComments';
+import { ReactionPicker } from '../../../components/ReactionPicker';
 import { PhotoAttachButton } from '../../../components/PhotoAttachButton';
 import { PredictionPhoto } from '../../../components/PredictionPhoto';
 import { PredictWord } from '../../../components/PredictWord';
@@ -492,6 +493,17 @@ export default function PredictionDetailScreen() {
               )
             )}
 
+            {/* Prédiction adressée à un groupe : c'est LE GROUPE le
+                destinataire. Énumérer ses membres n'apprend rien et noie
+                l'information sous une liste de pseudos — d'autant que le
+                groupe peut changer de composition. Le repli sur la liste
+                détaillée reste possible si le nom manque (groupe supprimé). */}
+            {prediction.scope === 'group' && prediction.group_name ? (
+              <View style={styles.sectionSpacing}>
+                <Text style={styles.eyebrow}>Destinataire</Text>
+                <Text style={styles.groupTarget}>{prediction.group_name}</Text>
+              </View>
+            ) : (
             <Pressable
               onPress={() => setRecipientsOpen((o) => !o)}
               style={[styles.sectionToggle, styles.sectionSpacing]}
@@ -500,6 +512,7 @@ export default function PredictionDetailScreen() {
               <Text style={styles.eyebrow}>Destinataires</Text>
               <Text style={styles.chevron}>{recipientsOpen ? ' ▲' : ' ▼'}</Text>
             </Pressable>
+            )}
 
             {recipientsOpen && (
               <>
@@ -558,6 +571,19 @@ export default function PredictionDetailScreen() {
                 )}
               </>
             )}
+
+            {/* Réagir depuis cet écran. Sans ce bloc, une notification de
+                révélation menait à une page où l'on ne pouvait rien faire :
+                il fallait retourner chercher la carte dans le Fil. */}
+            <Text style={[styles.eyebrow, styles.sectionSpacing]}>Réactions</Text>
+            <View style={styles.reactionRow}>
+              <ReactionPicker
+                predictionId={id}
+                userId={userId!}
+                initialCounts={prediction.emoji_counts ?? {}}
+                initialMine={prediction.my_emoji_reaction ?? null}
+              />
+            </View>
 
             <Text style={[styles.eyebrow, styles.sectionSpacing]}>Discussion</Text>
             <InlineComments
@@ -659,6 +685,8 @@ function createStyles(colors: Colors) {
   verdictChoiceText: { fontSize: 14, fontWeight: '700', color: colors.text },
   verdictChoiceTextActive: { color: colors.surface },
   chevron: { fontSize: 13, color: colors.textFaint },
+  groupTarget: { fontFamily: fonts.bodyEmphasis, fontSize: 17, color: colors.text, marginTop: 4 },
+  reactionRow: { marginTop: 6 },
   hint: { fontSize: 14, color: colors.textFaint, lineHeight: 20 },
   row: {
     flexDirection: 'row',

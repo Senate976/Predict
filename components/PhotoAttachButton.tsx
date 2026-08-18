@@ -32,7 +32,7 @@ export function PhotoAttachButton({ uri, onChange, disabled, label = 'Ajouter un
   if (uri) {
     return (
       <View style={styles.box}>
-        <Image source={{ uri }} style={styles.preview} resizeMode="cover" />
+        <Image source={{ uri }} style={styles.preview} resizeMode="contain" />
         <Pressable onPress={() => onChange(null)} disabled={disabled} style={styles.resetButton}>
           <Text style={styles.resetButtonText}>Retirer la photo</Text>
         </Pressable>
@@ -56,7 +56,9 @@ function createStyles(colors: Colors) {
       padding: 10,
       backgroundColor: colors.surface,
     },
-    preview: { width: '100%', aspectRatio: 4 / 3, borderRadius: radius.sm },
+    // `resizeMode="contain"` et hauteur bornée plutôt qu'un rapport figé :
+    // l'aperçu doit montrer ce qui sera réellement envoyé, portrait compris.
+    preview: { width: '100%', height: 240, borderRadius: radius.sm },
     resetButton: { marginTop: 8, alignSelf: 'flex-start' },
     resetButtonText: { fontSize: 15, color: colors.textMuted, fontWeight: '600' },
     pickButton: {

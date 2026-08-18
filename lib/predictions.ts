@@ -62,6 +62,10 @@ export type PredictionFeedItem = {
   /** ISO 8601, en UTC. */
   reveal_at: string;
   scope: PredictionScope;
+  /** Groupe visé, si `scope === 'group'` — sinon `null`. */
+  group_id: string | null;
+  /** Nom de ce groupe, pour l'afficher à la place de la liste des membres. */
+  group_name: string | null;
   /** `true` : aucune date fixée par l'auteur, `reveal_at` porte une valeur
    * lointaine sans signification propre — ne jamais l'afficher tel quel dans
    * ce cas, seule la révélation manuelle (`revealPredictionNow`) compte. */
@@ -200,7 +204,7 @@ const FEED_COLUMNS =
   'is_immediate, type, answer_format, created_at, is_revealed, final_status, verdict_set_at, is_favorite, ' +
   'is_hidden, is_seen, is_verdict_seen, emoji_counts, my_emoji_reaction, mentioned_user_ids, answer_count, ' +
   'correct_answer_count, my_answer_text, my_answer_option_id, my_answer_is_correct, ' +
-  'bet_count, believer_count, doubter_count, my_bet';
+  'bet_count, believer_count, doubter_count, my_bet, group_id, group_name';
 
 export async function fetchPredictionsFeed() {
   return supabase

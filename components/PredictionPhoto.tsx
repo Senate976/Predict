@@ -27,6 +27,16 @@ export function PredictionPhoto({
 }) {
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  /**
+   * Rapport largeur/hauteur réel de l'image, mesuré une fois l'URL connue.
+   *
+   * Le cadre était figé à 4/3, donc au format paysage : une photo prise en
+   * portrait s'y trouvait rognée en haut et en bas, et il n'y avait aucun moyen
+   * d'en voir le sujet. On suit désormais la forme de l'image, en bornant
+   * seulement la hauteur pour qu'un portrait très allongé n'occupe pas tout
+   * l'écran à lui seul.
+   */
+  const [ratio, setRatio] = useState<number | null>(null);
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -41,6 +51,15 @@ export function PredictionPhoto({
         return;
       }
       setUrl(signedUrl);
+      Image.getSize(
+        signedUrl,
+        (w, h) => {
+          if (!cancelled && h > 0) setRatio(w / h);
+        },
+        // Échec de mesure : on garde le cadre par défaut plutôt que de ne rien
+        // afficher. L'image reste visible, simplement au format d'origine.
+        () => {}
+      );
     });
     return () => {
       cancelled = true;
@@ -59,14 +78,30 @@ export function PredictionPhoto({
     );
   }
 
-  return <Image source={{ uri: url }} style={fill ? styles.fill : styles.image} resizeMode="cover" />;
+  if (fill) {
+    return <Image source={{ uri: url }} style={styles.fill} resizeMode="cover" />;
+  }
+
+  // `contain` et non `cover` dès que la forme réelle est connue : le cadre
+  // épouse l'image, il n'y a donc plus rien à rogner.
+  return (
+    <Image
+      source={{ uri: url }}
+      style={[styles.image, ratio ? { aspectRatio: ratio } : null]}
+      resizeMode={ratio ? 'contain' : 'cover'}
+    />
+  );
 }
 
 function createStyles(colors: Colors) {
   return StyleSheet.create({
     image: {
       width: '100%',
+      // Cadre de repli, le temps que la forme réelle soit mesurée.
       aspectRatio: 4 / 3,
+      // Un portrait très allongé ne doit pas occuper tout l'écran : au-delà,
+      // l'image se contente de cette hauteur.
+      maxHeight: 460,
       borderRadius: radius.sm,
       backgroundColor: colors.border,
     },
