@@ -4355,12 +4355,19 @@ grant execute on function public.create_prediction(text, text, timestamptz, text
 -- Nouveau type de notification : l'auteur est prévenu qu'une réponse est
 -- arrivée sur sa Question (une seule fois par Question, comme `new_teaser`
 -- — la clé unique `notifications_unique_key` s'en charge).
+--
+-- `new_comment` figure déjà ici alors que ce type n'est introduit que plus
+-- bas dans le fichier (section 45) : sur une base qui contient déjà des
+-- notifications de ce type (le cas dès que la fonctionnalité a tourné une
+-- fois), reposer ici une liste plus étroite les rejetterait — cette
+-- contrainte est de toute façon remplacée par la liste complète et à jour
+-- plus loin dans le script.
 alter table public.notifications drop constraint if exists notifications_type_check;
 alter table public.notifications add constraint notifications_type_check
   check (type in (
     'new_teaser', 'prediction_revealed', 'prediction_approved', 'group_invite',
     'prediction_mentioned', 'prediction_realized', 'prediction_missed', 'reveal_reminder',
-    'question_answered'
+    'question_answered', 'new_comment'
   ));
 
 create or replace function public.notify_question_answered()
