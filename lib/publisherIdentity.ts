@@ -53,7 +53,7 @@ export const PUBLISHER: { kind: PublisherKind } & Record<string, string> = {
   /** Région Supabase où sont stockées les données (Project Settings → General).
    * Si elle est hors Union européenne, les garanties de transfert doivent être
    * décrites dans la Politique de confidentialité. */
-  dataRegion: 'À COMPLÉTER — région d’hébergement Supabase',
+  dataRegion: 'eu-central-1 (Francfort, Allemagne)',
 
   // --- Requis seulement si `kind === 'company'` ---------------------------
   /** Nom ou raison sociale. Facultatif pour un particulier non professionnel,
