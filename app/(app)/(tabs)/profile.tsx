@@ -332,8 +332,8 @@ function createStyles(colors: Colors) {
     textTransform: 'uppercase',
     marginTop: 8,
   },
-  username: { fontFamily: fonts.bodyEmphasis, fontSize: 22, color: colors.text, marginTop: 6 },
-  email: { fontSize: 15, color: colors.textFaint, marginTop: 4 },
+  username: { fontFamily: fonts.bodyEmphasis, fontSize: 26, color: colors.text, marginTop: 6 },
+  email: { fontSize: 16, color: colors.textFaint, marginTop: 4 },
   loader: { marginTop: 24 },
   modalOverlay: {
     flex: 1,
@@ -376,9 +376,9 @@ function createStyles(colors: Colors) {
   statCardActive: { borderBottomWidth: 3, borderBottomColor: colors.text },
   // Pas de code couleur réalisé/manqué : seul le libellé sous le nombre
   // porte le sens, conformément à la palette stricte noir/blanc/jaune.
-  statValue: { fontFamily: fonts.body, fontSize: 26, color: colors.text },
+  statValue: { fontFamily: fonts.body, fontSize: 32, color: colors.text },
   statLabel: {
-    fontSize: 12,
+    fontSize: 14,
     letterSpacing: 1,
     textTransform: 'uppercase',
     color: colors.textFaint,
@@ -399,8 +399,8 @@ function createStyles(colors: Colors) {
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  historyTeaser: { fontFamily: fonts.body, fontSize: 17, color: colors.text },
-  historyMeta: { fontSize: 14, color: colors.textFaint, marginTop: 4 },
+  historyTeaser: { fontFamily: fonts.body, fontSize: 19, color: colors.text },
+  historyMeta: { fontSize: 15, color: colors.textFaint, marginTop: 4 },
   error: {
     color: colors.danger,
     backgroundColor: colors.dangerSoft,

@@ -73,6 +73,8 @@ export default function RemindersSettingsScreen() {
                 <Text style={styles.rowLabel}>Rappel avant révélation</Text>
                 <Text style={styles.rowHint}>
                   Une notification avant qu’un Predict que tu peux voir se révèle.
+                  Ce réglage couvre aussi le rappel hebdomadaire sur tes propres
+                  Predicts « Libres » encore scellés.
                 </Text>
               </View>
               <Switch

@@ -1927,6 +1927,12 @@ grant execute on function public.get_prediscore(uuid) to authenticated;
 -- `reveal_at > now()` après modification, ce qu'une révélation immédiate ne
 -- satisfait jamais par construction. Cette fonction porte donc elle-même son
 -- garde-fou (auteur, pas déjà révélée) plutôt que de relâcher cette policy.
+-- `open_ended` obligatoire : une prédiction Programmée porte une date que son
+-- auteur s'est engagé à tenir, et pouvoir l'ouvrir quand ça l'arrange vide la
+-- programmation de son sens (on choisirait la date après coup, au vu du
+-- résultat). Seule une prédiction à révélation libre s'ouvre à la main — c'est
+-- précisément ce qui la définit. Le bouton correspondant est masqué côté app,
+-- mais la règle tient ici : le client ne fait qu'obéir, il ne décide pas.
 create or replace function public.reveal_prediction_now(p_prediction_id uuid)
 returns void
 language plpgsql
@@ -1938,7 +1944,8 @@ begin
   set reveal_at = now()
   where id = p_prediction_id
     and author_id = auth.uid()
-    and reveal_at > now();
+    and reveal_at > now()
+    and open_ended;
 end;
 $$;
 
@@ -4367,7 +4374,7 @@ alter table public.notifications add constraint notifications_type_check
   check (type in (
     'new_teaser', 'prediction_revealed', 'prediction_approved', 'group_invite',
     'prediction_mentioned', 'prediction_realized', 'prediction_missed', 'reveal_reminder',
-    'question_answered', 'new_comment'
+    'question_answered', 'new_comment', 'open_reminder'
   ));
 
 create or replace function public.notify_question_answered()
@@ -4886,7 +4893,7 @@ alter table public.notifications add constraint notifications_type_check
   check (type in (
     'new_teaser', 'prediction_revealed', 'prediction_approved', 'group_invite',
     'prediction_mentioned', 'prediction_realized', 'prediction_missed', 'reveal_reminder',
-    'question_answered', 'new_comment'
+    'question_answered', 'new_comment', 'open_reminder'
   ));
 
 -- Jamais pour son propre commentaire (`author_id <> new.author_id`) — écrire
@@ -5261,7 +5268,71 @@ revoke all on function public.get_prediction_voters(uuid) from public;
 grant execute on function public.get_prediction_voters(uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 54. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 54. Rappel d'ouverture d'une prédiction à révélation libre
+-- ---------------------------------------------------------------------------
+--
+-- Une prédiction « Libre » n'a pas de date : son `reveal_at` est un repère
+-- technique posé des années plus tard, sans signification (voir
+-- `computeOpenEndedRevealAt` côté app). Personne ne l'ouvrira donc à sa place
+-- et rien ne la fera remonter — elle peut rester scellée indéfiniment, oubliée
+-- de son propre auteur. D'où ce rappel, adressé à l'AUTEUR (et à lui seul,
+-- contrairement à `generate_reveal_reminders` qui prévient les destinataires) :
+-- tous les 7 jours tant qu'elle n'est pas ouverte.
+--
+-- Le point délicat est la répétition. `notifications_unique_key` interdit deux
+-- lignes (même personne, même prédiction, même type), ce qui empêche par
+-- construction d'empiler un rappel de plus chaque semaine. Plutôt que d'affaiblir
+-- cette contrainte — elle protège tous les autres types — on RALLUME la ligne
+-- existante : `created_at` repart à maintenant, et les drapeaux « lu » et
+-- « écarté » retombent à faux. L'auteur retrouve donc un rappel frais en tête de
+-- sa liste, sans qu'aucun doublon n'existe jamais en base.
+create or replace function public.generate_open_reminders()
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  -- Premier rappel : 7 jours après la création, si elle est toujours scellée.
+  insert into public.notifications (user_id, prediction_id, type)
+  select p.author_id, p.id, 'open_reminder'
+  from public.predictions p
+  join public.profiles pr on pr.id = p.author_id
+  where p.open_ended
+    and p.reveal_at > now()
+    and p.created_at <= now() - interval '7 days'
+    and pr.reveal_reminder_enabled
+  on conflict (user_id, prediction_id, type) do nothing;
+
+  -- Relances : la même ligne est remise à neuf tous les 7 jours, tant que la
+  -- prédiction reste fermée. Une fois révélée, `reveal_at > now()` devient
+  -- faux et le rappel cesse de lui-même — il n'y a rien à nettoyer.
+  update public.notifications n
+  set created_at = now(), is_read = false, is_dismissed = false
+  from public.predictions p, public.profiles pr
+  where n.type = 'open_reminder'
+    and p.id = n.prediction_id
+    and pr.id = n.user_id
+    and p.open_ended
+    and p.reveal_at > now()
+    and pr.reveal_reminder_enabled
+    and n.created_at <= now() - interval '7 days';
+end;
+$$;
+
+revoke all on function public.generate_open_reminders() from public;
+grant execute on function public.generate_open_reminders() to authenticated;
+
+alter table public.notifications drop constraint if exists notifications_type_check;
+alter table public.notifications add constraint notifications_type_check
+  check (type in (
+    'new_teaser', 'prediction_revealed', 'prediction_approved', 'group_invite',
+    'prediction_mentioned', 'prediction_realized', 'prediction_missed', 'reveal_reminder',
+    'question_answered', 'new_comment', 'open_reminder'
+  ));
+
+-- ---------------------------------------------------------------------------
+-- 55. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une

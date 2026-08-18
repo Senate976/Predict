@@ -64,11 +64,16 @@ import { InlineQuestionAnswer } from './InlineQuestionAnswer';
 import { PhotoAttachButton } from './PhotoAttachButton';
 import { PredictionPhoto } from './PredictionPhoto';
 
-/** Largeur fixe de la bulle de réactions, ancrée par son bord droit sur le pouce. */
-const EMOJI_PANEL_WIDTH = 272;
-/** 12 réactions sur 2 rangées de 6 plutôt qu'une seule rangée trop dense. */
+/** Géométrie de la bulle de réactions : 12 emojis sur 2 rangées de 6 plutôt
+ * qu'une seule rangée trop dense. La largeur est DÉDUITE du reste plutôt que
+ * choisie à l'œil — c'est ce qui garantit six colonnes exactement régulières,
+ * sans espace résiduel qui décale la dernière. */
 const EMOJI_COLUMNS = 6;
-const EMOJI_ROWS = Math.ceil(EMOJI_REACTIONS.length / EMOJI_COLUMNS);
+const EMOJI_ITEM = 34;
+const EMOJI_GAP = 6;
+const EMOJI_PANEL_PADDING = 10;
+const EMOJI_PANEL_WIDTH =
+  EMOJI_COLUMNS * EMOJI_ITEM + (EMOJI_COLUMNS - 1) * EMOJI_GAP + 2 * EMOJI_PANEL_PADDING;
 /** Silhouette affichée à la place du contenu pour un destinataire, avant
  * révélation — la RLS ne lui donne aucun `content` à cet endroit (voir plus
  * bas), donc rien de réel à flouter. Un texte de longueur plausible plutôt
@@ -577,6 +582,16 @@ export function PredictionCard({
   // (sans glissement) garde l'ancien comportement : ouvrir/fermer la bulle.
   const panelRef = useRef<View>(null);
   const panelLayoutRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+  // Position et taille de CHAQUE emoji dans la bulle, relevées au rendu
+  // (`onLayout` donne des coordonnées relatives à la bulle, donc fiables).
+  // C'est ce qui remplace l'ancien calcul de grille : celui-ci supposait des
+  // colonnes régulières, ce que `space-between` et un retour à la ligne ne
+  // garantissent pas — d'où un emoji grossi qui ne correspondait pas à celui
+  // sous le doigt. Ici on teste la vraie boîte de chacun, il n'y a plus rien
+  // à supposer.
+  const itemLayoutsRef = useRef<({ x: number; y: number; width: number; height: number } | null)[]>(
+    EMOJI_REACTIONS.map(() => null)
+  );
   const hoveredIndexRef = useRef<number | null>(null);
   const panelOpenAtGrantRef = useRef(false);
   const scaleAnims = useRef(EMOJI_REACTIONS.map(() => new Animated.Value(1))).current;
@@ -594,16 +609,52 @@ export function PredictionCard({
   const myEmojiRef = useRef(myEmoji);
   myEmojiRef.current = myEmoji;
 
+  /** Grossit l'emoji survolé et rend sa taille normale au précédent. */
   function setHovered(index: number | null) {
     if (hoveredIndexRef.current === index) return;
     const previous = hoveredIndexRef.current;
     hoveredIndexRef.current = index;
     if (previous !== null) {
-      Animated.spring(scaleAnims[previous], { toValue: 1, useNativeDriver: false, speed: 20 }).start();
+      Animated.spring(scaleAnims[previous], { toValue: 1, useNativeDriver: false, speed: 20, bounciness: 8 }).start();
     }
     if (index !== null) {
-      Animated.spring(scaleAnims[index], { toValue: 1.9, useNativeDriver: false, speed: 20 }).start();
+      Animated.spring(scaleAnims[index], { toValue: 1.85, useNativeDriver: false, speed: 20, bounciness: 8 }).start();
     }
+  }
+
+  /** Quel emoji se trouve sous le doigt, aux coordonnées écran données —
+   * `null` si le doigt est hors de la bulle. Compare aux boîtes réellement
+   * mesurées, sans supposer de grille. La tolérance verticale laisse le doigt
+   * déborder un peu au-dessus/en dessous sans perdre la sélection : on vise
+   * avec un doigt, pas avec un curseur. */
+  function emojiAt(pageX: number, pageY: number): number | null {
+    const panel = panelLayoutRef.current;
+    if (!panel) return null;
+    const x = pageX - panel.x;
+    const y = pageY - panel.y;
+    const TOLERANCE = 14;
+    for (let i = 0; i < itemLayoutsRef.current.length; i++) {
+      const box = itemLayoutsRef.current[i];
+      if (!box) continue;
+      if (
+        x >= box.x - TOLERANCE / 2 &&
+        x <= box.x + box.width + TOLERANCE / 2 &&
+        y >= box.y - TOLERANCE &&
+        y <= box.y + box.height + TOLERANCE
+      ) {
+        return i;
+      }
+    }
+    return null;
+  }
+
+  /** Relève la position de la bulle à l'écran. Rappelée à chaque appui (pas
+   * seulement au montage) : le Fil défile, donc une mesure prise à
+   * l'ouverture n'est plus valable au geste suivant. */
+  function measurePanel() {
+    panelRef.current?.measureInWindow((x, y, width, height) => {
+      panelLayoutRef.current = { x, y, width, height };
+    });
   }
 
   const panResponder = useRef(
@@ -611,27 +662,13 @@ export function PredictionCard({
       onStartShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
         panelOpenAtGrantRef.current = emojiPanelOpenRef.current;
-        panelLayoutRef.current = null;
         setEmojiPanelOpen(true);
+        // Si la bulle est déjà ouverte, sa position est mesurable tout de
+        // suite ; sinon `onLayout` s'en chargera au montage.
+        measurePanel();
       },
       onPanResponderMove: (_evt, gesture) => {
-        const layout = panelLayoutRef.current;
-        if (!layout) return;
-        const withinX = gesture.moveX >= layout.x && gesture.moveX <= layout.x + layout.width;
-        const withinY = gesture.moveY >= layout.y - 30 && gesture.moveY <= layout.y + layout.height + 30;
-        if (!withinX || !withinY) {
-          setHovered(null);
-          return;
-        }
-        // Grille 2D (6 colonnes × 2 rangées) : la position du doigt se lit
-        // séparément sur chaque axe, puis se combine en index de tableau
-        // (ordre ligne par ligne, identique à l'ordre d'affichage du `.map`).
-        const relativeX = gesture.moveX - layout.x;
-        const relativeY = gesture.moveY - layout.y;
-        const col = Math.min(EMOJI_COLUMNS - 1, Math.max(0, Math.floor((relativeX / layout.width) * EMOJI_COLUMNS)));
-        const row = Math.min(EMOJI_ROWS - 1, Math.max(0, Math.floor((relativeY / layout.height) * EMOJI_ROWS)));
-        const index = Math.min(EMOJI_REACTIONS.length - 1, row * EMOJI_COLUMNS + col);
-        setHovered(index);
+        setHovered(emojiAt(gesture.moveX, gesture.moveY));
       },
       onPanResponderRelease: (_evt, gesture) => {
         const moved = Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4;
@@ -692,30 +729,38 @@ export function PredictionCard({
                 de qui a réagi avec quoi, sans interférer avec le geste du pouce. */}
             <View style={styles.reactionTriggerRow}>
               <View style={styles.reactionTriggerWrap}>
-                <View style={[styles.reactionTrigger, styles.iconSlot]} hitSlop={8} {...panResponder.panHandlers}>
-                  {myEmoji ? (
-                    <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
-                  ) : (
-                    <ThumbsUp
-                      size={21}
-                      color={totalReactions > 0 ? colors.text : colors.footerIconInactive}
-                      strokeWidth={1.75}
-                    />
-                  )}
-                </View>
+                {/* `Pressable` sans effet propre autour du pouce : le
+                    `PanResponder` seul ne suffit pas à retenir le toucher sur
+                    le web, et celle de l'enveloppe ouvrait la carte au lieu de
+                    laisser réagir. Même parade que pour la photo et le
+                    formulaire de Sondage. */}
+                <Pressable onPress={() => {}} hitSlop={8}>
+                  <View style={[styles.reactionTrigger, styles.iconSlot]} {...panResponder.panHandlers}>
+                    {myEmoji ? (
+                      <Text style={styles.reactionTriggerEmoji}>{myEmoji}</Text>
+                    ) : (
+                      <ThumbsUp
+                        size={21}
+                        color={totalReactions > 0 ? colors.text : colors.footerIconInactive}
+                        strokeWidth={1.75}
+                      />
+                    )}
+                  </View>
+                </Pressable>
 
                 {emojiPanelOpen && (
-                  <View
-                    ref={panelRef}
-                    style={styles.emojiPanel}
-                    onLayout={() => {
-                      panelRef.current?.measureInWindow((x, y, width, height) => {
-                        panelLayoutRef.current = { x, y, width, height };
-                      });
-                    }}
-                  >
+                  <View ref={panelRef} style={styles.emojiPanel} onLayout={measurePanel}>
                     {EMOJI_REACTIONS.map((emoji, i) => (
-                      <Animated.View key={emoji} style={{ transform: [{ scale: scaleAnims[i] }] }}>
+                      <Animated.View
+                        key={emoji}
+                        // Relève la boîte de cet emoji dans la bulle — c'est
+                        // ce que `emojiAt` interroge pour savoir lequel est
+                        // sous le doigt.
+                        onLayout={(e) => {
+                          itemLayoutsRef.current[i] = e.nativeEvent.layout;
+                        }}
+                        style={styles.emojiBubbleSlot}
+                      >
                         {/* Un tap direct sur un emoji le sélectionne toujours,
                             indépendamment du glissé : sans ça, un utilisateur qui
                             relâche le pouce puis tape un emoji comme un bouton
@@ -726,7 +771,15 @@ export function PredictionCard({
                           style={[styles.emojiBubbleItem, myEmoji === emoji && styles.emojiBubbleItemActive]}
                           hitSlop={4}
                         >
-                          <Text style={styles.emojiButtonText}>{emoji}</Text>
+                          {/* Le grossissement porte sur l'emoji seul, pas sur
+                              sa boîte : la boîte garde sa place dans la rangée,
+                              donc les voisins ne se décalent pas quand le doigt
+                              passe — et la mesure ci-dessus reste juste. */}
+                          <Animated.Text
+                            style={[styles.emojiButtonText, { transform: [{ scale: scaleAnims[i] }] }]}
+                          >
+                            {emoji}
+                          </Animated.Text>
                         </Pressable>
                       </Animated.View>
                     ))}
@@ -817,7 +870,11 @@ export function PredictionCard({
               {revealHintText}
             </Text>
           )}
-          {isAuthor && cardState.kind === 'sealed' && (
+          {/* `open_ended` seulement : une Programmée s'ouvre à sa date, pas
+              quand son auteur le décide — sinon la date ne veut plus rien
+              dire. La fonction SQL `reveal_prediction_now` pose la même
+              condition, ce bouton ne fait que ne pas la proposer. */}
+          {isAuthor && cardState.kind === 'sealed' && item.open_ended && (
             <Pressable
               onPress={handleRevealNow}
               disabled={revealPending}
@@ -1239,6 +1296,20 @@ const stampStyles = StyleSheet.create({
   },
 });
 
+/** Les trois compteurs du pied de carte (commentaires, réactions, réponses).
+ * `minWidth` fixe et texte cadré à gauche : sans lui, passer de « 9 » à « 10 »
+ * élargissait le groupe et décalait tous les suivants sur la rangée. Les
+ * chiffres ne bougent donc plus d'une carte à l'autre. */
+function footerCount(colors: Colors) {
+  return {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: colors.text,
+    minWidth: 16,
+    textAlign: 'left' as const,
+  };
+}
+
 function createStyles(colors: Colors) {
   return StyleSheet.create({
   cardPressed: { opacity: 0.85 },
@@ -1464,15 +1535,17 @@ function createStyles(colors: Colors) {
   commentsToggle: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   // Toujours affiché, y compris à zéro — encre dès qu'il y a au moins une
   // interaction, teinte discrète sinon (voir `footerCountInactive`).
-  commentsToggleText: { fontSize: 15, fontWeight: '700', color: colors.text },
+  commentsToggleText: footerCount(colors),
   reactionTriggerWrap: { position: 'relative' },
   reactionTriggerRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   reactionTrigger: { flexDirection: 'row', alignItems: 'center' },
-  reactionTriggerEmoji: { fontSize: 17 },
-  reactionTriggerCount: { fontSize: 15, fontWeight: '700', color: colors.text },
+  // Calé sur la taille des icônes voisines (21) : un emoji plus petit qu'un
+  // pouce faisait sauter la rangée dès qu'on réagissait.
+  reactionTriggerEmoji: { fontSize: 21, lineHeight: 26, textAlign: 'center' },
+  reactionTriggerCount: footerCount(colors),
   footerCountInactive: { color: colors.footerIconInactive },
   answersRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  answersCountText: { fontSize: 15, fontWeight: '700', color: colors.text },
+  answersCountText: footerCount(colors),
   // Une seule « grande bulle », façon Facebook — flottante au-dessus du
   // pouce (pas en dessous) pour ne pas être masquée par le doigt qui la
   // fait glisser, et pas des puces séparées.
@@ -1494,13 +1567,16 @@ function createStyles(colors: Colors) {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    rowGap: 6,
+    // `gap` fixe plutôt que `space-between` : l'écart entre deux emojis est
+    // alors le même partout, y compris si une rangée n'est pas pleine — la
+    // largeur de la bulle est calculée pour que six tiennent pile.
+    columnGap: EMOJI_GAP,
+    rowGap: EMOJI_GAP,
     backgroundColor: colors.surfaceRaised,
     borderRadius: radius.xl,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingHorizontal: 10,
+    paddingHorizontal: EMOJI_PANEL_PADDING,
     paddingVertical: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -1508,15 +1584,18 @@ function createStyles(colors: Colors) {
     shadowRadius: 8,
     elevation: 8,
   },
+  // Emplacement de taille fixe : c'est lui qui tient la grille. L'emoji
+  // grossit à l'intérieur (voir `scaleAnims`) sans jamais bouger ses voisins.
+  emojiBubbleSlot: { width: EMOJI_ITEM, height: EMOJI_ITEM },
   emojiBubbleItem: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: EMOJI_ITEM,
+    height: EMOJI_ITEM,
+    borderRadius: EMOJI_ITEM / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   emojiBubbleItemActive: { backgroundColor: colors.accentSoft },
-  emojiButtonText: { fontSize: 20 },
+  emojiButtonText: { fontSize: 20, lineHeight: 26, textAlign: 'center' },
   // Menu ••• de gestion (favoris / masquer / supprimer), ouvert depuis
   // l'en-tête — même registre visuel que `reactorsBox` (boîte centrée sur
   // fond assombri).

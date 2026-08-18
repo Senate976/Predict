@@ -6,8 +6,10 @@ import { Text } from './Text';
 import { eyebrow, fonts, type Colors } from '../lib/theme';
 import { useColors } from '../lib/themeMode';
 
-const BAR_HEIGHT = 6;
-const CURSOR_SIZE = 15;
+// Le Prediscore est l'élément central du profil : sa barre et son curseur
+// sont dimensionnés en conséquence, pas comme un indicateur secondaire.
+const BAR_HEIGHT = 10;
+const CURSOR_SIZE = 22;
 
 /**
  * Jauge horizontale du Prediscore — dégradé bleu clair → jaune, avec un
@@ -88,15 +90,17 @@ function createStyles(colors: Colors) {
   return StyleSheet.create({
     wrap: { width: '100%' },
     emptyText: {
-      fontSize: 15,
+      fontSize: 16,
       color: colors.textFaint,
       textAlign: 'center',
       lineHeight: 21,
       paddingVertical: 8,
     },
-    headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 },
+    headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 },
     scoreLabel: eyebrow(colors),
-    scoreValue: { fontFamily: fonts.bodyEmphasis, fontSize: 16, color: colors.text },
+    // Le chiffre, et rien d'autre, porte l'information : c'est le plus gros
+    // texte de la page après le pseudo.
+    scoreValue: { fontFamily: fonts.bodyEmphasis, fontSize: 34, color: colors.text },
     barBox: { width: '100%', height: CURSOR_SIZE, justifyContent: 'center' },
     cursorWrap: {
       position: 'absolute',

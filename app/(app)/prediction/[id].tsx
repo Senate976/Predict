@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AudioPlayerButton } from '../../../components/AudioPlayerButton';
 import { Avatar } from '../../../components/Avatar';
-import { CreateFab } from '../../../components/CreateFab';
+import { BottomNavBar } from '../../../components/BottomNavBar';
 import { InlineComments } from '../../../components/InlineComments';
 import { PhotoAttachButton } from '../../../components/PhotoAttachButton';
 import { PredictionPhoto } from '../../../components/PredictionPhoto';
@@ -354,7 +354,10 @@ export default function PredictionDetailScreen() {
               )}
             </View>
 
-            {isAuthor && !revealed && (
+            {/* Réservé aux prédictions à révélation libre : une Programmée
+                tient sa date (voir `reveal_prediction_now` dans schema.sql,
+                qui refuse le cas de toute façon). */}
+            {isAuthor && !revealed && prediction.open_ended && (
               <View style={styles.revealNowBox}>
                 {revealError && <Text style={styles.error}>{revealError}</Text>}
                 <Pressable
@@ -567,7 +570,7 @@ export default function PredictionDetailScreen() {
         ) : null}
       </ScrollView>
 
-      <CreateFab />
+      <BottomNavBar />
     </SafeAreaView>
   );
 }
