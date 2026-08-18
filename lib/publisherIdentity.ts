@@ -3,65 +3,138 @@
  * ║  À REMPLIR AVANT TOUTE MISE EN LIGNE PUBLIQUE                            ║
  * ╚══════════════════════════════════════════════════════════════════════════╝
  *
- * Identité de l'éditeur de l'application. Ces informations sont une OBLIGATION
- * LÉGALE en France (LCEN art. 6-III) : une app accessible au public doit dire
- * qui l'édite, où, et comment le joindre. Aucun texte générique ne peut s'y
- * substituer — c'est précisément l'identité réelle qui est exigée.
+ * Identité de l'éditeur. Une application accessible au public doit dire qui
+ * l'édite et comment le joindre (LCEN art. 6-III) — mais l'étendue de ce qu'il
+ * faut publier dépend de qui édite, d'où le champ `kind` ci-dessous.
  *
- * Elles sont regroupées ici, et nulle part ailleurs : les documents légaux
- * (`lib/legalContent.ts`) les reprennent depuis ce fichier. Il y a donc un seul
- * endroit à corriger, pas une dizaine de trous à retrouver dans des paragraphes.
+ * Tout est regroupé ici et nulle part ailleurs : `lib/legalContent.ts` reprend
+ * ces valeurs. Il n'y a donc qu'un fichier à corriger, pas une dizaine de trous
+ * à retrouver dans des paragraphes.
  *
- * Tant qu'une valeur commence par « À COMPLÉTER », `isPublisherIdentityComplete`
- * renvoie `false` et l'app affiche un avertissement en tête des documents
- * légaux. C'est volontairement visible : mieux vaut le voir en développement que
- * de le découvrir en ligne.
+ * Tant qu'une valeur REQUISE commence par « À COMPLÉTER »,
+ * `isPublisherIdentityComplete` renvoie `false` et l'écran des documents légaux
+ * affiche un avertissement. Volontairement visible : mieux vaut le voir en
+ * développement que le découvrir en ligne.
  */
-export const PUBLISHER = {
-  /** Personne physique (nom prénom) ou raison sociale. */
-  name: 'À COMPLÉTER — nom ou raison sociale',
-  /** Ex. « SAS », « auto-entrepreneur ». Laisser vide si personne physique. */
-  legalForm: '',
-  /** Capital social, sans le symbole €. Laisser vide si sans objet. */
-  capital: '',
-  /** Numéro SIRET (14 chiffres). Obligatoire si activité professionnelle. */
-  siret: 'À COMPLÉTER — SIRET',
-  /** Adresse postale complète du siège. */
-  address: 'À COMPLÉTER — adresse complète',
-  /** Nom et prénom du directeur de la publication. */
-  publicationDirector: 'À COMPLÉTER — nom du directeur de la publication',
-  /** Adresse de contact, réellement relevée : c'est par elle qu'arriveront les
-   * demandes RGPD, auxquelles il faut répondre sous un mois. */
+
+/**
+ * Qui édite l'application.
+ *
+ * - `individual` — un particulier, sans société ni activité commerciale.
+ *   L'app est gratuite, sans publicité et sans achat. C'est le régime de
+ *   l'éditeur NON PROFESSIONNEL : la loi permet alors de ne pas rendre publics
+ *   ses nom et adresse, à condition d'avoir communiqué son identité à
+ *   l'hébergeur (ce que Vercel et Supabase détiennent déjà via le compte). Il
+ *   reste obligatoire de publier le nom de l'hébergeur et un moyen de contact.
+ *
+ * - `company` — dès qu'il y a une société, OU une activité commerciale même
+ *   sans société (abonnement, achat intégré, publicité, vente de données).
+ *   L'éditeur devient professionnel : identité complète, SIRET et adresse
+ *   doivent être publiés.
+ *
+ * Le RGPD, lui, s'applique dans LES DEUX CAS : Predict traite les données
+ * d'autrui (emails, pseudos, contenus, liens d'amitié) et n'est pas une
+ * activité « purement personnelle » puisque l'app est ouverte à des inconnus.
+ * D'où un `contactEmail` requis quoi qu'il arrive — c'est par lui qu'arrivent
+ * les demandes d'accès ou de suppression, auxquelles il faut répondre sous un
+ * mois.
+ */
+export type PublisherKind = 'individual' | 'company';
+
+export const PUBLISHER: { kind: PublisherKind } & Record<string, string> = {
+  kind: 'individual',
+
+  // --- Requis dans tous les cas ------------------------------------------
+  /** Adresse de contact, réellement relevée. Sert aussi aux demandes RGPD. */
   contactEmail: 'À COMPLÉTER — email de contact',
-  /** Hébergeur du site (nom + adresse). Pour Vercel :
+  /** Hébergeur (nom + adresse). Pour Vercel :
    * « Vercel Inc., 440 N Barranca Ave #4133, Covina, CA 91723, États-Unis ». */
   host: 'À COMPLÉTER — nom et adresse de l’hébergeur',
-  /** Tribunal compétent, en général celui du siège de l'éditeur. */
-  jurisdictionCity: 'À COMPLÉTER — ville du tribunal compétent',
-  /** Région Supabase où sont stockées les données (visible dans le dashboard,
-   * Project Settings → General). Si elle est hors Union européenne, les
-   * garanties de transfert doivent être décrites dans la Politique de
-   * confidentialité — voir `legalContent.ts`. */
+  /** Région Supabase où sont stockées les données (Project Settings → General).
+   * Si elle est hors Union européenne, les garanties de transfert doivent être
+   * décrites dans la Politique de confidentialité. */
   dataRegion: 'À COMPLÉTER — région d’hébergement Supabase',
-} as const;
 
-/** `false` tant qu'au moins une information obligatoire n'est pas renseignée. */
+  // --- Requis seulement si `kind === 'company'` ---------------------------
+  /** Nom ou raison sociale. Facultatif pour un particulier non professionnel,
+   * qui peut rester anonyme vis-à-vis du public. */
+  name: '',
+  /** Ex. « SAS », « auto-entrepreneur ». */
+  legalForm: '',
+  /** Capital social, sans le symbole €. */
+  capital: '',
+  /** SIRET (14 chiffres). */
+  siret: '',
+  /** Adresse postale du siège. */
+  address: '',
+  /** Directeur de la publication. */
+  publicationDirector: '',
+  /** Ville du tribunal compétent. À défaut, celle du domicile de l'éditeur. */
+  jurisdictionCity: 'À COMPLÉTER — ville du tribunal compétent',
+};
+
+/** Les champs à renseigner selon le régime choisi. */
+function requiredFields(): string[] {
+  const always = [
+    'contactEmail',
+    'host',
+    'dataRegion',
+    'jurisdictionCity',
+  ];
+  if (PUBLISHER.kind === 'individual') return always;
+  return [...always, 'name', 'siret', 'address', 'publicationDirector'];
+}
+
+/** `false` tant qu'au moins une information requise manque. */
 export function isPublisherIdentityComplete(): boolean {
-  return !Object.values(PUBLISHER).some((v) => v.startsWith('À COMPLÉTER'));
+  return missingPublisherFields().length === 0;
 }
 
-/** Les champs encore vides, pour les nommer dans l'avertissement. */
+/** Les champs requis encore vides, pour les nommer dans l'avertissement. */
 export function missingPublisherFields(): string[] {
-  return Object.entries(PUBLISHER)
-    .filter(([, v]) => v.startsWith('À COMPLÉTER'))
-    .map(([k]) => k);
+  return requiredFields().filter((key) => {
+    const value = PUBLISHER[key];
+    return !value || value.startsWith('À COMPLÉTER');
+  });
 }
 
-/** L'éditeur en une ligne : « Nom (SAS au capital de 1 000 €) ». */
+/** L'éditeur en une ligne : « Nom (SAS au capital de 1 000 €) ». Pour un
+ * particulier resté anonyme, une formule neutre plutôt qu'un vide. */
 export function publisherLine(): string {
+  if (!PUBLISHER.name) return 'L’éditeur de Predict';
   const parts = [PUBLISHER.name];
   if (PUBLISHER.legalForm) {
-    parts.push(PUBLISHER.capital ? `${PUBLISHER.legalForm} au capital de ${PUBLISHER.capital} €` : PUBLISHER.legalForm);
+    parts.push(
+      PUBLISHER.capital
+        ? `${PUBLISHER.legalForm} au capital de ${PUBLISHER.capital} €`
+        : PUBLISHER.legalForm
+    );
   }
   return parts.length > 1 ? `${parts[0]} (${parts.slice(1).join(', ')})` : parts[0];
+}
+
+/**
+ * Le paragraphe d'identification des Mentions légales, adapté au régime.
+ *
+ * Écrit ici plutôt que dans `legalContent.ts` : un particulier non
+ * professionnel n'a pas de SIRET ni de siège, et une phrase à trous du genre
+ * « immatriculée sous le numéro SIRET  , dont le siège est situé  » serait pire
+ * que pas de phrase du tout.
+ */
+export function publisherIdentityParagraph(): string {
+  if (PUBLISHER.kind === 'company') {
+    return `L’application Predict est éditée par ${publisherLine()}, immatriculée sous le numéro SIRET ${PUBLISHER.siret}, dont le siège est situé ${PUBLISHER.address}.`;
+  }
+  return (
+    'L’application Predict est éditée par un particulier, à titre non professionnel et sans but commercial. ' +
+    'Conformément à l’article 6-III-2 de la loi pour la confiance dans l’économie numérique, son identité n’est ' +
+    `pas rendue publique ; elle a été communiquée à l’hébergeur, qui la tient à disposition de l’autorité judiciaire. ` +
+    `Toute demande peut être adressée à ${PUBLISHER.contactEmail}.`
+  );
+}
+
+/** Le directeur de la publication — sans objet pour un particulier anonyme. */
+export function publicationDirectorParagraph(): string | null {
+  if (PUBLISHER.kind !== 'company') return null;
+  return `Directeur de la publication : ${PUBLISHER.publicationDirector}.`;
 }
