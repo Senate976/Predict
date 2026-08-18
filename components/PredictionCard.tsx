@@ -1,5 +1,7 @@
 import { useRouter } from 'expo-router';
 import {
+  CircleCheck,
+  CircleX,
   Eye,
   EyeOff,
   Flag,
@@ -906,14 +908,6 @@ export function PredictionCard({
           porte donc que le teaser d'une Déclaration, quand il y en a un. */}
       {!isQuestion && !!item.teaser && <Text style={styles.envTeaser}>{item.teaser}</Text>}
 
-      {/* Pendant l'attente, l'auteur ne voit qu'un NOMBRE : la répartition lui
-          dirait si on le croit, or il peut encore modifier sa prédiction. */}
-      {isAuthor && cardState.kind === 'sealed' && betCount > 0 && (
-        <Text style={styles.betNote}>
-          {betCount} pari{betCount > 1 ? 's' : ''} en cours
-        </Text>
-      )}
-
       {/* Le dénouement — c'est ici que le mécanisme paie. */}
       {betOutcome && <Text style={styles.betOutcome}>{betOutcome}</Text>}
 
@@ -940,32 +934,62 @@ export function PredictionCard({
               enveloppe scellée (la date y est écrite en haut, sur le rabat).
               Aucune hauteur ajoutée, donc les proportions de l'enveloppe et la
               position du sceau ne bougent pas d'un pixel. */}
+          {/* Deux signes, aucun mot : l'enveloppe porte déjà l'auteur, le
+              teaser, la date et trois icônes d'action. `CircleCheck` et
+              `CircleX` plutôt que les `Check`/`X` nus employés ailleurs dans
+              l'app (cases à cocher, fermetures) : cerclés, ils se lisent comme
+              une paire de choix et non comme une validation de formulaire. */}
+          {/* Ce que voit l'AUTEUR : combien de personnes ont parié, jamais dans
+              quel sens — la répartition lui dirait si on le croit, or il peut
+              encore modifier sa prédiction tant qu'elle est scellée. Posé ici
+              plutôt qu'en ligne de texte sous le teaser : l'enveloppe scellée
+              porte déjà l'auteur, le teaser, la date et trois icônes. */}
+          {isAuthor && cardState.kind === 'sealed' && betCount > 0 && (
+            <View style={styles.betCountRow} accessibilityLabel={`${betCount} pari en cours`}>
+              <CircleCheck size={20} color={colors.footerIconInactive} strokeWidth={1.75} />
+              <Text style={styles.betCountText}>{betCount}</Text>
+            </View>
+          )}
+
           {canBet && myBet === null && (
             <View style={styles.betRow}>
               <Pressable
                 onPress={() => handleBet(true)}
-                style={styles.betPill}
-                hitSlop={6}
+                style={styles.betIcon}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="J’y crois"
               >
-                <Text style={styles.betPillText}>J’y crois</Text>
+                <CircleCheck size={22} color={colors.icon} strokeWidth={1.75} />
               </Pressable>
               <Pressable
                 onPress={() => handleBet(false)}
-                style={styles.betPill}
-                hitSlop={6}
+                style={styles.betIcon}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Je n’y crois pas"
               >
-                <Text style={styles.betPillText}>Non</Text>
+                <CircleX size={22} color={colors.icon} strokeWidth={1.75} />
               </Pressable>
             </View>
           )}
 
-          {/* Une fois le pari posé, les deux boutons cèdent la place à ce qu'ils
-              ont produit. Le choix ne se represente pas : c'est un engagement,
-              pas un réglage. */}
+          {/* Le pari posé : un seul signe reste, dans une encre affirmée. Comme
+              l'autre choix a disparu, aucun état « sélectionné » n'est
+              nécessaire pour comprendre lequel a été retenu. Le jaune pour
+              l'accord et l'encre pour le doute suivent la distinction déjà
+              faite ailleurs entre Réalisé (accent plein) et Manqué (neutre). */}
           {canBet && myBet !== null && (
-            <Text style={styles.betPlaced}>
-              {myBet ? 'Tu y crois' : 'Tu n’y crois pas'}
-            </Text>
+            <View
+              style={styles.betIcon}
+              accessibilityLabel={myBet ? 'Tu y crois' : 'Tu n’y crois pas'}
+            >
+              {myBet ? (
+                <CircleCheck size={22} color={colors.accent} strokeWidth={2.25} />
+              ) : (
+                <CircleX size={22} color={colors.text} strokeWidth={2.25} />
+              )}
+            </View>
           )}
 
           {isAuthor && cardState.kind === 'sealed' && item.open_ended && (
@@ -1512,23 +1536,12 @@ function createStyles(colors: Colors) {
   // Plus de `flexShrink` : c'est lui qui la laissait se réduire à néant. Elle
   // garde sa largeur, et c'est la rangée qui passe à la ligne si besoin.
   envRevealHint: { fontFamily: fonts.label, fontSize: 13, color: colors.textMuted },
-  // Compact à dessein : ces deux boutons partagent une rangée avec les icônes
-  // d'action, et ne doivent jamais la faire passer à la ligne.
-  betRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, minWidth: 0 },
-  betPill: {
-    flexShrink: 1,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    backgroundColor: colors.surface,
-  },
-  betPillText: { fontFamily: fonts.label, fontSize: 13, color: colors.textMuted },
-  // Le pari posé : une affirmation, pas un bouton. Encre pleine pour qu'elle se
-  // lise comme un fait acquis, sans contour qui inviterait à re-toucher.
-  betPlaced: { fontFamily: fonts.bodyEmphasis, fontSize: 13, color: colors.text },
-  betNote: { fontFamily: fonts.label, fontSize: 13, color: colors.textFaint, marginTop: 4 },
+  betRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  // Même gabarit que les icônes du pied de carte, pour que la rangée reste
+  // alignée qu'on ait parié ou non.
+  betIcon: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
+  betCountRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  betCountText: { fontFamily: fonts.label, fontSize: 13, color: colors.textMuted },
   betOutcome: { fontFamily: fonts.bodyEmphasis, fontSize: 14, color: colors.text, marginTop: 4 },
   sealedBadge: { position: 'absolute', left: '50%', zIndex: 2 },
   // Corps de carte assourdi une fois Manquée — jamais le badge d'état,
