@@ -24,6 +24,11 @@ export async function pickPredictionPhoto(): Promise<{ uri: string | null; error
     return { uri: null, error: new Error('Autorisation d’accès aux photos refusée.') };
   }
 
+  // `allowsEditing` ouvre l'outil de recadrage du système : c'est lui qui
+  // permet de cibler un détail précis d'une photo. Aucun `aspect` n'est imposé
+  // — en fixer un forcerait toutes les photos à la même forme, alors qu'un
+  // portrait doit rester un portrait (l'affichage suit désormais la forme
+  // réelle, voir `PredictionPhoto`).
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
     allowsEditing: true,

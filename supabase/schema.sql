@@ -4345,11 +4345,19 @@ begin
     where f.status = 'accepted'
       and (f.requester_id = auth.uid() or f.addressee_id = auth.uid());
   elsif p_scope = 'group' then
+    -- Ouvert à TOUT membre accepté, plus au seul propriétaire : un groupe où
+    -- seul son créateur peut publier n'est pas un groupe. L'auteur est exclu
+    -- des destinataires, sinon il recevrait une notification « nouveau
+    -- Predict » pour le sien — `notify_new_teaser` se déclenche à chaque ligne
+    -- de `prediction_access`, y compris la sienne depuis que le propriétaire
+    -- est lui-même membre (section 61).
     insert into public.prediction_access (prediction_id, user_id)
     select v_id, gm.friend_id
     from public.group_members gm
-    join public.groups g on g.id = gm.group_id
-    where gm.group_id = p_group_id and g.owner_id = auth.uid() and gm.status = 'accepted';
+    where gm.group_id = p_group_id
+      and gm.status = 'accepted'
+      and gm.friend_id <> auth.uid()
+      and public.is_group_member(p_group_id, auth.uid());
   else
     foreach v_recipient in array coalesce(p_friend_ids, array[]::uuid[]) loop
       insert into public.prediction_access (prediction_id, user_id)
@@ -5995,7 +6003,12 @@ select
   (
     select b4.believes from public.prediction_bets b4
     where b4.prediction_id = p.id and b4.bettor_id = auth.uid()
-  ) as my_bet
+  ) as my_bet,
+  p.group_id,
+  -- Le nom du groupe visé, quand la prédiction en cible un. Sert à écrire
+  -- « Aux Potes » plutôt que d'énumérer ses douze membres : le groupe EST
+  -- le destinataire, la liste n'apprend rien et noie l'information.
+  (select g.name from public.groups g where g.id = p.group_id) as group_name
 from public.predictions p
 left join public.prediction_contents pc on pc.prediction_id = p.id;
 
@@ -6094,7 +6107,103 @@ revoke all on function public.get_prediscore(uuid) from public;
 grant execute on function public.get_prediscore(uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 61. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 61. Le créateur d'un groupe en est membre
+-- ---------------------------------------------------------------------------
+--
+-- `groups.owner_id` désignait le propriétaire, mais aucune ligne ne le plaçait
+-- dans `group_members`. Conséquence : il n'apparaissait pas dans la liste des
+-- membres de son propre groupe, et surtout `create_prediction` en portée
+-- « groupe » exigeait `g.owner_id = auth.uid()` — un membre ne pouvait donc
+-- jamais adresser un Predict au groupe qu'il a rejoint.
+--
+-- Le propriétaire rejoint donc `group_members` avec le statut 'accepted' : il
+-- n'a personne à qui demander la permission d'entrer chez lui.
+create or replace function public.add_owner_as_member()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.group_members (group_id, friend_id, status)
+  values (new.id, new.owner_id, 'accepted')
+  on conflict (group_id, friend_id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists groups_add_owner_as_member on public.groups;
+create trigger groups_add_owner_as_member
+  after insert on public.groups
+  for each row execute function public.add_owner_as_member();
+
+-- Rattrapage des groupes déjà créés avant ce correctif.
+insert into public.group_members (group_id, friend_id, status)
+select g.id, g.owner_id, 'accepted' from public.groups g
+on conflict (group_id, friend_id) do nothing;
+
+-- `notify_group_invite` ne doit pas prévenir le propriétaire de sa propre
+-- création : le trigger ci-dessus insère une ligne 'accepted', jamais
+-- 'pending', donc la condition existante suffit — mais on s'en assure ici,
+-- car une ligne 'pending' pour soi-même produirait une invitation à se
+-- rejoindre soi-même.
+create or replace function public.notify_group_invite()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.status = 'pending' and new.friend_id <> (
+    select g.owner_id from public.groups g where g.id = new.group_id
+  ) then
+    insert into public.notifications (user_id, group_id, type)
+    select new.friend_id, new.group_id, 'group_invite'
+    from public.profiles p
+    where p.id = new.friend_id
+      and coalesce((p.notification_prefs->>'group_invite')::boolean, true)
+    on conflict (user_id, group_id, type) where (type = 'group_invite') do nothing;
+  end if;
+  return new;
+end;
+$$;
+
+
+-- ---------------------------------------------------------------------------
+-- 62. Photo joignable à une prédiction révélée d'emblée
+-- ---------------------------------------------------------------------------
+--
+-- La policy d'envoi exigeait `reveal_at > now()` : la prédiction devait être
+-- encore scellée. Or une prédiction créée avec « Révéler immédiatement » a
+-- `reveal_at = now()`, donc déjà passé quand l'envoi de la photo suit la
+-- création. Toute photo jointe à une telle prédiction était refusée, avec le
+-- message « new row violates row-level security policy ».
+--
+-- La condition devient : l'auteur peut envoyer tant qu'AUCUNE photo n'est
+-- encore associée (le cas de la création, quel que soit le mode de
+-- révélation), ou tant que la prédiction est scellée (le cas du remplacement
+-- avant révélation, qui existait déjà). On ne peut donc toujours pas changer
+-- la photo après coup pour réécrire l'histoire.
+drop policy if exists "prediction_photos_insert" on storage.objects;
+create policy "prediction_photos_insert"
+  on storage.objects
+  for insert
+  to authenticated
+  with check (
+    bucket_id = 'prediction-photos'
+    and exists (
+      select 1 from public.predictions p
+      -- `photo_path` vit sur `prediction_contents`, pas sur `predictions` :
+      -- c'est une donnée du contenu scellé, au même titre que le texte.
+      left join public.prediction_contents pc on pc.prediction_id = p.id
+      where p.id::text = (storage.foldername(name))[1]
+        and p.author_id = auth.uid()
+        and (pc.photo_path is null or p.reveal_at > now())
+    )
+  );
+
+-- ---------------------------------------------------------------------------
+-- 63. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une

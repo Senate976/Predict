@@ -60,16 +60,20 @@ type RawNotification = {
   is_read: boolean;
   created_at: string;
   prediction: { teaser: string; author_id: string } | null;
-  group: { name: string; owner: { username: string } | null } | null;
+  group: { name: string; owner_id: string } | null;
 };
 
 /**
  * Les notifications de l'utilisateur, les plus récentes en tête.
  *
- * `owner:profiles!groups_owner_id_fkey(username)` — hint explicite requis :
- * `group_members` relie déjà `groups` et `profiles` (via `friend_id`), donc
- * sans préciser la contrainte, PostgREST trouve deux chemins possibles entre
- * les deux tables et refuse de deviner lequel embarquer.
+ * Le propriétaire du groupe n'est PAS embarqué non plus. Il l'était, avec un
+ * hint explicite (`owner:profiles!groups_owner_id_fkey`), et le résultat était
+ * faux : l'invitation annonçait le pseudo de l'INVITÉ au lieu de celui de
+ * l'invitant. `group_members` relie déjà `groups` à `profiles` par
+ * `friend_id` ; quand le hint ne prend pas, PostgREST résout par ce chemin et
+ * ramène les membres visibles du groupe — c'est-à-dire, pour l'invité et à
+ * cause de la RLS, sa propre ligne. Même parade que partout ailleurs ici :
+ * deux requêtes simples, assemblage côté client, aucun embed de `profiles`.
  *
  * L'auteur de la prédiction n'est PAS embarqué en `predictions(author:
  * profiles(...))` : PostgREST a renvoyé « more than one relationship was
@@ -86,7 +90,7 @@ export async function fetchNotifications(userId: string) {
     .select(
       'id, user_id, prediction_id, group_id, type, is_read, created_at, ' +
         'prediction:predictions(teaser, author_id), ' +
-        'group:groups(name, owner:profiles!groups_owner_id_fkey(username))'
+        'group:groups(name, owner_id)'
     )
     .eq('user_id', userId)
     .eq('is_dismissed', false)
@@ -112,6 +116,20 @@ export async function fetchNotifications(userId: string) {
     }
   }
 
+  // Pseudos des propriétaires de groupe, dans une requête à part — voir le
+  // commentaire de tête pour la raison.
+  const ownerIds = Array.from(
+    new Set(data.map((n) => n.group?.owner_id).filter((id): id is string => !!id))
+  );
+  const ownersById = new Map<string, string>();
+  if (ownerIds.length > 0) {
+    const { data: owners } = await supabase
+      .from('profiles')
+      .select('id, username')
+      .in('id', ownerIds);
+    for (const owner of owners ?? []) ownersById.set(owner.id, owner.username);
+  }
+
   const notifications: Notification[] = data.map((n) => ({
     id: n.id,
     user_id: n.user_id,
@@ -123,7 +141,14 @@ export async function fetchNotifications(userId: string) {
     prediction: n.prediction
       ? { teaser: n.prediction.teaser, author: authorsById.get(n.prediction.author_id) ?? null }
       : null,
-    group: n.group,
+    group: n.group
+      ? {
+          name: n.group.name,
+          owner: ownersById.has(n.group.owner_id)
+            ? { username: ownersById.get(n.group.owner_id)! }
+            : null,
+        }
+      : null,
   }));
 
   return { data: notifications, error: null };
