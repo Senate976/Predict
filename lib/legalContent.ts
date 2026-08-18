@@ -1,4 +1,9 @@
-import { PUBLISHER, publisherLine } from './publisherIdentity';
+import {
+  PUBLISHER,
+  publicationDirectorParagraph,
+  publisherIdentityParagraph,
+  publisherLine,
+} from './publisherIdentity';
 import type { LegalDocId } from './settingsSections';
 
 export type LegalSection = { heading: string; paragraphs: string[] };
@@ -21,11 +26,14 @@ export const LEGAL_CONTENT: Record<LegalDocId, LegalDocContent> = {
     sections: [
       {
         heading: 'Éditeur de l’application',
+        // `filter` : le directeur de la publication n'existe pas pour un
+        // particulier non professionnel. Mieux vaut retirer la ligne que
+        // publier « Directeur de la publication : . »
         paragraphs: [
-          `L’application Predict est éditée par ${publisherLine()}, immatriculée sous le numéro SIRET ${PUBLISHER.siret}, dont le siège est situé ${PUBLISHER.address}.`,
-          `Directeur de la publication : ${PUBLISHER.publicationDirector}.`,
+          publisherIdentityParagraph(),
+          publicationDirectorParagraph(),
           `Contact : ${PUBLISHER.contactEmail}.`,
-        ],
+        ].filter((paragraph): paragraph is string => paragraph !== null),
       },
       {
         heading: 'Hébergement',

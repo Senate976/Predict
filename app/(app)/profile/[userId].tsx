@@ -192,12 +192,6 @@ export default function FriendProfileScreen() {
                         : `Bloquer ${profile.username}`}
                   </Text>
                 </Pressable>
-
-                <Text style={styles.moderationHint}>
-                  {blocked
-                    ? 'Vous ne voyez plus rien l’un de l’autre. Débloquer rétablit la situation ; il faudra redevenir amis.'
-                    : 'Bloquer coupe le lien des deux côtés : plus aucun Predict ni commentaire, et votre amitié est retirée.'}
-                </Text>
               </View>
             )}
           </>
@@ -284,7 +278,6 @@ function createStyles(colors: Colors) {
   moderationRowLast: { paddingBottom: 6 },
   moderationText: { fontSize: 16, color: colors.text },
   moderationTextDanger: { color: colors.danger },
-  moderationHint: { fontSize: 14, color: colors.textFaint, lineHeight: 20, marginTop: 4 },
   statValue: { fontFamily: fonts.body, fontSize: 32, color: colors.text },
   statLabel: { fontSize: 14, color: colors.textFaint, marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 },
   error: {
