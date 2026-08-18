@@ -125,7 +125,13 @@ export const LEGAL_CONTENT: Record<LegalDocId, LegalDocContent> = {
       {
         heading: '9. Droit applicable',
         paragraphs: [
-          `Les présentes CGU sont soumises au droit français. Tout litige relève, à défaut de résolution amiable, des tribunaux compétents du ressort de ${PUBLISHER.jurisdictionCity}.`,
+          // Aucune ville nommée, volontairement. Une clause qui désigne un
+          // tribunal précis est de toute façon inopposable à un consommateur en
+          // France (art. R. 631-3 du code de la consommation) : il peut
+          // toujours saisir la juridiction de son domicile. Nommer une ville
+          // n'apportait donc rien, et obligeait l'éditeur à deviner de quel
+          // ressort dépend sa commune.
+          'Les présentes CGU sont soumises au droit français. À défaut de résolution amiable, tout litige relève des juridictions françaises compétentes. Si tu agis en qualité de consommateur, tu conserves le droit de saisir la juridiction de ton lieu de résidence.',
         ],
       },
       {
@@ -192,7 +198,11 @@ export const LEGAL_CONTENT: Record<LegalDocId, LegalDocContent> = {
       {
         heading: '8. Transferts hors Union européenne',
         paragraphs: [
-          `Région d’hébergement : ${PUBLISHER.dataRegion}. Si elle se situe hors de l’Union européenne, les garanties de transfert (clauses contractuelles types ou équivalent) doivent être précisées ici.`,
+          // Cette phrase énonçait auparavant ce que l'éditeur DEVAIT écrire
+          // selon la région choisie : une note de rédaction, pas un texte
+          // destiné à qui lit la politique. Elle dit maintenant le fait.
+          `Tes données sont stockées dans l’Union européenne : la base est hébergée à Francfort (Allemagne), région ${PUBLISHER.dataRegion.split(' ')[0]}.`,
+          'Supabase Inc. et Vercel Inc. étant des sociétés de droit américain, leurs équipes techniques peuvent accéder aux données depuis les États-Unis dans le cadre de l’exploitation du service. Ces accès sont encadrés par l’accord de traitement des données conclu avec chaque prestataire, qui intègre les clauses contractuelles types de la Commission européenne.',
         ],
       },
       {
