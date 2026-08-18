@@ -13,7 +13,7 @@ import { Text } from '../../../components/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
-import { CreateFab } from '../../../components/CreateFab';
+import { BottomNavBar } from '../../../components/BottomNavBar';
 import { PredictWord } from '../../../components/PredictWord';
 import { PrediscoreGauge } from '../../../components/PrediscoreGauge';
 import { fetchProfileById, type FriendProfile } from '../../../lib/friends';
@@ -168,7 +168,7 @@ export default function FriendProfileScreen() {
         </Pressable>
       </Modal>
 
-      <CreateFab />
+      <BottomNavBar />
     </SafeAreaView>
   );
 }
@@ -205,7 +205,7 @@ function createStyles(colors: Colors) {
     borderColor: colors.border,
     alignItems: 'center',
   },
-  username: { fontFamily: fonts.bodyEmphasis, fontSize: 22, color: colors.text, marginTop: 10 },
+  username: { fontFamily: fonts.bodyEmphasis, fontSize: 26, color: colors.text, marginTop: 10 },
   prediscoreWrap: { width: '50%', minWidth: 180, alignSelf: 'center' },
   statsRow: { flexDirection: 'row', gap: 8, marginTop: spacing.lg },
   statCard: {
@@ -217,8 +217,8 @@ function createStyles(colors: Colors) {
     borderColor: colors.border,
     alignItems: 'center',
   },
-  statValue: { fontFamily: fonts.body, fontSize: 26, color: colors.text },
-  statLabel: { fontSize: 13, color: colors.textFaint, marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 },
+  statValue: { fontFamily: fonts.body, fontSize: 32, color: colors.text },
+  statLabel: { fontSize: 14, color: colors.textFaint, marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 },
   error: {
     color: colors.danger,
     backgroundColor: colors.dangerSoft,

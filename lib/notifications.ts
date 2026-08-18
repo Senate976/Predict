@@ -12,7 +12,11 @@ export type NotificationType =
   | 'prediction_missed'
   | 'reveal_reminder'
   | 'question_answered'
-  | 'new_comment';
+  | 'new_comment'
+  /** Rappel adressé à l'AUTEUR d'une prédiction « Libre » encore scellée,
+   * répété tous les 7 jours (voir `generate_open_reminders`, schema.sql
+   * section 54) — sans date de révélation, rien ne la ferait remonter. */
+  | 'open_reminder';
 
 /**
  * Une notification telle que renvoyée par `public.notifications`. Selon le

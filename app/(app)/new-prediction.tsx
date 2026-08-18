@@ -782,7 +782,7 @@ export default function NewPredictionScreen() {
                         disabled={submitting}
                         style={[styles.friendChip, selected && styles.friendChipActive]}
                       >
-                        <Avatar url={friend.avatar_url} username={friend.username} size={20} />
+                        <Avatar url={friend.avatar_url} username={friend.username} size={56} />
                         <Text
                           style={[
                             styles.friendChipText,
@@ -935,21 +935,25 @@ function createStyles(colors: Colors) {
   },
   checkboxChecked: { backgroundColor: colors.accent, borderColor: colors.accent },
   revealNowText: { fontSize: 14, fontWeight: '600', color: colors.text },
-  friendsBox: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: spacing.md },
+  // Une ligne par ami plutôt que des étiquettes qui s'enroulent : avec des
+  // avatars à la taille du Cercle (56), deux par rangée ne tenaient plus et
+  // l'œil ne savait plus où lire. La liste se parcourt de haut en bas, comme
+  // celle des amis.
+  friendsBox: { marginTop: spacing.md },
   searchLoader: { marginTop: spacing.sm },
-  // Étiquettes façon tags de presse : texte simple, trait noir sous le choix
-  // sélectionné — assez d'espace autour pour rester facile à toucher malgré
-  // l'absence de contour.
+  // Trait noir sous la ligne sélectionnée — même repère que les autres choix
+  // de cet écran, tiré sur toute la largeur maintenant qu'il s'agit d'une
+  // ligne et non plus d'une étiquette.
   friendChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingVertical: 6,
+    gap: 12,
+    paddingVertical: 8,
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
   friendChipActive: { borderBottomColor: colors.text },
-  friendChipText: { fontSize: 14, color: colors.textMuted, fontWeight: '600' },
+  friendChipText: { fontSize: 17, color: colors.textMuted, fontWeight: '600', flexShrink: 1 },
   friendChipTextActive: { color: colors.text, fontWeight: '700' },
   error: {
     color: colors.danger,

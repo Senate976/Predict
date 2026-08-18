@@ -132,6 +132,10 @@ export default function HomeScreen() {
     await Promise.all([
       supabase.rpc('generate_reveal_notifications'),
       supabase.rpc('generate_reveal_reminders'),
+      // Et le rappel hebdomadaire adressé à l'auteur d'une prédiction
+      // « Libre » toujours scellée : sans date, personne ne l'ouvrira à sa
+      // place et rien ne la ferait remonter d'elle-même.
+      supabase.rpc('generate_open_reminders'),
     ]);
 
     const { data, error: fetchError } = await fetchPredictionsFeed();

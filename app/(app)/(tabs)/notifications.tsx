@@ -77,6 +77,12 @@ function notificationLabel(notification: Notification) {
           Un <PredictWord /> se révèle bientôt
         </>
       );
+    case 'open_reminder':
+      return (
+        <>
+          Ton <PredictWord /> attend toujours d’être révélé
+        </>
+      );
     case 'question_answered':
       return 'Quelqu’un a répondu à ton Sondage';
     case 'new_comment':
