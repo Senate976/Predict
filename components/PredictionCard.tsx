@@ -60,6 +60,7 @@ import {
   PredictBadge,
   WASH,
 } from './EnvelopeArt';
+import { betOutcomeLabel, placeBet } from '../lib/bets';
 import { InlineComments } from './InlineComments';
 import { InlineQuestionAnswer } from './InlineQuestionAnswer';
 import { PhotoAttachButton } from './PhotoAttachButton';
@@ -292,6 +293,11 @@ export function PredictionCard({
    * temps qu'il se termine.
    */
   const reactionGestureRef = useRef(0);
+  // Le pari se pose d'un tap : l'affichage bascule immédiatement, sans attendre
+  // la base. C'est un geste léger et réversible — faire patienter un curseur
+  // pour ça casserait la fluidité recherchée.
+  const [myBet, setMyBet] = useState<boolean | null>(item.my_bet);
+  const [betCount, setBetCount] = useState(item.bet_count ?? 0);
   const env = useMemo(() => {
     const W = envelopeWidth;
     const H = W / ENVELOPE_RATIO;
@@ -590,6 +596,36 @@ export function PredictionCard({
 
   const totalReactions = Object.values(emojiCounts).reduce((sum, count) => sum + (count ?? 0), 0);
 
+  /**
+   * Parier, ou changer d'avis. Un second tap sur le même choix ne l'annule
+   * pas : sur une rangée de deux boutons, l'annulation par re-tap se déclenche
+   * surtout par accident. On change d'avis en touchant l'autre, ce qui est le
+   * geste qu'on a en tête.
+   */
+  async function handleBet(believes: boolean) {
+    if (myBet === believes) return;
+    const previous = myBet;
+    setMyBet(believes);
+    if (previous === null) setBetCount((n) => n + 1);
+    const { error } = await placeBet(item.id, believes);
+    if (error) {
+      setMyBet(previous);
+      if (previous === null) setBetCount((n) => Math.max(0, n - 1));
+    }
+  }
+
+  /* Parier n'a de sens que sur la Déclaration d'un autre, encore scellée.
+     Pas sur un Sondage : on y RÉPOND, il n'y a pas de « vrai ou faux » auquel
+     croire — et le Prediscore ne compte de toute façon que les paris tranchés
+     par un verdict, qu'un Sondage n'a pas. Accessoirement, la rangée du bas
+     porte déjà trois icônes sur un Sondage et n'aurait pas la place.
+     La base refuse tout le reste (`place_bet`) ; ici on se contente de ne pas
+     le proposer. */
+  const canBet = !isAuthor && !isQuestion && cardState.kind === 'sealed';
+  const betOutcome = revealed
+    ? betOutcomeLabel(item.believer_count ?? 0, item.doubter_count ?? 0, item.final_status)
+    : null;
+
   // Panneau de réactions façon Facebook : maintenir le doigt sur le pouce
   // fait apparaître la bulle, la faire glisser dessus grossit l'emoji
   // survolé, et relâcher le doigt sur l'un d'eux le valide. Un tap simple
@@ -870,6 +906,17 @@ export function PredictionCard({
           porte donc que le teaser d'une Déclaration, quand il y en a un. */}
       {!isQuestion && !!item.teaser && <Text style={styles.envTeaser}>{item.teaser}</Text>}
 
+      {/* Pendant l'attente, l'auteur ne voit qu'un NOMBRE : la répartition lui
+          dirait si on le croit, or il peut encore modifier sa prédiction. */}
+      {isAuthor && cardState.kind === 'sealed' && betCount > 0 && (
+        <Text style={styles.betNote}>
+          {betCount} pari{betCount > 1 ? 's' : ''} en cours
+        </Text>
+      )}
+
+      {/* Le dénouement — c'est ici que le mécanisme paie. */}
+      {betOutcome && <Text style={styles.betOutcome}>{betOutcome}</Text>}
+
       {/* Le bouton « Révéler », réservé à l'auteur d'une carte encore Scellée,
           tient sur la ligne du bas plutôt que sur une ligne à lui : sur sa
           propre ligne il allongeait l'enveloppe, et les cartes de l'auteur ne
@@ -889,6 +936,33 @@ export function PredictionCard({
               quand son auteur le décide — sinon la date ne veut plus rien
               dire. La fonction SQL `reveal_prediction_now` pose la même
               condition, ce bouton ne fait que ne pas la proposer. */}
+          {/* Les deux paris prennent la place laissée libre à droite sur une
+              enveloppe scellée (la date y est écrite en haut, sur le rabat).
+              Aucune hauteur ajoutée, donc les proportions de l'enveloppe et la
+              position du sceau ne bougent pas d'un pixel. */}
+          {canBet && (
+            <View style={styles.betRow}>
+              <Pressable
+                onPress={() => handleBet(true)}
+                style={[styles.betPill, myBet === true && styles.betPillYes]}
+                hitSlop={6}
+              >
+                <Text style={[styles.betPillText, myBet === true && styles.betPillTextYes]}>
+                  J’y crois
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => handleBet(false)}
+                style={[styles.betPill, myBet === false && styles.betPillNo]}
+                hitSlop={6}
+              >
+                <Text style={[styles.betPillText, myBet === false && styles.betPillTextNo]}>
+                  Non
+                </Text>
+              </Pressable>
+            </View>
+          )}
+
           {isAuthor && cardState.kind === 'sealed' && item.open_ended && (
             <Pressable
               onPress={handleRevealNow}
@@ -1419,6 +1493,31 @@ function createStyles(colors: Colors) {
     minHeight: 30,
   },
   envRevealHint: { fontFamily: fonts.label, fontSize: 13, color: colors.textMuted, flexShrink: 1 },
+  // Compact à dessein : ces deux boutons partagent une rangée avec les icônes
+  // d'action, et ne doivent jamais la faire passer à la ligne.
+  betRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, minWidth: 0 },
+  betPill: {
+    flexShrink: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: colors.surface,
+  },
+  betPillYes: { backgroundColor: colors.accent, borderColor: colors.accent },
+  // Le refus ne se distingue pas par une couleur d'alerte : ce n'est pas une
+  // erreur d'être sceptique. Contour plein, même registre que l'accord.
+  betPillNo: { backgroundColor: colors.text, borderColor: colors.text },
+  betPillText: { fontFamily: fonts.label, fontSize: 13, color: colors.textMuted },
+  // Deux encres distinctes : le jaune demande une encre sombre (`textOnAccent`,
+  // comme sur tous les boutons dorés de l'app), l'aplat d'encre demande la
+  // couleur du fond. Une seule valeur pour les deux aurait donné du presque
+  // blanc sur jaune en mode clair.
+  betPillTextYes: { color: colors.textOnAccent },
+  betPillTextNo: { color: colors.background },
+  betNote: { fontFamily: fonts.label, fontSize: 13, color: colors.textFaint, marginTop: 4 },
+  betOutcome: { fontFamily: fonts.bodyEmphasis, fontSize: 14, color: colors.text, marginTop: 4 },
   sealedBadge: { position: 'absolute', left: '50%', zIndex: 2 },
   // Corps de carte assourdi une fois Manquée — jamais le badge d'état,
   // rendu séparément avant ce conteneur et donc toujours à `opacity: 1`.
