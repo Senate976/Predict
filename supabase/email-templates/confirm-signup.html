@@ -1,0 +1,56 @@
+<!-- Modèle « Confirm signup » — à coller dans Supabase :
+     Authentication → Emails → Confirm signup.
+     Objet suggéré : Confirme ton adresse pour activer ton compte Predict
+     Styles en ligne uniquement : les clients mail (Gmail, Outlook) suppriment
+     les feuilles de style externes et une bonne partie de ce qui est dans
+     <head>. Ce qui n'est pas écrit sur la balise elle-même ne survit pas. -->
+<div style="margin:0;padding:32px 16px;background-color:#f9fcfe;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <div style="max-width:480px;margin:0 auto;background-color:#ffffff;border:1px solid rgba(66,97,112,0.15);border-radius:14px;padding:36px 32px;">
+
+    <p style="margin:0 0 28px;text-align:center;font-size:20px;letter-spacing:6px;text-transform:uppercase;color:#1c2737;">
+      <strong>P</strong>REDICT
+    </p>
+
+    <h1 style="margin:0 0 16px;font-size:22px;line-height:30px;color:#1c2737;font-weight:700;">
+      Plus qu'une étape
+    </h1>
+
+    <p style="margin:0 0 16px;font-size:15px;line-height:23px;color:#426170;">
+      Ton compte Predict est créé. Confirme ton adresse email pour l'activer et
+      commencer à sceller tes prédictions.
+    </p>
+
+    <p style="margin:0 0 28px;font-size:15px;line-height:23px;color:#426170;">
+      Ce lien est valable 24 heures.
+    </p>
+
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 28px;">
+      <tr>
+        <td style="border-radius:999px;background-color:#eca835;">
+          <a href="{{ .ConfirmationURL }}"
+             style="display:inline-block;padding:15px 34px;font-size:15px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#1c2737;text-decoration:none;">
+            Confirmer mon adresse
+          </a>
+        </td>
+      </tr>
+    </table>
+
+    <p style="margin:0 0 8px;font-size:13px;line-height:20px;color:rgba(66,97,112,0.7);">
+      Si le bouton ne fonctionne pas, copie ce lien dans ton navigateur :
+    </p>
+    <p style="margin:0 0 28px;font-size:13px;line-height:20px;word-break:break-all;">
+      <a href="{{ .ConfirmationURL }}" style="color:#426170;">{{ .ConfirmationURL }}</a>
+    </p>
+
+    <hr style="border:none;border-top:1px solid rgba(66,97,112,0.15);margin:0 0 20px;">
+
+    <p style="margin:0 0 8px;font-size:13px;line-height:20px;color:rgba(66,97,112,0.7);">
+      Tu n'es pas à l'origine de cette inscription ? Ignore simplement cet
+      email : sans confirmation, aucun compte ne sera activé avec ton adresse.
+    </p>
+    <p style="margin:0;font-size:13px;line-height:20px;color:rgba(66,97,112,0.7);">
+      Predict — tes prédictions ne sont visibles que par le Cercle que tu choisis.
+    </p>
+
+  </div>
+</div>

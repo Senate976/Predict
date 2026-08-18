@@ -1,28 +1,49 @@
 import type { AuthError, PostgrestError } from '@supabase/supabase-js';
+import { Check, Eye, EyeOff, X } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
-import { Text } from '../../components/Text';
-import { TextInput } from '../../components/TextInput';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PredictWord } from '../../components/PredictWord';
+import { Text } from '../../components/Text';
+import { TextInput } from '../../components/TextInput';
+import { LEGAL_CONTENT } from '../../lib/legalContent';
+import { DEFAULT_NOTIFICATION_PREFS } from '../../lib/settings';
+import type { LegalDocId } from '../../lib/settingsSections';
 import { supabase } from '../../lib/supabase';
 import { eyebrow, fonts, radius, spacing, type Colors } from '../../lib/theme';
 import { useColors } from '../../lib/themeMode';
 
 type Mode = 'signIn' | 'signUp';
 
-const MIN_PASSWORD_LENGTH = 6;
+const MIN_PASSWORD_LENGTH = 8;
 const MIN_USERNAME_LENGTH = 3;
 const MAX_USERNAME_LENGTH = 20;
+
+/**
+ * Les exigences du mot de passe, énoncées une seule fois et vérifiées à
+ * l'affichage comme à la validation. Une seule liste : impossible d'afficher
+ * une règle que le code ne contrôle pas, ou l'inverse.
+ */
+const PASSWORD_RULES: { label: string; test: (value: string) => boolean }[] = [
+  { label: `${MIN_PASSWORD_LENGTH} caractères minimum`, test: (v) => v.length >= MIN_PASSWORD_LENGTH },
+  { label: 'Une lettre', test: (v) => /[a-zA-Z]/.test(v) },
+  { label: 'Un chiffre', test: (v) => /[0-9]/.test(v) },
+  { label: 'Un signe (! ? * - … )', test: (v) => /[^a-zA-Z0-9]/.test(v) },
+];
+
+function passwordIssues(value: string): string[] {
+  return PASSWORD_RULES.filter((rule) => !rule.test(value)).map((rule) => rule.label);
+}
 
 /** Détecte les échecs réseau, qui remontent en anglais depuis fetch. */
 function isNetworkFailure(message: string): boolean {
@@ -40,7 +61,7 @@ function authErrorMessage(error: AuthError): string {
     case 'email_exists':
       return 'Cette adresse email est déjà utilisée.';
     case 'weak_password':
-      return `Mot de passe trop faible (${MIN_PASSWORD_LENGTH} caractères minimum).`;
+      return `Mot de passe trop faible (${MIN_PASSWORD_LENGTH} caractères minimum, dont un chiffre et un signe).`;
     case 'invalid_credentials':
       return 'Email ou mot de passe incorrect.';
     case 'email_not_confirmed':
@@ -94,18 +115,36 @@ async function checkUsernameAvailable(candidate: string): Promise<boolean | null
   return data;
 }
 
+/** Case à cocher carrée, reprise du reste de l'app (écran de création). */
+function Checkbox({ checked }: { checked: boolean }) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
+      {checked && <Check size={14} color={colors.background} strokeWidth={3} />}
+    </View>
+  );
+}
+
 export default function LoginScreen() {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [mode, setMode] = useState<Mode>('signUp');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [username, setUsername] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [notificationsAccepted, setNotificationsAccepted] = useState(true);
+  const [openDoc, setOpenDoc] = useState<LegalDocId | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const isSignUp = mode === 'signUp';
+  // La liste des exigences ne s'affiche qu'une fois la saisie commencée : à
+  // vide, elle se lirait comme quatre reproches avant même d'avoir tapé.
+  const showPasswordRules = isSignUp && password.length > 0;
 
   function switchMode() {
     setMode(isSignUp ? 'signIn' : 'signUp');
@@ -117,10 +156,13 @@ export default function LoginScreen() {
   function validate(): string | null {
     if (!email.trim()) return 'Renseigne ton adresse email.';
     if (!password) return 'Renseigne un mot de passe.';
-    if (password.length < MIN_PASSWORD_LENGTH) {
-      return `Le mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH} caractères.`;
-    }
+
     if (isSignUp) {
+      const issues = passwordIssues(password);
+      if (issues.length > 0) {
+        return `Mot de passe incomplet — il manque : ${issues.join(', ').toLowerCase()}.`;
+      }
+
       const trimmed = username.trim();
       if (trimmed.length < MIN_USERNAME_LENGTH) {
         return `Le pseudo doit contenir au moins ${MIN_USERNAME_LENGTH} caractères.`;
@@ -130,6 +172,9 @@ export default function LoginScreen() {
       }
       if (!/^[a-zA-Z0-9_.]+$/.test(trimmed)) {
         return 'Le pseudo ne peut contenir que des lettres, chiffres, _ et .';
+      }
+      if (!termsAccepted) {
+        return 'Accepte les Conditions Générales d’Utilisation pour créer ton compte.';
       }
     }
     return null;
@@ -146,13 +191,28 @@ export default function LoginScreen() {
       return;
     }
 
+    // Refusées à l'inscription, toutes les notifications partent à `false`.
+    // Le réglage reste modifiable ensuite (Réglages › Notifications) : c'est
+    // un choix de départ, pas une porte fermée.
+    const notificationPrefs = notificationsAccepted
+      ? DEFAULT_NOTIFICATION_PREFS
+      : Object.fromEntries(Object.keys(DEFAULT_NOTIFICATION_PREFS).map((k) => [k, false]));
+
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: email.trim(),
       password,
       // Le username est aussi stocké dans les metadata : c'est le seul endroit
       // où il survit si la session n'est pas ouverte immédiatement (confirmation
       // d'email activée), et ça permet à un trigger côté base de le récupérer.
-      options: { data: { username: trimmedUsername } },
+      // L'acceptation des CGU y est jointe pour la même raison : elle doit être
+      // horodatée au moment du consentement, pas à la première connexion.
+      options: {
+        data: {
+          username: trimmedUsername,
+          terms_accepted_at: new Date().toISOString(),
+          notifications_opt_in: notificationsAccepted,
+        },
+      },
     });
 
     if (signUpError) {
@@ -170,7 +230,7 @@ export default function LoginScreen() {
 
     if (!data.session) {
       setNotice(
-        'Compte créé. Vérifie ta boîte mail pour confirmer ton adresse, puis connecte-toi.'
+        `Compte créé. Un email de confirmation vient de partir vers ${email.trim()} — ouvre-le pour activer ton compte, puis reviens te connecter. Pense à regarder tes spams.`
       );
       setMode('signIn');
       setPassword('');
@@ -180,9 +240,12 @@ export default function LoginScreen() {
     // Session ouverte : on peut écrire dans `profiles`, la RLS voit bien
     // auth.uid(). `upsert` rend l'opération idempotente si un trigger côté base
     // a déjà créé la ligne.
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .upsert({ id: data.session.user.id, username: trimmedUsername });
+    const { error: profileError } = await supabase.from('profiles').upsert({
+      id: data.session.user.id,
+      username: trimmedUsername,
+      terms_accepted_at: new Date().toISOString(),
+      notification_prefs: notificationPrefs,
+    });
 
     if (profileError) {
       setError(profileErrorMessage(profileError));
@@ -233,6 +296,8 @@ export default function LoginScreen() {
     }
   }
 
+  const doc = openDoc ? LEGAL_CONTENT[openDoc] : null;
+
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
@@ -243,93 +308,229 @@ export default function LoginScreen() {
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.brand}>
-            <PredictWord />
-          </Text>
-          <Text style={styles.title}>
-            {isSignUp ? 'Créer un compte' : 'Se connecter'}
-          </Text>
+          {/* Colonne de largeur bornée, centrée : sur un navigateur large, un
+              formulaire étalé sur 1400 px se lit mal et fait tout sauf sérieux. */}
+          <View style={styles.column}>
+            <View style={styles.headerBlock}>
+              <Text style={styles.brand}>
+                <PredictWord />
+              </Text>
+              <Text style={styles.tagline}>Scelle tes prédictions. Le temps te donnera raison.</Text>
+            </View>
 
-          {isSignUp && (
+            <Text style={styles.title}>
+              {isSignUp ? 'Créer un compte' : 'Bon retour'}
+            </Text>
+            <Text style={styles.subtitle}>
+              {isSignUp
+                ? 'Trois informations suffisent. Ton pseudo est ce que ton Cercle verra.'
+                : 'Retrouve ton Cercle et tes Predicts en attente.'}
+            </Text>
+
+            {isSignUp && (
+              <View style={styles.field}>
+                <View style={styles.labelRow}>
+                  <Text style={styles.label}>Pseudo</Text>
+                  <Text style={styles.required}>obligatoire</Text>
+                </View>
+                <TextInput
+                  value={username}
+                  onChangeText={setUsername}
+                  placeholder="ton_pseudo"
+                  placeholderTextColor={colors.textFaint}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="username"
+                  editable={!submitting}
+                  style={styles.input}
+                />
+                <Text style={styles.fieldHint}>
+                  {MIN_USERNAME_LENGTH} à {MAX_USERNAME_LENGTH} caractères — lettres, chiffres, « _ » et « . ».
+                  C’est par lui qu’on t’ajoutera dans un Cercle.
+                </Text>
+              </View>
+            )}
+
             <View style={styles.field}>
-              <Text style={styles.label}>Pseudo</Text>
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Email</Text>
+                <Text style={styles.required}>obligatoire</Text>
+              </View>
               <TextInput
-                value={username}
-                onChangeText={setUsername}
-                placeholder="ton_pseudo"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="toi@exemple.com"
+                placeholderTextColor={colors.textFaint}
+                keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
-                autoComplete="username"
+                autoComplete="email"
                 editable={!submitting}
                 style={styles.input}
               />
-              <Text style={styles.fieldHint}>
-                {MIN_USERNAME_LENGTH} à {MAX_USERNAME_LENGTH} caractères — lettres, chiffres, « _ » et « . » uniquement.
-              </Text>
             </View>
-          )}
 
-          <View style={styles.field}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder="toi@exemple.com"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="email"
-              editable={!submitting}
-              style={styles.input}
-            />
-          </View>
+            <View style={styles.field}>
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Mot de passe</Text>
+                <Text style={styles.required}>obligatoire</Text>
+              </View>
+              <View style={styles.passwordRow}>
+                <TextInput
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder={isSignUp ? 'Choisis un mot de passe' : 'Ton mot de passe'}
+                  placeholderTextColor={colors.textFaint}
+                  secureTextEntry={!passwordVisible}
+                  autoCapitalize="none"
+                  autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                  editable={!submitting}
+                  onSubmitEditing={handleSubmit}
+                  returnKeyType="go"
+                  style={[styles.input, styles.passwordInput]}
+                />
+                <Pressable
+                  onPress={() => setPasswordVisible((v) => !v)}
+                  style={styles.passwordToggle}
+                  hitSlop={8}
+                  accessibilityLabel={passwordVisible ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                >
+                  {passwordVisible ? (
+                    <EyeOff size={20} color={colors.icon} strokeWidth={1.75} />
+                  ) : (
+                    <Eye size={20} color={colors.icon} strokeWidth={1.75} />
+                  )}
+                </Pressable>
+              </View>
 
-          <View style={styles.field}>
-            <Text style={styles.label}>Mot de passe</Text>
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder={`${MIN_PASSWORD_LENGTH} caractères minimum`}
-              secureTextEntry
-              autoCapitalize="none"
-              autoComplete={isSignUp ? 'new-password' : 'current-password'}
-              editable={!submitting}
-              onSubmitEditing={handleSubmit}
-              returnKeyType="go"
-              style={styles.input}
-            />
-          </View>
+              {/* Chaque règle se coche en direct pendant la frappe : on sait
+                  toujours ce qu'il reste à faire, plutôt que de se le voir
+                  reprocher après coup au moment de valider. */}
+              {showPasswordRules && (
+                <View style={styles.rules}>
+                  {PASSWORD_RULES.map((rule) => {
+                    const ok = rule.test(password);
+                    return (
+                      <View key={rule.label} style={styles.ruleRow}>
+                        {ok ? (
+                          <Check size={15} color={colors.accent} strokeWidth={3} />
+                        ) : (
+                          <X size={15} color={colors.textFaint} strokeWidth={2.5} />
+                        )}
+                        <Text style={[styles.ruleText, ok && styles.ruleTextOk]}>{rule.label}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
 
-          {error && <Text style={styles.error}>{error}</Text>}
-          {notice && <Text style={styles.notice}>{notice}</Text>}
+            {isSignUp && (
+              <View style={styles.consents}>
+                <Pressable
+                  onPress={() => setTermsAccepted((v) => !v)}
+                  disabled={submitting}
+                  style={styles.consentRow}
+                >
+                  <Checkbox checked={termsAccepted} />
+                  <Text style={styles.consentText}>
+                    J’ai lu et j’accepte les{' '}
+                    <Text style={styles.link} onPress={() => setOpenDoc('terms')}>
+                      Conditions Générales d’Utilisation
+                    </Text>{' '}
+                    et la{' '}
+                    <Text style={styles.link} onPress={() => setOpenDoc('privacy')}>
+                      Politique de confidentialité
+                    </Text>
+                    . <Text style={styles.required}>obligatoire</Text>
+                  </Text>
+                </Pressable>
 
-          <Pressable
-            onPress={handleSubmit}
-            disabled={submitting}
-            style={({ pressed }) => [
-              styles.submit,
-              pressed && styles.submitPressed,
-              submitting && styles.submitDisabled,
-            ]}
-          >
-            {submitting ? (
-              <ActivityIndicator color={colors.text} />
-            ) : (
-              <Text style={styles.submitText}>
-                {isSignUp ? 'Créer mon compte' : 'Se connecter'}
-              </Text>
+                <Pressable
+                  onPress={() => setNotificationsAccepted((v) => !v)}
+                  disabled={submitting}
+                  style={styles.consentRow}
+                >
+                  <Checkbox checked={notificationsAccepted} />
+                  <Text style={styles.consentText}>
+                    Je veux être prévenu des révélations et de l’activité de mon Cercle.{' '}
+                    <Text style={styles.optional}>facultatif, modifiable à tout moment</Text>
+                  </Text>
+                </Pressable>
+              </View>
             )}
-          </Pressable>
 
-          <Pressable onPress={switchMode} disabled={submitting} style={styles.switch}>
-            <Text style={styles.switchText}>
-              {isSignUp
-                ? 'Déjà un compte ? Se connecter'
-                : 'Pas encore de compte ? En créer un'}
+            {error && <Text style={styles.error}>{error}</Text>}
+            {notice && <Text style={styles.notice}>{notice}</Text>}
+
+            <Pressable
+              onPress={handleSubmit}
+              disabled={submitting}
+              style={({ pressed }) => [
+                styles.submit,
+                pressed && styles.submitPressed,
+                submitting && styles.submitDisabled,
+              ]}
+            >
+              {submitting ? (
+                <ActivityIndicator color={colors.textOnAccent} />
+              ) : (
+                <Text style={styles.submitText}>
+                  {isSignUp ? 'Créer mon compte' : 'Se connecter'}
+                </Text>
+              )}
+            </Pressable>
+
+            <Pressable onPress={switchMode} disabled={submitting} style={styles.switch}>
+              <Text style={styles.switchText}>
+                {isSignUp
+                  ? 'Déjà un compte ? Se connecter'
+                  : 'Pas encore de compte ? En créer un'}
+              </Text>
+            </Pressable>
+
+            <Text style={styles.legalFootnote}>
+              Tes Predicts ne sont visibles que par les personnes de ton Cercle que tu choisis.
+              Aucune donnée n’est revendue.{' '}
+              <Text style={styles.link} onPress={() => setOpenDoc('mentions')}>
+                Mentions légales
+              </Text>
             </Text>
-          </Pressable>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Les textes légaux sont lisibles AVANT de cocher : les enfermer
+          derrière l'écran Réglages reviendrait à faire accepter un document
+          qu'on ne peut pas consulter. */}
+      <Modal visible={openDoc !== null} animationType="slide" onRequestClose={() => setOpenDoc(null)}>
+        <SafeAreaView style={styles.safe}>
+          <View style={styles.docHeader}>
+            <Pressable onPress={() => setOpenDoc(null)} hitSlop={8}>
+              <Text style={styles.back}>Fermer</Text>
+            </Pressable>
+            <View style={styles.headerSpacer} />
+          </View>
+          <ScrollView contentContainerStyle={styles.docScroll}>
+            {doc && (
+              <>
+                <Text style={styles.docUpdatedAt}>Mis à jour le {doc.updatedAt}</Text>
+                {doc.intro && <Text style={styles.docParagraph}>{doc.intro}</Text>}
+                {doc.sections.map((section) => (
+                  <View key={section.heading} style={styles.docSection}>
+                    <Text style={styles.docHeading}>{section.heading}</Text>
+                    {section.paragraphs.map((paragraph, i) => (
+                      <Text key={i} style={styles.docParagraph}>
+                        {paragraph}
+                      </Text>
+                    ))}
+                  </View>
+                ))}
+              </>
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -339,23 +540,52 @@ function createStyles(colors: Colors) {
   safe: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: spacing.lg },
+  // Colonne bornée et centrée — c'est elle qui tient toute la mise en page.
+  column: { width: '100%', maxWidth: 460, alignSelf: 'center' },
+  headerBlock: { alignItems: 'center', marginBottom: spacing.xl },
   brand: {
     fontFamily: fonts.display,
-    fontSize: 18,
-    letterSpacing: 4,
+    fontSize: 26,
+    letterSpacing: 6,
     color: colors.text,
     textTransform: 'uppercase',
-    marginBottom: 8,
+    textAlign: 'center',
+  },
+  tagline: {
+    fontSize: 15,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginTop: 10,
+    lineHeight: 21,
   },
   title: {
     fontFamily: fonts.display,
     fontSize: 30,
     color: colors.text,
-    marginBottom: 28,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 15,
+    color: colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 21,
+    marginTop: 8,
+    marginBottom: spacing.lg,
   },
   field: { marginBottom: spacing.md },
-  label: { ...eyebrow(colors), marginBottom: 6 },
-  fieldHint: { fontSize: 14, color: colors.textFaint, marginTop: 6 },
+  labelRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 },
+  label: eyebrow(colors),
+  // Mention portée par chaque champ concerné plutôt qu'un astérisque renvoyant
+  // à une légende en bas de page : l'information est là où la question se pose.
+  required: {
+    fontFamily: fonts.label,
+    fontSize: 12,
+    color: colors.accent,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  optional: { fontSize: 14, color: colors.textFaint },
+  fieldHint: { fontSize: 14, color: colors.textFaint, marginTop: 6, lineHeight: 19 },
   input: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -366,12 +596,35 @@ function createStyles(colors: Colors) {
     color: colors.text,
     backgroundColor: colors.surface,
   },
+  passwordRow: { position: 'relative', justifyContent: 'center' },
+  passwordInput: { paddingRight: 48 },
+  passwordToggle: { position: 'absolute', right: 12, height: '100%', justifyContent: 'center' },
+  rules: { marginTop: 10, gap: 5 },
+  ruleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  ruleText: { fontSize: 14, color: colors.textFaint },
+  ruleTextOk: { color: colors.text },
+  consents: { marginTop: 4, marginBottom: spacing.md, gap: 14 },
+  consentRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  consentText: { flex: 1, fontSize: 14, color: colors.textMuted, lineHeight: 20 },
+  link: { color: colors.text, fontFamily: fonts.bodyEmphasis, textDecorationLine: 'underline' },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  checkboxChecked: { backgroundColor: colors.accent, borderColor: colors.accent },
   error: {
     color: colors.danger,
     backgroundColor: colors.dangerSoft,
     borderRadius: radius.sm,
     padding: 12,
     fontSize: 14,
+    lineHeight: 20,
     marginBottom: spacing.sm,
   },
   notice: {
@@ -380,6 +633,7 @@ function createStyles(colors: Colors) {
     borderRadius: radius.sm,
     padding: 12,
     fontSize: 14,
+    lineHeight: 20,
     marginBottom: spacing.sm,
   },
   submit: {
@@ -396,6 +650,29 @@ function createStyles(colors: Colors) {
   // Texte sombre sur le bouton jaune — `text` (blanc en mode sombre) y serait peu lisible.
   submitText: { fontFamily: fonts.sansBold, color: colors.textOnAccent, fontSize: 16, textTransform: 'uppercase', letterSpacing: 0.5 },
   switch: { marginTop: 18, alignItems: 'center' },
-  switchText: { fontFamily: fonts.bodyEmphasis, color: colors.text, fontSize: 14 },
+  switchText: { fontFamily: fonts.bodyEmphasis, color: colors.text, fontSize: 15 },
+  legalFootnote: {
+    fontSize: 13,
+    color: colors.textFaint,
+    textAlign: 'center',
+    lineHeight: 19,
+    marginTop: spacing.xl,
+  },
+  // --- Lecture d'un document légal, en plein écran -------------------------
+  docHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  back: { fontSize: 15, color: colors.text },
+  headerSpacer: { flex: 1 },
+  docScroll: { padding: spacing.lg, maxWidth: 640, alignSelf: 'center', width: '100%' },
+  docUpdatedAt: { fontSize: 14, color: colors.textFaint, marginBottom: spacing.md },
+  docSection: { marginTop: spacing.lg },
+  docHeading: { fontFamily: fonts.display, fontSize: 19, color: colors.text, marginBottom: 8 },
+  docParagraph: { fontSize: 15, color: colors.textMuted, lineHeight: 23, marginBottom: 10 },
   });
 }

@@ -27,6 +27,22 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
+-- Date d'acceptation des CGU et de la Politique de confidentialité, cochées à
+-- l'inscription. Horodatée plutôt que booléenne : ce qui compte juridiquement
+-- est de pouvoir dire QUAND le consentement a été donné, pas seulement qu'il
+-- l'a été. `null` pour les comptes créés avant l'ajout de la case — c'est un
+-- état à distinguer d'un refus, et non à confondre avec lui.
+alter table public.profiles add column if not exists terms_accepted_at timestamptz;
+
+-- Préférences de notification. Déclarée ici, et non à la section Paramètres
+-- qui les expose (plus bas), parce que `handle_new_user` — juste en dessous —
+-- l'alimente dès l'inscription : une colonne créée après la fonction qui
+-- l'écrit ne tient que par l'ordre d'exécution, ce qui est un piège pour la
+-- prochaine modification. Le `add column if not exists` de la section
+-- Paramètres devient un simple no-op.
+alter table public.profiles add column if not exists notification_prefs jsonb not null
+  default '{"new_teaser":true,"prediction_revealed":true,"prediction_verdict":true,"prediction_mentioned":true,"group_invite":true}'::jsonb;
+
 -- Le `create table if not exists` ci-dessus est un no-op si la table existe
 -- déjà — y compris si son `id` n'est pas un uuid (cas d'une table créée via le
 -- Table Editor, qui met un `bigint identity` par défaut). Les policies de la
@@ -171,10 +187,22 @@ security definer
 set search_path = ''
 as $$
 begin
-  insert into public.profiles (id, username)
+  -- `terms_accepted_at` et les préférences de notification viennent des
+  -- metadata posées par `signUp` : quand la confirmation d'email est activée,
+  -- aucune session n'est ouverte à l'inscription et le client ne PEUT pas
+  -- écrire dans `profiles` lui-même. Sans ce relais, le consentement recueilli
+  -- à l'écran serait perdu, et l'utilisateur se retrouverait avec les
+  -- notifications par défaut quel que soit son choix.
+  insert into public.profiles (id, username, terms_accepted_at, notification_prefs)
   values (
     new.id,
-    coalesce(new.raw_user_meta_data ->> 'username', 'joueur_' || left(new.id::text, 8))
+    coalesce(new.raw_user_meta_data ->> 'username', 'joueur_' || left(new.id::text, 8)),
+    (new.raw_user_meta_data ->> 'terms_accepted_at')::timestamptz,
+    case
+      when coalesce((new.raw_user_meta_data ->> 'notifications_opt_in')::boolean, true)
+        then '{"new_teaser": true, "prediction_revealed": true, "prediction_verdict": true, "prediction_mentioned": true, "group_invite": true}'::jsonb
+      else '{"new_teaser": false, "prediction_revealed": false, "prediction_verdict": false, "prediction_mentioned": false, "group_invite": false}'::jsonb
+    end
   )
   on conflict (id) do nothing;
   return new;
