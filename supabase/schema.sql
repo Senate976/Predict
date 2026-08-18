@@ -5612,7 +5612,145 @@ revoke all on function public.export_own_data() from public;
 grant execute on function public.export_own_data() to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 58. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 58. Notifications push : jetons d'appareil et déclenchement planifié
+-- ---------------------------------------------------------------------------
+--
+-- Jusqu'ici, une « notification » était une ligne de table, créée seulement
+-- quand quelqu'un ouvrait le Fil (`generate_reveal_notifications` &co. sont
+-- appelées par le client). Deux conséquences : rien n'arrivait jamais sur un
+-- téléphone verrouillé, et si personne n'ouvrait l'app pendant une semaine,
+-- aucune révélation n'était constatée pendant une semaine — alors que toute la
+-- promesse du produit est « le 12 mars, tu sauras ».
+--
+-- Cette section corrige la cause : les jetons d'appareil sont stockés, et la
+-- génération est planifiée côté serveur.
+
+create table if not exists public.push_tokens (
+  -- Le jeton lui-même est la clé : un même appareil réinstallé en reçoit un
+  -- nouveau, et un jeton ne peut appartenir qu'à un compte à la fois (se
+  -- déconnecter puis reconnecter avec un autre compte doit le réattribuer,
+  -- pas le dupliquer — d'où l'upsert côté app).
+  token text primary key,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  platform text not null check (platform in ('ios', 'android', 'web')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists push_tokens_user_idx on public.push_tokens (user_id);
+
+alter table public.push_tokens enable row level security;
+
+drop policy if exists "push_tokens_select_own" on public.push_tokens;
+create policy "push_tokens_select_own"
+  on public.push_tokens for select to authenticated
+  using (user_id = auth.uid());
+
+drop policy if exists "push_tokens_insert_own" on public.push_tokens;
+create policy "push_tokens_insert_own"
+  on public.push_tokens for insert to authenticated
+  with check (user_id = auth.uid());
+
+drop policy if exists "push_tokens_update_own" on public.push_tokens;
+create policy "push_tokens_update_own"
+  on public.push_tokens for update to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+drop policy if exists "push_tokens_delete_own" on public.push_tokens;
+create policy "push_tokens_delete_own"
+  on public.push_tokens for delete to authenticated
+  using (user_id = auth.uid());
+
+-- Marque qu'une notification a été poussée, pour ne pas la renvoyer à chaque
+-- passage de la tâche planifiée. `null` = jamais poussée.
+alter table public.notifications add column if not exists pushed_at timestamptz;
+
+-- Ce que la fonction d'envoi doit expédier : les notifications jamais poussées,
+-- avec le jeton de chaque appareil du destinataire. Récente uniquement (24 h) :
+-- réveiller quelqu'un pour une révélation d'il y a trois jours n'a pas de sens,
+-- et évite un envoi massif au premier déploiement.
+create or replace function public.pending_push_notifications()
+returns table (
+  notification_id uuid,
+  token text,
+  platform text,
+  type text,
+  teaser text,
+  author_username text
+)
+language sql
+security definer
+stable
+set search_path = ''
+as $$
+  select n.id, t.token, t.platform, n.type, p.teaser, pr.username
+  from public.notifications n
+  join public.push_tokens t on t.user_id = n.user_id
+  left join public.predictions p on p.id = n.prediction_id
+  left join public.profiles pr on pr.id = p.author_id
+  where n.pushed_at is null
+    and not n.is_dismissed
+    and n.created_at > now() - interval '24 hours'
+  order by n.created_at;
+$$;
+
+revoke all on function public.pending_push_notifications() from public;
+grant execute on function public.pending_push_notifications() to service_role;
+
+create or replace function public.mark_notifications_pushed(p_ids uuid[])
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  update public.notifications set pushed_at = now() where id = any(p_ids);
+$$;
+
+revoke all on function public.mark_notifications_pushed(uuid[]) from public;
+grant execute on function public.mark_notifications_pushed(uuid[]) to service_role;
+
+-- Regroupe les trois générateurs, pour n'avoir qu'un seul appel à planifier.
+create or replace function public.generate_all_notifications()
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform public.generate_reveal_notifications();
+  perform public.generate_reveal_reminders();
+  perform public.generate_open_reminders();
+end;
+$$;
+
+revoke all on function public.generate_all_notifications() from public;
+grant execute on function public.generate_all_notifications() to authenticated, service_role;
+
+-- Planification côté serveur, indépendante de qui ouvre l'app. `pg_cron` n'est
+-- pas activé par défaut sur tous les plans Supabase : le bloc échoue en silence
+-- plutôt que d'interrompre tout le script, et un message explique quoi faire.
+-- Sans lui, l'app continue de fonctionner exactement comme avant (génération au
+-- chargement du Fil) — c'est une amélioration, pas une dépendance.
+do $$
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.unschedule('predict_generate_notifications')
+      where exists (select 1 from cron.job where jobname = 'predict_generate_notifications');
+    perform cron.schedule(
+      'predict_generate_notifications',
+      '*/5 * * * *',
+      $cron$ select public.generate_all_notifications(); $cron$
+    );
+    raise notice 'pg_cron : generation des notifications planifiee toutes les 5 minutes.';
+  else
+    raise notice 'pg_cron absent : les notifications restent generees a l ouverture du Fil. Pour les planifier, activer l extension pg_cron (Database > Extensions) puis rejouer ce fichier.';
+  end if;
+exception when others then
+  raise notice 'pg_cron non configurable ici (%). Les notifications restent generees a l ouverture du Fil.', sqlerrm;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 59. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une

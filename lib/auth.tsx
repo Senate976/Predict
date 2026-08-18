@@ -3,12 +3,14 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type PropsWithChildren,
 } from 'react';
 import { Platform } from 'react-native';
 
 import type { PredictionScope } from './predictions';
+import { registerForPush, unregisterPush } from './push';
 import { supabase } from './supabase';
 
 const VALID_OTP_TYPES = new Set([
@@ -194,7 +196,36 @@ export function AuthProvider({ children }: PropsWithChildren) {
     };
   }, [userId]);
 
+  /**
+   * Enregistre l'appareil pour les notifications push, une fois connecté.
+   *
+   * Le jeton est conservé ici pour pouvoir le retirer à la déconnexion : sans
+   * ça, l'appareil continuerait de recevoir les notifications du compte
+   * précédent — y compris si quelqu'un d'autre se connecte dessus.
+   */
+  const pushTokenRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    registerForPush(userId).then((result) => {
+      if (cancelled) return;
+      if (result.status === 'ok') pushTokenRef.current = result.token;
+      // Un refus ou un environnement sans push (web, simulateur, projet EAS pas
+      // encore lié) n'est pas une anomalie : l'app fonctionne sans, les
+      // notifications restent visibles dans l'onglet dédié.
+      else if (result.status === 'error') console.warn('Notifications push :', result.message);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
   const signOut = async () => {
+    if (pushTokenRef.current) {
+      await unregisterPush(pushTokenRef.current);
+      pushTokenRef.current = null;
+    }
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   };
