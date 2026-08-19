@@ -32,7 +32,20 @@ export async function uploadPredictionAudio(predictionId: string, uri: string) {
 
 /** Associe le fichier déjà envoyé à la prédiction — colonne à part, RLS à part. */
 export async function setPredictionAudioPath(predictionId: string, path: string) {
-  return supabase.from('prediction_contents').update({ audio_path: path }).eq('prediction_id', predictionId);
+  // Même vérification que pour la photo (`setPredictionPhotoPath`) : un UPDATE
+  // refusé par la RLS ne renvoie pas d'erreur, il ne touche aucune ligne. Sans
+  // ce contrôle, le vocal partirait vers le stockage sans jamais être associé.
+  const { data, error } = await supabase
+    .from('prediction_contents')
+    .update({ audio_path: path })
+    .eq('prediction_id', predictionId)
+    .select('prediction_id');
+
+  if (error) return { error };
+  if (!data || data.length === 0) {
+    return { error: { message: 'la base a refusé d’associer le vocal à ce Predict.' } };
+  }
+  return { error: null };
 }
 
 /**

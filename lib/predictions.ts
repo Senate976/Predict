@@ -553,8 +553,34 @@ export async function removeRecipient(predictionId: string, userId: string) {
  * suppression de son contenu, de son audience, des votes et des
  * commentaires (contraintes `on delete cascade`).
  */
+/**
+ * Supprime définitivement une prédiction. La base efface tout ce qui pend
+ * après elle — contenu, accès, paris, relances, réponses, commentaires,
+ * notifications — par cascade : il n'y a rien à nettoyer ici.
+ *
+ * `.select()` n'est pas décoratif. Sans lui, un DELETE que la RLS refuse ne
+ * renvoie AUCUNE erreur : il ne touche simplement aucune ligne, l'app croit
+ * avoir supprimé, retire la carte de sa liste — et la prédiction réapparaît
+ * au rechargement suivant. On exige donc de voir la ligne effacée, et on
+ * fabrique une erreur explicite quand il n'y en a pas.
+ */
 export async function deletePrediction(predictionId: string) {
-  return supabase.from('predictions').delete().eq('id', predictionId);
+  const { data, error } = await supabase
+    .from('predictions')
+    .delete()
+    .eq('id', predictionId)
+    .select('id');
+
+  if (error) return { error };
+  if (!data || data.length === 0) {
+    return {
+      error: {
+        message:
+          'la base a refusé la suppression. Recharge l’app et réessaie ; si ça persiste, c’est que cette prédiction n’est plus la tienne.',
+      },
+    };
+  }
+  return { error: null };
 }
 
 export type PredictionOutcomeStatus = 'pending' | 'realized' | 'missed';

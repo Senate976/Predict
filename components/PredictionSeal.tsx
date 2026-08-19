@@ -27,6 +27,20 @@ export function PredictionSeal({ visible, onFinish, glyph = 'P' }: Props) {
   const drop = useRef(new Animated.Value(0)).current;
   const pulse = useRef(new Animated.Value(0)).current;
 
+  /* `onFinish` est presque toujours écrit en ligne par l'appelant
+     (`onFinish={() => router.back()}`), donc c'est une NOUVELLE fonction à
+     chaque rendu du parent. Le laisser dans les dépendances de l'effet
+     relançait l'animation depuis zéro à chaque re-rendu : un parent qui se
+     re-rend pendant les 2,3 s de l'animation la redémarrait indéfiniment,
+     `onFinish` n'était jamais appelé, et l'écran restait figé sur place —
+     c'est très exactement ce qui se passait après « Sceller le Predict ».
+
+     La fonction passe donc par une référence, que l'effet lit au moment de
+     rappeler l'appelant. L'effet ne dépend plus que de `visible` : il démarre
+     l'animation une fois, et la laisse finir. */
+  const onFinishRef = useRef(onFinish);
+  onFinishRef.current = onFinish;
+
   useEffect(() => {
     if (!visible) return;
 
@@ -47,11 +61,11 @@ export function PredictionSeal({ visible, onFinish, glyph = 'P' }: Props) {
     ]);
 
     animation.start(({ finished }) => {
-      if (finished) onFinish();
+      if (finished) onFinishRef.current();
     });
 
     return () => animation.stop();
-  }, [visible, overlayOpacity, drop, pulse, onFinish]);
+  }, [visible, overlayOpacity, drop, pulse]);
 
   if (!visible) return null;
 

@@ -62,10 +62,27 @@ export async function uploadPredictionPhoto(predictionId: string, uri: string) {
   return uploadPhoto(CONTENT_BUCKET, predictionId, uri);
 }
 
-/** Associe le fichier déjà envoyé à la prédiction — colonne à part, RLS à part,
- * même principe que `setPredictionAudioPath` (lib/audio.ts). */
+/**
+ * Associe le fichier déjà envoyé à la prédiction — colonne à part, RLS à part,
+ * même principe que `setPredictionAudioPath` (lib/audio.ts).
+ *
+ * `.select()` est indispensable : un UPDATE que la RLS refuse ne renvoie pas
+ * d'erreur, il ne touche aucune ligne. Sans cette vérification, la photo
+ * partait bien vers le stockage mais son chemin n'était jamais associé — et
+ * elle n'apparaissait nulle part, sans le moindre message.
+ */
 export async function setPredictionPhotoPath(predictionId: string, path: string) {
-  return supabase.from('prediction_contents').update({ photo_path: path }).eq('prediction_id', predictionId);
+  const { data, error } = await supabase
+    .from('prediction_contents')
+    .update({ photo_path: path })
+    .eq('prediction_id', predictionId)
+    .select('prediction_id');
+
+  if (error) return { error };
+  if (!data || data.length === 0) {
+    return { error: { message: 'la base a refusé d’associer la photo à ce Predict.' } };
+  }
+  return { error: null };
 }
 
 /** Envoie la photo-preuve du verdict vers son propre bucket privé — le chemin

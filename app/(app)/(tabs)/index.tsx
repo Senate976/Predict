@@ -1,5 +1,13 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ChevronLeft, ChevronRight, SlidersHorizontal, User, XCircle } from 'lucide-react-native';
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  SlidersHorizontal,
+  User,
+  XCircle,
+} from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -42,6 +50,9 @@ import { useColors } from '../../../lib/themeMode';
  */
 const TICK_MS = 30_000;
 
+/** Nombre de cartes montrées par zone avant de devoir la déplier. */
+const ZONE_PREVIEW = 5;
+
 type AuthorInfo = { username: string; avatar_url: string | null };
 type AuthorMap = Record<string, AuthorInfo>;
 /* Plus d'onglets. Le Fil est UNE liste, coupée en deux zones qu'on fait
@@ -80,6 +91,8 @@ export default function HomeScreen() {
   });
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [sealedExpanded, setSealedExpanded] = useState(false);
+  const [openedExpanded, setOpenedExpanded] = useState(false);
   const [now, setNow] = useState(() => new Date());
   // « Predict » par défaut, à gauche — c'est ce qu'on veut voir en premier en
   // ouvrant l'app : ce qui reste à découvrir, pas ce qui est déjà joué.
@@ -329,6 +342,14 @@ export default function HomeScreen() {
   const unreadSealed = zoneSealed.filter((item) => !item.is_seen).length;
   const unreadOpened = zoneOpened.filter((item) => !item.is_seen).length;
 
+  /* Chaque zone ne montre que ses premières cartes, et se déplie d'un geste.
+     Sans ça, quelqu'un qui a cent Predicts scellés ne voyait jamais la zone
+     des Ouverts : il aurait fallu faire défiler cent enveloppes pour
+     l'atteindre. Les deux zones restent donc à portée d'écran, et on ouvre
+     celle qu'on veut lire. */
+  const visibleSealed = sealedExpanded ? zoneSealed : zoneSealed.slice(0, ZONE_PREVIEW);
+  const visibleOpened = openedExpanded ? zoneOpened : zoneOpened.slice(0, ZONE_PREVIEW);
+
   /* La carte est rendue à l'identique dans les deux zones : une seule
      fonction, pour qu'une correction faite d'un côté ne manque jamais de
      l'autre. */
@@ -551,7 +572,15 @@ export default function HomeScreen() {
                 unread={unreadSealed}
               />
             )}
-            {zoneSealed.map(renderCard)}
+            {visibleSealed.map(renderCard)}
+            <ZoneMore
+              styles={styles}
+              colors={colors}
+              total={zoneSealed.length}
+              shown={visibleSealed.length}
+              expanded={sealedExpanded}
+              onToggle={() => setSealedExpanded((e) => !e)}
+            />
 
             {zoneSealed.length > 0 && zoneOpened.length > 0 && (
               <ZoneTitle
@@ -561,7 +590,15 @@ export default function HomeScreen() {
                 unread={unreadOpened}
               />
             )}
-            {zoneOpened.map(renderCard)}
+            {visibleOpened.map(renderCard)}
+            <ZoneMore
+              styles={styles}
+              colors={colors}
+              total={zoneOpened.length}
+              shown={visibleOpened.length}
+              expanded={openedExpanded}
+              onToggle={() => setOpenedExpanded((e) => !e)}
+            />
           </>
         )}
       </ScrollView>
@@ -598,6 +635,45 @@ function ZoneTitle({
         </View>
       )}
     </View>
+  );
+}
+
+/**
+ * Le bouton qui déplie ou replie une zone.
+ *
+ * Absent quand tout est déjà montré : proposer « voir les 0 autres » n'a pas
+ * de sens, et un bouton qui ne fait rien coûte plus cher qu'il ne rapporte.
+ */
+function ZoneMore({
+  styles,
+  colors,
+  total,
+  shown,
+  expanded,
+  onToggle,
+}: {
+  styles: ReturnType<typeof createStyles>;
+  colors: Colors;
+  total: number;
+  shown: number;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const rest = total - shown;
+  if (!expanded && rest <= 0) return null;
+  if (expanded && total <= ZONE_PREVIEW) return null;
+
+  return (
+    <Pressable onPress={onToggle} style={styles.zoneMore} hitSlop={6}>
+      <Text style={styles.zoneMoreText}>
+        {expanded ? 'Replier' : rest === 1 ? 'Voir la dernière' : `Voir les ${rest} autres`}
+      </Text>
+      {expanded ? (
+        <ChevronUp size={18} color={colors.text} strokeWidth={2} />
+      ) : (
+        <ChevronDown size={18} color={colors.text} strokeWidth={2} />
+      )}
+    </Pressable>
   );
 }
 
@@ -657,6 +733,16 @@ function createStyles(colors: Colors) {
     justifyContent: 'center',
   },
   zoneBadgeText: { fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
+  // Centré sous les cartes de sa zone : c'est la suite de la liste, pas une
+  // action de la barre d'outils.
+  zoneMore: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+  },
+  zoneMoreText: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.text },
   filtersRow: {
     flexDirection: 'row',
     alignItems: 'center',
