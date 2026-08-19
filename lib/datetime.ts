@@ -120,6 +120,30 @@ export function formatTimeAgo(iso: string, now: Date): string {
   return days === 1 ? 'il y a 1 jour' : `il y a ${days} jours`;
 }
 
+/**
+ * Depuis combien de temps une prédiction est scellée : « 3 jours »,
+ * « 2 mois », « 1 an ».
+ *
+ * Remplace le compte à rebours sur les cartes scellées. Une prédiction n'a
+ * plus de date de révélation — c'est son auteur qui l'ouvre quand la réalité a
+ * tranché — donc il n'y a plus rien à décompter. Reste l'âge, qui dit quelque
+ * chose de vrai : une prédiction scellée depuis longtemps se remarque, sans
+ * que personne n'ait à en faire le reproche.
+ *
+ * Volontairement grossier au-delà de la semaine : « scellé depuis 3 mois » se
+ * lit d'un coup d'œil, « scellé depuis 94 jours » demande un calcul.
+ */
+export function formatSealedFor(createdAtIso: string, now: Date): string {
+  const days = Math.floor((now.getTime() - new Date(createdAtIso).getTime()) / 86_400_000);
+  if (days < 1) return 'aujourd’hui';
+  if (days === 1) return '1 jour';
+  if (days < 31) return `${days} jours`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return months === 1 ? '1 mois' : `${months} mois`;
+  const years = Math.floor(days / 365);
+  return years === 1 ? '1 an' : `${years} ans`;
+}
+
 /** « dans 12 min », « dans 3 h 05 », « dans 4 jours ». */
 export function formatCountdown(target: Date, from: Date): string {
   const ms = target.getTime() - from.getTime();

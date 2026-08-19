@@ -7,11 +7,10 @@ import { Text } from '../../../components/Text';
 import { useAuth } from '../../../lib/auth';
 import {
   fetchReminderSettings,
-  REMINDER_LEAD_OPTIONS,
   updateReminderSettings,
   type ReminderSettings,
 } from '../../../lib/settings';
-import { eyebrow, fonts, radius, spacing, type Colors } from '../../../lib/theme';
+import { fonts, radius, spacing, type Colors } from '../../../lib/theme';
 import { useColors } from '../../../lib/themeMode';
 
 /** Gestion du temps : rappel avant qu'un Predict qu'on peut voir se révèle —
@@ -70,11 +69,12 @@ export default function RemindersSettingsScreen() {
           <>
             <View style={styles.row}>
               <View style={styles.rowText}>
-                <Text style={styles.rowLabel}>Rappel avant révélation</Text>
+                <Text style={styles.rowLabel}>Rappel sur mes Predicts scellés</Text>
                 <Text style={styles.rowHint}>
-                  Une notification avant qu’un Predict que tu peux voir se révèle.
-                  Ce réglage couvre aussi le rappel hebdomadaire sur tes propres
-                  Predicts « Libres » encore scellés.
+                  Une notification chaque semaine tant qu'un de tes Predicts
+                  n'est pas ouvert. Plus aucun Predict n'a de date : sans ce
+                  rappel, rien ne te ferait penser à ouvrir celui dont la
+                  réponse est tombée.
                 </Text>
               </View>
               <Switch
@@ -87,29 +87,9 @@ export default function RemindersSettingsScreen() {
               />
             </View>
 
-            {settings?.enabled && (
-              <>
-                <Text style={[styles.eyebrow, styles.sectionSpacing]}>Délai</Text>
-                <View style={styles.group}>
-                  {REMINDER_LEAD_OPTIONS.map((option, i) => {
-                    const active = settings.leadMinutes === option.minutes;
-                    return (
-                      <Pressable
-                        key={option.minutes}
-                        onPress={() => persist({ ...settings, leadMinutes: option.minutes })}
-                        style={[
-                          styles.optionRow,
-                          i === REMINDER_LEAD_OPTIONS.length - 1 && styles.optionRowLast,
-                        ]}
-                      >
-                        <Text style={styles.optionText}>{option.label}</Text>
-                        {active && <View style={styles.optionDot} />}
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </>
-            )}
+            {/* Plus de choix de délai : il servait à dire combien de temps
+                AVANT une date on voulait être prévenu. Il n'y a plus de date,
+                donc plus rien à devancer — le rappel est hebdomadaire, point. */}
           </>
         )}
       </ScrollView>
@@ -134,8 +114,6 @@ function createStyles(colors: Colors) {
   headerSpacer: { width: 56 },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   loader: { marginTop: 24 },
-  eyebrow: { ...eyebrow(colors), marginBottom: 8 },
-  sectionSpacing: { marginTop: spacing.xl },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -150,25 +128,6 @@ function createStyles(colors: Colors) {
   rowText: { flex: 1 },
   rowLabel: { fontSize: 15, fontWeight: '600', color: colors.text },
   rowHint: { fontSize: 14, color: colors.textFaint, marginTop: 2 },
-  group: {
-    borderRadius: 16,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-  },
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  optionRowLast: { borderBottomWidth: 0 },
-  optionText: { fontSize: 15, color: colors.text, fontWeight: '600' },
-  optionDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.accent },
   error: {
     color: colors.danger,
     backgroundColor: colors.dangerSoft,

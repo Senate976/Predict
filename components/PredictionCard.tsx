@@ -28,7 +28,7 @@ import {
 import { Text } from './Text';
 
 import { fetchCommentCount } from '../lib/comments';
-import { formatCountdown } from '../lib/datetime';
+import { formatSealedFor } from '../lib/datetime';
 import { uploadVerdictPhoto } from '../lib/photos';
 import {
   castEmojiReaction,
@@ -955,9 +955,15 @@ export function PredictionCard({
      sur une ligne, le teaser dessous, puis les boutons d'action à gauche et la
      date de révélation à droite sur une dernière ligne. Sur une carte Scellée
      il vient sous le badge, sur une carte ouverte sous la lettre. */
-  const revealHintText = revealed
-    ? null
-    : `Révélation : ${item.open_ended ? 'libre' : formatCountdown(new Date(item.reveal_at), now)}`;
+  /**
+   * L'âge du scellé, à la place du compte à rebours.
+   *
+   * Il n'y a plus de date à décompter : une prédiction reste scellée jusqu'à
+   * ce que son auteur l'ouvre. L'âge, lui, dit quelque chose de vrai et de
+   * vérifiable — et c'est ce qui rend visible, sans accuser personne, une
+   * prédiction qu'on laisse dormir parce qu'on l'a perdue.
+   */
+  const revealHintText = revealed ? null : `Scellé depuis ${formatSealedFor(item.created_at, now)}`;
 
   const envelopeFooter = (
     <View style={[styles.envFooter, emojiPanelOpen && styles.envFooterRaised]}>

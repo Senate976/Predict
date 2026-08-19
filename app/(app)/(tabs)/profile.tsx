@@ -17,7 +17,7 @@ import { PredictWord } from '../../../components/PredictWord';
 import { PrediscoreGauge } from '../../../components/PrediscoreGauge';
 import { pickAvatarImage, removeAvatar, uploadAvatar } from '../../../lib/avatar';
 import { useAuth } from '../../../lib/auth';
-import { formatRevealAt } from '../../../lib/datetime';
+import { formatRevealAt, formatSealedFor } from '../../../lib/datetime';
 import { fetchProfileById } from '../../../lib/friends';
 import {
   fetchPredictionOutcomes,
@@ -278,9 +278,15 @@ export default function ProfileScreen() {
                   <Text style={styles.historyTeaser} numberOfLines={2}>
                     {item.teaser}
                   </Text>
+                  {/* La date n'est affichée QUE si la prédiction est ouverte :
+                      tant qu'elle est scellée, `reveal_at` ne porte que le
+                      repère technique lointain, et on lirait « le 19 août
+                      2031 ». On donne son âge à la place. */}
                   <Text style={styles.historyMeta}>
                     {statusLabel(item.final_status, item.is_revealed)} ·{' '}
-                    {formatRevealAt(new Date(item.reveal_at))}
+                    {item.is_revealed
+                      ? formatRevealAt(new Date(item.reveal_at))
+                      : `scellé depuis ${formatSealedFor(item.created_at, new Date())}`}
                   </Text>
                 </Pressable>
               ))
