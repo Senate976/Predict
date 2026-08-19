@@ -102,6 +102,15 @@ export type PredictionFeedItem = {
   /** Posée au premier tap sur la carte — sert au badge de compteur des
    * onglets et au surlignage des cartes non lues. */
   is_seen: boolean;
+  /**
+   * Cette personne a-t-elle décacheté la révélation ?
+   *
+   * Distinct de `is_seen`, qui signifie « j'ai ouvert l'écran de détail » et
+   * se pose y compris avant révélation. Tant que `is_opened` est faux, la
+   * carte reste fermée pour elle : le contenu est disponible, mais elle ne
+   * l'a pas encore ouvert de sa main.
+   */
+  is_opened: boolean;
   /** Posée après la première apparition de l'animation de pulsation verte
    * du verdict Réalisé, pour cet utilisateur — ne rejoue jamais deux fois. */
   is_verdict_seen: boolean;
@@ -204,7 +213,7 @@ const FEED_COLUMNS =
   'is_immediate, type, answer_format, created_at, is_revealed, final_status, verdict_set_at, is_favorite, ' +
   'is_hidden, is_seen, is_verdict_seen, emoji_counts, my_emoji_reaction, mentioned_user_ids, answer_count, ' +
   'correct_answer_count, my_answer_text, my_answer_option_id, my_answer_is_correct, ' +
-  'bet_count, believer_count, doubter_count, my_bet, group_id, group_name';
+  'bet_count, believer_count, doubter_count, my_bet, group_id, group_name, is_opened';
 
 export async function fetchPredictionsFeed() {
   return supabase
@@ -350,9 +359,17 @@ export async function revealPredictionNow(predictionId: string) {
 export async function setPredictionUserState(
   predictionId: string,
   userId: string,
-  patch: { favorite?: boolean; hidden?: boolean; seen?: boolean; verdictSeen?: boolean }
+  patch: {
+    favorite?: boolean;
+    hidden?: boolean;
+    seen?: boolean;
+    verdictSeen?: boolean;
+    /** Décachetage de la révélation par cette personne — horodaté, pas
+     * booléen : savoir QUAND permettra d'afficher « ouvert il y a 2 min ». */
+    opened?: boolean;
+  }
 ) {
-  const { verdictSeen, ...rest } = patch;
+  const { verdictSeen, opened, ...rest } = patch;
   return supabase
     .from('prediction_user_state')
     .upsert(
@@ -361,6 +378,9 @@ export async function setPredictionUserState(
         user_id: userId,
         ...rest,
         ...(verdictSeen !== undefined ? { verdict_seen: verdictSeen } : {}),
+        // `opened` est un booléen côté appelant, un horodatage côté base :
+        // c'est l'instant du décachetage qui a de la valeur, pas le fait brut.
+        ...(opened !== undefined ? { opened_at: opened ? new Date().toISOString() : null } : {}),
       },
       { onConflict: 'prediction_id,user_id' }
     );

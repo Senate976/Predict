@@ -17,6 +17,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Easing,
   Modal,
   PanResponder,
   Platform,
@@ -62,6 +63,7 @@ import {
   PredictBadge,
   WASH,
 } from './EnvelopeArt';
+import { useAuth } from '../lib/auth';
 import { betOutcomeLabel, placeBet } from '../lib/bets';
 import { InlineComments } from './InlineComments';
 import { InlineQuestionAnswer } from './InlineQuestionAnswer';
@@ -230,6 +232,7 @@ export function PredictionCard({
 }) {
   const router = useRouter();
   const colors = useColors();
+  const { reduceMotion } = useAuth();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -369,8 +372,61 @@ export function PredictionCard({
   const correctAnswerPercent =
     item.answer_count > 0 ? Math.round((item.correct_answer_count / item.answer_count) * 100) : null;
 
+  /**
+   * Décachetage.
+   *
+   * Le contenu est disponible, mais cette personne ne l'a pas encore ouvert de
+   * sa main : la carte reste fermée et attend son geste. C'est le moment fort
+   * du produit, qui n'existait pas — la prédiction basculait en « révélée »
+   * toute seule, en silence.
+   *
+   * L'auteur en est dispensé : il connaît son propre texte, et pour lui
+   * l'ouverture est l'acte de révéler aux autres, pas de découvrir.
+   */
+  const [openedLocally, setOpenedLocally] = useState(item.is_opened);
+  const [opening, setOpening] = useState(false);
+  const openAnim = useRef(new Animated.Value(0)).current;
+  /**
+   * Entrée de la lettre, juste après le décachetage.
+   *
+   * Sans elle, l'enveloppe s'efface puis la lettre surgit d'un coup — et comme
+   * la lettre est bien plus haute que l'enveloppe fermée, le saut de hauteur
+   * se voit. Un fondu à l'entrée transforme la coupure en enchaînement.
+   * Reste à 1 pour toutes les cartes déjà ouvertes : elles ne doivent pas
+   * réapparaître en fondu à chaque rendu du Fil.
+   */
+  const enterAnim = useRef(new Animated.Value(1)).current;
+  const needsOpening = revealed && !isAuthor && !openedLocally;
+
+  function handleOpenEnvelope() {
+    if (opening) return;
+    setOpening(true);
+    Animated.timing(openAnim, {
+      toValue: 1,
+      // `reduce_motion` est un réglage d'accessibilité de l'app : à zéro, le
+      // décachetage reste un geste, il n'est simplement pas animé.
+      duration: reduceMotion ? 0 : 420,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start(() => {
+      setOpenedLocally(true);
+      setOpening(false);
+      openAnim.setValue(0);
+      enterAnim.setValue(0);
+      Animated.timing(enterAnim, {
+        toValue: 1,
+        duration: reduceMotion ? 0 : 320,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }).start();
+    });
+    // Écrit sans attendre la fin de l'animation : si l'app se ferme entre les
+    // deux, la prédiction reste ouverte plutôt que de se refermer.
+    setPredictionUserState(item.id, userId, { opened: true });
+  }
+
   const cardState: {
-    kind: 'sealed' | 'active' | 'realized' | 'missed' | 'question_open' | 'question_closed';
+    kind: 'sealed' | 'to_open' | 'active' | 'realized' | 'missed' | 'question_open' | 'question_closed';
     label?: string;
   } = isQuestion
     ? revealed
@@ -381,7 +437,9 @@ export function PredictionCard({
       : { kind: 'question_open', label: 'PREDICT PUBLIC' }
     : !revealed
       ? { kind: 'sealed', label: 'SCELLÉ' }
-      : verdict === 'realized'
+      : needsOpening
+        ? { kind: 'to_open', label: 'À OUVRIR' }
+        : verdict === 'realized'
         ? { kind: 'realized' }
         : verdict === 'missed'
           ? { kind: 'missed' }
@@ -624,9 +682,16 @@ export function PredictionCard({
      La base refuse tout le reste (`place_bet`) ; ici on se contente de ne pas
      le proposer. */
   const canBet = !isAuthor && !isQuestion && cardState.kind === 'sealed';
-  const betOutcome = revealed
-    ? betOutcomeLabel(item.believer_count ?? 0, item.doubter_count ?? 0, item.final_status)
-    : null;
+  /* L'action unique d'une carte « à ouvrir » : elle remplace tout le reste sur
+     la ligne du bas, parce qu'il n'y a plus qu'une chose à faire. */
+  const canOpen = cardState.kind === 'to_open';
+  /* `!needsOpening` : « 3 amis n'y croyaient pas. Raison quand même. » donne le
+     verdict. L'afficher sur une enveloppe encore fermée éventerait la
+     révélation avant qu'on l'ait ouverte. */
+  const betOutcome =
+    revealed && !needsOpening
+      ? betOutcomeLabel(item.believer_count ?? 0, item.doubter_count ?? 0, item.final_status)
+      : null;
 
   // Panneau de réactions façon Facebook : maintenir le doigt sur le pouce
   // fait apparaître la bulle, la faire glisser dessus grossit l'emoji
@@ -951,6 +1016,18 @@ export function PredictionCard({
             </View>
           )}
 
+          {canOpen && (
+            <Pressable
+              onPress={handleOpenEnvelope}
+              disabled={opening}
+              style={({ pressed }) => [styles.openButton, pressed && styles.openButtonPressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Ouvrir cette prédiction"
+            >
+              <Text style={styles.openButtonText}>{opening ? 'Ouverture…' : 'Ouvrir'}</Text>
+            </Pressable>
+          )}
+
           {canBet && myBet === null && (
             <View style={styles.betRow}>
               <Pressable
@@ -1045,27 +1122,57 @@ export function PredictionCard({
             // l'appui synthétique qui le suit, plus court que le temps qu'il
             // faut pour viser volontairement l'enveloppe ensuite.
             if (Date.now() - reactionGestureRef.current < 400) return;
+            // Sur une enveloppe à décacheter, toute la carte est le bouton :
+            // aller à l'écran de détail contournerait le geste et livrerait le
+            // contenu sans l'avoir ouvert.
+            if (canOpen) {
+              handleOpenEnvelope();
+              return;
+            }
             onPress?.();
           }}
           style={styles.envelope}
           onLayout={(e) => setEnvelopeWidth(e.nativeEvent.layout.width)}
         >
-          {cardState.kind === 'sealed' ? (
+          {cardState.kind === 'sealed' || cardState.kind === 'to_open' ? (
             /* `predict scellé.png` : le rectangle, le rabat pointe en bas, le
                badge sur sa pointe — puis le bloc commun juste sous le badge.
                `minHeight` plutôt qu'une hauteur fixe : la carte garde le ratio
                exact de la maquette, mais un teaser long l'allonge au lieu
-               d'être tronqué. */
-            <View style={[styles.envelopeShell, { minHeight: env.envH, backgroundColor: WASH.sealedBody }]}>
+               d'être tronqué.
+
+               `to_open` emprunte exactement la même enveloppe : le contenu est
+               disponible, mais tant que la personne ne l'a pas décacheté elle
+               doit voir une enveloppe FERMÉE — sinon il n'y a plus rien à
+               ouvrir. Seule l'animation de sortie les distingue. */
+            <Animated.View
+              style={[
+                styles.envelopeShell,
+                { minHeight: env.envH, backgroundColor: WASH.sealedBody },
+                cardState.kind === 'to_open' && {
+                  opacity: openAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
+                },
+              ]}
+            >
               <View style={styles.sealedFlapLayer} pointerEvents="none">
                 <FlapDown height={env.flapH} />
               </View>
-              <View
-                style={[styles.sealedBadge, { top: env.badgeTop, marginLeft: -env.badge / 2 }]}
+              {/* Le sceau grossit et s'efface au décachetage : c'est lui qui
+                  cède, comme un cachet de cire qu'on brise. */}
+              <Animated.View
+                style={[
+                  styles.sealedBadge,
+                  { top: env.badgeTop, marginLeft: -env.badge / 2 },
+                  cardState.kind === 'to_open' && {
+                    transform: [
+                      { scale: openAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.6] }) },
+                    ],
+                  },
+                ]}
                 pointerEvents="none"
               >
                 {envelopeWidth > 0 && <PredictBadge glyph="P" size={env.badge} />}
-              </View>
+              </Animated.View>
 
               {/* Centrée en haut, sur le rabat : c'est le seul endroit de
                   l'enveloppe scellée qui reste libre, et le regard y tombe
@@ -1082,9 +1189,9 @@ export function PredictionCard({
                   dans le flux, donc l'enveloppe s'allonge s'il déborde. */}
               <View style={{ height: env.badgeBottom }} pointerEvents="none" />
               {envelopeFooter}
-            </View>
+            </Animated.View>
           ) : (
-            <View style={[styles.envelopeShell, { paddingTop: env.flapPeek }]}>
+            <Animated.View style={[styles.envelopeShell, { paddingTop: env.flapPeek, opacity: enterAnim }]}>
               {/* Les deux couches de lavis, derrière la lettre : le rabat
                   ouvert occupe le haut (ses deux bords obliques restent
                   visibles de part et d'autre de la lettre), le corps prend
@@ -1202,7 +1309,7 @@ export function PredictionCard({
                     </View>
 
               {envelopeFooter}
-            </View>
+            </Animated.View>
           )}
 
           {/* Photo-preuve du verdict — sous la lettre, jamais dedans : elle
@@ -1540,6 +1647,22 @@ function createStyles(colors: Colors) {
   // Même gabarit que les icônes du pied de carte, pour que la rangée reste
   // alignée qu'on ait parié ou non.
   betIcon: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
+  // L'unique action d'une carte à ouvrir : pleine, dorée, impossible à
+  // confondre avec les icônes discrètes qui l'entourent.
+  openButton: {
+    backgroundColor: colors.accent,
+    borderRadius: radius.pill,
+    paddingHorizontal: 18,
+    paddingVertical: 7,
+  },
+  openButtonPressed: { backgroundColor: colors.accentBright },
+  openButtonText: {
+    fontFamily: fonts.sansBold,
+    fontSize: 13,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    color: colors.textOnAccent,
+  },
   betCountRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   betCountText: { fontFamily: fonts.label, fontSize: 13, color: colors.textMuted },
   betOutcome: { fontFamily: fonts.bodyEmphasis, fontSize: 14, color: colors.text, marginTop: 4 },
