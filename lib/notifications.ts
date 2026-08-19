@@ -17,7 +17,7 @@ export type NotificationType =
    * répété tous les 7 jours (voir `generate_open_reminders`, schema.sql
    * section 54) — sans date de révélation, rien ne la ferait remonter. */
   | 'open_reminder'
-  /** Un membre du Cercle a envoyé son « Alors ? » sur une prédiction encore
+  /** Un membre du Cercle s'est dit impatient sur une prédiction encore
    * scellée (voir `nudge_prediction`, schema.sql section 64). Elle prévient
    * l'auteur qu'on l'attend — elle n'ouvre rien, c'est tout son intérêt. */
   | 'nudge';

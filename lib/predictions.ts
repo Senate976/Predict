@@ -87,7 +87,7 @@ export type PredictionFeedItem = {
   /** Mon propre pari : `true` j'y crois, `false` je n'y crois pas, `null` pas
    * encore parié. Toujours lisible, même avant révélation. */
   my_bet: boolean | null;
-  /** Combien de personnes ont envoyé leur « Alors ? » (voir `lib/nudges.ts`).
+  /** Combien de personnes se sont dites impatientes (voir `lib/nudges.ts`).
    * Une par personne, jamais davantage : le nombre dit COMBIEN DE GENS
    * attendent, pas combien de fois on a insisté. */
   nudge_count: number;

@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 
 /**
- * La relance « Alors ? ».
+ * La relance « Impatient ».
  *
  * Une prédiction scellée n'a plus de date : elle s'ouvre quand son auteur le
  * décide. Rien ne la fait donc remonter, et le Cercle n'avait aucun moyen de
@@ -44,13 +44,12 @@ export async function unnudgePrediction(predictionId: string) {
  * n'a encore relancé — une carte qui annoncerait « 0 personne attend » ne dit
  * rien et occupe une ligne.
  *
- * On s'adresse à l'auteur ou au Cercle selon le cas : lui doit lire une
- * attente qui le concerne, les autres un simple état des lieux.
+ * Le même mot que le bouton, pour que les deux se répondent : on appuie sur
+ * « Impatient », l'auteur lit « 6 personnes s'impatientent ». La formulation
+ * est la même pour tout le monde : elle décrit le Cercle, pas l'auteur, et
+ * n'a donc pas à changer selon qui la lit.
  */
-export function nudgeCountLabel(count: number, isAuthor: boolean): string | null {
+export function nudgeCountLabel(count: number): string | null {
   if (count <= 0) return null;
-  if (isAuthor) {
-    return count === 1 ? '1 personne t’attend' : `${count} personnes t’attendent`;
-  }
-  return count === 1 ? '1 personne attend' : `${count} personnes attendent`;
+  return count === 1 ? '1 personne s’impatiente' : `${count} personnes s’impatientent`;
 }

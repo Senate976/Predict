@@ -708,7 +708,7 @@ export function PredictionCard({
      la ligne du bas, parce qu'il n'y a plus qu'une chose à faire. */
   const canOpen = cardState.kind === 'to_open';
 
-  /* La relance « Alors ? » : disponible sur l'enveloppe scellée de quelqu'un
+  /* La relance « Impatient » : disponible sur l'enveloppe scellée de quelqu'un
      d'autre, y compris un Sondage — attendre la clôture d'une Question est
      exactement la même impatience.
 
@@ -739,8 +739,7 @@ export function PredictionCard({
   /* Ce que l'auteur lit sur sa propre enveloppe : une attente, jamais une
      liste de noms — « Untel et Unetelle t'attendent » ferait d'un signal
      collectif une pression nominative, ce qui n'est pas le même geste. */
-  const nudgeLabel =
-    cardState.kind === 'sealed' ? nudgeCountLabel(nudgeCount, isAuthor) : null;
+  const nudgeLabel = cardState.kind === 'sealed' ? nudgeCountLabel(nudgeCount) : null;
   /* `!needsOpening` : « 3 amis n'y croyaient pas. Raison quand même. » donne le
      verdict. L'afficher sur une enveloppe encore fermée éventerait la
      révélation avant qu'on l'ait ouverte. */
@@ -1157,11 +1156,11 @@ export function PredictionCard({
               ]}
               accessibilityRole="button"
               accessibilityLabel={
-                iNudged ? 'Retirer ma relance' : 'Envoyer une relance : alors ?'
+                iNudged ? 'Retirer ma relance' : 'Dire que je suis impatient'
               }
             >
               <Text style={[styles.nudgeButtonText, iNudged && styles.nudgeButtonTextOn]}>
-                Alors ?{nudgeCount > 0 ? ` ${nudgeCount}` : ''}
+                Impatient{nudgeCount > 0 ? ` ${nudgeCount}` : ''}
               </Text>
             </Pressable>
           )}

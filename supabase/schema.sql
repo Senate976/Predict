@@ -6365,7 +6365,7 @@ from public.predictions p
 left join public.prediction_contents pc on pc.prediction_id = p.id;
 
 -- ---------------------------------------------------------------------------
--- 64. La relance « Alors ? »
+-- 64. La relance « Impatient »
 -- ---------------------------------------------------------------------------
 --
 -- Une prédiction scellée n'a plus de date : elle s'ouvre quand son auteur le
@@ -6624,7 +6624,7 @@ select
     select us2.opened_at is not null from public.prediction_user_state us2
     where us2.prediction_id = p.id and us2.user_id = auth.uid()
   ) as is_opened,
-  -- Combien de personnes ont déjà envoyé leur « Alors ? ». Le nombre est
+  -- Combien de personnes se sont déjà dites impatientes. Le nombre est
   -- visible de tous : c'est LUI la relance. L'auteur voit une attente, pas
   -- une sommation, et il reste seul à décider du moment.
   (
