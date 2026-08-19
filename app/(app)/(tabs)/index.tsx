@@ -51,7 +51,10 @@ type AuthorMap = Record<string, AuthorInfo>;
  * révélation, jamais qui a écrit la prédiction. */
 type Tab = 'predict' | 'revealed';
 type SortOrder = 'recent' | 'oldest';
-type SortKey = 'default' | 'seal' | 'reveal';
+// Plus de tri « par date de révélation » : une prédiction scellée n'a plus de
+// date annoncée, ce tri classait donc tout le monde sur le même repère
+// technique lointain — un ordre qui n'avait aucun sens pour qui le lisait.
+type SortKey = 'default' | 'seal';
 type MenuView = 'main' | 'author';
 
 /** Fil d'actualité — Archives a été fusionné ici, sous forme de deux onglets. */
@@ -86,7 +89,6 @@ export default function HomeScreen() {
   const [mineOnly, setMineOnly] = useState(false);
   // Ne garder que ce qui se révèle d'ici sept jours — repérer d'un coup ce qui
   // arrive bientôt, sans avoir à lire chaque compte à rebours.
-  const [thisWeekOnly, setThisWeekOnly] = useState(false);
   // `load` est mémoïsé sur `userId` : lire `feed` dedans y figerait sa valeur
   // du premier rendu. Cette ref dit simplement si le fil a déjà été affiché
   // au moins une fois, ce qui suffit à décider si un échec mérite un message.
@@ -97,7 +99,7 @@ export default function HomeScreen() {
   const [sortKey, setSortKey] = useState<SortKey>('default');
   const [sortOrder, setSortOrder] = useState<SortOrder>('recent');
 
-  function toggleSortKey(key: 'seal' | 'reveal') {
+  function toggleSortKey(key: 'seal') {
     if (sortKey === key) {
       setSortOrder((o) => (o === 'recent' ? 'oldest' : 'recent'));
     } else {
@@ -107,13 +109,12 @@ export default function HomeScreen() {
   }
 
   const hasActiveFilters =
-    authorFilter !== null || favoritesOnly || mineOnly || thisWeekOnly || sortKey !== 'default';
+    authorFilter !== null || favoritesOnly || mineOnly || sortKey !== 'default';
 
   function resetFilters() {
     setAuthorFilter(null);
     setFavoritesOnly(false);
     setMineOnly(false);
-    setThisWeekOnly(false);
     setSortKey('default');
     setSortOrder('recent');
   }
@@ -304,24 +305,14 @@ export default function HomeScreen() {
     .filter((item) => !item.is_hidden)
     .filter((item) => !authorFilter || item.author_id === authorFilter)
     .filter((item) => !favoritesOnly || item.is_favorite)
-    .filter((item) => !mineOnly || item.author_id === userId)
-    // Une révélation « libre » n'a pas de date : elle ne peut donc jamais être
-    // annoncée pour cette semaine, et sort du filtre.
-    .filter((item) => {
-      if (!thisWeekOnly) return true;
-      if (item.open_ended || isRevealed(item, now)) return false;
-      const revealAt = new Date(item.reveal_at).getTime();
-      return revealAt <= now.getTime() + 7 * 24 * 60 * 60 * 1000;
-    });
+    // Plus de filtre « révélations cette semaine » : aucune prédiction n'a
+    // désormais de date annoncée, il n'y a donc rien à prévoir pour la semaine.
+    .filter((item) => !mineOnly || item.author_id === userId);
 
   const shown = [...filtered].sort((a, b) => {
     if (sortKey === 'seal') {
       const diff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       return sortOrder === 'recent' ? diff : -diff;
-    }
-    if (sortKey === 'reveal') {
-      const diff = new Date(b.reveal_at).getTime() - new Date(a.reveal_at).getTime();
-      return sortOrder === 'recent' ? -diff : diff;
     }
     // Défaut : ordre de publication, le plus récent en tête.
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
@@ -434,23 +425,6 @@ export default function HomeScreen() {
                       {sortOrder === 'recent' ? 'Plus récent' : 'Plus ancien'}
                     </Text>
                   )}
-                </Pressable>
-
-                <Pressable onPress={() => toggleSortKey('reveal')} style={styles.menuRow}>
-                  <Text style={[styles.menuRowText, sortKey === 'reveal' && styles.menuRowTextActive]}>
-                    Par date de révélation
-                  </Text>
-                  {sortKey === 'reveal' && (
-                    <Text style={styles.menuRowValue}>
-                      {sortOrder === 'recent' ? 'Plus récent' : 'Plus ancien'}
-                    </Text>
-                  )}
-                </Pressable>
-
-                <Pressable onPress={() => setThisWeekOnly((o) => !o)} style={styles.menuRow}>
-                  <Text style={[styles.menuRowText, thisWeekOnly && styles.menuRowTextActive]}>
-                    Révélations cette semaine
-                  </Text>
                 </Pressable>
 
                 <Pressable

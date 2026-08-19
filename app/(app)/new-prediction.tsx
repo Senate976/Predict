@@ -1,5 +1,4 @@
 import { useNavigation, useRouter } from 'expo-router';
-import { Check } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -16,23 +15,19 @@ import { TextInput } from '../../components/TextInput';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../components/Avatar';
-import { CalendarPicker } from '../../components/CalendarPicker';
 import { PhotoAttachButton } from '../../components/PhotoAttachButton';
 import { PredictionRecorder } from '../../components/PredictionRecorder';
 import { PredictBadge } from '../../components/EnvelopeArt';
 import { PredictionSeal } from '../../components/PredictionSeal';
 import { PredictWord } from '../../components/PredictWord';
-import { SelectField, type SelectOption } from '../../components/SelectField';
 import { setPredictionAudioPath, uploadPredictionAudio } from '../../lib/audio';
 import { setPredictionPhotoPath, uploadPredictionPhoto } from '../../lib/photos';
 import { useAuth } from '../../lib/auth';
-import { formatCountdown, formatRevealAt } from '../../lib/datetime';
 import { fetchFriendships, otherProfile, type FriendProfile } from '../../lib/friends';
 import { fetchGroups, type FriendGroup } from '../../lib/groups';
 import {
   MAX_CONTENT_LENGTH,
   MAX_TEASER_LENGTH,
-  MIN_REVEAL_DELAY_MS,
   computeOpenEndedRevealAt,
   createPrediction,
   extractMentionedUsernames,
@@ -44,11 +39,6 @@ import { fonts, radius, spacing, type Colors } from '../../lib/theme';
 import { useColors } from '../../lib/themeMode';
 
 type ContentMode = 'text' | 'audio';
-/** `scheduled` (« Programmée ») : date fixée par l'auteur. `open_ended`
- * (« Libre ») : révélée quand l'auteur le déclenche depuis son écran — ou
- * tout de suite si `revealNow` est cochée à la création (voir plus bas), au
- * lieu d'attendre ce déclenchement manuel. */
-type RevealTiming = 'scheduled' | 'open_ended';
 
 /** Contenu écrit à la place du texte quand la prédiction est uniquement vocale. */
 const AUDIO_PLACEHOLDER = '🎙️ Message vocal';
@@ -66,21 +56,6 @@ const MIN_ANSWER_OPTIONS = 2;
  * qui borne la réponse d'un répondant, pas le libellé d'une option posée par
  * l'auteur à la création. */
 const MAX_OPTION_LENGTH = 60;
-
-function pad2(value: number): string {
-  return String(value).padStart(2, '0');
-}
-
-const HOUR_OPTIONS: SelectOption<number>[] = Array.from({ length: 24 }, (_, i) => ({
-  value: i,
-  label: pad2(i),
-}));
-
-/** Quarts d'heure uniquement (:00/:15/:30/:45) — un choix plus rapide qu'une minute exacte. */
-const MINUTE_OPTIONS: SelectOption<number>[] = [0, 15, 30, 45].map((m) => ({
-  value: m,
-  label: pad2(m),
-}));
 
 export default function NewPredictionScreen() {
   const { session, defaultScope } = useAuth();
@@ -105,13 +80,8 @@ export default function NewPredictionScreen() {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   // La date reste un choix explicite, mais l'heure est facultative : pré-remplie
   // à midi, l'auteur n'a besoin de la toucher que s'il veut une autre heure.
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [hour, setHour] = useState<number | null>(12);
-  const [minute, setMinute] = useState<number | null>(0);
-  const [revealTiming, setRevealTiming] = useState<RevealTiming>('scheduled');
   // Uniquement pertinent en mode « Libre » : coché, la prédiction est révélée
   // dès sa création plutôt que d'attendre un déclenchement manuel ultérieur.
-  const [revealNow, setRevealNow] = useState(false);
 
   const [scope, setScope] = useState<PredictionScope>('circle');
   // Réglage Confidentialité : pré-sélectionne la portée par défaut de
@@ -150,7 +120,7 @@ export default function NewPredictionScreen() {
   const trimmedContent = content.trim();
   const remaining = MAX_CONTENT_LENGTH - trimmedContent.length;
   const hasUnsavedContent =
-    trimmedTeaser.length > 0 || trimmedContent.length > 0 || !!audioUri || !!selectedDate;
+    trimmedTeaser.length > 0 || trimmedContent.length > 0 || !!audioUri;
 
   // Repéré juste avant le curseur, jamais ailleurs dans le texte — sinon un
   // « @ » déjà validé plus haut rouvrirait les suggestions à chaque frappe
@@ -217,22 +187,14 @@ export default function NewPredictionScreen() {
   // `revealNow`, la valeur exacte n'a pas d'importance : la base pose son
   // propre `now()` de toute façon (voir `create_prediction`, `isImmediate`) —
   // celle-ci ne sert qu'à satisfaire la validation locale.
-  const revealAt =
-    revealTiming === 'open_ended'
-      ? revealNow
-        ? new Date()
-        : computeOpenEndedRevealAt()
-      : selectedDate && hour !== null && minute !== null
-        ? new Date(
-            selectedDate.getFullYear(),
-            selectedDate.getMonth(),
-            selectedDate.getDate(),
-            hour,
-            minute,
-            0,
-            0
-          )
-        : null;
+  /**
+   * Toujours le repère technique lointain : plus aucune prédiction ni aucun
+   * Sondage ne porte de date choisie. C'est leur auteur qui les ouvre ou les
+   * clôt, quand la réalité a tranché — la valeur ci-dessous ne sert donc qu'à
+   * satisfaire la contrainte d'insertion (`reveal_at > now()`), jamais à être
+   * affichée.
+   */
+  const revealAt = computeOpenEndedRevealAt();
 
   function toggleFriend(id: string) {
     setSelectedFriendIds((prev) => {
@@ -286,14 +248,6 @@ export default function NewPredictionScreen() {
       }
       if (answerOptions.some((o) => o.trim().length > MAX_OPTION_LENGTH)) {
         return `Une option ne peut pas dépasser ${MAX_OPTION_LENGTH} caractères.`;
-      }
-    }
-    if (revealTiming === 'scheduled') {
-      if (!revealAt) {
-        return 'Choisis la date de la révélation.';
-      }
-      if (revealAt.getTime() - Date.now() < MIN_REVEAL_DELAY_MS) {
-        return 'La révélation doit être au moins une minute après maintenant.';
       }
     }
     if (scope === 'selected' && selectedFriendIds.size === 0) {
@@ -351,8 +305,8 @@ export default function NewPredictionScreen() {
         friendIds: Array.from(selectedFriendIds),
         groupId: selectedGroupId,
         mentionedFriendIds,
-        openEnded: revealTiming === 'open_ended',
-        isImmediate: revealTiming === 'open_ended' && revealNow,
+        openEnded: true,
+        isImmediate: false,
         answerFormat: isQuestion ? answerFormat : undefined,
         answerOptions: isChoiceFormat ? answerOptions.map((o) => o.trim()).filter(Boolean) : undefined,
       });
@@ -604,87 +558,20 @@ export default function NewPredictionScreen() {
             </>
           )}
 
-          <Text style={[styles.label, styles.sectionLabel]}>{isQuestion ? 'Clôture' : 'Révélation'}</Text>
-
-          <View style={styles.scopeRow}>
-            <Pressable
-              onPress={() => setRevealTiming('scheduled')}
-              disabled={submitting}
-              style={[styles.scopeOption, revealTiming === 'scheduled' && styles.scopeOptionActive]}
-            >
-              <Text style={[styles.scopeText, revealTiming === 'scheduled' && styles.scopeTextActive]}>
-                Programmée
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setRevealTiming('open_ended')}
-              disabled={submitting}
-              style={[styles.scopeOption, revealTiming === 'open_ended' && styles.scopeOptionActive]}
-            >
-              <Text style={[styles.scopeText, revealTiming === 'open_ended' && styles.scopeTextActive]}>
-                Libre
-              </Text>
-            </Pressable>
-          </View>
-
-          {revealTiming === 'open_ended' ? (
-            <>
-              <Text style={[styles.sectionHint, styles.fieldSpacing]}>
-                {revealNow
-                  ? <>Ce <PredictWord /> sera révélé dès la validation : ton Cercle pourra tout de suite donner son avis.</>
-                  : <>Tu pourras révéler ce <PredictWord /> quand tu veux.</>}
-              </Text>
-              <Pressable
-                onPress={() => setRevealNow((prev) => !prev)}
-                disabled={submitting}
-                style={[styles.revealNowRow, styles.fieldSpacing]}
-              >
-                <View style={[styles.checkbox, revealNow && styles.checkboxChecked]}>
-                  {revealNow && <Check size={12} color={colors.background} strokeWidth={2.5} />}
-                </View>
-                <Text style={styles.revealNowText}>Révéler immédiatement</Text>
-              </Pressable>
-            </>
-          ) : (
-            <>
-              <View style={styles.fieldSpacing}>
-                <CalendarPicker value={selectedDate} onChange={setSelectedDate} disabled={submitting} />
-              </View>
-
-              <View style={[styles.row, styles.fieldSpacing]}>
-                <View style={styles.timeField}>
-                  <SelectField
-                    label="Heure"
-                    value={hour}
-                    options={HOUR_OPTIONS}
-                    placeholder="HH"
-                    onChange={setHour}
-                    disabled={submitting}
-                  />
-                </View>
-                <View style={styles.timeField}>
-                  <SelectField
-                    label="Minute"
-                    value={minute}
-                    options={MINUTE_OPTIONS}
-                    placeholder="MM"
-                    onChange={setMinute}
-                    disabled={submitting}
-                  />
-                </View>
-              </View>
-
-              {/* Rien tant qu'aucun des champs n'est renseigné : à l'ouverture,
-                  un rappel se lirait comme une erreur alors que l'utilisateur
-                  n'a encore rien choisi. */}
-              {revealAt && (
-                <Text style={styles.preview}>
-                  Se révélera {formatRevealAt(revealAt)} —{' '}
-                  {formatCountdown(revealAt, new Date())}.
-                </Text>
-              )}
-            </>
-          )}
+          {/* Plus aucune date à choisir. Un Predict est scellé sans échéance
+              et son auteur l'ouvre quand la réalité a tranché ; un Sondage est
+              ouvert dès sa création et son auteur le clôt de même. On ne
+              connaît pas d'avance le jour où Julie sortira avec Adrien : le
+              demander était une question sans réponse, qui coûtait quatre
+              champs (date, heure, minute, et le choix entre programmée et
+              libre). */}
+          <Text style={[styles.sectionHint, styles.fieldSpacing]}>
+            {isQuestion ? (
+              <>Ton Cercle peut répondre dès maintenant. Tu clôtureras quand la réponse sera connue.</>
+            ) : (
+              <>Ton <PredictWord /> reste scellé jusqu'à ce que tu l'ouvres, le jour où ça se produit.</>
+            )}
+          </Text>
 
           <Text style={[styles.label, styles.sectionLabel]}>Visible par</Text>
           <View style={styles.scopeRow}>
