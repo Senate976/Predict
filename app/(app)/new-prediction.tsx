@@ -38,7 +38,6 @@ import { type AnswerFormat, type PredictionType } from '../../lib/questions';
 import { fonts, radius, spacing, type Colors } from '../../lib/theme';
 import { useColors } from '../../lib/themeMode';
 
-type ContentMode = 'text' | 'audio';
 
 /** Contenu écrit à la place du texte quand la prédiction est uniquement vocale. */
 const AUDIO_PLACEHOLDER = '🎙️ Message vocal';
@@ -65,17 +64,18 @@ export default function NewPredictionScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const userId = session?.user.id;
 
-  const [predictType, setPredictType] = useState<PredictionType>('declaration');
+  /** `null` tant que la personne n'a pas choisi entre « Je prédis » et
+   * « Je demande ». Le formulaire n'apparaît qu'après. */
+  const [predictType, setPredictType] = useState<PredictionType | null>(null);
   const isQuestion = predictType === 'question';
   const [answerFormat, setAnswerFormat] = useState<AnswerFormat>('text');
   const [answerOptions, setAnswerOptions] = useState<string[]>(['', '']);
   const isChoiceFormat = isQuestion && answerFormat === 'choice';
 
   const [teaser, setTeaser] = useState('');
-  const [contentMode, setContentMode] = useState<ContentMode>('text');
   const [content, setContent] = useState('');
   const [audioUri, setAudioUri] = useState<string | null>(null);
-  // Facultative, quel que soit `contentMode` — une preuve visuelle jointe au
+  // Facultative — une preuve visuelle jointe au
   // secret, pas un troisième mode de contenu exclusif des deux autres.
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   // La date reste un choix explicite, mais l'heure est facultative : pré-remplie
@@ -120,7 +120,7 @@ export default function NewPredictionScreen() {
   const trimmedContent = content.trim();
   const remaining = MAX_CONTENT_LENGTH - trimmedContent.length;
   const hasUnsavedContent =
-    trimmedTeaser.length > 0 || trimmedContent.length > 0 || !!audioUri;
+    trimmedTeaser.length > 0 || trimmedContent.length > 0 || !!audioUri || !!photoUri;
 
   // Repéré juste avant le curseur, jamais ailleurs dans le texte — sinon un
   // « @ » déjà validé plus haut rouvrirait les suggestions à chaque frappe
@@ -229,17 +229,17 @@ export default function NewPredictionScreen() {
         return `Le teaser ne peut pas dépasser ${MAX_TEASER_LENGTH} caractères.`;
       }
     }
-    if (contentMode === 'text') {
-      if (!trimmedContent) {
-        return isQuestion ? 'Écris ta question.' : 'Écris le contenu secret de ton Predict.';
-      }
-      if (trimmedContent.length > MAX_CONTENT_LENGTH) {
-        return isQuestion
-          ? `La question ne peut pas dépasser ${MAX_CONTENT_LENGTH} caractères.`
-          : `Le contenu secret ne peut pas dépasser ${MAX_CONTENT_LENGTH} caractères.`;
-      }
-    } else if (!audioUri) {
-      return isQuestion ? 'Enregistre ta question avant de la publier.' : 'Enregistre ton Predict avant de le sceller.';
+    // Texte OU vocal : l'un des deux suffit, les deux sont permis. C'est ce que
+    // permet le passage du vocal en pièce jointe — avant, il fallait choisir.
+    if (!trimmedContent && !audioUri) {
+      return isQuestion
+        ? 'Écris ou enregistre ta question.'
+        : 'Écris ou enregistre ton Predict.';
+    }
+    if (trimmedContent.length > MAX_CONTENT_LENGTH) {
+      return isQuestion
+        ? `La question ne peut pas dépasser ${MAX_CONTENT_LENGTH} caractères.`
+        : `Le contenu secret ne peut pas dépasser ${MAX_CONTENT_LENGTH} caractères.`;
     }
     if (isChoiceFormat) {
       const trimmedOptions = answerOptions.map((o) => o.trim()).filter(Boolean);
@@ -282,7 +282,7 @@ export default function NewPredictionScreen() {
       // « @ » qui ne désigne personne. Sans objet en message vocal : rien à
       // repérer dans un placeholder.
       const mentionedUsernames =
-        contentMode === 'text' ? extractMentionedUsernames(trimmedContent) : [];
+        extractMentionedUsernames(trimmedContent);
       const mentionedFriendIds = (friends ?? [])
         .filter((f) => mentionedUsernames.includes(f.username.toLowerCase()))
         .map((f) => f.id);
@@ -291,15 +291,17 @@ export default function NewPredictionScreen() {
       // est masqué) : on en dérive un du texte de la question, faute de mieux
       // en message vocal.
       const effectiveTeaser = isQuestion
-        ? contentMode === 'text'
+        ? trimmedContent
           ? trimmedContent.slice(0, MAX_TEASER_LENGTH)
           : AUDIO_QUESTION_TEASER
         : trimmedTeaser;
 
       const { data: predictionId, error: insertError } = await createPrediction({
-        type: predictType,
+        type: predictType ?? 'declaration',
         teaser: effectiveTeaser,
-        content: contentMode === 'text' ? trimmedContent : AUDIO_PLACEHOLDER,
+        // `content` reste requis en base. Sans texte, c'est donc le vocal seul
+        // qui porte le message, et le placeholder tient la place.
+        content: trimmedContent || AUDIO_PLACEHOLDER,
         revealAt,
         scope,
         friendIds: Array.from(selectedFriendIds),
@@ -319,7 +321,7 @@ export default function NewPredictionScreen() {
       // La prédiction existe déjà à ce stade (le texte ou son placeholder est
       // scellé) ; le message vocal s'y ajoute en deux étapes séparées, faute
       // de pouvoir connaître son identifiant avant sa création.
-      if (contentMode === 'audio' && audioUri && predictionId) {
+      if (audioUri && predictionId) {
         const { path, error: uploadError } = await uploadPredictionAudio(predictionId, audioUri);
         if (uploadError || !path) {
           setError(`Predict créé, mais l’envoi de l’audio a échoué : ${uploadError?.message ?? 'erreur inconnue'}`);
@@ -333,7 +335,7 @@ export default function NewPredictionScreen() {
       }
 
       // Même principe en deux étapes que l'audio — facultative, quel que soit
-      // `contentMode` : une photo peut accompagner un texte ou un message vocal.
+      // Une photo peut accompagner un texte comme un message vocal.
       if (photoUri && predictionId) {
         const { path, error: uploadError } = await uploadPredictionPhoto(predictionId, photoUri);
         if (uploadError || !path) {
@@ -370,48 +372,76 @@ export default function NewPredictionScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} disabled={submitting} hitSlop={8}>
-            <Text style={styles.cancel}>Annuler</Text>
+          <Pressable
+            onPress={() => (predictType === null ? router.back() : setPredictType(null))}
+            disabled={submitting}
+            hitSlop={8}
+          >
+            <Text style={styles.cancel}>{predictType === null ? 'Annuler' : 'Retour'}</Text>
           </Pressable>
           {/* Titres de section : « Predict » s'écrit en clair plutôt qu'avec
               `PredictWord`. Le titre est déjà entièrement en gras, donc le P
               renforcé du composant n'ajoutait rien — il créait juste une
               rupture de graisse au milieu du mot. */}
-          <Text style={styles.headerTitle}>Nouveau Predict</Text>
+          <Text style={styles.headerTitle}>
+            {predictType === null ? 'Créer' : isQuestion ? 'Nouveau Sondage' : 'Nouveau Predict'}
+          </Text>
           {/* Espaceur de même largeur que « Annuler », pour centrer le titre. */}
           <View style={styles.headerSpacer} />
         </View>
 
-        <View style={styles.predictTypeWrap}>
-          <View style={styles.scopeRow}>
+
+        {/* Le choix se fait ICI, avant le moindre champ. On sait ce qu'on
+            fabrique parce qu'on a appuyé sur ce bouton-là — pas parce qu'on a
+            coché une case au milieu d'un formulaire. Chaque bouton porte sa
+            propre explication : c'est le seul moment où elle est utile. */}
+        {predictType === null ? (
+          <View style={styles.chooser}>
             <Pressable
               onPress={() => setPredictType('declaration')}
-              disabled={submitting}
-              style={[styles.scopeOption, predictType === 'declaration' && styles.scopeOptionActive]}
+              style={({ pressed }) => [styles.chooserCard, pressed && styles.chooserCardPressed]}
             >
-              <Text style={[styles.scopeText, predictType === 'declaration' && styles.scopeTextActive]}>
-                Predict
+              <View style={styles.chooserHead}>
+                <PredictBadge glyph="P" size={34} />
+                {/* Espaces insécables à l'intérieur de chaque temps : le titre ne se
+                    coupe qu'aux virgules, jamais entre « tu » et son verbe. */}
+                <Text style={styles.chooserTitle}>
+                  Tu scelles, tu intrigues, tu révèles
+                </Text>
+              </View>
+              {/* Le titre dit déjà le geste en trois temps ; le corps ne
+                  répète pas, il ajoute ce que le titre ne dit pas — ce que
+                  le Cercle voit, et qui décide du moment de l'ouverture. */}
+              <Text style={styles.chooserBody}>
+                Ton Cercle ne voit qu'un indice et parie. Tu ouvres le jour où ça
+                se produit.
               </Text>
             </Pressable>
+
             <Pressable
               onPress={() => setPredictType('question')}
-              disabled={submitting}
-              style={[styles.scopeOption, predictType === 'question' && styles.scopeOptionActive]}
+              style={({ pressed }) => [styles.chooserCard, pressed && styles.chooserCardPressed]}
             >
-              <Text style={[styles.scopeText, predictType === 'question' && styles.scopeTextActive]}>
-                Sondage
+              <View style={styles.chooserHead}>
+                <PredictBadge glyph="?" size={34} />
+                <Text style={styles.chooserTitle}>
+                  Tu questionnes, tu patientes, tu révèles
+                </Text>
+              </View>
+              <Text style={styles.chooserBody}>
+                Ton Cercle répond tout de suite. Tu clôtures quand la réponse est
+                connue.
               </Text>
             </Pressable>
           </View>
-        </View>
-
+        ) : (
         <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
         >
           {!isQuestion && (
             <>
-              <Text style={styles.label}>Teaser</Text>
+              <Text style={styles.label}>Ce que ton Cercle voit tout de suite</Text>
               <TextInput
                 value={teaser}
                 onChangeText={setTeaser}
@@ -426,31 +456,13 @@ export default function NewPredictionScreen() {
           )}
 
           <Text style={[styles.label, styles.sectionLabel]}>
-            {isQuestion ? 'Sondage Predict' : 'Mon Predict'}
+            {isQuestion ? 'Ta question' : 'Ce qui s’ouvrira quand tu le décideras'}
           </Text>
-          <View style={styles.scopeRow}>
-            <Pressable
-              onPress={() => setContentMode('text')}
-              disabled={submitting}
-              style={[styles.scopeOption, contentMode === 'text' && styles.scopeOptionActive]}
-            >
-              <Text style={[styles.scopeText, contentMode === 'text' && styles.scopeTextActive]}>
-                Texte
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setContentMode('audio')}
-              disabled={submitting}
-              style={[styles.scopeOption, contentMode === 'audio' && styles.scopeOptionActive]}
-            >
-              <Text style={[styles.scopeText, contentMode === 'audio' && styles.scopeTextActive]}>
-                Message vocal
-              </Text>
-            </Pressable>
-          </View>
-
-          {contentMode === 'text' ? (
-            <>
+          {/* Plus de bascule « Texte / Message vocal ». Elle obligeait à
+              trancher AVANT d'avoir commencé, et interdisait d'avoir les deux.
+              Le vocal rejoint la photo en pièce jointe, juste sous le champ :
+              on écrit, ou on parle, ou les deux. */}
+          <>
               <TextInput
                 value={content}
                 onChangeText={setContent}
@@ -458,8 +470,8 @@ export default function NewPredictionScreen() {
                 selection={contentSelection}
                 placeholder={
                   isQuestion
-                    ? 'Votre question'
-                    : 'Prouvez que vous aviez raison'
+                    ? 'Ta question'
+                    : 'Prouve que tu avais raison'
                 }
                 placeholderTextColor={colors.textFaint}
                 multiline
@@ -487,17 +499,14 @@ export default function NewPredictionScreen() {
               <Text style={[styles.counter, remaining < 20 && styles.counterLow]}>
                 {remaining} caractères restants
               </Text>
-            </>
-          ) : (
-            <View style={styles.fieldSpacing}>
-              <PredictionRecorder uri={audioUri} onChange={setAudioUri} disabled={submitting} />
-            </View>
-          )}
+          </>
 
-          {/* Facultative, quel que soit le mode de contenu — une preuve
-              visuelle jointe dès la création, masquée jusqu'à la révélation
-              comme le reste du secret. */}
-          <View style={styles.fieldSpacing}>
+          {/* Les deux pièces jointes, côte à côte sous le champ : c'est là que
+              le regard tombe une fois qu'on a fini d'écrire, et c'est là que le
+              clavier laisse la place. Toutes deux facultatives, et masquées
+              jusqu'à l'ouverture comme le reste du secret. */}
+          <View style={[styles.attachments, styles.fieldSpacing]}>
+            <PredictionRecorder uri={audioUri} onChange={setAudioUri} disabled={submitting} />
             <PhotoAttachButton uri={photoUri} onChange={setPhotoUri} disabled={submitting} />
           </View>
 
@@ -557,21 +566,6 @@ export default function NewPredictionScreen() {
               )}
             </>
           )}
-
-          {/* Plus aucune date à choisir. Un Predict est scellé sans échéance
-              et son auteur l'ouvre quand la réalité a tranché ; un Sondage est
-              ouvert dès sa création et son auteur le clôt de même. On ne
-              connaît pas d'avance le jour où Julie sortira avec Adrien : le
-              demander était une question sans réponse, qui coûtait quatre
-              champs (date, heure, minute, et le choix entre programmée et
-              libre). */}
-          <Text style={[styles.sectionHint, styles.fieldSpacing]}>
-            {isQuestion ? (
-              <>Ton Cercle peut répondre dès maintenant. Tu clôtureras quand la réponse sera connue.</>
-            ) : (
-              <>Ton <PredictWord /> reste scellé jusqu'à ce que tu l'ouvres, le jour où ça se produit.</>
-            )}
-          </Text>
 
           <Text style={[styles.label, styles.sectionLabel]}>Visible par</Text>
           <View style={styles.scopeRow}>
@@ -703,12 +697,19 @@ export default function NewPredictionScreen() {
               <View style={styles.submitContent}>
                 <PredictBadge glyph={isQuestion ? '?' : 'P'} size={22} />
                 <Text style={styles.submitText}>
-                  Sceller le <PredictWord />
+                  {isQuestion ? (
+                    'Poser ma question'
+                  ) : (
+                    <>
+                      Sceller le <PredictWord />
+                    </>
+                  )}
                 </Text>
               </View>
             )}
           </Pressable>
         </ScrollView>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -733,6 +734,23 @@ function createStyles(colors: Colors) {
     color: colors.text,
   },
   headerSpacer: { width: 52 },
+  // Le choix d'entrée : deux cartes pleine largeur, assez hautes pour qu'on ne
+  // puisse pas les rater, chacune avec sa phrase d'explication.
+  chooser: { padding: spacing.lg, gap: 14 },
+  attachments: { gap: 12 },
+  chooserCard: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    padding: 20,
+  },
+  chooserCardPressed: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  // Le titre tient sur deux lignes : le sceau s'aligne en haut, sur la
+  // première ligne, plutôt qu'au milieu du bloc de texte.
+  chooserHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 8 },
+  chooserTitle: { flex: 1, fontFamily: fonts.display, fontSize: 21, lineHeight: 28, color: colors.text },
+  chooserBody: { fontSize: 15, lineHeight: 22, color: colors.textMuted },
   cancel: { fontSize: 15, color: colors.text },
   predictTypeWrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
   scroll: { padding: spacing.lg, paddingBottom: 40 },
@@ -786,7 +804,6 @@ function createStyles(colors: Colors) {
   },
   mentionSuggestionText: { fontSize: 14, fontWeight: '600', color: colors.text },
   hint: { fontSize: 15, color: colors.textMuted, marginTop: 10, lineHeight: 20 },
-  sectionHint: { fontSize: 15, color: colors.textMuted, marginBottom: 10, lineHeight: 20 },
   row: { flexDirection: 'row', gap: 12 },
   timeField: { flex: 1 },
   preview: { fontSize: 14, color: colors.textMuted, marginTop: 14 },

@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useMemo } from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
@@ -42,6 +43,7 @@ export function PhotoAttachButton({ uri, onChange, disabled, label = 'Ajouter un
 
   return (
     <Pressable onPress={handlePick} disabled={disabled} style={styles.pickButton}>
+      <Ionicons name="image-outline" size={20} color={colors.text} />
       <Text style={styles.pickButtonText}>{label}</Text>
     </Pressable>
   );
@@ -62,13 +64,18 @@ function createStyles(colors: Colors) {
     resetButton: { marginTop: 8, alignSelf: 'flex-start' },
     resetButtonText: { fontSize: 15, color: colors.textMuted, fontWeight: '600' },
     pickButton: {
+      flexDirection: 'row',
+      gap: 10,
       borderWidth: 1,
       borderColor: colors.border,
       borderRadius: radius.sm,
       paddingVertical: 12,
       alignItems: 'center',
+      justifyContent: 'center',
       backgroundColor: colors.surface,
     },
-    pickButtonText: { fontSize: 14, fontWeight: '600', color: colors.text },
+    // Même taille que le libellé du bouton vocal : les deux pièces jointes
+    // s'empilent l'une sous l'autre, elles doivent avoir le même poids visuel.
+    pickButtonText: { fontSize: 15, fontWeight: '600', color: colors.text },
   });
 }
