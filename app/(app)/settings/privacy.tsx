@@ -13,11 +13,13 @@ import type { PredictionScope } from '../../../lib/predictions';
 import { eyebrow, fonts, radius, spacing, type Colors } from '../../../lib/theme';
 import { useColors } from '../../../lib/themeMode';
 
-/** Uniquement Cercle/Amis sélectionnés : « Un groupe » n'a pas de sens comme
- * défaut global, il désigne un groupe précis à choisir à chaque création. */
+/** Les deux mêmes réponses qu'à la création, mot pour mot : le réglage n'a
+ * d'intérêt que s'il pré-coche exactement ce qu'on retrouvera là-bas.
+ * « Un groupe » n'y figure pas — il désigne un groupe précis, qui se choisit
+ * à chaque fois, pas un défaut global. */
 const OPTIONS: { value: PredictionScope; label: string; hint: string }[] = [
   { value: 'circle', label: 'Tout mon Cercle', hint: 'Visible par tous mes amis acceptés.' },
-  { value: 'selected', label: 'Amis sélectionnés', hint: 'Je choisis les destinataires à chaque fois.' },
+  { value: 'selected', label: 'Je choisis', hint: 'Je désigne un groupe ou des amis à chaque fois.' },
 ];
 
 export default function PrivacySettingsScreen() {

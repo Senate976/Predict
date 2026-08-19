@@ -83,12 +83,20 @@ export default function NewPredictionScreen() {
   // Uniquement pertinent en mode « Libre » : coché, la prédiction est révélée
   // dès sa création plutôt que d'attendre un déclenchement manuel ultérieur.
 
-  const [scope, setScope] = useState<PredictionScope>('circle');
-  // Réglage Confidentialité : pré-sélectionne la portée par défaut de
-  // l'auteur, une fois son profil chargé — un seul alignement, pas un
-  // verrou : l'auteur reste libre de choisir une autre portée ensuite.
+  /* « Amis sélectionnés » et « Groupe » posaient DEUX fois la même question —
+     « lesquels de mes amis ? » — sous deux onglets qu'il fallait avoir
+     compris avant de choisir. On ne pose plus qu'une question, « à qui ? »,
+     avec deux réponses : tout mon Cercle, ou une liste que je compose. Les
+     groupes et les amis s'y présentent ensemble, dans le même écran.
+
+     La portée (`scope`), elle, reste ce qu'elle était en base : elle se
+     DÉDUIT de ce qu'on a coché, elle n'est plus un choix à faire. */
+  const [audience, setAudience] = useState<'all' | 'choose'>('all');
+  // Réglage Confidentialité : la portée par défaut de l'auteur ne pilote plus
+  // qu'un seul bit — « tout mon Cercle » ou « je choisis ». Elle reste un
+  // alignement de départ, jamais un verrou.
   useEffect(() => {
-    if (defaultScope) setScope(defaultScope);
+    if (defaultScope) setAudience(defaultScope === 'circle' ? 'all' : 'choose');
   }, [defaultScope]);
   const [friends, setFriends] = useState<FriendProfile[] | null>(null);
   const [selectedFriendIds, setSelectedFriendIds] = useState<Set<string>>(new Set());
@@ -196,13 +204,24 @@ export default function NewPredictionScreen() {
    */
   const revealAt = computeOpenEndedRevealAt();
 
+  /* Un groupe et une liste d'amis s'excluent : la base ne connaît qu'une
+     portée à la fois. Cocher l'un décoche donc l'autre, plutôt que de laisser
+     construire une sélection dont la moitié serait silencieusement ignorée à
+     l'envoi. */
   function toggleFriend(id: string) {
+    setSelectedGroupId(null);
     setSelectedFriendIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+  }
+
+  /** Choisir un groupe, ou le décocher en le retouchant. */
+  function chooseGroup(id: string) {
+    setSelectedFriendIds(new Set());
+    setSelectedGroupId((prev) => (prev === id ? null : id));
   }
 
   function updateOption(index: number, value: string) {
@@ -250,14 +269,17 @@ export default function NewPredictionScreen() {
         return `Une option ne peut pas dépasser ${MAX_OPTION_LENGTH} caractères.`;
       }
     }
-    if (scope === 'selected' && selectedFriendIds.size === 0) {
-      return 'Choisis au moins un ami, ou passe sur « Tous ».';
-    }
-    if (scope === 'group' && !selectedGroupId) {
-      return 'Choisis un groupe.';
+    if (audience === 'choose' && !selectedGroupId && selectedFriendIds.size === 0) {
+      return 'Choisis un groupe ou au moins un ami, ou repasse sur « Tout mon Cercle ».';
     }
     return null;
   }
+
+  /* La portée envoyée en base. Un groupe l'emporte sur une liste d'amis parce
+     qu'on ne peut pas cocher les deux : choisir un groupe vide la sélection
+     d'amis, et inversement (voir `chooseGroup` / `toggleFriend`). */
+  const scope: PredictionScope =
+    audience === 'all' ? 'circle' : selectedGroupId ? 'group' : 'selected';
 
   async function handleSubmit() {
     setError(null);
@@ -567,73 +589,61 @@ export default function NewPredictionScreen() {
             </>
           )}
 
-          <Text style={[styles.label, styles.sectionLabel]}>Visible par</Text>
+          <Text style={[styles.label, styles.sectionLabel]}>Qui le voit ?</Text>
           <View style={styles.scopeRow}>
             <Pressable
-              onPress={() => setScope('circle')}
+              onPress={() => setAudience('all')}
               disabled={submitting}
-              style={[styles.scopeOption, scope === 'circle' && styles.scopeOptionActive]}
+              style={[styles.scopeOption, audience === 'all' && styles.scopeOptionActive]}
             >
-              <Text
-                style={[styles.scopeText, scope === 'circle' && styles.scopeTextActive]}
-              >
-                Tous
+              <Text style={[styles.scopeText, audience === 'all' && styles.scopeTextActive]}>
+                Tout mon Cercle
               </Text>
             </Pressable>
             <Pressable
-              onPress={() => setScope('selected')}
+              onPress={() => setAudience('choose')}
               disabled={submitting}
-              style={[styles.scopeOption, scope === 'selected' && styles.scopeOptionActive]}
+              style={[styles.scopeOption, audience === 'choose' && styles.scopeOptionActive]}
             >
-              <Text
-                style={[styles.scopeText, scope === 'selected' && styles.scopeTextActive]}
-              >
-                Amis
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setScope('group')}
-              disabled={submitting}
-              style={[styles.scopeOption, scope === 'group' && styles.scopeOptionActive]}
-            >
-              <Text style={[styles.scopeText, scope === 'group' && styles.scopeTextActive]}>
-                Groupe
+              <Text style={[styles.scopeText, audience === 'choose' && styles.scopeTextActive]}>
+                Je choisis
               </Text>
             </Pressable>
           </View>
 
-          {scope === 'group' && (
-            <View style={styles.friendsBox}>
-              {groups === null ? (
-                <ActivityIndicator color={colors.text} style={styles.searchLoader} />
-              ) : groups.length === 0 ? (
-                <Text style={styles.hint}>
-                  Tu n’as pas encore de groupe. Crée-en un depuis l’onglet Cercle.
-                </Text>
-              ) : (
-                groups.map((group) => {
-                  const selected = selectedGroupId === group.id;
-                  return (
-                    <Pressable
-                      key={group.id}
-                      onPress={() => setSelectedGroupId(group.id)}
-                      disabled={submitting}
-                      style={[styles.friendChip, selected && styles.friendChipActive]}
-                    >
-                      <Text
-                        style={[styles.friendChipText, selected && styles.friendChipTextActive]}
-                      >
-                        {group.name}
-                      </Text>
-                    </Pressable>
-                  );
-                })
-              )}
-            </View>
-          )}
-
-          {scope === 'selected' && (
+          {/* Un seul écran de choix, groupes et amis ensemble. Avant, il
+              fallait avoir compris la différence entre « Amis » et « Groupe »
+              AVANT de pouvoir désigner qui que ce soit — deux onglets pour la
+              même question. Les groupes viennent en premier parce qu'ils
+              désignent le plus de monde en un seul geste. */}
+          {audience === 'choose' && (
             <>
+              {groups !== null && groups.length > 0 && (
+                <>
+                  <Text style={[styles.subLabel, styles.audienceSubLabel]}>Un groupe</Text>
+                  <View style={styles.friendsBox}>
+                    {groups.map((group) => {
+                      const selected = selectedGroupId === group.id;
+                      return (
+                        <Pressable
+                          key={group.id}
+                          onPress={() => chooseGroup(group.id)}
+                          disabled={submitting}
+                          style={[styles.friendChip, selected && styles.friendChipActive]}
+                        >
+                          <Text style={[styles.friendChipText, selected && styles.friendChipTextActive]}>
+                            {group.name}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
+
+              <Text style={[styles.subLabel, styles.audienceSubLabel]}>
+                {groups !== null && groups.length > 0 ? 'Ou des amis' : 'Des amis'}
+              </Text>
               {friends !== null && friends.length > 0 && (
                 <TextInput
                   value={friendSearchQuery}
@@ -648,9 +658,7 @@ export default function NewPredictionScreen() {
                 {friends === null ? (
                   <ActivityIndicator color={colors.text} style={styles.searchLoader} />
                 ) : friends.length === 0 ? (
-                  <Text style={styles.hint}>
-                    Tu n’as pas encore d’ami accepté dans ton Cercle.
-                  </Text>
+                  <Text style={styles.hint}>Tu n’as pas encore d’ami accepté dans ton Cercle.</Text>
                 ) : filteredFriends && filteredFriends.length === 0 ? (
                   <Text style={styles.hint}>Aucun ami ne correspond à cette recherche.</Text>
                 ) : (
@@ -665,10 +673,7 @@ export default function NewPredictionScreen() {
                       >
                         <Avatar url={friend.avatar_url} username={friend.username} size={56} />
                         <Text
-                          style={[
-                            styles.friendChipText,
-                            selected && styles.friendChipTextActive,
-                          ]}
+                          style={[styles.friendChipText, selected && styles.friendChipTextActive]}
                         >
                           {friend.username}
                         </Text>
@@ -679,8 +684,6 @@ export default function NewPredictionScreen() {
               </View>
             </>
           )}
-
-          {error && <Text style={styles.error}>{error}</Text>}
 
           <Pressable
             onPress={handleSubmit}
@@ -763,6 +766,9 @@ function createStyles(colors: Colors) {
   sectionLabel: { marginTop: spacing.lg },
   fieldSpacing: { marginTop: spacing.md },
   subLabel: { fontSize: 14, color: colors.textFaint, marginBottom: 6 },
+  // Décolle les intitulés « Un groupe » / « Ou des amis » du trait de
+  // sélection juste au-dessus, où ils venaient se coller.
+  audienceSubLabel: { marginTop: spacing.md },
   input: {
     borderWidth: 1,
     borderColor: colors.border,
