@@ -6365,7 +6365,286 @@ from public.predictions p
 left join public.prediction_contents pc on pc.prediction_id = p.id;
 
 -- ---------------------------------------------------------------------------
--- 64. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 64. La relance « Alors ? »
+-- ---------------------------------------------------------------------------
+--
+-- Une prédiction scellée n'a plus de date : elle s'ouvre quand son auteur le
+-- décide. Rien ne la fait donc remonter, et le Cercle n'a aucun moyen de dire
+-- « on attend toujours » — sauf à commenter, ce qui oblige à écrire quelque
+-- chose alors qu'on n'a rien à dire de plus que ça.
+--
+-- La relance est ce geste-là, et rien d'autre. Point capital, décidé avec
+-- l'auteur du produit : elle N'OUVRE JAMAIS la prédiction. Une prédiction sur
+-- l'élection de 2027 qui s'ouvrirait parce que six amis ont appuyé perdrait
+-- exactement ce qui en fait l'intérêt. La relance envoie une notification et
+-- incrémente un compteur ; la décision reste entière à l'auteur.
+--
+-- Une seule relance par personne et par prédiction : la clé primaire s'en
+-- charge. Sans elle, la relance deviendrait un bouton sur lequel on tape en
+-- boucle, donc du harcèlement à faible coût. Le compteur, lui, ne bouge plus
+-- une fois qu'on a relancé — c'est voulu : il mesure COMBIEN DE PERSONNES
+-- attendent, pas combien de fois on a insisté.
+create table if not exists public.prediction_nudges (
+  prediction_id uuid not null references public.predictions (id) on delete cascade,
+  sender_id uuid not null references public.profiles (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (prediction_id, sender_id)
+);
+
+create index if not exists prediction_nudges_prediction_idx
+  on public.prediction_nudges (prediction_id);
+
+alter table public.prediction_nudges enable row level security;
+
+-- Le compteur est public (au sein du Cercle), pas la liste des relanceurs :
+-- afficher « Untel et Unetelle t'attendent » transformerait un signal collectif
+-- en pression nominative, ce qui n'est pas le même geste du tout. Chacun ne lit
+-- donc que sa propre ligne ; le total passe par la vue du Fil.
+drop policy if exists "prediction_nudges_select_own" on public.prediction_nudges;
+create policy "prediction_nudges_select_own"
+  on public.prediction_nudges
+  for select
+  to authenticated
+  using (sender_id = auth.uid());
+
+-- Aucune policy d'insert : tout passe par `nudge_prediction`, qui vérifie les
+-- quatre conditions au même endroit — même démarche que `place_bet`.
+--
+-- Retrait possible en revanche : on peut toujours revenir en arrière, ici comme
+-- ailleurs. Retirer sa relance décrémente le compteur ; la notification déjà
+-- partie, elle, ne se rattrape pas, et c'est honnête ainsi.
+drop policy if exists "prediction_nudges_delete_own" on public.prediction_nudges;
+create policy "prediction_nudges_delete_own"
+  on public.prediction_nudges
+  for delete
+  to authenticated
+  using (sender_id = auth.uid());
+
+/**
+ * Envoie sa relance. Sans effet — silencieusement — si la prédiction est déjà
+ * ouverte, si c'est la sienne, si on n'y a pas accès, ou si l'un des deux a
+ * bloqué l'autre. Un `return` plutôt qu'une erreur : le bouton n'a pas à
+ * expliquer à quelqu'un qu'il est bloqué.
+ *
+ * `has_prediction_access` ne teste pas le blocage (il ne connaît que la
+ * portée) : le test est donc explicite ici. Il l'est d'autant plus qu'une
+ * relance ÉCRIT dans les notifications de l'auteur — c'est précisément ce
+ * qu'un blocage doit empêcher.
+ */
+create or replace function public.nudge_prediction(p_prediction_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_author_id uuid;
+begin
+  select p.author_id into v_author_id
+  from public.predictions p
+  where p.id = p_prediction_id
+    and p.reveal_at > now()
+    and p.author_id <> auth.uid()
+    and public.has_prediction_access(p.id, auth.uid());
+
+  if v_author_id is null then
+    return;
+  end if;
+
+  if public.is_blocked_pair(v_author_id, auth.uid()) then
+    return;
+  end if;
+
+  insert into public.prediction_nudges (prediction_id, sender_id)
+  values (p_prediction_id, auth.uid())
+  on conflict (prediction_id, sender_id) do nothing;
+
+  -- La notification est unique par (auteur, prédiction, type) : le deuxième
+  -- ami qui relance ne crée pas une deuxième ligne, il RALLUME celle qui
+  -- existe — même mécanique que `generate_open_reminders`. L'auteur reçoit
+  -- donc « on t'attend » une fois, remise en tête à chaque nouvelle relance,
+  -- et jamais six notifications pour une seule prédiction.
+  insert into public.notifications (user_id, prediction_id, type)
+  values (v_author_id, p_prediction_id, 'nudge')
+  on conflict (user_id, prediction_id, type)
+  do update set created_at = now(), is_read = false, is_dismissed = false;
+end;
+$$;
+
+revoke all on function public.nudge_prediction(uuid) from public;
+grant execute on function public.nudge_prediction(uuid) to authenticated;
+
+/** Retire sa relance. Le compteur redescend ; rien d'autre ne bouge. */
+create or replace function public.unnudge_prediction(p_prediction_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  delete from public.prediction_nudges
+  where prediction_id = p_prediction_id and sender_id = auth.uid();
+end;
+$$;
+
+revoke all on function public.unnudge_prediction(uuid) from public;
+grant execute on function public.unnudge_prediction(uuid) to authenticated;
+
+-- Le nouveau type de notification. La liste est reprise EN ENTIER : reposer
+-- une liste plus courte rejetterait les notifications déjà en base d'un type
+-- absent de la liste (« is violated by some row »), ce qui s'est déjà produit.
+alter table public.notifications drop constraint if exists notifications_type_check;
+alter table public.notifications add constraint notifications_type_check
+  check (type in (
+    'new_teaser', 'prediction_revealed', 'prediction_approved', 'group_invite',
+    'prediction_mentioned', 'prediction_realized', 'prediction_missed', 'reveal_reminder',
+    'question_answered', 'new_comment', 'open_reminder', 'nudge'
+  ));
+
+
+-- La vue du Fil, redéfinie pour exposer le compteur de relances. Elle doit
+-- venir APRÈS `prediction_nudges` : une vue résout ses tables à la création,
+-- pas à l'exécution.
+drop view if exists public.predictions_feed;
+
+create view public.predictions_feed
+with (security_invoker = true) as
+select
+  p.id,
+  p.author_id,
+  p.teaser,
+  pc.content,
+  pc.audio_path,
+  pc.photo_path,
+  p.verdict_photo_path,
+  p.reveal_at,
+  p.scope,
+  p.open_ended,
+  p.is_immediate,
+  p.type,
+  p.answer_format,
+  p.mentioned_user_ids,
+  p.created_at,
+  p.verdict_set_at,
+  (p.reveal_at <= now()) as is_revealed,
+  case
+    when p.reveal_at > now() then 'pending'
+    when p.author_verdict is not null then p.author_verdict
+    else 'pending'
+  end as final_status,
+  coalesce(
+    (
+      select us.favorite from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_favorite,
+  coalesce(
+    (
+      select us.hidden from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_hidden,
+  coalesce(
+    (
+      select us.seen from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_seen,
+  coalesce(
+    (
+      select us.verdict_seen from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_verdict_seen,
+  coalesce(
+    (
+      select jsonb_object_agg(counts.emoji, counts.total)
+      from (
+        select emoji, count(*) as total
+        from public.prediction_emoji_reactions er
+        where er.prediction_id = p.id
+        group by emoji
+      ) counts
+    ),
+    '{}'::jsonb
+  ) as emoji_counts,
+  (
+    select er2.emoji from public.prediction_emoji_reactions er2
+    where er2.prediction_id = p.id and er2.user_id = auth.uid()
+  ) as my_emoji_reaction,
+  public.get_prediction_answer_count(p.id) as answer_count,
+  public.get_prediction_correct_answer_count(p.id) as correct_answer_count,
+  (
+    select pa2.answer_text from public.prediction_answers pa2
+    where pa2.prediction_id = p.id and pa2.user_id = auth.uid()
+  ) as my_answer_text,
+  (
+    select pa3.option_id from public.prediction_answers pa3
+    where pa3.prediction_id = p.id and pa3.user_id = auth.uid()
+  ) as my_answer_option_id,
+  (
+    select pa4.is_correct from public.prediction_answers pa4
+    where pa4.prediction_id = p.id and pa4.user_id = auth.uid()
+  ) as my_answer_is_correct,
+  -- Paris du Cercle. Rendus par la vue plutôt que par un appel dédié à chaque
+  -- carte : le Fil en affiche une vingtaine, ce serait vingt allers-retours
+  -- réseau pour trois chiffres.
+  (
+    select count(*) from public.prediction_bets b1 where b1.prediction_id = p.id
+  ) as bet_count,
+  -- La répartition ne sort qu'une fois la prédiction révélée. Avant, elle
+  -- créerait un effet de meute (chacun parie comme les autres) et renseignerait
+  -- l'auteur, qui peut encore modifier sa prédiction tant qu'elle est scellée
+  -- (`predictions_update_own_before_reveal`).
+  (
+    select count(*) from public.prediction_bets b2
+    where b2.prediction_id = p.id and b2.believes and p.reveal_at <= now()
+  ) as believer_count,
+  (
+    select count(*) from public.prediction_bets b3
+    where b3.prediction_id = p.id and not b3.believes and p.reveal_at <= now()
+  ) as doubter_count,
+  -- Son propre pari, toujours lisible : `null` tant qu'on n'a pas parié.
+  (
+    select b4.believes from public.prediction_bets b4
+    where b4.prediction_id = p.id and b4.bettor_id = auth.uid()
+  ) as my_bet,
+  p.group_id,
+  -- Le nom du groupe visé, quand la prédiction en cible un. Sert à écrire
+  -- « Aux Potes » plutôt que d'énumérer ses douze membres : le groupe EST
+  -- le destinataire, la liste n'apprend rien et noie l'information.
+  (select g.name from public.groups g where g.id = p.group_id) as group_name,
+  -- Cette personne a-t-elle déjà décacheté la révélation ? Tant que c'est
+  -- faux, la carte reste fermée pour elle et attend son geste.
+  (
+    select us2.opened_at is not null from public.prediction_user_state us2
+    where us2.prediction_id = p.id and us2.user_id = auth.uid()
+  ) as is_opened,
+  -- Combien de personnes ont déjà envoyé leur « Alors ? ». Le nombre est
+  -- visible de tous : c'est LUI la relance. L'auteur voit une attente, pas
+  -- une sommation, et il reste seul à décider du moment.
+  (
+    select count(*) from public.prediction_nudges pn
+    where pn.prediction_id = p.id
+  ) as nudge_count,
+  -- Ai-je déjà relancé ? Sert à griser le bouton plutôt qu'à laisser croire
+  -- qu'un second appui compterait double.
+  (
+    select exists (
+      select 1 from public.prediction_nudges pn2
+      where pn2.prediction_id = p.id and pn2.sender_id = auth.uid()
+    )
+  ) as i_nudged
+from public.predictions p
+left join public.prediction_contents pc on pc.prediction_id = p.id;
+
+
+-- ---------------------------------------------------------------------------
+-- 65. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une

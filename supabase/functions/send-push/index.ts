@@ -38,6 +38,8 @@ function messageFor(row: Pending): { title: string; body: string } {
       return { title: 'Bientôt', body: `${what} se révèle dans peu de temps.` };
     case 'open_reminder':
       return { title: 'Ton Predict attend', body: `${what} est toujours scellé. À toi de l’ouvrir.` };
+    case 'nudge':
+      return { title: 'Alors ?', body: `Ton Cercle attend ${what}.` };
     case 'new_teaser':
       return { title: 'Nouveau Predict', body: `${who} a scellé ${what}.` };
     case 'prediction_realized':

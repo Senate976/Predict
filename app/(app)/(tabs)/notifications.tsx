@@ -83,6 +83,15 @@ function notificationLabel(notification: Notification) {
           Ton <PredictWord /> attend toujours d’être révélé
         </>
       );
+    case 'nudge':
+      // Le nombre de personnes qui attendent est sur la carte, pas ici : une
+      // notification qui dirait « 6 personnes t'attendent » se lirait comme
+      // une sommation. Elle signale, la carte détaille.
+      return (
+        <>
+          Ton Cercle attend ton <PredictWord />
+        </>
+      );
     case 'question_answered':
       return 'Quelqu’un a répondu à ton Sondage';
     case 'new_comment':

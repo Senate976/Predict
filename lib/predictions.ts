@@ -87,6 +87,13 @@ export type PredictionFeedItem = {
   /** Mon propre pari : `true` j'y crois, `false` je n'y crois pas, `null` pas
    * encore parié. Toujours lisible, même avant révélation. */
   my_bet: boolean | null;
+  /** Combien de personnes ont envoyé leur « Alors ? » (voir `lib/nudges.ts`).
+   * Une par personne, jamais davantage : le nombre dit COMBIEN DE GENS
+   * attendent, pas combien de fois on a insisté. */
+  nudge_count: number;
+  /** Ai-je déjà relancé ? Sert à ne pas laisser croire qu'un second appui
+   * compterait double. */
+  i_nudged: boolean;
   created_at: string;
   is_revealed: boolean;
   /** `pending` tant que l'auteur n'a pas affirmé le résultat (voir
@@ -213,7 +220,7 @@ const FEED_COLUMNS =
   'is_immediate, type, answer_format, created_at, is_revealed, final_status, verdict_set_at, is_favorite, ' +
   'is_hidden, is_seen, is_verdict_seen, emoji_counts, my_emoji_reaction, mentioned_user_ids, answer_count, ' +
   'correct_answer_count, my_answer_text, my_answer_option_id, my_answer_is_correct, ' +
-  'bet_count, believer_count, doubter_count, my_bet, group_id, group_name, is_opened';
+  'bet_count, believer_count, doubter_count, my_bet, nudge_count, i_nudged, group_id, group_name, is_opened';
 
 export async function fetchPredictionsFeed() {
   return supabase
