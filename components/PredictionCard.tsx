@@ -398,6 +398,24 @@ export function PredictionCard({
   const enterAnim = useRef(new Animated.Value(1)).current;
   const needsOpening = revealed && !isAuthor && !openedLocally;
 
+  /**
+   * Le décachetage, en trois temps.
+   *
+   * Un simple fondu ne donnait aucun poids : rien ne s'ouvrait, l'image
+   * changeait. Ici il se passe quelque chose de physique — le sceau cède, le
+   * rabat se lève, la lettre sort. `openAnim` va de 0 à 1 et chaque élément
+   * n'occupe qu'une tranche de cet intervalle, ce qui produit un enchaînement
+   * plutôt que trois mouvements simultanés.
+   *
+   *   0 ──── 0,30 ──────── 0,75 ──── 1
+   *   │ sceau │ rabat       │ corps
+   *   │ qui   │ qui se lève │ qui
+   *   │ cède  │             │ s'efface
+   *
+   * `Easing.bezier` plutôt que `Easing.out` : la courbe démarre lentement (le
+   * sceau résiste) puis accélère (il lâche). C'est ce contraste qui donne
+   * l'impression de matière.
+   */
   function handleOpenEnvelope() {
     if (opening) return;
     setOpening(true);
@@ -405,8 +423,8 @@ export function PredictionCard({
       toValue: 1,
       // `reduce_motion` est un réglage d'accessibilité de l'app : à zéro, le
       // décachetage reste un geste, il n'est simplement pas animé.
-      duration: reduceMotion ? 0 : 420,
-      easing: Easing.out(Easing.cubic),
+      duration: reduceMotion ? 0 : 760,
+      easing: Easing.bezier(0.32, 0, 0.24, 1),
       useNativeDriver: false,
     }).start(() => {
       setOpenedLocally(true);
@@ -415,7 +433,7 @@ export function PredictionCard({
       enterAnim.setValue(0);
       Animated.timing(enterAnim, {
         toValue: 1,
-        duration: reduceMotion ? 0 : 320,
+        duration: reduceMotion ? 0 : 420,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: false,
       }).start();
@@ -1149,14 +1167,44 @@ export function PredictionCard({
               style={[
                 styles.envelopeShell,
                 { minHeight: env.envH, backgroundColor: WASH.sealedBody },
-                cardState.kind === 'to_open' && {
-                  opacity: openAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
-                },
+                // Le corps NE s'efface PAS. Le faire disparaître laissait, au
+                // milieu du geste, une carte blanche pendant près d'une demi-
+                // seconde — un trou, exactement le contraire du poids
+                // recherché. L'enveloppe reste donc entière et visible jusqu'au
+                // bout ; c'est la lettre qui, en montant par-dessus, prend le
+                // relais.
               ]}
             >
-              <View style={styles.sealedFlapLayer} pointerEvents="none">
+              {/* Le rabat pivote autour de son bord SUPÉRIEUR, exactement comme
+                  un vrai rabat d'enveloppe : `transformOrigin: 'top'`. Sans
+                  lui, la rotation se ferait autour du centre et le rabat
+                  traverserait l'enveloppe au lieu de s'en détacher.
+                  `perspective` donne la profondeur — sans elle, `rotateX`
+                  écrase simplement la forme au lieu de la faire basculer. */}
+              <Animated.View
+                style={[
+                  styles.sealedFlapLayer,
+                  cardState.kind === 'to_open' && {
+                    transformOrigin: 'top',
+                    transform: [
+                      { perspective: 600 },
+                      {
+                        // S'arrête à -72°, jamais au-delà : passé 90° le rabat
+                        // se présente sur la tranche puis montre son dos, donc
+                        // il s'évanouit au lieu de s'ouvrir. À -72° il est
+                        // franchement relevé et reste lisible.
+                        rotateX: openAnim.interpolate({
+                          inputRange: [0, 0.25, 0.9, 1],
+                          outputRange: ['0deg', '0deg', '-72deg', '-72deg'],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+                pointerEvents="none"
+              >
                 <FlapDown height={env.flapH} />
-              </View>
+              </Animated.View>
               {/* Le sceau grossit et s'efface au décachetage : c'est lui qui
                   cède, comme un cachet de cire qu'on brise. */}
               <Animated.View
@@ -1164,8 +1212,32 @@ export function PredictionCard({
                   styles.sealedBadge,
                   { top: env.badgeTop, marginLeft: -env.badge / 2 },
                   cardState.kind === 'to_open' && {
+                    // Il gonfle sous la contrainte, puis lâche : il bascule et
+                    // tombe hors de l'enveloppe. C'est le premier mouvement, et
+                    // c'est lui qui déclenche visuellement tout le reste.
+                    opacity: openAnim.interpolate({
+                      inputRange: [0, 0.14, 0.3],
+                      outputRange: [1, 1, 0],
+                    }),
                     transform: [
-                      { scale: openAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.6] }) },
+                      {
+                        scale: openAnim.interpolate({
+                          inputRange: [0, 0.16, 0.34],
+                          outputRange: [1, 1.18, 0.9],
+                        }),
+                      },
+                      {
+                        translateY: openAnim.interpolate({
+                          inputRange: [0, 0.16, 0.34],
+                          outputRange: [0, 0, 26],
+                        }),
+                      },
+                      {
+                        rotate: openAnim.interpolate({
+                          inputRange: [0, 0.16, 0.34],
+                          outputRange: ['0deg', '-6deg', '22deg'],
+                        }),
+                      },
                     ],
                   },
                 ]}
@@ -1191,7 +1263,21 @@ export function PredictionCard({
               {envelopeFooter}
             </Animated.View>
           ) : (
-            <Animated.View style={[styles.envelopeShell, { paddingTop: env.flapPeek, opacity: enterAnim }]}>
+            <Animated.View
+              style={[
+                styles.envelopeShell,
+                {
+                  paddingTop: env.flapPeek,
+                  opacity: enterAnim,
+                  // Elle monte depuis l'intérieur de l'enveloppe plutôt que
+                  // d'apparaître sur place : c'est ce glissement qui fait lire
+                  // « la lettre sort » et non « l'image a changé ».
+                  transform: [
+                    { translateY: enterAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) },
+                  ],
+                },
+              ]}
+            >
               {/* Les deux couches de lavis, derrière la lettre : le rabat
                   ouvert occupe le haut (ses deux bords obliques restent
                   visibles de part et d'autre de la lettre), le corps prend
