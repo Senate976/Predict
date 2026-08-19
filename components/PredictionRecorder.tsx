@@ -7,6 +7,7 @@ import {
   useAudioRecorder,
   useAudioRecorderState,
 } from 'expo-audio';
+import { Ionicons } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
@@ -89,14 +90,22 @@ export function PredictionRecorder({ uri, onChange, disabled }: Props) {
         disabled={disabled}
         style={[styles.recordButton, recorderState.isRecording && styles.recordButtonActive]}
       >
-        <View style={[styles.dot, recorderState.isRecording && styles.dotSquare]} />
+        {/* Un picto micro dit le geste ; la pastille rouge, elle, se lisait
+            comme un enregistrement déjà en cours. Pendant l'enregistrement on
+            passe au carré « stop », qui est ce que le bouton fait alors. */}
+        {recorderState.isRecording ? (
+          <View style={styles.dotSquare} />
+        ) : (
+          <Ionicons name="mic" size={20} color={colors.text} />
+        )}
         <Text style={styles.recordButtonText}>
           {recorderState.isRecording ? (
             `Arrêter · ${formatDuration(recorderState.durationMillis)}`
           ) : (
-            <>
-              Enregistrer mon <PredictWord />
-            </>
+            // « Enregistrer mon Predict » se lisait comme « sauvegarder » —
+            // le mot juste, à côté d'un bouton « Ajouter une photo », est le
+            // geste : parler.
+            'Enregistrer un vocal'
           )}
         </Text>
       </Pressable>
@@ -122,8 +131,7 @@ function createStyles(colors: Colors) {
   },
   recordButtonActive: {},
   recordButtonText: { fontSize: 15, fontWeight: '600', color: colors.text },
-  dot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.danger },
-  dotSquare: { borderRadius: 3 },
+  dotSquare: { width: 12, height: 12, borderRadius: 3, backgroundColor: colors.danger },
   playButton: { alignSelf: 'flex-start' },
   playButtonText: { fontFamily: fonts.bodyEmphasis, fontSize: 15, color: colors.text },
   duration: { fontSize: 15, color: colors.textFaint, marginTop: 8 },
