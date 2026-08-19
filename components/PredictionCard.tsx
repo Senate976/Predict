@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import {
+  BellRing,
   CircleCheck,
   CircleX,
   Eye,
@@ -65,6 +66,7 @@ import {
 } from './EnvelopeArt';
 import { useAuth } from '../lib/auth';
 import { betOutcomeLabel, placeBet } from '../lib/bets';
+import { nudgeCountLabel, nudgePrediction, unnudgePrediction } from '../lib/nudges';
 import { InlineComments } from './InlineComments';
 import { InlineQuestionAnswer } from './InlineQuestionAnswer';
 import { PhotoAttachButton } from './PhotoAttachButton';
@@ -302,6 +304,8 @@ export function PredictionCard({
   // la base. C'est un geste léger et réversible — faire patienter un curseur
   // pour ça casserait la fluidité recherchée.
   const [myBet, setMyBet] = useState<boolean | null>(item.my_bet);
+  const [nudgeCount, setNudgeCount] = useState(item.nudge_count ?? 0);
+  const [iNudged, setINudged] = useState(!!item.i_nudged);
   const [betCount, setBetCount] = useState(item.bet_count ?? 0);
   const env = useMemo(() => {
     const W = envelopeWidth;
@@ -703,6 +707,39 @@ export function PredictionCard({
   /* L'action unique d'une carte « à ouvrir » : elle remplace tout le reste sur
      la ligne du bas, parce qu'il n'y a plus qu'une chose à faire. */
   const canOpen = cardState.kind === 'to_open';
+
+  /* La relance « Impatient » : disponible sur l'enveloppe scellée de quelqu'un
+     d'autre, y compris un Sondage — attendre la clôture d'une Question est
+     exactement la même impatience.
+
+     Elle N'OUVRE RIEN, et c'est tout son intérêt : une prédiction sur
+     l'élection de 2027 qui s'ouvrirait parce que six amis ont appuyé perdrait
+     ce qui en fait l'intérêt. Elle prévient l'auteur, un point c'est tout.
+
+     On peut la retirer : le compteur redescend. Là comme ailleurs, on doit
+     pouvoir revenir en arrière. */
+  const canNudge = !isAuthor && cardState.kind === 'sealed';
+
+  async function handleNudge() {
+    const wasNudged = iNudged;
+    // Mise à jour optimiste : le geste doit répondre tout de suite. En cas
+    // d'échec on remet exactement l'état d'avant, sans message — le bouton
+    // n'a rien à expliquer, notamment pas qu'on a été bloqué.
+    setINudged(!wasNudged);
+    setNudgeCount((n) => Math.max(0, wasNudged ? n - 1 : n + 1));
+    const { error } = wasNudged
+      ? await unnudgePrediction(item.id)
+      : await nudgePrediction(item.id);
+    if (error) {
+      setINudged(wasNudged);
+      setNudgeCount((n) => Math.max(0, wasNudged ? n + 1 : n - 1));
+    }
+  }
+
+  /* Ce que l'auteur lit sur sa propre enveloppe : une attente, jamais une
+     liste de noms — « Untel et Unetelle t'attendent » ferait d'un signal
+     collectif une pression nominative, ce qui n'est pas le même geste. */
+  const nudgeLabel = cardState.kind === 'sealed' ? nudgeCountLabel(nudgeCount) : null;
   /* `!needsOpening` : « 3 amis n'y croyaient pas. Raison quand même. » donne le
      verdict. L'afficher sur une enveloppe encore fermée éventerait la
      révélation avant qu'on l'ait ouverte. */
@@ -1091,6 +1128,41 @@ export function PredictionCard({
                 <CircleX size={22} color={colors.text} strokeWidth={2.25} />
               )}
             </View>
+          )}
+
+          {/* Ce que l'auteur lit : combien de personnes attendent. Aucun bouton
+              en face — la relance n'est pas une demande à laquelle il faudrait
+              répondre, et il n'existe volontairement aucun raccourci « ouvrir
+              maintenant » branché dessus. Il ouvre quand il veut, avec le même
+              bouton « Révéler » qu'avant. */}
+          {isAuthor && nudgeLabel && (
+            <View style={styles.nudgeCountRow} accessibilityLabel={nudgeLabel}>
+              <BellRing size={18} color={colors.footerIconInactive} strokeWidth={1.75} />
+              <Text style={styles.betCountText}>{nudgeCount}</Text>
+            </View>
+          )}
+
+          {/* Le geste, côté Cercle. Une fois envoyé, le bouton reste — c'est
+              ainsi qu'on le retire — mais il passe en encre pleine : on voit
+              qu'on a déjà relancé, et qu'appuyer encore ne comptera pas double. */}
+          {canNudge && (
+            <Pressable
+              onPress={handleNudge}
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.nudgeButton,
+                iNudged && styles.nudgeButtonOn,
+                pressed && styles.nudgeButtonPressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={
+                iNudged ? 'Retirer ma relance' : 'Dire que je suis impatient'
+              }
+            >
+              <Text style={[styles.nudgeButtonText, iNudged && styles.nudgeButtonTextOn]}>
+                Impatient{nudgeCount > 0 ? ` ${nudgeCount}` : ''}
+              </Text>
+            </Pressable>
           )}
 
           {isAuthor && cardState.kind === 'sealed' && item.open_ended && (
@@ -1756,6 +1828,22 @@ function createStyles(colors: Colors) {
     color: colors.textOnAccent,
   },
   betCountRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  nudgeCountRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  // Contour plutôt que bouton plein : « Révéler », qui est la vraie décision,
+  // reste la seule chose dorée de la rangée. Une relance ne doit pas peser
+  // plus lourd à l'œil que l'ouverture elle-même.
+  nudgeButton: {
+    flexShrink: 0,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  nudgeButtonOn: { borderColor: colors.text, backgroundColor: colors.accentSoft },
+  nudgeButtonPressed: { opacity: 0.7 },
+  nudgeButtonText: { fontFamily: fonts.label, fontSize: 13, color: colors.textMuted },
+  nudgeButtonTextOn: { color: colors.text },
   betCountText: { fontFamily: fonts.label, fontSize: 13, color: colors.textMuted },
   betOutcome: { fontFamily: fonts.bodyEmphasis, fontSize: 14, color: colors.text, marginTop: 4 },
   sealedBadge: { position: 'absolute', left: '50%', zIndex: 2 },

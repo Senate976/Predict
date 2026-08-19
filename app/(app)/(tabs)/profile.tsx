@@ -35,7 +35,7 @@ const FILTER_LABEL: Record<Filter, string> = {
   total: 'Predict',
   realized: 'Réalisés',
   missed: 'Manqués',
-  pending: 'Scellées',
+  pending: 'En attente',
 };
 
 function statusLabel(status: PredictionOutcomeStatus, isRevealed: boolean): string {
@@ -140,6 +140,19 @@ export default function ProfileScreen() {
   const missed = (outcomes ?? []).filter((o) => o.final_status === 'missed');
   const pending = (outcomes ?? []).filter((o) => o.final_status === 'pending');
   const total = outcomes ?? [];
+  /* « Sans verdict » et « encore scellée » ne sont pas la même chose : une
+     prédiction ouverte dont l'auteur n'a pas encore dit si elle s'est réalisée
+     est en attente, mais elle n'est plus scellée. La quatrième carte porte
+     donc « En attente », qui est ce qu'elle compte réellement, et le nombre
+     d'enveloppes encore fermées se lit à part — c'est un chiffre d'ambiance
+     (« je garde quatre secrets »), pas un filtre de plus. */
+  const stillSealed = (outcomes ?? []).filter((o) => !o.is_revealed).length;
+  const sealedLabel =
+    stillSealed === 0
+      ? null
+      : stillSealed === 1
+        ? '1 enveloppe encore scellée'
+        : `${stillSealed} enveloppes encore scellées`;
 
   const filtered =
     filter === 'realized' ? realized : filter === 'missed' ? missed : filter === 'pending' ? pending : total;
@@ -218,6 +231,7 @@ export default function ProfileScreen() {
           ) : (
             <PrediscoreGauge score={prediscore} />
           )}
+          {sealedLabel && <Text style={styles.sealedCount}>{sealedLabel}</Text>}
         </View>
 
         {error && <Text style={styles.error}>{error}</Text>}
@@ -255,7 +269,7 @@ export default function ProfileScreen() {
                 style={[styles.statCard, filter === 'pending' && styles.statCardActive]}
               >
                 <Text style={styles.statValue}>{pending.length}</Text>
-                <Text style={styles.statLabel}>Scellées</Text>
+                <Text style={styles.statLabel}>En attente</Text>
               </Pressable>
             </View>
 
@@ -368,6 +382,7 @@ function createStyles(colors: Colors) {
   avatarMenuItemText: { fontSize: 15, fontWeight: '600', color: colors.text },
   avatarMenuItemDanger: { color: colors.danger },
   prediscoreWrap: { width: '50%', minWidth: 180, alignSelf: 'center' },
+  sealedCount: { fontSize: 14, color: colors.textMuted, textAlign: 'center', marginTop: 8 },
   statsRow: { flexDirection: 'row', gap: 8, marginTop: spacing.lg },
   statCard: {
     flex: 1,

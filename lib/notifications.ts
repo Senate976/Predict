@@ -16,7 +16,11 @@ export type NotificationType =
   /** Rappel adressé à l'AUTEUR d'une prédiction « Libre » encore scellée,
    * répété tous les 7 jours (voir `generate_open_reminders`, schema.sql
    * section 54) — sans date de révélation, rien ne la ferait remonter. */
-  | 'open_reminder';
+  | 'open_reminder'
+  /** Un membre du Cercle s'est dit impatient sur une prédiction encore
+   * scellée (voir `nudge_prediction`, schema.sql section 64). Elle prévient
+   * l'auteur qu'on l'attend — elle n'ouvre rien, c'est tout son intérêt. */
+  | 'nudge';
 
 /**
  * Une notification telle que renvoyée par `public.notifications`. Selon le
