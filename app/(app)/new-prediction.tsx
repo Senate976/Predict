@@ -425,18 +425,15 @@ export default function NewPredictionScreen() {
             >
               <View style={styles.chooserHead}>
                 <PredictBadge glyph="P" size={34} />
-                {/* Espaces insécables à l'intérieur de chaque temps : le titre ne se
-                    coupe qu'aux virgules, jamais entre « tu » et son verbe. */}
-                <Text style={styles.chooserTitle}>
-                  Tu scelles, tu intrigues, tu révèles
-                </Text>
+                <Text style={styles.chooserTitle}>Predict</Text>
               </View>
-              {/* Le titre dit déjà le geste en trois temps ; le corps ne
-                  répète pas, il ajoute ce que le titre ne dit pas — ce que
-                  le Cercle voit, et qui décide du moment de l'ouverture. */}
+              {/* Le nom seul en titre, le geste en sous-titre : on choisit
+                  entre deux OBJETS (un Predict, un Sondage), et la phrase en
+                  dessous dit ce qu'on en fait. Espaces insécables à
+                  l'intérieur de chaque temps, pour que la phrase ne se coupe
+                  qu'aux virgules — jamais entre « tu » et son verbe. */}
               <Text style={styles.chooserBody}>
-                Ton Cercle ne voit qu'un indice et parie. Tu ouvres le jour où ça
-                se produit.
+                Tu scelles, tu intrigues, tu révèles
               </Text>
             </Pressable>
 
@@ -446,13 +443,10 @@ export default function NewPredictionScreen() {
             >
               <View style={styles.chooserHead}>
                 <PredictBadge glyph="?" size={34} />
-                <Text style={styles.chooserTitle}>
-                  Tu questionnes, tu patientes, tu révèles
-                </Text>
+                <Text style={styles.chooserTitle}>Sondage</Text>
               </View>
               <Text style={styles.chooserBody}>
-                Ton Cercle répond tout de suite. Tu clôtures quand la réponse est
-                connue.
+                Tu questionnes, tu patientes, tu révèles
               </Text>
             </Pressable>
           </View>
@@ -463,7 +457,7 @@ export default function NewPredictionScreen() {
         >
           {!isQuestion && (
             <>
-              <Text style={styles.label}>Ce que ton Cercle voit tout de suite</Text>
+              <Text style={styles.label}>Aperçu</Text>
               <TextInput
                 value={teaser}
                 onChangeText={setTeaser}
@@ -478,7 +472,7 @@ export default function NewPredictionScreen() {
           )}
 
           <Text style={[styles.label, styles.sectionLabel]}>
-            {isQuestion ? 'Ta question' : 'Ce qui s’ouvrira quand tu le décideras'}
+            {isQuestion ? 'Ta question' : 'Ton Predict'}
           </Text>
           {/* Plus de bascule « Texte / Message vocal ». Elle obligeait à
               trancher AVANT d'avoir commencé, et interdisait d'avoir les deux.
@@ -749,10 +743,10 @@ function createStyles(colors: Colors) {
     padding: 20,
   },
   chooserCardPressed: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
-  // Le titre tient sur deux lignes : le sceau s'aligne en haut, sur la
-  // première ligne, plutôt qu'au milieu du bloc de texte.
-  chooserHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 8 },
-  chooserTitle: { flex: 1, fontFamily: fonts.display, fontSize: 21, lineHeight: 28, color: colors.text },
+  // Le titre est redevenu court (« Predict », « Sondage ») : il tient sur une
+  // ligne, le sceau se recentre donc à côté de lui.
+  chooserHead: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
+  chooserTitle: { fontFamily: fonts.display, fontSize: 24, color: colors.text },
   chooserBody: { fontSize: 15, lineHeight: 22, color: colors.textMuted },
   cancel: { fontSize: 15, color: colors.text },
   predictTypeWrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },

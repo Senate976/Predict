@@ -388,6 +388,10 @@ export function PredictionCard({
    * l'ouverture est l'acte de révéler aux autres, pas de découvrir.
    */
   const [openedLocally, setOpenedLocally] = useState(item.is_opened);
+  /* Le surlignage « non lue » vient d'une prop (`unseen`) calculée par le Fil.
+     Il ne retomberait donc qu'au prochain chargement — d'où cet écho local,
+     posé au moment du geste. */
+  const [seenLocally, setSeenLocally] = useState(false);
   const [opening, setOpening] = useState(false);
   const openAnim = useRef(new Animated.Value(0)).current;
   /**
@@ -444,7 +448,14 @@ export function PredictionCard({
     });
     // Écrit sans attendre la fin de l'animation : si l'app se ferme entre les
     // deux, la prédiction reste ouverte plutôt que de se refermer.
-    setPredictionUserState(item.id, userId, { opened: true });
+    //
+    // `seen` en même temps qu'`opened` : décacheter une enveloppe, c'est
+    // l'avoir vue. Sans lui, la carte restait surlignée « non lue » après son
+    // ouverture — le surlignage ne retombait qu'en ouvrant l'écran de détail,
+    // ce que plus personne n'a besoin de faire depuis que la lettre se lit
+    // sur la carte.
+    setSeenLocally(true);
+    setPredictionUserState(item.id, userId, { opened: true, seen: true });
   }
 
   const cardState: {
@@ -1219,7 +1230,7 @@ export function PredictionCard({
     <View
       style={[
         styles.card,
-        unseen && styles.cardUnseen,
+        unseen && !seenLocally && styles.cardUnseen,
         cardState.kind === 'realized' && {
           boxShadow: [
             { offsetX: 0, offsetY: 0, color: hexToRgba(colors.accent, glowShadowOpacity), blurRadius: glowShadowRadius },
