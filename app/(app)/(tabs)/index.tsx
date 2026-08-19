@@ -44,12 +44,17 @@ const TICK_MS = 30_000;
 
 type AuthorInfo = { username: string; avatar_url: string | null };
 type AuthorMap = Record<string, AuthorInfo>;
-/** `predict` : tout ce qui n'est pas encore révélé/clos — Scellées et
- * Sondages encore ouverts. `revealed` : tout ce qui l'est déjà — Révélées et
- * Sondages clos. Les siennes et celles reçues mélangées dans les deux cas :
- * ce qui distingue les deux onglets, c'est uniquement le statut de
- * révélation, jamais qui a écrit la prédiction. */
-type Tab = 'predict' | 'revealed';
+/* Plus d'onglets. Le Fil est UNE liste, coupée en deux zones qu'on fait
+   défiler l'une après l'autre : « Predict » (ce qui n'est pas encore ouvert —
+   Scellées et Sondages en cours) puis « Ouverts » (ce qui l'est déjà).
+
+   Deux onglets obligeaient à choisir un camp avant d'avoir rien vu, et
+   cachaient la moitié du Fil derrière un geste que personne ne faisait : on
+   arrivait sur « Predict », on ne voyait jamais ce qui s'était ouvert. Une
+   seule liste montre les deux, dans l'ordre où ça compte — ce qui attend
+   d'abord, ce qui est joué ensuite. Les siennes et celles reçues restent
+   mélangées : ce qui sépare les deux zones est le statut d'ouverture, jamais
+   qui a écrit la prédiction. */
 type SortOrder = 'recent' | 'oldest';
 // Plus de tri « par date de révélation » : une prédiction scellée n'a plus de
 // date annoncée, ce tri classait donc tout le monde sur le même repère
@@ -57,7 +62,7 @@ type SortOrder = 'recent' | 'oldest';
 type SortKey = 'default' | 'seal';
 type MenuView = 'main' | 'author';
 
-/** Fil d'actualité — Archives a été fusionné ici, sous forme de deux onglets. */
+/** Fil d'actualité — une seule liste, coupée en deux zones (voir plus haut). */
 export default function HomeScreen() {
   const { username, session, onboarded, markOnboarded, reduceMotion } = useAuth();
   const router = useRouter();
@@ -78,7 +83,7 @@ export default function HomeScreen() {
   const [now, setNow] = useState(() => new Date());
   // « Predict » par défaut, à gauche — c'est ce qu'on veut voir en premier en
   // ouvrant l'app : ce qui reste à découvrir, pas ce qui est déjà joué.
-  const [tab, setTab] = useState<Tab>('predict');
+
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuView, setMenuView] = useState<MenuView>('main');
   const [authorFilter, setAuthorFilter] = useState<string | null>(null);
@@ -261,7 +266,9 @@ export default function HomeScreen() {
    * retapé l'œil de chacune une par une depuis sa carte. */
   async function handleUnhideAll() {
     if (!userId) return;
-    const hiddenItems = byTab.filter((item) => item.is_hidden);
+    // Tout le Fil, et non plus le seul onglet courant : il n'y a plus
+    // d'onglet, et « X masquées » compte désormais les deux zones.
+    const hiddenItems = (feed ?? []).filter((item) => item.is_hidden);
     if (hiddenItems.length === 0) return;
     const hiddenIds = new Set(hiddenItems.map((item) => item.id));
     setFeed((prev) => (prev ?? []).map((item) => (hiddenIds.has(item.id) ? { ...item, is_hidden: false } : item)));
@@ -286,22 +293,18 @@ export default function HomeScreen() {
     if (userId) setPredictionUserState(predictionId, userId, { seen: true });
   }
 
-  const byTab = (feed ?? []).filter((item) =>
-    tab === 'revealed' ? isRevealed(item, now) : !isRevealed(item, now)
-  );
-  const hiddenCount = byTab.filter((item) => item.is_hidden).length;
+  // Les filtres portent sur tout le Fil : ils ne dépendent plus d'un onglet
+  // actif, puisqu'il n'y en a plus. Le découpage en zones se fait juste avant
+  // l'affichage, une fois filtré et trié.
+  const all = feed ?? [];
+  const hiddenCount = all.filter((item) => item.is_hidden).length;
 
-  // Comptés indépendamment de l'onglet actif : le badge de « Révélés »
-  // doit rester juste même quand on regarde « Predict », et inversement.
-  const unreadPredict = (feed ?? []).filter((item) => !isRevealed(item, now) && !item.is_seen).length;
-  const unreadRevealed = (feed ?? []).filter((item) => isRevealed(item, now) && !item.is_seen).length;
-
-  const authorEntries = Array.from(new Set(byTab.map((item) => item.author_id))).map((id) => ({
+  const authorEntries = Array.from(new Set(all.map((item) => item.author_id))).map((id) => ({
     id,
     username: authors[id]?.username ?? '…',
   }));
 
-  const filtered = byTab
+  const filtered = all
     .filter((item) => !item.is_hidden)
     .filter((item) => !authorFilter || item.author_id === authorFilter)
     .filter((item) => !favoritesOnly || item.is_favorite)
@@ -317,6 +320,45 @@ export default function HomeScreen() {
     // Défaut : ordre de publication, le plus récent en tête.
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
+
+  /* Les deux zones du Fil, découpées après filtrage ET tri : chacune garde
+     donc l'ordre choisi dans le menu, sans qu'on ait à trier deux fois.
+     « Predict » d'abord parce que c'est ce qui attend quelque chose de toi. */
+  const zoneSealed = shown.filter((item) => !isRevealed(item, now));
+  const zoneOpened = shown.filter((item) => isRevealed(item, now));
+  const unreadSealed = zoneSealed.filter((item) => !item.is_seen).length;
+  const unreadOpened = zoneOpened.filter((item) => !item.is_seen).length;
+
+  /* La carte est rendue à l'identique dans les deux zones : une seule
+     fonction, pour qu'une correction faite d'un côté ne manque jamais de
+     l'autre. */
+  const renderCard = (item: PredictionFeedItem) => (
+    <PredictionCard
+      key={item.id}
+      item={item}
+      now={now}
+      authorLabel={authors[item.author_id]?.username ?? '…'}
+      authorId={item.author_id}
+      authorAvatarUrl={authors[item.author_id]?.avatar_url}
+      mentionLabel={buildMentionLabel(
+        item.id,
+        item.mentioned_user_ids,
+        Object.fromEntries(item.mentioned_user_ids.map((id) => [id, authors[id]?.username])),
+        userId!,
+        friendIds
+      )}
+      userId={userId!}
+      unseen={!item.is_seen}
+      onPress={() => {
+        handleMarkSeen(item.id);
+        router.push(`/prediction/${item.id}`);
+      }}
+      onDelete={() => handleDeletePrediction(item.id)}
+      onFavoriteChange={(isFavorite) => handleFavoriteChange(item.id, isFavorite)}
+      onHiddenChange={(isHidden) => handleHiddenChange(item.id, isHidden)}
+      onVerdictChange={(verdict) => handleVerdictChange(item.id, verdict)}
+    />
+  );
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -341,25 +383,6 @@ export default function HomeScreen() {
             </Text>
           </Pressable>
         </View>
-      </View>
-
-      <View style={styles.tabs}>
-        <Pressable onPress={() => setTab('predict')} style={[styles.tab, tab === 'predict' && styles.tabActive]}>
-          <Text style={[styles.tabText, tab === 'predict' && styles.tabTextActive]}>Predict</Text>
-          {unreadPredict > 0 && (
-            <View style={styles.tabBadge}>
-              <Text style={styles.tabBadgeText}>{unreadPredict > 99 ? '99+' : unreadPredict}</Text>
-            </View>
-          )}
-        </Pressable>
-        <Pressable onPress={() => setTab('revealed')} style={[styles.tab, tab === 'revealed' && styles.tabActive]}>
-          <Text style={[styles.tabText, tab === 'revealed' && styles.tabTextActive]}>Révélés</Text>
-          {unreadRevealed > 0 && (
-            <View style={styles.tabBadge}>
-              <Text style={styles.tabBadgeText}>{unreadRevealed > 99 ? '99+' : unreadRevealed}</Text>
-            </View>
-          )}
-        </Pressable>
       </View>
 
       <View style={styles.filtersRow}>
@@ -507,51 +530,74 @@ export default function HomeScreen() {
           <ActivityIndicator style={styles.loader} color={colors.text} />
         ) : shown.length === 0 ? (
           <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>
-              {tab === 'predict' ? 'Rien de scellé ni de Sondage en cours.' : 'Rien de révélé pour l’instant.'}
+            <Text style={styles.emptyTitle}>Ton Fil est vide.</Text>
+            <Text style={styles.emptyText}>
+              Les <PredictWord /> et les Sondages apparaîtront ici — les tiens comme ceux de
+              ton Cercle. Ceux qui attendent en haut, ceux qui sont ouverts en dessous.
             </Text>
-            {tab === 'predict' ? (
-              <Text style={styles.emptyText}>
-                Les <PredictWord /> pas encore révélés et les Sondages pas encore clos apparaîtront ici — les tiens
-                comme ceux de ton Cercle.
-              </Text>
-            ) : (
-              <Text style={styles.emptyText}>
-                Les <PredictWord /> révélés et les Sondages clos apparaîtront ici.
-              </Text>
-            )}
           </View>
         ) : (
-          shown.map((item) => (
-            <PredictionCard
-              key={item.id}
-              item={item}
-              now={now}
-              authorLabel={authors[item.author_id]?.username ?? '…'}
-              authorId={item.author_id}
-              authorAvatarUrl={authors[item.author_id]?.avatar_url}
-              mentionLabel={buildMentionLabel(
-                item.id,
-                item.mentioned_user_ids,
-                Object.fromEntries(item.mentioned_user_ids.map((id) => [id, authors[id]?.username])),
-                userId!,
-                friendIds
-              )}
-              userId={userId!}
-              unseen={!item.is_seen}
-              onPress={() => {
-                handleMarkSeen(item.id);
-                router.push(`/prediction/${item.id}`);
-              }}
-              onDelete={() => handleDeletePrediction(item.id)}
-              onFavoriteChange={(isFavorite) => handleFavoriteChange(item.id, isFavorite)}
-              onHiddenChange={(isHidden) => handleHiddenChange(item.id, isHidden)}
-              onVerdictChange={(verdict) => handleVerdictChange(item.id, verdict)}
-            />
-          ))
+          <>
+            {/* Le titre de zone n'apparaît que si la zone contient quelque
+                chose : un intitulé suivi de rien annoncerait un vide, ce qui
+                est pire que de ne rien annoncer. Et quand une seule des deux
+                zones est peuplée, aucun titre n'est nécessaire — il n'y a
+                rien à distinguer. */}
+            {zoneSealed.length > 0 && zoneOpened.length > 0 && (
+              <ZoneTitle
+                styles={styles}
+                label="Predict"
+                count={zoneSealed.length}
+                unread={unreadSealed}
+              />
+            )}
+            {zoneSealed.map(renderCard)}
+
+            {zoneSealed.length > 0 && zoneOpened.length > 0 && (
+              <ZoneTitle
+                styles={styles}
+                label="Ouverts"
+                count={zoneOpened.length}
+                unread={unreadOpened}
+              />
+            )}
+            {zoneOpened.map(renderCard)}
+          </>
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+/**
+ * L'intitulé d'une zone du Fil.
+ *
+ * Un titre, pas un bouton : il ne se touche pas, il n'ouvre rien. Il dit
+ * seulement où on est arrivé en faisant défiler, et combien il reste. La
+ * pastille compte ce qu'on n'a pas encore vu dans CETTE zone — c'est ce que
+ * portaient les badges d'onglets, qui n'existent plus.
+ */
+function ZoneTitle({
+  styles,
+  label,
+  count,
+  unread,
+}: {
+  styles: ReturnType<typeof createStyles>;
+  label: string;
+  count: number;
+  unread: number;
+}) {
+  return (
+    <View style={styles.zoneTitleRow}>
+      <Text style={styles.zoneTitle}>{label}</Text>
+      <Text style={styles.zoneCount}>{count}</Text>
+      {unread > 0 && (
+        <View style={styles.zoneBadge}>
+          <Text style={styles.zoneBadgeText}>{unread > 99 ? '99+' : unread}</Text>
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -584,28 +630,24 @@ function createStyles(colors: Colors) {
   // Trait sous le choix plutôt qu'un bouton de couleur — plus sobre, plus
   // « presse ». Le trait actif reprend le jaune de marque, épais pour rester
   // net face à la fine bordure neutre du reste de la barre.
-  tabs: {
+  // Intitulé de zone : discret, aligné à gauche au-dessus des cartes qu'il
+  // annonce. Un trait au-dessus le sépare de la zone précédente sans faire
+  // barre pleine largeur — ce n'est pas un onglet, il ne se touche pas.
+  zoneTitleRow: {
     flexDirection: 'row',
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  tab: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    paddingVertical: 12,
     alignItems: 'center',
-    gap: 6,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-    marginBottom: -1,
+    gap: 8,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
-  tabActive: { borderBottomColor: colors.accent },
-  // Même principe que le badge de la cloche de notifications — rouge plein,
-  // texte blanc, taille fixe pour ne pas déplacer le libellé de l'onglet.
-  tabBadge: {
+  zoneTitle: { fontFamily: fonts.sansBold, fontSize: 17, color: colors.text },
+  zoneCount: { fontFamily: fonts.label, fontSize: 15, color: colors.textFaint },
+  // Même badge que la cloche de notifications — rouge plein, texte blanc,
+  // taille fixe pour ne pas déplacer l'intitulé.
+  zoneBadge: {
     backgroundColor: colors.notificationBadge,
     borderRadius: radius.pill,
     minWidth: 20,
@@ -614,13 +656,7 @@ function createStyles(colors: Colors) {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tabBadgeText: { fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
-  tabText: {
-    fontFamily: fonts.sansBold,
-    fontSize: 17,
-    color: colors.icon,
-  },
-  tabTextActive: { color: colors.text },
+  zoneBadgeText: { fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
   filtersRow: {
     flexDirection: 'row',
     alignItems: 'center',

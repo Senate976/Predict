@@ -807,9 +807,9 @@ function createStyles(colors: Colors) {
   row: { flexDirection: 'row', gap: 12 },
   timeField: { flex: 1 },
   preview: { fontSize: 14, color: colors.textMuted, marginTop: 14 },
-  // Trait sous le choix plutôt qu'un bouton de couleur — même registre sobre
-  // que les onglets Predict / Révélés du Fil, jamais un aplat plein pour
-  // un simple choix parmi d'autres (réservé au CTA principal).
+  // Trait sous le choix plutôt qu'un bouton de couleur : registre sobre,
+  // jamais un aplat plein pour un simple choix parmi d'autres — le plein est
+  // réservé à l'action principale de l'écran.
   scopeRow: {
     flexDirection: 'row',
     borderBottomWidth: 1,
