@@ -6203,7 +6203,169 @@ create policy "prediction_photos_insert"
   );
 
 -- ---------------------------------------------------------------------------
--- 63. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 63. Décacheter une révélation, destinataire par destinataire
+-- ---------------------------------------------------------------------------
+--
+-- Jusqu'ici, une prédiction passait de « scellée » à « révélée » toute seule,
+-- en silence : le moment le plus fort du produit — la découverte — n'avait
+-- jamais lieu. Le contenu apparaissait, c'est tout.
+--
+-- `opened_at` retient QUAND CETTE PERSONNE a décacheté la révélation. Tant
+-- qu'il est nul, elle voit encore l'enveloppe fermée et doit la toucher pour
+-- l'ouvrir. Chacun a donc son propre moment, indépendamment des autres.
+--
+-- Une colonne distincte de `seen` (déjà présente) et non un réemploi : `seen`
+-- signifie « j'ai ouvert l'écran de détail », posé au premier tap sur la
+-- carte, y compris AVANT révélation. Confondre les deux ferait considérer
+-- comme déjà décachetée une prédiction qu'on a simplement consultée pendant
+-- qu'elle était scellée.
+alter table public.prediction_user_state
+  add column if not exists opened_at timestamptz;
+
+-- Rattrapage, à ne faire qu'une fois. Sans lui, toutes les prédictions déjà
+-- révélées redeviendraient « à ouvrir » du jour au lendemain : quelqu'un qui a
+-- lu vingt révélations les retrouverait scellées, avec vingt enveloppes à
+-- décacheter. Ce serait une régression, pas une nouveauté.
+--
+-- On considère donc comme déjà décachetée toute prédiction révélée que cette
+-- personne avait déjà consultée (`seen`). `where opened_at is null` rend
+-- l'opération rejouable sans jamais écraser une vraie date d'ouverture.
+update public.prediction_user_state us
+set opened_at = coalesce(us.updated_at, now())
+from public.predictions p
+where p.id = us.prediction_id
+  and us.seen
+  and p.reveal_at <= now()
+  and us.opened_at is null;
+
+
+-- La vue du Fil, redéfinie pour exposer `opened_at`. Elle doit venir APRÈS la
+-- colonne : une vue résout ses tables et ses colonnes à la création, pas à
+-- l'exécution.
+drop view if exists public.predictions_feed;
+
+create view public.predictions_feed
+with (security_invoker = true) as
+select
+  p.id,
+  p.author_id,
+  p.teaser,
+  pc.content,
+  pc.audio_path,
+  pc.photo_path,
+  p.verdict_photo_path,
+  p.reveal_at,
+  p.scope,
+  p.open_ended,
+  p.is_immediate,
+  p.type,
+  p.answer_format,
+  p.mentioned_user_ids,
+  p.created_at,
+  p.verdict_set_at,
+  (p.reveal_at <= now()) as is_revealed,
+  case
+    when p.reveal_at > now() then 'pending'
+    when p.author_verdict is not null then p.author_verdict
+    else 'pending'
+  end as final_status,
+  coalesce(
+    (
+      select us.favorite from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_favorite,
+  coalesce(
+    (
+      select us.hidden from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_hidden,
+  coalesce(
+    (
+      select us.seen from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_seen,
+  coalesce(
+    (
+      select us.verdict_seen from public.prediction_user_state us
+      where us.prediction_id = p.id and us.user_id = auth.uid()
+    ),
+    false
+  ) as is_verdict_seen,
+  coalesce(
+    (
+      select jsonb_object_agg(counts.emoji, counts.total)
+      from (
+        select emoji, count(*) as total
+        from public.prediction_emoji_reactions er
+        where er.prediction_id = p.id
+        group by emoji
+      ) counts
+    ),
+    '{}'::jsonb
+  ) as emoji_counts,
+  (
+    select er2.emoji from public.prediction_emoji_reactions er2
+    where er2.prediction_id = p.id and er2.user_id = auth.uid()
+  ) as my_emoji_reaction,
+  public.get_prediction_answer_count(p.id) as answer_count,
+  public.get_prediction_correct_answer_count(p.id) as correct_answer_count,
+  (
+    select pa2.answer_text from public.prediction_answers pa2
+    where pa2.prediction_id = p.id and pa2.user_id = auth.uid()
+  ) as my_answer_text,
+  (
+    select pa3.option_id from public.prediction_answers pa3
+    where pa3.prediction_id = p.id and pa3.user_id = auth.uid()
+  ) as my_answer_option_id,
+  (
+    select pa4.is_correct from public.prediction_answers pa4
+    where pa4.prediction_id = p.id and pa4.user_id = auth.uid()
+  ) as my_answer_is_correct,
+  -- Paris du Cercle. Rendus par la vue plutôt que par un appel dédié à chaque
+  -- carte : le Fil en affiche une vingtaine, ce serait vingt allers-retours
+  -- réseau pour trois chiffres.
+  (
+    select count(*) from public.prediction_bets b1 where b1.prediction_id = p.id
+  ) as bet_count,
+  -- La répartition ne sort qu'une fois la prédiction révélée. Avant, elle
+  -- créerait un effet de meute (chacun parie comme les autres) et renseignerait
+  -- l'auteur, qui peut encore modifier sa prédiction tant qu'elle est scellée
+  -- (`predictions_update_own_before_reveal`).
+  (
+    select count(*) from public.prediction_bets b2
+    where b2.prediction_id = p.id and b2.believes and p.reveal_at <= now()
+  ) as believer_count,
+  (
+    select count(*) from public.prediction_bets b3
+    where b3.prediction_id = p.id and not b3.believes and p.reveal_at <= now()
+  ) as doubter_count,
+  -- Son propre pari, toujours lisible : `null` tant qu'on n'a pas parié.
+  (
+    select b4.believes from public.prediction_bets b4
+    where b4.prediction_id = p.id and b4.bettor_id = auth.uid()
+  ) as my_bet,
+  p.group_id,
+  -- Le nom du groupe visé, quand la prédiction en cible un. Sert à écrire
+  -- « Aux Potes » plutôt que d'énumérer ses douze membres : le groupe EST
+  -- le destinataire, la liste n'apprend rien et noie l'information.
+  (select g.name from public.groups g where g.id = p.group_id) as group_name,
+  -- Cette personne a-t-elle déjà décacheté la révélation ? Tant que c'est
+  -- faux, la carte reste fermée pour elle et attend son geste.
+  (
+    select us2.opened_at is not null from public.prediction_user_state us2
+    where us2.prediction_id = p.id and us2.user_id = auth.uid()
+  ) as is_opened
+from public.predictions p
+left join public.prediction_contents pc on pc.prediction_id = p.id;
+
+-- ---------------------------------------------------------------------------
+-- 64. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une
