@@ -403,11 +403,18 @@ export default function NewPredictionScreen() {
             >
               <View style={styles.chooserHead}>
                 <PredictBadge glyph="P" size={34} />
-                <Text style={styles.chooserTitle}>Je prédis</Text>
+                {/* Espaces insécables à l'intérieur de chaque temps : le titre ne se
+                    coupe qu'aux virgules, jamais entre « tu » et son verbe. */}
+                <Text style={styles.chooserTitle}>
+                  Tu scelles, tu intrigues, tu révèles
+                </Text>
               </View>
+              {/* Le titre dit déjà le geste en trois temps ; le corps ne
+                  répète pas, il ajoute ce que le titre ne dit pas — ce que
+                  le Cercle voit, et qui décide du moment de l'ouverture. */}
               <Text style={styles.chooserBody}>
-                Tu scelles quelque chose. Ton Cercle ne voit qu'un indice et parie.
-                Tu ouvres le jour où ça se produit.
+                Ton Cercle ne voit qu'un indice et parie. Tu ouvres le jour où ça
+                se produit.
               </Text>
             </Pressable>
 
@@ -417,11 +424,13 @@ export default function NewPredictionScreen() {
             >
               <View style={styles.chooserHead}>
                 <PredictBadge glyph="?" size={34} />
-                <Text style={styles.chooserTitle}>Je demande</Text>
+                <Text style={styles.chooserTitle}>
+                  Tu questionnes, tu patientes, tu révèles
+                </Text>
               </View>
               <Text style={styles.chooserBody}>
-                Tu poses une question. Ton Cercle répond tout de suite. Tu clôtures
-                quand la réponse est connue.
+                Ton Cercle répond tout de suite. Tu clôtures quand la réponse est
+                connue.
               </Text>
             </Pressable>
           </View>
@@ -737,8 +746,10 @@ function createStyles(colors: Colors) {
     padding: 20,
   },
   chooserCardPressed: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
-  chooserHead: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
-  chooserTitle: { fontFamily: fonts.display, fontSize: 24, color: colors.text },
+  // Le titre tient sur deux lignes : le sceau s'aligne en haut, sur la
+  // première ligne, plutôt qu'au milieu du bloc de texte.
+  chooserHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 8 },
+  chooserTitle: { flex: 1, fontFamily: fonts.display, fontSize: 21, lineHeight: 28, color: colors.text },
   chooserBody: { fontSize: 15, lineHeight: 22, color: colors.textMuted },
   cancel: { fontSize: 15, color: colors.text },
   predictTypeWrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
