@@ -708,17 +708,24 @@ export function PredictionCard({
      la ligne du bas, parce qu'il n'y a plus qu'une chose à faire. */
   const canOpen = cardState.kind === 'to_open';
 
-  /* La relance « Impatient » : disponible sur l'enveloppe scellée de quelqu'un
-     d'autre, y compris un Sondage — attendre la clôture d'une Question est
-     exactement la même impatience.
+  /* La relance « Impatient ».
 
      Elle N'OUVRE RIEN, et c'est tout son intérêt : une prédiction sur
      l'élection de 2027 qui s'ouvrirait parce que six amis ont appuyé perdrait
      ce qui en fait l'intérêt. Elle prévient l'auteur, un point c'est tout.
+     On peut la retirer : le compteur redescend.
 
-     On peut la retirer : le compteur redescend. Là comme ailleurs, on doit
-     pouvoir revenir en arrière. */
-  const canNudge = !isAuthor && cardState.kind === 'sealed';
+     Elle n'apparaît qu'APRÈS avoir pris position — pari posé sur une
+     Déclaration, réponse envoyée sur un Sondage. Deux raisons, la seconde
+     étant la vraie : on ne réclame pas la fin d'une histoire dans laquelle on
+     n'est pas entré ; et surtout, une carte scellée qui proposait à la fois
+     « j'y crois », « j'y crois pas » et « Impatient » posait trois questions
+     d'un coup sans dire laquelle vient en premier. Maintenant il n'y en a
+     qu'une à la fois : d'abord se mouiller, ensuite s'impatienter. */
+  const hasAnswered = item.my_answer_text !== null || item.my_answer_option_id !== null;
+  const hasTakenSide = isQuestion ? hasAnswered : myBet !== null;
+  const canNudge =
+    !isAuthor && (cardState.kind === 'sealed' || cardState.kind === 'question_open') && hasTakenSide;
 
   async function handleNudge() {
     const wasNudged = iNudged;
@@ -739,7 +746,10 @@ export function PredictionCard({
   /* Ce que l'auteur lit sur sa propre enveloppe : une attente, jamais une
      liste de noms — « Untel et Unetelle t'attendent » ferait d'un signal
      collectif une pression nominative, ce qui n'est pas le même geste. */
-  const nudgeLabel = cardState.kind === 'sealed' ? nudgeCountLabel(nudgeCount) : null;
+  const nudgeLabel =
+    cardState.kind === 'sealed' || cardState.kind === 'question_open'
+      ? nudgeCountLabel(nudgeCount)
+      : null;
   /* `!needsOpening` : « 3 amis n'y croyaient pas. Raison quand même. » donne le
      verdict. L'afficher sur une enveloppe encore fermée éventerait la
      révélation avant qu'on l'ait ouverte. */
@@ -1000,7 +1010,12 @@ export function PredictionCard({
    * vérifiable — et c'est ce qui rend visible, sans accuser personne, une
    * prédiction qu'on laisse dormir parce qu'on l'a perdue.
    */
-  const revealHintText = revealed ? null : `Scellé depuis ${formatSealedFor(item.created_at, now)}`;
+  const revealHintText = revealed
+    ? null
+    : // Un Sondage n'est pas scellé : sa question se lit dès la première
+      // seconde, c'est la CLÔTURE qu'on attend. Écrire « Scellé » dessus
+      // contredisait ce que la carte montrait juste au-dessus.
+      `${isQuestion ? 'Ouvert' : 'Scellé'} depuis ${formatSealedFor(item.created_at, now)}`;
 
   const envelopeFooter = (
     <View style={[styles.envFooter, emojiPanelOpen && styles.envFooterRaised]}>
@@ -1042,8 +1057,17 @@ export function PredictionCard({
           propre ligne il allongeait l'enveloppe, et les cartes de l'auteur ne
           faisaient plus la même hauteur que les autres. */}
       <View style={styles.envBottomRow}>
-        {actionsRow}
-        <View style={styles.envBottomRight}>
+        {/* Une lettre qu'on n'a pas encore décachetée ne propose RIEN d'autre
+            que de l'ouvrir : ni commentaire, ni réaction, ni compteur. On ne
+            commente pas ce qu'on n'a pas lu, et laisser ces icônes à côté du
+            bouton « Ouvrir » revenait à poser trois questions là où il n'y en
+            a qu'une. Elles reviennent toutes seules une fois l'enveloppe
+            ouverte. */}
+        {cardState.kind !== 'to_open' && actionsRow}
+        {/* Seul sur sa ligne, « Ouvrir » se centre et prend toute la largeur :
+            il n'y a plus rien à sa gauche dont il faudrait le distinguer, et
+            un bouton unique collé au bord se lit comme un reste de rangée. */}
+        <View style={[styles.envBottomRight, cardState.kind === 'to_open' && styles.envBottomOnly]}>
           {/* Sur une enveloppe scellée la date est écrite en haut, sur le
               rabat : le bas y était trop chargé. Les autres états n'ont pas de
               rabat à leur disposition, elle reste donc ici. */}
@@ -1804,6 +1828,7 @@ function createStyles(colors: Colors) {
     minWidth: 0,
     minHeight: 30,
   },
+  envBottomOnly: { flexGrow: 1, justifyContent: 'center' },
   // Plus de `flexShrink` : c'est lui qui la laissait se réduire à néant. Elle
   // garde sa largeur, et c'est la rangée qui passe à la ligne si besoin.
   envRevealHint: { fontFamily: fonts.label, fontSize: 13, color: colors.textMuted },
