@@ -66,7 +66,7 @@ import {
 } from './EnvelopeArt';
 import { useAuth } from '../lib/auth';
 import { betOutcomeLabel, placeBet } from '../lib/bets';
-import { nudgeCountLabel, nudgePrediction, unnudgePrediction } from '../lib/nudges';
+import { nudgeCountLabel, nudgePrediction } from '../lib/nudges';
 import { InlineComments } from './InlineComments';
 import { InlineQuestionAnswer } from './InlineQuestionAnswer';
 import { PhotoAttachButton } from './PhotoAttachButton';
@@ -768,22 +768,28 @@ export function PredictionCard({
      qu'une à la fois : d'abord se mouiller, ensuite s'impatienter. */
   const hasAnswered = item.my_answer_text !== null || item.my_answer_option_id !== null;
   const hasTakenSide = isQuestion ? hasAnswered : myBet !== null;
+  /* `!iNudged` : une fois la relance envoyée, le bouton QUITTE la carte. Il
+     restait auparavant, pour qu'on puisse retirer sa relance — mais il
+     encombrait une carte scellée à laquelle on n'avait plus rien à dire. La
+     base fait revenir `i_nudged` à faux au bout de sept jours (schema.sql
+     section 65) : le bouton réapparaît alors de lui-même, et une nouvelle
+     relance rallume la notification de l'auteur. */
   const canNudge =
-    !isAuthor && (cardState.kind === 'sealed' || cardState.kind === 'question_open') && hasTakenSide;
+    !isAuthor &&
+    (cardState.kind === 'sealed' || cardState.kind === 'question_open') &&
+    hasTakenSide &&
+    !iNudged;
 
   async function handleNudge() {
-    const wasNudged = iNudged;
-    // Mise à jour optimiste : le geste doit répondre tout de suite. En cas
-    // d'échec on remet exactement l'état d'avant, sans message — le bouton
-    // n'a rien à expliquer, notamment pas qu'on a été bloqué.
-    setINudged(!wasNudged);
-    setNudgeCount((n) => Math.max(0, wasNudged ? n - 1 : n + 1));
-    const { error } = wasNudged
-      ? await unnudgePrediction(item.id)
-      : await nudgePrediction(item.id);
+    // Mise à jour optimiste : le bouton disparaît tout de suite. En cas
+    // d'échec il revient, sans message — il n'a rien à expliquer, notamment
+    // pas qu'on a été bloqué.
+    setINudged(true);
+    setNudgeCount((n) => n + 1);
+    const { error } = await nudgePrediction(item.id);
     if (error) {
-      setINudged(wasNudged);
-      setNudgeCount((n) => Math.max(0, wasNudged ? n + 1 : n - 1));
+      setINudged(false);
+      setNudgeCount((n) => Math.max(0, n - 1));
     }
   }
 
@@ -1210,24 +1216,18 @@ export function PredictionCard({
             </View>
           )}
 
-          {/* Le geste, côté Cercle. Une fois envoyé, le bouton reste — c'est
-              ainsi qu'on le retire — mais il passe en encre pleine : on voit
-              qu'on a déjà relancé, et qu'appuyer encore ne comptera pas double. */}
+          {/* Le geste, côté Cercle — et il ne s'affiche que tant qu'on ne
+              l'a pas fait. Plus d'état « déjà relancé » à représenter : dans
+              ce cas le bouton n'est simplement pas là. */}
           {canNudge && (
             <Pressable
               onPress={handleNudge}
               hitSlop={8}
-              style={({ pressed }) => [
-                styles.nudgeButton,
-                iNudged && styles.nudgeButtonOn,
-                pressed && styles.nudgeButtonPressed,
-              ]}
+              style={({ pressed }) => [styles.nudgeButton, pressed && styles.nudgeButtonPressed]}
               accessibilityRole="button"
-              accessibilityLabel={
-                iNudged ? 'Retirer ma relance' : 'Dire que je suis impatient'
-              }
+              accessibilityLabel="Dire que je suis impatient"
             >
-              <Text style={[styles.nudgeButtonText, iNudged && styles.nudgeButtonTextOn]}>
+              <Text style={styles.nudgeButtonText}>
                 Impatient{nudgeCount > 0 ? ` ${nudgeCount}` : ''}
               </Text>
             </Pressable>
@@ -1909,10 +1909,8 @@ function createStyles(colors: Colors) {
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  nudgeButtonOn: { borderColor: colors.text, backgroundColor: colors.accentSoft },
   nudgeButtonPressed: { opacity: 0.7 },
   nudgeButtonText: { fontFamily: fonts.label, fontSize: 13, color: colors.textMuted },
-  nudgeButtonTextOn: { color: colors.text },
   betCountText: { fontFamily: fonts.label, fontSize: 13, color: colors.textMuted },
   betOutcome: { fontFamily: fonts.bodyEmphasis, fontSize: 14, color: colors.text, marginTop: 4 },
   sealedBadge: { position: 'absolute', left: '50%', zIndex: 2 },
