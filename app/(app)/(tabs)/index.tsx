@@ -367,6 +367,11 @@ export default function HomeScreen() {
   const zoneOpened = shown.filter((item) => isRevealed(item, now) && !aOuvrir(item));
   const unreadSealed = zoneSealed.filter((item) => !item.is_seen).length;
   const unreadOpened = zoneOpened.filter((item) => !item.is_seen).length;
+  /* Ce qu'on annonce en haut de l'écran : tout ce qui est nouveau, les deux
+     zones confondues. Les compter séparément par zone garde son sens une fois
+     qu'on fait défiler ; en titre, c'est « combien de choses m'attendent »
+     qu'on veut lire, pas une répartition. */
+  const nouveautes = unreadSealed + unreadOpened;
 
   /* Chaque zone ne montre que ses premières cartes, et se déplie d'un geste.
      Sans ça, quelqu'un qui a cent Predicts scellés ne voyait jamais la zone
@@ -421,7 +426,22 @@ export default function HomeScreen() {
       />
 
       <View style={styles.header}>
-        <Text style={styles.brand}>Predict</Text>
+        <View style={styles.brandRow}>
+          <Text style={styles.brand}>Predict</Text>
+          {/* Ce qui est arrivé depuis la dernière visite : les enveloppes
+              qu'on n'a pas encore vues, scellées comme à ouvrir. Même pastille
+              dorée que la cloche des notifications — c'est le même message,
+              « il s'est passé quelque chose », et il n'y a aucune raison qu'il
+              se dise de deux façons dans la même app. */}
+          {nouveautes > 0 && (
+            <View
+              style={styles.brandBadge}
+              accessibilityLabel={`${nouveautes} nouveauté${nouveautes > 1 ? 's' : ''}`}
+            >
+              <Text style={styles.brandBadgeText}>{nouveautes > 99 ? '99+' : nouveautes}</Text>
+            </View>
+          )}
+        </View>
         <View style={styles.headerActions}>
           <Pressable style={styles.userChip} onPress={() => router.push('/profile')} hitSlop={4}>
             <Avatar url={userId ? authors[userId]?.avatar_url ?? null : null} username={username ?? ''} size={32} />
@@ -593,7 +613,7 @@ export default function HomeScreen() {
             {zoneSealed.length > 0 && zoneOpened.length > 0 && (
               <ZoneTitle
                 styles={styles}
-                label="Predict"
+                label="Scellés"
                 count={zoneSealed.length}
                 unread={unreadSealed}
               />
@@ -715,12 +735,27 @@ function createStyles(colors: Colors) {
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
   brand: {
     fontFamily: fonts.display,
     fontSize: 24,
     color: colors.text,
     flexShrink: 0,
   },
+  // Repris trait pour trait de la pastille de la cloche (`standaloneBadge`
+  // dans `BottomNavBar`) : même fond, même diamètre, même texte blanc. Deux
+  // pastilles qui disent la même chose ne doivent pas se ressembler « à peu
+  // près ».
+  brandBadge: {
+    backgroundColor: colors.notificationBadge,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brandBadgeText: { fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
   // `flexShrink` + `minWidth: 0` en chaîne (plutôt qu'un `maxWidth` en
   // pourcentage sur `userChip`, calculé contre un parent lui-même sans
   // largeur définie) : c'est ce qui permet au pseudo de rétrécir avec

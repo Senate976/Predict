@@ -436,11 +436,9 @@ export function PredictionCard({
       toValue: 1,
       // `reduce_motion` est un réglage d'accessibilité de l'app : à zéro, le
       // décachetage reste un geste, il n'est simplement pas animé.
-      // Court : mesuré, ce premier temps ne montrait presque rien pendant
-      // 620 ms — d'où l'impression que « ça démarre doucement puis ça part
-      // d'un coup ». Il fait céder le sceau et lever le rabat, et rend la
-      // main à la lettre, qui est le vrai spectacle.
-      duration: reduceMotion ? 0 : 420,
+      // Le sceau cède, le rabat se lève. Volontairement posé : c'est le temps
+      // du suspens, celui où l'on comprend que quelque chose s'ouvre.
+      duration: reduceMotion ? 0 : 620,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     }).start(() => {
@@ -450,12 +448,17 @@ export function PredictionCard({
       enterAnim.setValue(0);
       Animated.timing(enterAnim, {
         toValue: 1,
-        duration: reduceMotion ? 0 : 700,
-        // Décélération franche mais LISIBLE. La courbe précédente
-        // (0.16, 1.02, 0.3, 1) était si chargée au départ que la moitié de la
-        // course était finie avant la première image affichée : on ne voyait
-        // que la fin. Celle-ci laisse voir la montée.
-        easing: Easing.bezier(0.22, 0.61, 0.36, 1),
+        // Un temps mort avant que la lettre ne bouge : l'enveloppe est
+        // ouverte, et il ne se passe rien pendant un quart de seconde. C'est
+        // ce vide qui fait le suspens — sans lui, tout s'enchaîne et il n'y a
+        // rien à attendre.
+        delay: reduceMotion ? 0 : 240,
+        // Longue et franchement décélérée : la feuille est tirée d'un coup,
+        // puis se pose. C'est la durée qui rend le geste lisible ; les
+        // versions précédentes étaient finies avant qu'on ait eu le temps de
+        // regarder.
+        duration: reduceMotion ? 0 : 1000,
+        easing: Easing.bezier(0.16, 0.72, 0.24, 1),
         useNativeDriver: false,
       }).start();
     });
@@ -1327,39 +1330,13 @@ export function PredictionCard({
               {envelopeFooter}
             </Animated.View>
           ) : (
-            <Animated.View
-              style={[
-                styles.envelopeShell,
-                {
-                  paddingTop: env.flapPeek,
-                  // Opaque très vite (à 25 % de la course) : au-delà, c'est le
-                  // DÉPLACEMENT qui raconte la sortie. Un fondu qui dure toute
-                  // l'animation donne « l'image apparaît », pas « la feuille
-                  // sort » — c'est ce qu'on avait.
-                  opacity: enterAnim.interpolate({
-                    inputRange: [0, 0.2, 1],
-                    outputRange: [0, 1, 1],
-                  }),
-                  // Elle part de bien plus bas qu'avant (110 px au lieu de 40)
-                  // et se rétrécit légèrement au départ : de loin, on lit une
-                  // feuille encore engagée dans l'enveloppe, qu'on tire.
-                  transform: [
-                    {
-                      translateY: enterAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [140, 0],
-                      }),
-                    },
-                    {
-                      scale: enterAnim.interpolate({
-                        inputRange: [0, 0.6, 1],
-                        outputRange: [0.94, 1.01, 1],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            >
+            <View style={[styles.envelopeShell, { paddingTop: env.flapPeek }]}>
+              {/* L'ENVELOPPE NE BOUGE PAS. L'animation était posée ici, sur la
+                  coque entière : lavis, lettre et pied montaient ensemble. On
+                  ne voyait donc pas une lettre sortir d'une enveloppe, mais un
+                  bloc glisser vers le haut — ce qui ne veut rien dire. Elle est
+                  maintenant portée par la lettre seule (plus bas), l'enveloppe
+                  restant plantée là où elle est. */}
               {/* Les deux couches de lavis, derrière la lettre : le rabat
                   ouvert occupe le haut (ses deux bords obliques restent
                   visibles de part et d'autre de la lettre), le corps prend
@@ -1404,11 +1381,28 @@ export function PredictionCard({
                   </Pressable>
                 ))}
 
-              <View
+              <Animated.View
                 onLayout={(e) => setLetterHeight(e.nativeEvent.layout.height)}
                 style={[
                   styles.letter,
                   {
+                    // C'est ICI que se joue la sortie, et nulle part ailleurs :
+                    // la lettre monte pendant que l'enveloppe reste immobile.
+                    // Portée par la coque, la même translation faisait monter
+                    // l'enveloppe avec elle — on ne voyait pas une lettre
+                    // sortir, mais un bloc glisser.
+                    opacity: enterAnim.interpolate({
+                      inputRange: [0, 0.12, 1],
+                      outputRange: [0, 1, 1],
+                    }),
+                    transform: [
+                      {
+                        translateY: enterAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [190, 0],
+                        }),
+                      },
+                    ],
                     width: env.letterW,
                     minHeight: env.letterH,
                     borderRadius: env.letterRadius,
@@ -1474,10 +1468,10 @@ export function PredictionCard({
                   <InlineQuestionAnswer prediction={item} />
                 </Pressable>
               )}
-                    </View>
+                    </Animated.View>
 
               {envelopeFooter}
-            </Animated.View>
+            </View>
           )}
 
           {/* Photo-preuve du verdict — sous la lettre, jamais dedans : elle
@@ -1525,7 +1519,6 @@ export function PredictionCard({
             carte de l'auteur indéfiniment. */}
         {!isQuestion && isAuthor && justSetVerdict && !verdictPhotoPath && (
           <View style={styles.verdictPhotoStep}>
-            <Text style={styles.verdictPhotoStepLabel}>Une preuve ? (facultatif)</Text>
             <PhotoAttachButton
               uri={verdictPhotoUri}
               onChange={setVerdictPhotoUri}
@@ -1972,7 +1965,7 @@ function createStyles(colors: Colors) {
   // `paddingBottom` : sans lui, les boutons Réalisé/Manqué touchaient le bord
   // inférieur de la carte, que `overflow: 'hidden'` rognait alors.
   verdictPrompt: { paddingHorizontal: 18, marginTop: 10, paddingBottom: 14 },
-  verdictPromptButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
+  verdictPromptButtons: { flexDirection: 'row', justifyContent: 'center', gap: 10 },
   verdictPromptButton: {
     borderWidth: 1,
     borderRadius: radius.pill,
@@ -1993,7 +1986,11 @@ function createStyles(colors: Colors) {
   // Étape 2 du verdict : preuve photo facultative, avant confirmation.
   // `alignItems` par défaut (stretch) : `PhotoAttachButton` a besoin de la
   // pleine largeur pour que son aperçu (width: '100%') ait une base non nulle.
-  verdictPhotoStep: { gap: 8 },
+  // Mêmes marges que le bloc de verdict juste au-dessus. Sans elles, ce bloc
+  // — rendu directement dans le corps de la carte, hors de l'enveloppe qui
+  // porte d'habitude les marges — collait au bord gauche et au bas de
+  // l'étiquette.
+  verdictPhotoStep: { gap: 10, paddingHorizontal: 18, paddingBottom: 14 },
   // Rien à envoyer tant qu'aucune photo n'est choisie : le bouton s'efface
   // plutôt que de promettre une action qui ne ferait rien.
   verdictPromptButtonDisabled: { opacity: 0.45 },

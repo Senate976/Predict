@@ -406,7 +406,6 @@ export default function PredictionDetailScreen() {
                       </View>
                     )}
                     <View style={styles.verdictPhotoAttach}>
-                      <Text style={styles.hint}>Insère une preuve (facultatif)</Text>
                       <PhotoAttachButton
                         uri={verdictPhotoUri}
                         onChange={setVerdictPhotoUri}
@@ -478,7 +477,6 @@ export default function PredictionDetailScreen() {
                     </View>
                   )}
                   <View style={styles.verdictPhotoAttach}>
-                    <Text style={styles.hint}>Preuve (facultatif)</Text>
                     <PhotoAttachButton
                       uri={verdictPhotoUri}
                       onChange={setVerdictPhotoUri}
