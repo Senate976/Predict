@@ -196,8 +196,14 @@ export function QuestionAnswerPanel({
           )}
         </>
       )}
-      <Text style={[styles.eyebrow, isAuthor && styles.eyebrowSpaced]}>Ta réponse</Text>
-      <InlineQuestionAnswer prediction={prediction} onAnswered={onAnswered} />
+      {/* Plus d'intitulé « Ta réponse » ici : `InlineQuestionAnswer` écrit
+          déjà « Ta réponse : … » une fois répondu, et son champ porte le même
+          mot en indication tant qu'on ne l'a pas fait. Le titre en petites
+          capitales redisait donc, en plus petit, ce qui se lisait juste
+          en dessous. */}
+      <View style={isAuthor ? styles.eyebrowSpaced : undefined}>
+        <InlineQuestionAnswer prediction={prediction} onAnswered={onAnswered} />
+      </View>
     </View>
   );
 }

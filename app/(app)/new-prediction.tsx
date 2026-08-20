@@ -54,7 +54,7 @@ const MIN_ANSWER_OPTIONS = 2;
 /** Court, façon sondage — distinct de `MAX_ANSWER_LENGTH` (lib/questions.ts),
  * qui borne la réponse d'un répondant, pas le libellé d'une option posée par
  * l'auteur à la création. */
-const MAX_OPTION_LENGTH = 60;
+const MAX_OPTION_LENGTH = 30;
 
 export default function NewPredictionScreen() {
   const { session, defaultScope } = useAuth();
@@ -228,7 +228,14 @@ export default function NewPredictionScreen() {
     setAnswerOptions((prev) => prev.map((o, i) => (i === index ? value : o)));
   }
 
+  /* On ne peut pas empiler des champs vides : tant que la dernière option
+     n'est pas remplie, « Ajouter une option » ne propose rien — c'est elle
+     qu'il faut écrire, pas une de plus. Le bouton s'efface plutôt que de
+     disparaître : sa place reste visible, on comprend qu'il reviendra. */
+  const canAddOption = answerOptions.every((o) => o.trim().length > 0);
+
   function addOption() {
+    if (!canAddOption) return;
     setAnswerOptions((prev) => [...prev, '']);
   }
 
@@ -270,7 +277,7 @@ export default function NewPredictionScreen() {
       }
     }
     if (audience === 'choose' && !selectedGroupId && selectedFriendIds.size === 0) {
-      return 'Choisis un groupe ou au moins un ami, ou repasse sur « Tout mon Cercle ».';
+      return 'Choisis un groupe ou au moins un ami, ou repasse sur « Mon Cercle ».';
     }
     return null;
   }
@@ -589,7 +596,11 @@ export default function NewPredictionScreen() {
                       )}
                     </View>
                   ))}
-                  <Pressable onPress={addOption} disabled={submitting} style={styles.addOptionButton}>
+                  <Pressable
+                    onPress={addOption}
+                    disabled={submitting || !canAddOption}
+                    style={[styles.addOptionButton, !canAddOption && styles.addOptionButtonDisabled]}
+                  >
                     <Text style={styles.addOptionButtonText}>+ Ajouter une option</Text>
                   </Pressable>
                 </View>
@@ -605,7 +616,7 @@ export default function NewPredictionScreen() {
               style={[styles.scopeOption, audience === 'all' && styles.scopeOptionActive]}
             >
               <Text style={[styles.scopeText, audience === 'all' && styles.scopeTextActive]}>
-                Tout mon Cercle
+                Mon Cercle
               </Text>
             </Pressable>
             <Pressable
@@ -798,6 +809,7 @@ function createStyles(colors: Colors) {
   removeOptionButton: { padding: 8 },
   removeOptionButtonText: { fontSize: 15, color: colors.textFaint, fontWeight: '700' },
   addOptionButton: { paddingVertical: 8, alignSelf: 'flex-start' },
+  addOptionButtonDisabled: { opacity: 0.4 },
   addOptionButtonText: { fontSize: 14, fontWeight: '700', color: colors.accent },
   counter: { fontSize: 14, color: colors.textFaint, marginTop: 6, textAlign: 'right' },
   counterLow: { color: colors.danger },

@@ -1,4 +1,5 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { MessageCircle } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -50,6 +51,9 @@ export default function PredictionDetailScreen() {
   const userId = session?.user.id;
 
   const [prediction, setPrediction] = useState<PredictionFeedItem | null>(null);
+  /* Fermée par défaut, comme sur la carte : on vient lire une prédiction, pas
+     une conversation. La bulle l'ouvre quand on la veut. */
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const [author, setAuthor] = useState<{ username: string; avatar_url: string | null } | null>(null);
   const [recipients, setRecipients] = useState<PredictionRecipient[] | null>(null);
   const [friends, setFriends] = useState<FriendProfile[] | null>(null);
@@ -469,18 +473,13 @@ export default function PredictionDetailScreen() {
                       </Text>
                     </Pressable>
                   </View>
-                  <Text style={styles.hint}>
-                    {prediction.final_status === 'pending'
-                      ? 'Affirme si cette prédiction s’est réalisée ou a été manquée.'
-                      : 'Tu peux revenir sur ce choix à tout moment.'}
-                  </Text>
                   {prediction.verdict_photo_path && (
                     <View style={styles.photoRow}>
                       <PredictionPhoto bucket="verdict" path={prediction.verdict_photo_path} />
                     </View>
                   )}
                   <View style={styles.verdictPhotoAttach}>
-                    <Text style={styles.hint}>Preuve visuelle (facultatif)</Text>
+                    <Text style={styles.hint}>Preuve (facultatif)</Text>
                     <PhotoAttachButton
                       uri={verdictPhotoUri}
                       onChange={setVerdictPhotoUri}
@@ -572,26 +571,45 @@ export default function PredictionDetailScreen() {
               </>
             )}
 
-            {/* Réagir depuis cet écran. Sans ce bloc, une notification de
-                révélation menait à une page où l'on ne pouvait rien faire :
-                il fallait retourner chercher la carte dans le Fil. */}
-            <Text style={[styles.eyebrow, styles.sectionSpacing]}>Réactions</Text>
-            <View style={styles.reactionRow}>
+            {/* Deux pictos, aucun intitulé — exactement la rangée du bas des
+                cartes du Fil. « Réactions » et « Discussion » annonçaient en
+                gros titre deux choses qu'un pouce et une bulle disent déjà,
+                et la discussion s'étalait sous la prédiction qu'on venait
+                lire, qu'on ait ou non l'intention de la lire. La bulle
+                l'ouvre maintenant, comme sur la carte. */}
+            <View style={[styles.reactionRow, styles.sectionSpacing]}>
               <ReactionPicker
                 predictionId={id}
                 userId={userId!}
                 initialCounts={prediction.emoji_counts ?? {}}
                 initialMine={prediction.my_emoji_reaction ?? null}
               />
+              <Pressable
+                onPress={() => setCommentsOpen((o) => !o)}
+                style={styles.commentsToggle}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  commentsOpen ? 'Fermer les commentaires' : 'Ouvrir les commentaires'
+                }
+              >
+                <MessageCircle
+                  size={21}
+                  color={commentsOpen ? colors.text : colors.textFaint}
+                  strokeWidth={1.75}
+                  fill={commentsOpen ? colors.text : 'none'}
+                />
+              </Pressable>
             </View>
 
-            <Text style={[styles.eyebrow, styles.sectionSpacing]}>Discussion</Text>
-            <InlineComments
-              predictionId={id}
-              userId={userId!}
-              revealed={revealed}
-              isPredictionAuthor={!!isAuthor}
-            />
+            {commentsOpen && (
+              <InlineComments
+                predictionId={id}
+                userId={userId!}
+                revealed={revealed}
+                isPredictionAuthor={!!isAuthor}
+              />
+            )}
           </>
         ) : null}
       </ScrollView>
@@ -686,7 +704,10 @@ function createStyles(colors: Colors) {
   verdictChoiceTextActive: { color: colors.surface },
   chevron: { fontSize: 13, color: colors.textFaint },
   groupTarget: { fontFamily: fonts.bodyEmphasis, fontSize: 17, color: colors.text, marginTop: 4 },
-  reactionRow: { marginTop: 6 },
+  // Le pouce et la bulle sur une seule ligne, écartés comme au bas d'une
+  // carte du Fil.
+  reactionRow: { flexDirection: 'row', alignItems: 'center', gap: 18, marginTop: 6 },
+  commentsToggle: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   hint: { fontSize: 14, color: colors.textFaint, lineHeight: 20 },
   row: {
     flexDirection: 'row',
