@@ -474,27 +474,42 @@ export default function NewPredictionScreen() {
           <Text style={[styles.label, styles.sectionLabel]}>
             {isQuestion ? 'Ta question' : 'Ton Predict'}
           </Text>
-          {/* Plus de bascule « Texte / Message vocal ». Elle obligeait à
-              trancher AVANT d'avoir commencé, et interdisait d'avoir les deux.
-              Le vocal rejoint la photo en pièce jointe, juste sous le champ :
-              on écrit, ou on parle, ou les deux. */}
+          {/* Plus de bascule « Texte / Message vocal », et plus de bouton
+              « Enregistrer un vocal » sur sa propre ligne : parler est une
+              manière d'écrire, pas une pièce jointe de plus. Le micro se pose
+              donc DANS le champ, en bas à gauche — là où on le cherche, comme
+              dans une messagerie. On écrit, ou on parle, ou les deux. */}
           <>
-              <TextInput
-                value={content}
-                onChangeText={setContent}
-                onSelectionChange={(e) => setContentSelection(e.nativeEvent.selection)}
-                selection={contentSelection}
-                placeholder={
-                  isQuestion
-                    ? 'Ta question'
-                    : 'Prouve que tu avais raison'
-                }
-                placeholderTextColor={colors.textFaint}
-                multiline
-                editable={!submitting}
-                maxLength={MAX_CONTENT_LENGTH}
-                style={[styles.input, styles.contentInput, styles.fieldSpacing]}
-              />
+              <View style={[styles.contentWrap, styles.fieldSpacing]}>
+                <TextInput
+                  value={content}
+                  onChangeText={setContent}
+                  onSelectionChange={(e) => setContentSelection(e.nativeEvent.selection)}
+                  selection={contentSelection}
+                  placeholder={
+                    isQuestion
+                      ? 'Ta question'
+                      : 'Prouve que tu avais raison'
+                  }
+                  placeholderTextColor={colors.textFaint}
+                  multiline
+                  editable={!submitting}
+                  maxLength={MAX_CONTENT_LENGTH}
+                  style={[styles.input, styles.contentInput]}
+                />
+                {/* Posé par-dessus le champ, pas à l'intérieur : un
+                    `TextInput` multiligne n'accepte pas d'enfant. Le champ
+                    réserve la hauteur nécessaire en bas (`contentInput`) pour
+                    que le texte saisi ne passe jamais dessous. */}
+                <View style={styles.contentMic}>
+                  <PredictionRecorder
+                    uri={audioUri}
+                    onChange={setAudioUri}
+                    disabled={submitting}
+                    variant="discret"
+                  />
+                </View>
+              </View>
               {/* Suggestions dès que le texte juste avant le curseur ressemble
                   à un « @pseudo » en cours de frappe — un tap insère le
                   pseudo complet et referme la liste. */}
@@ -517,12 +532,11 @@ export default function NewPredictionScreen() {
               </Text>
           </>
 
-          {/* Les deux pièces jointes, côte à côte sous le champ : c'est là que
-              le regard tombe une fois qu'on a fini d'écrire, et c'est là que le
-              clavier laisse la place. Toutes deux facultatives, et masquées
-              jusqu'à l'ouverture comme le reste du secret. */}
+          {/* La photo reste un vrai bouton sous le champ : contrairement au
+              vocal, elle ouvre le sélecteur du système et affiche ensuite un
+              aperçu, qui a besoin de toute la largeur. Facultative, et
+              masquée jusqu'à l'ouverture comme le reste du secret. */}
           <View style={[styles.attachments, styles.fieldSpacing]}>
-            <PredictionRecorder uri={audioUri} onChange={setAudioUri} disabled={submitting} />
             <PhotoAttachButton uri={photoUri} onChange={setPhotoUri} disabled={submitting} />
           </View>
 
@@ -774,7 +788,11 @@ function createStyles(colors: Colors) {
     backgroundColor: colors.surface,
   },
   teaserInput: { minHeight: 60, textAlignVertical: 'top' },
-  contentInput: { minHeight: 110, textAlignVertical: 'top' },
+  contentWrap: { position: 'relative' },
+  // `paddingBottom` élargi : c'est la place réservée au micro posé par-dessus,
+  // pour que le texte saisi ne vienne jamais s'écrire dessous.
+  contentInput: { minHeight: 132, textAlignVertical: 'top', paddingBottom: 42 },
+  contentMic: { position: 'absolute', left: 12, bottom: 10 },
   optionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   optionInput: { flex: 1 },
   removeOptionButton: { padding: 8 },

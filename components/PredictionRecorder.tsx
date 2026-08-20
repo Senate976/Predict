@@ -21,6 +21,16 @@ type Props = {
   uri: string | null;
   onChange: (uri: string | null) => void;
   disabled?: boolean;
+  /**
+   * `bloc` : le cadre bordé, sur sa propre ligne. `discret` : rien qu'un
+   * picto micro, fait pour se poser dans un coin du champ de saisie.
+   *
+   * Le bouton « Enregistrer un vocal » disait à voix haute une possibilité
+   * qui n'a pas à occuper une ligne entière : parler est une manière d'écrire,
+   * pas une pièce jointe de plus. En discret, le micro se range là où on le
+   * cherche — au bord du champ, comme dans une messagerie.
+   */
+  variant?: 'bloc' | 'discret';
 };
 
 function formatDuration(ms: number): string {
@@ -36,7 +46,7 @@ function formatDuration(ms: number): string {
  * n'est envoyé au stockage qu'à la validation du formulaire (lib/audio.ts) —
  * ce composant ne gère que la capture locale.
  */
-export function PredictionRecorder({ uri, onChange, disabled }: Props) {
+export function PredictionRecorder({ uri, onChange, disabled, variant = 'bloc' }: Props) {
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder);
   const player = useAudioPlayer(uri ?? undefined);
@@ -60,6 +70,69 @@ export function PredictionRecorder({ uri, onChange, disabled }: Props) {
   async function handleStop() {
     await recorder.stop();
     onChange(recorder.uri);
+  }
+
+  if (variant === 'discret') {
+    // Un enregistrement existe : on le réécoute, ou on le jette pour
+    // recommencer. Deux pictos, aucun mot — la place est comptée, on est dans
+    // le coin d'un champ de saisie.
+    if (uri) {
+      return (
+        <View style={styles.discreetRow}>
+          <Pressable
+            onPress={() => (playerStatus.playing ? player.pause() : player.play())}
+            disabled={disabled}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={playerStatus.playing ? 'Mettre en pause' : 'Écouter mon vocal'}
+          >
+            <Ionicons
+              name={playerStatus.playing ? 'pause' : 'play'}
+              size={20}
+              color={colors.text}
+            />
+          </Pressable>
+          <Text style={styles.discreetDuration}>
+            {formatDuration((playerStatus.duration || 0) * 1000)}
+          </Text>
+          <Pressable
+            onPress={() => onChange(null)}
+            disabled={disabled}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Supprimer mon vocal"
+          >
+            <Ionicons name="close" size={18} color={colors.textFaint} />
+          </Pressable>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.discreetRow}>
+        <Pressable
+          onPress={recorderState.isRecording ? handleStop : handleStart}
+          disabled={disabled}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={
+            recorderState.isRecording ? 'Arrêter l’enregistrement' : 'Enregistrer un vocal'
+          }
+        >
+          {recorderState.isRecording ? (
+            <View style={styles.dotSquare} />
+          ) : (
+            <Ionicons name="mic" size={22} color={colors.textMuted} />
+          )}
+        </Pressable>
+        {recorderState.isRecording && (
+          <Text style={styles.discreetDuration}>
+            {formatDuration(recorderState.durationMillis)}
+          </Text>
+        )}
+        {permissionError && <Text style={styles.discreetError}>{permissionError}</Text>}
+      </View>
+    );
   }
 
   if (uri) {
@@ -132,6 +205,11 @@ function createStyles(colors: Colors) {
   recordButtonActive: {},
   recordButtonText: { fontSize: 15, fontWeight: '600', color: colors.text },
   dotSquare: { width: 12, height: 12, borderRadius: 3, backgroundColor: colors.danger },
+  // Aucun cadre ni fond : la rangée se pose dans le coin du champ de saisie,
+  // qui porte déjà sa propre bordure.
+  discreetRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  discreetDuration: { fontSize: 13, color: colors.textMuted },
+  discreetError: { fontSize: 13, color: colors.danger, flexShrink: 1 },
   playButton: { alignSelf: 'flex-start' },
   playButtonText: { fontFamily: fonts.bodyEmphasis, fontSize: 15, color: colors.text },
   duration: { fontSize: 15, color: colors.textFaint, marginTop: 8 },
