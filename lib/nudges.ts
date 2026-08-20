@@ -14,10 +14,12 @@ import { supabase } from './supabase';
  * notification et fait monter un compteur ; la décision reste entière à
  * l'auteur, indéfiniment s'il le veut.
  *
- * Une relance par personne et par prédiction, imposée par la clé primaire côté
- * base. Le compteur mesure donc COMBIEN DE PERSONNES attendent, pas combien de
- * fois on a insisté — sans quoi ce serait un bouton sur lequel on tape en
- * boucle, c'est-à-dire du harcèlement à faible coût.
+ * Une relance par personne et par SEMAINE. La clé primaire garantit qu'il
+ * n'existe jamais qu'une ligne par personne et par prédiction : le compteur
+ * mesure donc COMBIEN DE PERSONNES attendent, pas combien de fois on a
+ * insisté — sans quoi ce serait un bouton sur lequel on tape en boucle,
+ * c'est-à-dire du harcèlement à faible coût. Passé sept jours, la même ligne
+ * est simplement remise à jour et la notification de l'auteur se rallume.
  */
 
 /**
@@ -32,8 +34,13 @@ export async function nudgePrediction(predictionId: string) {
 }
 
 /**
- * Retire sa relance ; le compteur redescend. On doit toujours pouvoir revenir
- * en arrière — la notification déjà partie, elle, ne se rattrape pas.
+ * Retire sa relance ; le compteur redescend.
+ *
+ * Plus appelée depuis la carte : le bouton « Impatient » disparaît une fois
+ * touché, il n'y a donc plus de second appui par lequel se rétracter — et la
+ * relance s'efface d'elle-même au bout de sept jours. La fonction reste
+ * exposée côté base, et ce point d'entrée avec elle : si un jour on redonne
+ * le moyen de se rétracter, c'est ici qu'il se branchera.
  */
 export async function unnudgePrediction(predictionId: string) {
   return supabase.rpc('unnudge_prediction', { p_prediction_id: predictionId });
