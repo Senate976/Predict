@@ -1,11 +1,11 @@
-import { usePathname, useRouter } from 'expo-router';
+import { useFocusEffect, usePathname, useRouter } from 'expo-router';
 import { Bell, CircleUserRound, Plus, Users } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View, type ColorValue } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { useAuth } from '../lib/auth';
-import { fetchUnreadNotificationCount } from '../lib/notifications';
+import { fetchUnreadNotificationCount, onUnreadChanged } from '../lib/notifications';
 import { fonts } from '../lib/theme';
 import { useColors } from '../lib/themeMode';
 import { Text } from './Text';
@@ -55,22 +55,32 @@ export function useUnreadCount(): number {
   const userId = session?.user.id;
   const [unreadCount, setUnreadCount] = useState(0);
 
-  useEffect(() => {
+  const refresh = useCallback(async () => {
     if (!userId) return;
-    let cancelled = false;
+    const { count } = await fetchUnreadNotificationCount(userId);
+    setUnreadCount(count);
+  }, [userId]);
 
-    async function refresh() {
-      const { count } = await fetchUnreadNotificationCount(userId!);
-      if (!cancelled) setUnreadCount(count);
-    }
-
+  useEffect(() => {
     refresh();
     const interval = setInterval(refresh, UNREAD_POLL_MS);
+    const unsubscribe = onUnreadChanged(refresh);
     return () => {
-      cancelled = true;
       clearInterval(interval);
+      unsubscribe();
     };
-  }, [userId]);
+  }, [refresh]);
+
+  /* Et à chaque retour sur l'écran, sans attendre le prochain tour de
+     sondage. L'écran des notifications les marque toutes comme lues dès
+     qu'on l'ouvre : sans ce rafraîchissement, la pastille resterait allumée
+     jusqu'à vingt secondes après qu'on a tout lu — exactement le compteur
+     faux qu'on cherche à faire disparaître. */
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh])
+  );
 
   return unreadCount;
 }

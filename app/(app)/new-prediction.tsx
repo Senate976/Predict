@@ -584,6 +584,22 @@ export default function NewPredictionScreen() {
                         maxLength={MAX_OPTION_LENGTH}
                         style={[styles.input, styles.optionInput]}
                       />
+                      {/* `maxLength` bloque bel et bien la saisie — mais en
+                          silence : on continue d'appuyer sur les touches et
+                          plus rien ne s'écrit, sans savoir pourquoi. Le
+                          décompte n'apparaît qu'aux abords de la limite, pour
+                          ne pas encombrer une option de trois mots, et vire à
+                          l'accent quand elle est atteinte. */}
+                      {option.length >= MAX_OPTION_LENGTH - 6 && (
+                        <Text
+                          style={[
+                            styles.optionCounter,
+                            option.length >= MAX_OPTION_LENGTH && styles.optionCounterFull,
+                          ]}
+                        >
+                          {option.length}/{MAX_OPTION_LENGTH}
+                        </Text>
+                      )}
                       {answerOptions.length > MIN_ANSWER_OPTIONS && (
                         <Pressable
                           onPress={() => removeOption(index)}
@@ -808,6 +824,8 @@ function createStyles(colors: Colors) {
   contentMic: { position: 'absolute', left: 10, right: 10, bottom: 8 },
   optionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   optionInput: { flex: 1 },
+  optionCounter: { fontFamily: fonts.label, fontSize: 12, color: colors.textFaint },
+  optionCounterFull: { color: colors.accent, fontWeight: '700' },
   removeOptionButton: { padding: 8 },
   removeOptionButtonText: { fontSize: 15, color: colors.textFaint, fontWeight: '700' },
   addOptionButton: { paddingVertical: 8, alignSelf: 'flex-start' },

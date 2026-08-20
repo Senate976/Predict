@@ -163,6 +163,51 @@ export async function markNotificationRead(id: string) {
 }
 
 /**
+ * Marque comme lues toutes les notifications de quelqu'un.
+ *
+ * Appelée à l'ouverture de l'écran : les avoir SOUS LES YEUX suffit à les
+ * avoir vues. Exiger d'ouvrir chacune pour éteindre la pastille laissait un
+ * compteur allumé et des fonds jaunes sur des lignes qu'on venait de lire —
+ * le badge ne mesurait plus « il s'est passé quelque chose » mais « tu n'as
+ * pas tapoté partout ».
+ *
+ * `.eq('is_read', false)` : sans lui, chaque passage réécrirait toute la
+ * liste pour rien.
+ */
+export async function markAllNotificationsRead(userId: string) {
+  const result = await supabase
+    .from('notifications')
+    .update({ is_read: true })
+    .eq('user_id', userId)
+    .eq('is_read', false);
+  if (!result.error) announceUnreadChanged();
+  return result;
+}
+
+/**
+ * Le compteur de la cloche est tenu par `useUnreadCount`, qui sonde la base
+ * toutes les vingt secondes. Ça suffit pour voir arriver une notification,
+ * pas pour voir la pastille S'ÉTEINDRE : on vient de tout lire, et elle
+ * resterait allumée jusqu'à vingt secondes de plus.
+ *
+ * D'où ce petit signal, sans dépendance ni bibliothèque : ce qui change
+ * l'état de lecture le dit, et le compteur se relit aussitôt.
+ */
+type UnreadListener = () => void;
+const unreadListeners = new Set<UnreadListener>();
+
+export function onUnreadChanged(listener: UnreadListener): () => void {
+  unreadListeners.add(listener);
+  return () => {
+    unreadListeners.delete(listener);
+  };
+}
+
+function announceUnreadChanged() {
+  for (const listener of unreadListeners) listener();
+}
+
+/**
  * Écarte une notification. On la marque plutôt que de l'effacer : les
  * notifications de révélation et de rappel sont regénérées à chaque
  * chargement du Fil (`generate_reveal_notifications`,

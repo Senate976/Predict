@@ -1,8 +1,6 @@
 import { useRouter } from 'expo-router';
 import {
   BellRing,
-  CircleCheck,
-  CircleX,
   Eye,
   EyeOff,
   Flag,
@@ -65,7 +63,7 @@ import {
   WASH,
 } from './EnvelopeArt';
 import { useAuth } from '../lib/auth';
-import { betOutcomeLabel, placeBet } from '../lib/bets';
+import { betOutcomeLabel } from '../lib/bets';
 import { nudgeCountLabel, nudgePrediction } from '../lib/nudges';
 import { InlineComments } from './InlineComments';
 import { InlineQuestionAnswer } from './InlineQuestionAnswer';
@@ -305,10 +303,8 @@ export function PredictionCard({
   // Le pari se pose d'un tap : l'affichage bascule immédiatement, sans attendre
   // la base. C'est un geste léger et réversible — faire patienter un curseur
   // pour ça casserait la fluidité recherchée.
-  const [myBet, setMyBet] = useState<boolean | null>(item.my_bet);
   const [nudgeCount, setNudgeCount] = useState(item.nudge_count ?? 0);
   const [iNudged, setINudged] = useState(!!item.i_nudged);
-  const [betCount, setBetCount] = useState(item.bet_count ?? 0);
   const env = useMemo(() => {
     const W = envelopeWidth;
     const H = W / ENVELOPE_RATIO;
@@ -422,9 +418,16 @@ export function PredictionCard({
    *   │ qui   │ qui se lève │ qui
    *   │ cède  │             │ s'efface
    *
-   * `Easing.bezier` plutôt que `Easing.out` : la courbe démarre lentement (le
-   * sceau résiste) puis accélère (il lâche). C'est ce contraste qui donne
-   * l'impression de matière.
+   * La courbe, elle, a été refaite. `bezier(0.32, 0, 0.24, 1)` démarrait très
+   * lentement puis partait d'un coup : on ne lisait pas « le sceau résiste
+   * puis lâche », on lisait un à-coup. `Easing.out(Easing.quad)` engage
+   * franchement dès le premier instant puis ralentit — le geste part vite et
+   * se pose, comme un objet qu'on soulève.
+   *
+   * Et surtout : la lettre ne se contente plus d'apparaître UNE FOIS
+   * l'enveloppe ouverte. Elle monte de l'intérieur (voir `enterAnim` plus
+   * bas), de bien plus bas qu'avant et en finissant par un léger dépassement,
+   * comme une feuille qu'on tire d'un coup sec et qui se remet à plat.
    */
   function handleOpenEnvelope() {
     if (opening) return;
@@ -433,8 +436,12 @@ export function PredictionCard({
       toValue: 1,
       // `reduce_motion` est un réglage d'accessibilité de l'app : à zéro, le
       // décachetage reste un geste, il n'est simplement pas animé.
-      duration: reduceMotion ? 0 : 760,
-      easing: Easing.bezier(0.32, 0, 0.24, 1),
+      // Court : mesuré, ce premier temps ne montrait presque rien pendant
+      // 620 ms — d'où l'impression que « ça démarre doucement puis ça part
+      // d'un coup ». Il fait céder le sceau et lever le rabat, et rend la
+      // main à la lettre, qui est le vrai spectacle.
+      duration: reduceMotion ? 0 : 420,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     }).start(() => {
       setOpenedLocally(true);
@@ -443,8 +450,12 @@ export function PredictionCard({
       enterAnim.setValue(0);
       Animated.timing(enterAnim, {
         toValue: 1,
-        duration: reduceMotion ? 0 : 420,
-        easing: Easing.out(Easing.cubic),
+        duration: reduceMotion ? 0 : 700,
+        // Décélération franche mais LISIBLE. La courbe précédente
+        // (0.16, 1.02, 0.3, 1) était si chargée au départ que la moitié de la
+        // course était finie avant la première image affichée : on ne voyait
+        // que la fin. Celle-ci laisse voir la montée.
+        easing: Easing.bezier(0.22, 0.61, 0.36, 1),
         useNativeDriver: false,
       }).start();
     });
@@ -722,62 +733,27 @@ export function PredictionCard({
 
   const totalReactions = Object.values(emojiCounts).reduce((sum, count) => sum + (count ?? 0), 0);
 
-  /**
-   * Parier, ou changer d'avis. Un second tap sur le même choix ne l'annule
-   * pas : sur une rangée de deux boutons, l'annulation par re-tap se déclenche
-   * surtout par accident. On change d'avis en touchant l'autre, ce qui est le
-   * geste qu'on a en tête.
-   */
-  async function handleBet(believes: boolean) {
-    if (myBet === believes) return;
-    const previous = myBet;
-    setMyBet(believes);
-    if (previous === null) setBetCount((n) => n + 1);
-    const { error } = await placeBet(item.id, believes);
-    if (error) {
-      setMyBet(previous);
-      if (previous === null) setBetCount((n) => Math.max(0, n - 1));
-    }
-  }
-
-  /* Parier n'a de sens que sur la Déclaration d'un autre, encore scellée.
-     Pas sur un Sondage : on y RÉPOND, il n'y a pas de « vrai ou faux » auquel
-     croire — et le Prediscore ne compte de toute façon que les paris tranchés
-     par un verdict, qu'un Sondage n'a pas. Accessoirement, la rangée du bas
-     porte déjà trois icônes sur un Sondage et n'aurait pas la place.
-     La base refuse tout le reste (`place_bet`) ; ici on se contente de ne pas
-     le proposer. */
-  const canBet = !isAuthor && !isQuestion && cardState.kind === 'sealed';
   /* L'action unique d'une carte « à ouvrir » : elle remplace tout le reste sur
      la ligne du bas, parce qu'il n'y a plus qu'une chose à faire. */
   const canOpen = cardState.kind === 'to_open';
 
-  /* La relance « Impatient ».
+  /* La relance « Impatient » — désormais la SEULE chose à faire sur
+     l'enveloppe scellée de quelqu'un d'autre.
 
      Elle N'OUVRE RIEN, et c'est tout son intérêt : une prédiction sur
      l'élection de 2027 qui s'ouvrirait parce que six amis ont appuyé perdrait
      ce qui en fait l'intérêt. Elle prévient l'auteur, un point c'est tout.
-     On peut la retirer : le compteur redescend.
 
-     Elle n'apparaît qu'APRÈS avoir pris position — pari posé sur une
-     Déclaration, réponse envoyée sur un Sondage. Deux raisons, la seconde
-     étant la vraie : on ne réclame pas la fin d'une histoire dans laquelle on
-     n'est pas entré ; et surtout, une carte scellée qui proposait à la fois
-     « j'y crois », « j'y crois pas » et « Impatient » posait trois questions
-     d'un coup sans dire laquelle vient en premier. Maintenant il n'y en a
-     qu'une à la fois : d'abord se mouiller, ensuite s'impatienter. */
-  const hasAnswered = item.my_answer_text !== null || item.my_answer_option_id !== null;
-  const hasTakenSide = isQuestion ? hasAnswered : myBet !== null;
-  /* `!iNudged` : une fois la relance envoyée, le bouton QUITTE la carte. Il
-     restait auparavant, pour qu'on puisse retirer sa relance — mais il
-     encombrait une carte scellée à laquelle on n'avait plus rien à dire. La
-     base fait revenir `i_nudged` à faux au bout de sept jours (schema.sql
-     section 65) : le bouton réapparaît alors de lui-même, et une nouvelle
-     relance rallume la notification de l'auteur. */
+     Elle ne dépend plus d'avoir pris position : le pari a quitté la carte, et
+     la conditionner à une réponse de Sondage n'aurait plus de symétrie.
+
+     `!iNudged` : une fois envoyée, le bouton QUITTE la carte. La base fait
+     revenir `i_nudged` à faux au bout de sept jours (schema.sql section 65) :
+     il réapparaît alors de lui-même, et une nouvelle relance rallume la
+     notification de l'auteur. */
   const canNudge =
     !isAuthor &&
     (cardState.kind === 'sealed' || cardState.kind === 'question_open') &&
-    hasTakenSide &&
     !iNudged;
 
   async function handleNudge() {
@@ -1134,23 +1110,6 @@ export function PredictionCard({
               enveloppe scellée (la date y est écrite en haut, sur le rabat).
               Aucune hauteur ajoutée, donc les proportions de l'enveloppe et la
               position du sceau ne bougent pas d'un pixel. */}
-          {/* Deux signes, aucun mot : l'enveloppe porte déjà l'auteur, le
-              teaser, la date et trois icônes d'action. `CircleCheck` et
-              `CircleX` plutôt que les `Check`/`X` nus employés ailleurs dans
-              l'app (cases à cocher, fermetures) : cerclés, ils se lisent comme
-              une paire de choix et non comme une validation de formulaire. */}
-          {/* Ce que voit l'AUTEUR : combien de personnes ont parié, jamais dans
-              quel sens — la répartition lui dirait si on le croit, or il peut
-              encore modifier sa prédiction tant qu'elle est scellée. Posé ici
-              plutôt qu'en ligne de texte sous le teaser : l'enveloppe scellée
-              porte déjà l'auteur, le teaser, la date et trois icônes. */}
-          {isAuthor && cardState.kind === 'sealed' && betCount > 0 && (
-            <View style={styles.betCountRow} accessibilityLabel={`${betCount} pari en cours`}>
-              <CircleCheck size={20} color={colors.footerIconInactive} strokeWidth={1.75} />
-              <Text style={styles.betCountText}>{betCount}</Text>
-            </View>
-          )}
-
           {canOpen && (
             <Pressable
               onPress={handleOpenEnvelope}
@@ -1161,47 +1120,6 @@ export function PredictionCard({
             >
               <Text style={styles.openButtonText}>{opening ? 'Ouverture…' : 'Ouvrir'}</Text>
             </Pressable>
-          )}
-
-          {canBet && myBet === null && (
-            <View style={styles.betRow}>
-              <Pressable
-                onPress={() => handleBet(true)}
-                style={styles.betIcon}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="J’y crois"
-              >
-                <CircleCheck size={22} color={colors.icon} strokeWidth={1.75} />
-              </Pressable>
-              <Pressable
-                onPress={() => handleBet(false)}
-                style={styles.betIcon}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="Je n’y crois pas"
-              >
-                <CircleX size={22} color={colors.icon} strokeWidth={1.75} />
-              </Pressable>
-            </View>
-          )}
-
-          {/* Le pari posé : un seul signe reste, dans une encre affirmée. Comme
-              l'autre choix a disparu, aucun état « sélectionné » n'est
-              nécessaire pour comprendre lequel a été retenu. Le jaune pour
-              l'accord et l'encre pour le doute suivent la distinction déjà
-              faite ailleurs entre Réalisé (accent plein) et Manqué (neutre). */}
-          {canBet && myBet !== null && (
-            <View
-              style={styles.betIcon}
-              accessibilityLabel={myBet ? 'Tu y crois' : 'Tu n’y crois pas'}
-            >
-              {myBet ? (
-                <CircleCheck size={22} color={colors.accent} strokeWidth={2.25} />
-              ) : (
-                <CircleX size={22} color={colors.text} strokeWidth={2.25} />
-              )}
-            </View>
           )}
 
           {/* Ce que l'auteur lit : combien de personnes attendent. Aucun bouton
@@ -1340,8 +1258,8 @@ export function PredictionCard({
                         // il s'évanouit au lieu de s'ouvrir. À -72° il est
                         // franchement relevé et reste lisible.
                         rotateX: openAnim.interpolate({
-                          inputRange: [0, 0.25, 0.9, 1],
-                          outputRange: ['0deg', '0deg', '-72deg', '-72deg'],
+                          inputRange: [0, 0.28, 1],
+                          outputRange: ['0deg', '0deg', '-72deg'],
                         }),
                       },
                     ],
@@ -1362,25 +1280,25 @@ export function PredictionCard({
                     // tombe hors de l'enveloppe. C'est le premier mouvement, et
                     // c'est lui qui déclenche visuellement tout le reste.
                     opacity: openAnim.interpolate({
-                      inputRange: [0, 0.14, 0.3],
+                      inputRange: [0, 0.3, 0.55],
                       outputRange: [1, 1, 0],
                     }),
                     transform: [
                       {
                         scale: openAnim.interpolate({
-                          inputRange: [0, 0.16, 0.34],
+                          inputRange: [0, 0.3, 0.6],
                           outputRange: [1, 1.18, 0.9],
                         }),
                       },
                       {
                         translateY: openAnim.interpolate({
-                          inputRange: [0, 0.16, 0.34],
-                          outputRange: [0, 0, 26],
+                          inputRange: [0, 0.3, 0.6],
+                          outputRange: [0, 0, 34],
                         }),
                       },
                       {
                         rotate: openAnim.interpolate({
-                          inputRange: [0, 0.16, 0.34],
+                          inputRange: [0, 0.3, 0.6],
                           outputRange: ['0deg', '-6deg', '22deg'],
                         }),
                       },
@@ -1414,12 +1332,30 @@ export function PredictionCard({
                 styles.envelopeShell,
                 {
                   paddingTop: env.flapPeek,
-                  opacity: enterAnim,
-                  // Elle monte depuis l'intérieur de l'enveloppe plutôt que
-                  // d'apparaître sur place : c'est ce glissement qui fait lire
-                  // « la lettre sort » et non « l'image a changé ».
+                  // Opaque très vite (à 25 % de la course) : au-delà, c'est le
+                  // DÉPLACEMENT qui raconte la sortie. Un fondu qui dure toute
+                  // l'animation donne « l'image apparaît », pas « la feuille
+                  // sort » — c'est ce qu'on avait.
+                  opacity: enterAnim.interpolate({
+                    inputRange: [0, 0.2, 1],
+                    outputRange: [0, 1, 1],
+                  }),
+                  // Elle part de bien plus bas qu'avant (110 px au lieu de 40)
+                  // et se rétrécit légèrement au départ : de loin, on lit une
+                  // feuille encore engagée dans l'enveloppe, qu'on tire.
                   transform: [
-                    { translateY: enterAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) },
+                    {
+                      translateY: enterAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [140, 0],
+                      }),
+                    },
+                    {
+                      scale: enterAnim.interpolate({
+                        inputRange: [0, 0.6, 1],
+                        outputRange: [0.94, 1.01, 1],
+                      }),
+                    },
                   ],
                 },
               ]}
@@ -1876,10 +1812,6 @@ function createStyles(colors: Colors) {
   // Plus de `flexShrink` : c'est lui qui la laissait se réduire à néant. Elle
   // garde sa largeur, et c'est la rangée qui passe à la ligne si besoin.
   envRevealHint: { fontFamily: fonts.label, fontSize: 13, color: colors.textMuted },
-  betRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  // Même gabarit que les icônes du pied de carte, pour que la rangée reste
-  // alignée qu'on ait parié ou non.
-  betIcon: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
   // L'unique action d'une carte à ouvrir : pleine, dorée, impossible à
   // confondre avec les icônes discrètes qui l'entourent.
   openButton: {
@@ -1896,7 +1828,6 @@ function createStyles(colors: Colors) {
     textTransform: 'uppercase',
     color: colors.textOnAccent,
   },
-  betCountRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   nudgeCountRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   // Contour plutôt que bouton plein : « Révéler », qui est la vraie décision,
   // reste la seule chose dorée de la rangée. Une relance ne doit pas peser
