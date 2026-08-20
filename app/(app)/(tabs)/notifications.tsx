@@ -28,6 +28,7 @@ import {
   deleteNotification,
   deleteNotifications,
   fetchNotifications,
+  markAllNotificationsRead,
   markNotificationRead,
   notificationErrorMessage,
   type Notification,
@@ -151,6 +152,15 @@ export default function NotificationsScreen() {
     }
     setError(null);
     setNotifications(data ?? []);
+
+    /* Les avoir sous les yeux suffit à les avoir vues : on éteint la pastille
+       et les fonds jaunes sans attendre qu'on ouvre chaque ligne. L'état
+       local est posé d'abord pour que l'écran ne montre jamais un surlignage
+       le temps de l'aller-retour ; la base suit. */
+    if ((data ?? []).some((n) => !n.is_read)) {
+      setNotifications((prev) => (prev ?? []).map((n) => ({ ...n, is_read: true })));
+      markAllNotificationsRead(userId);
+    }
 
     const { data: memberships } = await supabase
       .from('group_members')
@@ -322,7 +332,6 @@ export default function NotificationsScreen() {
                 disabled={isGroupInvite && !selecting}
                 style={({ pressed }) => [
                   styles.row,
-                  !notification.is_read && styles.rowUnread,
                   pressed && styles.rowPressed,
                 ]}
               >
@@ -447,7 +456,6 @@ function createStyles(colors: Colors) {
     borderRadius: radius.card,
     backgroundColor: colors.surface,
   },
-  rowUnread: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
   rowPressed: { opacity: 0.7 },
   iconSlot: { marginTop: 1 },
   checkbox: {

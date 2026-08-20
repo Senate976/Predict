@@ -336,9 +336,35 @@ export default function HomeScreen() {
 
   /* Les deux zones du Fil, découpées après filtrage ET tri : chacune garde
      donc l'ordre choisi dans le menu, sans qu'on ait à trier deux fois.
-     « Predict » d'abord parce que c'est ce qui attend quelque chose de toi. */
-  const zoneSealed = shown.filter((item) => !isRevealed(item, now));
-  const zoneOpened = shown.filter((item) => isRevealed(item, now));
+     « Predict » d'abord parce que c'est ce qui attend quelque chose de toi.
+
+     Une prédiction qui vient de se révéler reste dans « Predict » TANT QU'ON
+     NE L'A PAS OUVERTE. Elle basculait auparavant dans « Ouverts » à la
+     seconde où son auteur la révélait — c'est-à-dire qu'elle quittait la zone
+     qu'on regarde, en silence, pour aller se ranger au milieu de choses déjà
+     lues. Le moment le plus fort du produit passait donc inaperçu. Elle
+     appartient à « Ouverts » une fois décachetée, pas avant.
+
+     Et elle passe EN TÊTE : c'est la seule carte du Fil qui demande un geste
+     immédiat, elle ne doit pas se trouver derrière trente enveloppes encore
+     scellées rangées par date. */
+  /* Exactement la condition de `cardState.kind === 'to_open'` dans
+     `PredictionCard` : ni un Sondage (qui se clôt, il n'y a pas d'enveloppe à
+     décacheter), ni sa propre prédiction (on n'ouvre pas ce qu'on a écrit —
+     `is_opened` reste faux pour l'auteur, qui sinon verrait les siennes
+     coincées dans « Predict » à jamais). Toute divergence entre les deux
+     endroits ferait apparaître une carte « à ouvrir » qui ne propose pas de
+     l'ouvrir, ou l'inverse. */
+  const aOuvrir = (item: PredictionFeedItem) =>
+    item.type !== 'question' &&
+    item.author_id !== userId &&
+    isRevealed(item, now) &&
+    !item.is_opened;
+  const zoneSealed = [
+    ...shown.filter(aOuvrir),
+    ...shown.filter((item) => !isRevealed(item, now)),
+  ];
+  const zoneOpened = shown.filter((item) => isRevealed(item, now) && !aOuvrir(item));
   const unreadSealed = zoneSealed.filter((item) => !item.is_seen).length;
   const unreadOpened = zoneOpened.filter((item) => !item.is_seen).length;
 
