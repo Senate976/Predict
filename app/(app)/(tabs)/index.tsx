@@ -365,8 +365,20 @@ export default function HomeScreen() {
     ...shown.filter((item) => !isRevealed(item, now)),
   ];
   const zoneOpened = shown.filter((item) => isRevealed(item, now) && !aOuvrir(item));
-  const unreadSealed = zoneSealed.filter((item) => !item.is_seen).length;
-  const unreadOpened = zoneOpened.filter((item) => !item.is_seen).length;
+  /* « Non lu » ne s'applique jamais à ce qu'on a écrit soi-même : on ne
+     découvre pas sa propre prédiction. Deux conséquences, et la seconde est
+     celle qui se voyait :
+
+     — le surlignage jaune disparaît des cartes de l'auteur ;
+     — la pastille du titre cesse d'annoncer des nouveautés qui n'ont aucune
+       notification en face. Une prédiction ne notifie que ses DESTINATAIRES
+       (`generate_reveal_notifications` passe par `prediction_access`, où
+       l'auteur ne figure pas) : compter les siennes ici faisait donc une
+       pastille dorée sans rien dans la liste des notifications. */
+  const estDeMoi = (item: PredictionFeedItem) => item.author_id === userId;
+  const nonLu = (item: PredictionFeedItem) => !item.is_seen && !estDeMoi(item);
+  const unreadSealed = zoneSealed.filter(nonLu).length;
+  const unreadOpened = zoneOpened.filter(nonLu).length;
   /* Ce qu'on annonce en haut de l'écran : tout ce qui est nouveau, les deux
      zones confondues. Les compter séparément par zone garde son sens une fois
      qu'on fait défiler ; en titre, c'est « combien de choses m'attendent »
@@ -400,7 +412,7 @@ export default function HomeScreen() {
         friendIds
       )}
       userId={userId!}
-      unseen={!item.is_seen}
+      unseen={nonLu(item)}
       onPress={() => {
         handleMarkSeen(item.id);
         router.push(`/prediction/${item.id}`);
@@ -600,7 +612,7 @@ export default function HomeScreen() {
             <Text style={styles.emptyTitle}>Ton Fil est vide.</Text>
             <Text style={styles.emptyText}>
               Les <PredictWord /> et les Sondages apparaîtront ici — les tiens comme ceux de
-              ton Cercle. Ceux qui attendent en haut, ceux qui sont ouverts en dessous.
+              ton Cercle. Ceux qui attendent en haut, ceux qui sont révélés en dessous.
             </Text>
           </View>
         ) : (
@@ -631,7 +643,7 @@ export default function HomeScreen() {
             {zoneSealed.length > 0 && zoneOpened.length > 0 && (
               <ZoneTitle
                 styles={styles}
-                label="Ouverts"
+                label="Révélés"
                 count={zoneOpened.length}
                 unread={unreadOpened}
               />

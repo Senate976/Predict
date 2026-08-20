@@ -17,10 +17,34 @@ export type EmojiReaction =
   | '😬'
   | '🤣'
   | '💀'
-  | '🔮';
+  | '🔮'
+  /* Les trois degrés de l'Ovation (voir `ACCLAIM_LEVELS`). Rangés dans le
+   * même type et la même table que les réactions ordinaires : chacun n'a
+   * qu'une réaction par prédiction, et acclamer EST sa réaction — bruyamment.
+   * Ils ne figurent pas dans `EMOJI_REACTIONS`, qui reste la bulle de douze. */
+  | '👏'
+  | '🔥'
+  | '🤯';
 
 /** 12 réactions, un multiple de 6 : la bulle de sélection s'affiche en 2
  * rangées de 6 (voir `EMOJI_COLUMNS` dans PredictionCard.tsx). */
+/**
+ * L'Ovation — trois degrés, réservés à une prédiction RÉVÉLÉE.
+ *
+ * Une prédiction qui se réalise contre toute attente méritait mieux qu'un
+ * pouce discret perdu au bas de la carte. Ici on applaudit fort, et le degré
+ * choisi se voit : chaque cran est plus gros et plus appuyé que le précédent,
+ * et le dernier déclenche la pluie d'or.
+ *
+ * Rangés dans la même table que les réactions ordinaires — on n'a toujours
+ * qu'une réaction par prédiction, acclamer remplace donc un éventuel 👍.
+ */
+export const ACCLAIM_LEVELS: { emoji: EmojiReaction; label: string }[] = [
+  { emoji: '👏', label: 'Bien vu' },
+  { emoji: '🔥', label: 'Fort' },
+  { emoji: '🤯', label: 'Incroyable' },
+];
+
 export const EMOJI_REACTIONS: EmojiReaction[] = [
   '👍',
   '❤️',

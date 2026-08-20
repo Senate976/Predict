@@ -13,7 +13,10 @@ export type PredictionType = 'declaration' | 'question';
 export type AnswerFormat = 'text' | 'choice';
 
 /** Doit rester aligné sur la contrainte `prediction_answers_*` du SQL. */
-export const MAX_ANSWER_LENGTH = 160;
+/** Court comme une option de Sondage : on répond d'un mot ou deux, pas d'un
+ * paragraphe. Aucune mention à l'écran — le champ s'arrête, sans explication
+ * à donner pour une limite qu'on n'atteint quasiment jamais en répondant. */
+export const MAX_ANSWER_LENGTH = 30;
 
 /** Une option prédéfinie (format « choix »), visible dès la création — ce
  * n'est pas un secret, seulement l'énoncé de la Question. */

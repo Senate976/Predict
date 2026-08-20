@@ -30,6 +30,7 @@ import { fetchCommentCount } from '../lib/comments';
 import { formatSealedFor } from '../lib/datetime';
 import { uploadVerdictPhoto } from '../lib/photos';
 import {
+  ACCLAIM_LEVELS,
   castEmojiReaction,
   EMOJI_REACTIONS,
   fetchEmojiReactors,
@@ -64,6 +65,7 @@ import {
 } from './EnvelopeArt';
 import { useAuth } from '../lib/auth';
 import { betOutcomeLabel } from '../lib/bets';
+import { CelebrationBurst } from './CelebrationBurst';
 import { nudgeCountLabel, nudgePrediction } from '../lib/nudges';
 import { InlineComments } from './InlineComments';
 import { InlineQuestionAnswer } from './InlineQuestionAnswer';
@@ -288,6 +290,14 @@ export function PredictionCard({
   // derrière doivent la suivre — à hauteur figée, elles s'arrêtaient en plein
   // milieu.
   const [letterHeight, setLetterHeight] = useState(0);
+  /* Vrai dès que la lettre est en place. Sert à ne rogner son cadre QUE
+     pendant la sortie : le tampon « ENCORE RAISON » déborde volontairement de
+     la lettre (`stamp` est en `top: -14, right: -6`), un rognage permanent le
+     couperait. Vrai par défaut, pour les cartes déjà ouvertes à l'affichage. */
+  const [letterSettled, setLetterSettled] = useState(true);
+  /* La pluie d'or, déclenchée par le troisième degré de l'Ovation. Locale à
+     la carte : c'est CETTE prédiction qu'on acclame. */
+  const [ovationBurst, setOvationBurst] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   /**
    * Horodatage du dernier geste de réaction. L'enveloppe s'ouvre au toucher, et
@@ -446,6 +456,7 @@ export function PredictionCard({
       setOpening(false);
       openAnim.setValue(0);
       enterAnim.setValue(0);
+      setLetterSettled(false);
       Animated.timing(enterAnim, {
         toValue: 1,
         // Un temps mort avant que la lettre ne bouge : l'enveloppe est
@@ -460,7 +471,7 @@ export function PredictionCard({
         duration: reduceMotion ? 0 : 1000,
         easing: Easing.bezier(0.16, 0.72, 0.24, 1),
         useNativeDriver: false,
-      }).start();
+      }).start(() => setLetterSettled(true));
     });
     // Écrit sans attendre la fin de l'animation : si l'app se ferme entre les
     // deux, la prédiction reste ouverte plutôt que de se refermer.
@@ -754,6 +765,10 @@ export function PredictionCard({
      revenir `i_nudged` à faux au bout de sept jours (schema.sql section 65) :
      il réapparaît alors de lui-même, et une nouvelle relance rallume la
      notification de l'auteur. */
+  /* L'Ovation ne s'offre que sur une révélation qu'on a déjà décachetée — on
+     n'applaudit pas une enveloppe fermée — et jamais sur la sienne. */
+  const canAcclaim = revealed && !isAuthor && !needsOpening;
+
   const canNudge =
     !isAuthor &&
     (cardState.kind === 'sealed' || cardState.kind === 'question_open') &&
@@ -1381,25 +1396,45 @@ export function PredictionCard({
                   </Pressable>
                 ))}
 
+              {/* LE CADRE QUI ROGNE — c'est lui qui fait qu'une lettre SORT au
+                  lieu de monter depuis le bas.
+
+                  Sans rognage, la lettre translatée vers le bas restait
+                  visible sous l'enveloppe et remontait à l'air libre : on
+                  voyait une feuille glisser vers le haut, pas une feuille
+                  qu'on tire. Ce cadre a exactement la taille de la lettre en
+                  place ; tout ce qui dépasse par le bas est invisible. La
+                  lettre commence donc entièrement dessous — dans l'enveloppe —
+                  et n'apparaît qu'au fur et à mesure qu'elle en sort, bord
+                  supérieur d'abord.
+
+                  Le rognage cesse une fois la lettre arrivée : le tampon
+                  « ENCORE RAISON » déborde volontairement du cadre, et serait
+                  coupé si l'on rognait en permanence. */}
+              <View
+                style={[
+                  styles.letterClip,
+                  !letterSettled && styles.letterClipActive,
+                  pages.length > 0 ? { marginBottom: PAGE_PEEK * pages.length } : null,
+                ]}
+              >
               <Animated.View
                 onLayout={(e) => setLetterHeight(e.nativeEvent.layout.height)}
                 style={[
                   styles.letter,
                   {
-                    // C'est ICI que se joue la sortie, et nulle part ailleurs :
-                    // la lettre monte pendant que l'enveloppe reste immobile.
-                    // Portée par la coque, la même translation faisait monter
-                    // l'enveloppe avec elle — on ne voyait pas une lettre
-                    // sortir, mais un bloc glisser.
                     opacity: enterAnim.interpolate({
-                      inputRange: [0, 0.12, 1],
+                      inputRange: [0, 0.06, 1],
                       outputRange: [0, 1, 1],
                     }),
                     transform: [
                       {
+                        // La course vaut la hauteur réelle de la lettre : elle
+                        // part donc entièrement cachée par le cadre, pas
+                        // « un peu plus bas ».
                         translateY: enterAnim.interpolate({
                           inputRange: [0, 1],
-                          outputRange: [190, 0],
+                          outputRange: [Math.max(letterHeight, env.letterH), 0],
                         }),
                       },
                     ],
@@ -1411,10 +1446,6 @@ export function PredictionCard({
                     backgroundColor: letterPaper(colors.surface),
                   },
                   showVerdictStamp && styles.letterWithStamp,
-                  // Réserve la bande que les photos laissent dépasser sous la
-                  // lettre : sans elle, le bloc auteur/teaser vient par-dessus
-                  // et capte l'appui à leur place.
-                  pages.length > 0 ? { marginBottom: PAGE_PEEK * pages.length } : null,
                 ]}
               >
                 {showVerdictStamp && <VerdictStamp verdict={cardState.kind as 'realized' | 'missed'} colors={colors} />}
@@ -1469,6 +1500,59 @@ export function PredictionCard({
                 </Pressable>
               )}
                     </Animated.View>
+              </View>
+
+              {/* L'OVATION. Une prédiction qui se réalise contre toute attente
+                  méritait mieux qu'un pouce discret perdu au bas de la carte :
+                  ici on applaudit, et le degré choisi se voit. Trois crans,
+                  chacun plus gros et plus appuyé que le précédent ; le dernier
+                  fait tomber la pluie d'or.
+
+                  Réservée à une révélation qu'on a DÉJÀ décachetée, et jamais
+                  sur la sienne : on n'applaudit pas son propre tour de force.
+
+                  Ce n'est pas une réaction de plus à côté des douze autres :
+                  c'est la même, dite plus fort. Acclamer remplace donc un 👍
+                  éventuel, et retaper le même cran l'enlève. */}
+              {canAcclaim && (
+                <View style={styles.acclaimRow}>
+                  {ACCLAIM_LEVELS.map((level, index) => {
+                    const mine = myEmoji === level.emoji;
+                    const count = emojiCounts[level.emoji] ?? 0;
+                    return (
+                      <Pressable
+                        key={level.emoji}
+                        onPress={() => {
+                          if (!mine && index === ACCLAIM_LEVELS.length - 1) setOvationBurst(true);
+                          handleEmojiPress(level.emoji);
+                        }}
+                        style={({ pressed }) => [
+                          styles.acclaimButton,
+                          // Chaque cran monte d'un ton : plus haut, plus gros.
+                          // Le barème se lit avant même les mots.
+                          { paddingVertical: 7 + index * 3 },
+                          mine && styles.acclaimButtonMine,
+                          pressed && styles.acclaimButtonPressed,
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${level.label}${count > 0 ? ` — ${count}` : ''}`}
+                      >
+                        <Text style={{ fontSize: 17 + index * 4 }}>{level.emoji}</Text>
+                        <Text
+                          style={[
+                            styles.acclaimLabel,
+                            { fontSize: 12 + index },
+                            mine && styles.acclaimLabelMine,
+                          ]}
+                        >
+                          {level.label}
+                        </Text>
+                        {count > 0 && <Text style={styles.acclaimCount}>{count}</Text>}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
 
               {envelopeFooter}
             </View>
@@ -1559,6 +1643,12 @@ export function PredictionCard({
             prend le relais (liste des réponses, validation). */}
 
       </View>
+
+      <CelebrationBurst
+        visible={ovationBurst && !reduceMotion}
+        message="Chapeau !"
+        onFinish={() => setOvationBurst(false)}
+      />
 
       {commentsOpen && (
         <View style={styles.commentsWrap}>
@@ -1836,6 +1926,24 @@ function createStyles(colors: Colors) {
   nudgeButtonPressed: { opacity: 0.7 },
   nudgeButtonText: { fontFamily: fonts.label, fontSize: 13, color: colors.textMuted },
   betCountText: { fontFamily: fonts.label, fontSize: 13, color: colors.textMuted },
+  // Les trois crans occupent toute la largeur, alignés par le bas : c'est ce
+  // qui rend le barème lisible d'un coup d'œil, chacun dépassant le précédent.
+  acclaimRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 10 },
+  acclaimButton: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+  },
+  acclaimButtonMine: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  acclaimButtonPressed: { opacity: 0.7 },
+  acclaimLabel: { fontFamily: fonts.label, color: colors.textMuted },
+  acclaimLabelMine: { color: colors.text, fontWeight: '700' },
+  acclaimCount: { fontFamily: fonts.label, fontSize: 12, color: colors.text, fontWeight: '700' },
   betOutcome: { fontFamily: fonts.bodyEmphasis, fontSize: 14, color: colors.text, marginTop: 4 },
   sealedBadge: { position: 'absolute', left: '50%', zIndex: 2 },
   // Corps de carte assourdi une fois Manquée — jamais le badge d'état,
@@ -1855,11 +1963,13 @@ function createStyles(colors: Colors) {
   // La lettre. Largeur, hauteur minimale, rayon et liseré sont posés au rendu
   // à partir de la largeur mesurée (voir `env` plus haut) : ce sont des
   // fractions relevées sur la maquette, pas des pixels fixes.
+  // Le cadre porte le centrage et la place dans le flux ; la lettre, à
+  // l'intérieur, ne porte plus que son apparence et son mouvement.
+  letterClip: { alignSelf: 'center', zIndex: 2 },
+  letterClipActive: { overflow: 'hidden' },
   letter: {
-    alignSelf: 'center',
     padding: 14,
     gap: 6,
-    zIndex: 2,
   },
   // Réserve la place du tampon par un padding interne plutôt qu'une marge
   // externe : une marge asymétrique (seulement à droite) décentrait toute la
@@ -1990,7 +2100,7 @@ function createStyles(colors: Colors) {
   // — rendu directement dans le corps de la carte, hors de l'enveloppe qui
   // porte d'habitude les marges — collait au bord gauche et au bas de
   // l'étiquette.
-  verdictPhotoStep: { gap: 10, paddingHorizontal: 18, paddingBottom: 14 },
+  verdictPhotoStep: { gap: 10, paddingHorizontal: 18, paddingTop: 14, paddingBottom: 14 },
   // Rien à envoyer tant qu'aucune photo n'est choisie : le bouton s'efface
   // plutôt que de promettre une action qui ne ferait rien.
   verdictPromptButtonDisabled: { opacity: 0.45 },
