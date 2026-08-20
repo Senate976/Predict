@@ -381,7 +381,7 @@ export default function PredictionDetailScreen() {
 
             {/* Pour une Question, remplace entièrement le bloc Verdict :
                 formulaire de réponse (définitive, un seul envoi) avant
-                Clôture, liste des réponses + validation Correcte/Incorrecte
+                Clôture, liste des réponses + validation « Bien vu » / « Manqué »
                 après — voir `QuestionAnswerPanel`. Visible à tout le monde,
                 pas seulement à l'auteur (contrairement au Verdict d'une
                 Déclaration). */}
@@ -437,42 +437,41 @@ export default function PredictionDetailScreen() {
               isAuthor && revealed && (
                 <View style={styles.sectionSpacing}>
                   <Text style={styles.eyebrow}>Verdict</Text>
-                  <View style={styles.verdictChoiceRow}>
-                    <Pressable
-                      onPress={() => handleSetVerdict('realized')}
-                      disabled={verdictPending}
-                      style={[
-                        styles.verdictChoice,
-                        prediction.final_status === 'realized' && styles.verdictChoiceActive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.verdictChoiceText,
-                          prediction.final_status === 'realized' && styles.verdictChoiceTextActive,
-                        ]}
+                  {/* Tant que rien n'est affirmé, les deux boutons : c'est
+                      ici qu'on peut trancher sans repasser par le Fil. Une
+                      fois le verdict posé, seul celui qu'on a choisi reste —
+                      les deux côte à côte, l'un allumé et l'autre éteint,
+                      laissaient croire qu'il restait un choix à faire alors
+                      que la décision était prise. Le verdict devient donc
+                      définitif : c'est ce qui donne son poids au tampon
+                      « ENCORE RAISON », qui ne vaudrait rien s'il suffisait
+                      de le retourner. */}
+                  {prediction.final_status === 'pending' ? (
+                    <View style={styles.verdictChoiceRow}>
+                      <Pressable
+                        onPress={() => handleSetVerdict('realized')}
+                        disabled={verdictPending}
+                        style={styles.verdictChoice}
                       >
-                        Réalisé
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => handleSetVerdict('missed')}
-                      disabled={verdictPending}
-                      style={[
-                        styles.verdictChoice,
-                        prediction.final_status === 'missed' && styles.verdictChoiceActive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.verdictChoiceText,
-                          prediction.final_status === 'missed' && styles.verdictChoiceTextActive,
-                        ]}
+                        <Text style={styles.verdictChoiceText}>Réalisé</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleSetVerdict('missed')}
+                        disabled={verdictPending}
+                        style={styles.verdictChoice}
                       >
-                        Manqué
-                      </Text>
-                    </Pressable>
-                  </View>
+                        <Text style={styles.verdictChoiceText}>Manqué</Text>
+                      </Pressable>
+                    </View>
+                  ) : (
+                    <View style={styles.verdictChoiceRow}>
+                      <View style={[styles.verdictChoice, styles.verdictChoiceActive]}>
+                        <Text style={[styles.verdictChoiceText, styles.verdictChoiceTextActive]}>
+                          {prediction.final_status === 'realized' ? 'Réalisé' : 'Manqué'}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
                   {prediction.verdict_photo_path && (
                     <View style={styles.photoRow}>
                       <PredictionPhoto bucket="verdict" path={prediction.verdict_photo_path} />

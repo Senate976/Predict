@@ -108,28 +108,41 @@ export function PredictionRecorder({ uri, onChange, disabled, variant = 'bloc' }
       );
     }
 
+    // Pendant l'enregistrement, le discret n'a plus lieu d'être : c'est le
+    // seul geste en cours, il doit occuper la place et le bouton d'arrêt doit
+    // tomber sous le doigt sans viser. Un picto de 22 px et un compteur de
+    // 13 px demandaient de la précision au moment où on en a le moins.
+    if (recorderState.isRecording) {
+      return (
+        <Pressable
+          onPress={handleStop}
+          disabled={disabled}
+          style={styles.recordingBanner}
+          accessibilityRole="button"
+          accessibilityLabel="Arrêter l’enregistrement"
+        >
+          <View style={styles.recordingStop}>
+            <View style={styles.recordingStopSquare} />
+          </View>
+          <Text style={styles.recordingTimer}>
+            {formatDuration(recorderState.durationMillis)}
+          </Text>
+          <Text style={styles.recordingHint}>Toucher pour arrêter</Text>
+        </Pressable>
+      );
+    }
+
     return (
       <View style={styles.discreetRow}>
         <Pressable
-          onPress={recorderState.isRecording ? handleStop : handleStart}
+          onPress={handleStart}
           disabled={disabled}
           hitSlop={10}
           accessibilityRole="button"
-          accessibilityLabel={
-            recorderState.isRecording ? 'Arrêter l’enregistrement' : 'Enregistrer un vocal'
-          }
+          accessibilityLabel="Enregistrer un vocal"
         >
-          {recorderState.isRecording ? (
-            <View style={styles.dotSquare} />
-          ) : (
-            <Ionicons name="mic" size={22} color={colors.textMuted} />
-          )}
+          <Ionicons name="mic" size={22} color={colors.textMuted} />
         </Pressable>
-        {recorderState.isRecording && (
-          <Text style={styles.discreetDuration}>
-            {formatDuration(recorderState.durationMillis)}
-          </Text>
-        )}
         {permissionError && <Text style={styles.discreetError}>{permissionError}</Text>}
       </View>
     );
@@ -210,6 +223,38 @@ function createStyles(colors: Colors) {
   discreetRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   discreetDuration: { fontSize: 13, color: colors.textMuted },
   discreetError: { fontSize: 13, color: colors.danger, flexShrink: 1 },
+  // La bande d'enregistrement occupe toute la largeur du champ et une bonne
+  // hauteur : pendant qu'elle tourne, il n'y a rien d'autre à faire.
+  recordingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    // Fond plein : la bande se pose au bas du champ de saisie et masque
+    // proprement le texte déjà écrit qui passerait dessous, le temps de
+    // l'enregistrement. Rien n'est perdu, tout revient à l'arrêt.
+    backgroundColor: colors.surface,
+    borderRadius: radius.sm,
+  },
+  recordingStop: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recordingStopSquare: { width: 16, height: 16, borderRadius: 3, backgroundColor: '#FFFFFF' },
+  // Chiffres tabulaires : sans eux, la largeur du compteur saute à chaque
+  // seconde et toute la rangée tressaute avec.
+  recordingTimer: {
+    fontFamily: fonts.display,
+    fontSize: 30,
+    color: colors.text,
+    fontVariant: ['tabular-nums'],
+  },
+  recordingHint: { fontSize: 13, color: colors.textMuted, flexShrink: 1 },
   playButton: { alignSelf: 'flex-start' },
   playButtonText: { fontFamily: fonts.bodyEmphasis, fontSize: 15, color: colors.text },
   duration: { fontSize: 15, color: colors.textFaint, marginTop: 8 },

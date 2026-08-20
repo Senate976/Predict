@@ -27,7 +27,7 @@ import { InlineQuestionAnswer } from './InlineQuestionAnswer';
  * autres reste caché jusqu'à la Clôture (voir schema.sql section 42).
  *
  * Après Clôture : tout le monde voit la liste des réponses ; l'auteur y
- * ajoute deux pastilles Correcte/Incorrecte par ligne. Aucun habillage de
+ * ajoute deux pastilles « Bien vu » / « Manqué » par ligne. Aucun habillage de
  * gamification ici (sceau, score) — volontairement remis à plus tard,
  * seule la donnée brute (`is_correct`) est posée.
  */
@@ -142,14 +142,14 @@ export function QuestionAnswerPanel({
                       disabled={gradingId === a.id}
                       style={[styles.gradeButton, a.is_correct === true && styles.gradeButtonCorrectActive]}
                     >
-                      <Text style={styles.gradeButtonText}>Correcte</Text>
+                      <Text style={styles.gradeButtonText}>Bien vu</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => handleGrade(a.id, false)}
                       disabled={gradingId === a.id}
                       style={[styles.gradeButton, a.is_correct === false && styles.gradeButtonIncorrectActive]}
                     >
-                      <Text style={styles.gradeButtonText}>Incorrecte</Text>
+                      <Text style={styles.gradeButtonText}>Manqué</Text>
                     </Pressable>
                   </View>
                 ) : (
@@ -257,7 +257,7 @@ function createStyles(colors: Colors) {
       paddingVertical: 5,
     },
     // Même registre que les boutons Réalisé/Manqué d'une Déclaration
-    // (`PredictionCard`) : Correcte en accent plein, Incorrecte en contour
+    // (`PredictionCard`) : « Bien vu » en accent plein, « Manqué » en contour
     // neutre — plus de vert/rouge, une seule couleur d'accent dans toute
     // l'app.
     gradeButtonCorrectActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },

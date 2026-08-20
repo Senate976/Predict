@@ -803,7 +803,9 @@ function createStyles(colors: Colors) {
   // `paddingBottom` élargi : c'est la place réservée au micro posé par-dessus,
   // pour que le texte saisi ne vienne jamais s'écrire dessous.
   contentInput: { minHeight: 132, textAlignVertical: 'top', paddingBottom: 42 },
-  contentMic: { position: 'absolute', left: 12, bottom: 10 },
+  // Bornée à gauche ET à droite : au repos le micro n'occupe que sa largeur,
+  // mais pendant l'enregistrement la bande a besoin de toute la ligne.
+  contentMic: { position: 'absolute', left: 10, right: 10, bottom: 8 },
   optionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   optionInput: { flex: 1 },
   removeOptionButton: { padding: 8 },
