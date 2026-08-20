@@ -440,7 +440,7 @@ export default function NewPredictionScreen() {
                   l'intérieur de chaque temps, pour que la phrase ne se coupe
                   qu'aux virgules — jamais entre « tu » et son verbe. */}
               <Text style={styles.chooserBody}>
-                Tu scelles, tu intrigues, tu révèles
+                Tu intrigues, tu scelles, tu révèles
               </Text>
             </Pressable>
 
@@ -478,9 +478,13 @@ export default function NewPredictionScreen() {
             </>
           )}
 
-          <Text style={[styles.label, styles.sectionLabel]}>
-            {isQuestion ? 'Ta question' : 'Ton Predict'}
-          </Text>
+          {/* Aucun intitulé sur un Sondage : le champ porte déjà « Ta
+              question » en indication, et le titre le répétait mot pour mot
+              juste au-dessus. Pas de `Text` vide non plus — il occuperait sa
+              hauteur de ligne pour ne rien dire. */}
+          {!isQuestion && (
+            <Text style={[styles.label, styles.sectionLabel]}>Predict</Text>
+          )}
           {/* Plus de bascule « Texte / Message vocal », et plus de bouton
               « Enregistrer un vocal » sur sa propre ligne : parler est une
               manière d'écrire, pas une pièce jointe de plus. Le micro se pose
@@ -624,7 +628,7 @@ export default function NewPredictionScreen() {
             </>
           )}
 
-          <Text style={[styles.label, styles.sectionLabel]}>Qui le voit ?</Text>
+          <Text style={[styles.label, styles.sectionLabel]}>Destinataires</Text>
           <View style={styles.scopeRow}>
             <Pressable
               onPress={() => setAudience('all')}

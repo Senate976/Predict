@@ -6902,7 +6902,39 @@ left join public.prediction_contents pc on pc.prediction_id = p.id;
 
 
 -- ---------------------------------------------------------------------------
--- 66. Filet de sécurité — forcer PostgREST à relire le schéma
+-- 66. L'Ovation — trois degrés d'applaudissement
+-- ---------------------------------------------------------------------------
+--
+-- Une prédiction qui se réalise contre toute attente méritait mieux qu'un
+-- pouce discret perdu au bas de la carte. D'où trois nouveaux emojis, réservés
+-- par l'app aux prédictions révélées : 👏 « Bien vu », 🔥 « Fort »,
+-- 🤯 « Incroyable ».
+--
+-- Rangés dans la table des réactions existante plutôt que dans une table à
+-- eux : on n'a toujours qu'UNE réaction par prédiction, et acclamer EST sa
+-- réaction — bruyamment. Rien d'autre à changer, ni compteur ni policy.
+--
+-- Les deux contraintes sont reposées EN ENTIER avec l'ancienne liste plus les
+-- trois nouveaux : en reposer une plus courte rejetterait les réactions déjà
+-- en base (« is violated by some row »), ce qui s'est déjà produit ici.
+alter table public.prediction_emoji_reactions
+  drop constraint if exists prediction_emoji_reactions_emoji_check;
+alter table public.prediction_emoji_reactions add constraint prediction_emoji_reactions_emoji_check
+  check (emoji in ('👍', '🖕', '❤️', '👎', '😊', '😮', '😢', '🫣', '😬', '🤣', '💀', '🔮',
+                   '👏', '🔥', '🤯'));
+
+-- Les réactions aux COMMENTAIRES gardent la même liste que les réactions aux
+-- prédictions : deux jeux différents obligeraient à se souvenir lequel vaut
+-- où, et l'app n'offre de toute façon l'Ovation que sur une prédiction.
+alter table public.prediction_comment_reactions
+  drop constraint if exists prediction_comment_reactions_emoji_check;
+alter table public.prediction_comment_reactions add constraint prediction_comment_reactions_emoji_check
+  check (emoji in ('👍', '🖕', '❤️', '👎', '😊', '😮', '😢', '🫣', '😬', '🤣', '💀', '🔮',
+                   '👏', '🔥', '🤯'));
+
+
+-- ---------------------------------------------------------------------------
+-- 67. Filet de sécurité — forcer PostgREST à relire le schéma
 -- ---------------------------------------------------------------------------
 --
 -- PostgREST met normalement à jour son cache de schéma tout seul après une
