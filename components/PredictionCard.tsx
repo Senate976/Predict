@@ -262,7 +262,9 @@ export function PredictionCard({
   // Lequel des deux boutons a été touché — affiche l'étape « photo-preuve
   // (facultative) » avant d'envoyer réellement le verdict, `null` tant que
   // l'auteur n'a rien touché ou vient d'annuler cette étape.
-  const [pendingVerdictChoice, setPendingVerdictChoice] = useState<'realized' | 'missed' | null>(null);
+  /* Vrai juste après avoir tranché, le temps de proposer une preuve. Ce n'est
+     pas un « verdict en attente » : le verdict est déjà enregistré. */
+  const [justSetVerdict, setJustSetVerdict] = useState(false);
   const [verdictPhotoUri, setVerdictPhotoUri] = useState<string | null>(null);
   // Écho optimiste du chemin renvoyé par `handleSetVerdict`, affiché tout de
   // suite sans attendre le prochain chargement du fil.
@@ -628,9 +630,40 @@ export function PredictionCard({
       return;
     }
     if (photoPath) setLocalVerdictPhotoPath(photoPath);
-    setPendingVerdictChoice(null);
     setVerdictPhotoUri(null);
+    // Le verdict est posé : on peut maintenant proposer une preuve, sans que
+    // rien de ce qui vient d'être décidé ne dépende de la réponse.
+    setJustSetVerdict(true);
     onVerdictChange?.(next);
+  }
+
+  /**
+   * Joint une preuve à un verdict DÉJÀ enregistré. On repasse le même verdict
+   * à `setPredictionVerdict` : c'est lui qui porte la colonne photo, et le
+   * rejouer à l'identique ne change rien d'autre.
+   */
+  async function handleAttachVerdictPhoto() {
+    const current = verdict;
+    if (!verdictPhotoUri || !current) return;
+    setVerdictPending(true);
+    setVerdictError(null);
+
+    const { path, error: uploadError } = await uploadVerdictPhoto(item.id, verdictPhotoUri);
+    if (uploadError || !path) {
+      setVerdictPending(false);
+      setVerdictError('Envoi de la photo impossible.');
+      return;
+    }
+
+    const { error } = await setPredictionVerdict(item.id, current, path);
+    setVerdictPending(false);
+    if (error) {
+      setVerdictError('Impossible de joindre la preuve.');
+      return;
+    }
+    setLocalVerdictPhotoPath(path);
+    setVerdictPhotoUri(null);
+    setJustSetVerdict(false);
   }
 
   /** Charge le détail « qui a réagi avec quoi », une seule fois par carte. */
@@ -1517,77 +1550,77 @@ export function PredictionCard({
 
         </Pressable>
 
-        {/* Invite l'auteur à trancher dès que sa prédiction est révélée mais
-            encore en attente de verdict — Réalisé en accent plein, Manqué en
-            contour neutre, même registre que le tampon, jamais de
-            vert/rouge. Touché, un bouton ouvre une étape intermédiaire
-            (photo-preuve facultative) plutôt que d'envoyer le verdict tout de
-            suite : une fois confirmé, revenir dessus n'est plus possible ici,
-            seulement depuis l'écran détail. */}
+        {/* Le verdict est posé DU PREMIER COUP. Auparavant, toucher
+            « Réalisé » ouvrait une étape intermédiaire proposant une photo,
+            dont le bouton de sortie s'appelait « Annuler » : qui n'avait pas
+            de photo à joindre appuyait dessus, et perdait son verdict sans
+            comprendre pourquoi. Le piège n'est pas rattrapable par un
+            meilleur libellé — c'est l'étape elle-même qui n'a pas lieu
+            d'être. Trancher est la décision ; la preuve vient après, si on
+            en a une. Le verdict reste modifiable depuis l'écran détail. */}
         {!isQuestion && isAuthor && revealed && verdict === null && (
           <View style={styles.verdictPrompt}>
-            {pendingVerdictChoice === null ? (
-              <View style={styles.verdictPromptButtons}>
-                <Pressable
-                  onPress={() => setPendingVerdictChoice('realized')}
-                  disabled={verdictPending}
-                  style={[styles.verdictPromptButton, styles.verdictPromptButtonRealized]}
-                >
-                  <Text style={styles.verdictPromptButtonTextOnAccent}>Réalisé</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => setPendingVerdictChoice('missed')}
-                  disabled={verdictPending}
-                  style={[styles.verdictPromptButton, styles.verdictPromptButtonMissed]}
-                >
-                  <Text style={styles.verdictPromptButtonText}>Manqué</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <View style={styles.verdictPhotoStep}>
-                <Text style={styles.verdictPhotoStepLabel}>
-                  Une preuve visuelle ? (facultatif)
+            <View style={styles.verdictPromptButtons}>
+              <Pressable
+                onPress={() => handleSetVerdict('realized')}
+                disabled={verdictPending}
+                style={[styles.verdictPromptButton, styles.verdictPromptButtonRealized]}
+              >
+                <Text style={styles.verdictPromptButtonTextOnAccent}>
+                  {verdictPending ? '…' : 'Réalisé'}
                 </Text>
-                <PhotoAttachButton
-                  uri={verdictPhotoUri}
-                  onChange={setVerdictPhotoUri}
-                  disabled={verdictPending}
-                  label="Joindre une photo"
-                />
-                <View style={styles.verdictPromptButtons}>
-                  <Pressable
-                    onPress={() => {
-                      setPendingVerdictChoice(null);
-                      setVerdictPhotoUri(null);
-                    }}
-                    disabled={verdictPending}
-                    style={[styles.verdictPromptButton, styles.verdictPromptButtonMissed]}
-                  >
-                    <Text style={styles.verdictPromptButtonText}>Annuler</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => handleSetVerdict(pendingVerdictChoice)}
-                    disabled={verdictPending}
-                    style={[
-                      styles.verdictPromptButton,
-                      pendingVerdictChoice === 'realized'
-                        ? styles.verdictPromptButtonRealized
-                        : styles.verdictPromptButtonMissed,
-                    ]}
-                  >
-                    <Text
-                      style={
-                        pendingVerdictChoice === 'realized'
-                          ? styles.verdictPromptButtonTextOnAccent
-                          : styles.verdictPromptButtonText
-                      }
-                    >
-                      {verdictPending ? 'Confirmation…' : 'Confirmer'}
-                    </Text>
-                  </Pressable>
-                </View>
-              </View>
-            )}
+              </Pressable>
+              <Pressable
+                onPress={() => handleSetVerdict('missed')}
+                disabled={verdictPending}
+                style={[styles.verdictPromptButton, styles.verdictPromptButtonMissed]}
+              >
+                <Text style={styles.verdictPromptButtonText}>
+                  {verdictPending ? '…' : 'Manqué'}
+                </Text>
+              </Pressable>
+            </View>
+            {verdictError && <Text style={styles.verdictPromptError}>{verdictError}</Text>}
+          </View>
+        )}
+
+        {/* La preuve, proposée juste après avoir tranché — et seulement là :
+            laisser ce bloc sur tous les verdicts passés encombrerait chaque
+            carte de l'auteur indéfiniment. */}
+        {!isQuestion && isAuthor && justSetVerdict && !verdictPhotoPath && (
+          <View style={styles.verdictPhotoStep}>
+            <Text style={styles.verdictPhotoStepLabel}>Une preuve ? (facultatif)</Text>
+            <PhotoAttachButton
+              uri={verdictPhotoUri}
+              onChange={setVerdictPhotoUri}
+              disabled={verdictPending}
+              label="Joindre une photo"
+            />
+            <View style={styles.verdictPromptButtons}>
+              <Pressable
+                onPress={() => {
+                  setJustSetVerdict(false);
+                  setVerdictPhotoUri(null);
+                }}
+                disabled={verdictPending}
+                style={[styles.verdictPromptButton, styles.verdictPromptButtonMissed]}
+              >
+                <Text style={styles.verdictPromptButtonText}>Sans preuve</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleAttachVerdictPhoto}
+                disabled={verdictPending || !verdictPhotoUri}
+                style={[
+                  styles.verdictPromptButton,
+                  styles.verdictPromptButtonRealized,
+                  !verdictPhotoUri && styles.verdictPromptButtonDisabled,
+                ]}
+              >
+                <Text style={styles.verdictPromptButtonTextOnAccent}>
+                  {verdictPending ? 'Envoi…' : 'Joindre'}
+                </Text>
+              </Pressable>
+            </View>
             {verdictError && <Text style={styles.verdictPromptError}>{verdictError}</Text>}
           </View>
         )}
@@ -2032,6 +2065,9 @@ function createStyles(colors: Colors) {
   // `alignItems` par défaut (stretch) : `PhotoAttachButton` a besoin de la
   // pleine largeur pour que son aperçu (width: '100%') ait une base non nulle.
   verdictPhotoStep: { gap: 8 },
+  // Rien à envoyer tant qu'aucune photo n'est choisie : le bouton s'efface
+  // plutôt que de promettre une action qui ne ferait rien.
+  verdictPromptButtonDisabled: { opacity: 0.45 },
   verdictPhotoStepLabel: { fontSize: 12, color: colors.textMuted },
   // Photo-preuve du verdict — sous la lettre, même padding horizontal que le corps.
   // Fil épuré façon réseau social : les deux blocs restants (commentaire,

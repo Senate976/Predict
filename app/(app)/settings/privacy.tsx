@@ -18,7 +18,7 @@ import { useColors } from '../../../lib/themeMode';
  * « Un groupe » n'y figure pas — il désigne un groupe précis, qui se choisit
  * à chaque fois, pas un défaut global. */
 const OPTIONS: { value: PredictionScope; label: string; hint: string }[] = [
-  { value: 'circle', label: 'Tout mon Cercle', hint: 'Visible par tous mes amis acceptés.' },
+  { value: 'circle', label: 'Mon Cercle', hint: 'Visible par tous mes amis acceptés.' },
   { value: 'selected', label: 'Je choisis', hint: 'Je désigne un groupe ou des amis à chaque fois.' },
 ];
 

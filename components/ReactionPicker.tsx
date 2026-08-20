@@ -85,8 +85,10 @@ export function ReactionPicker({
         ) : (
           <ThumbsUp size={21} color={total > 0 ? colors.text : colors.textFaint} strokeWidth={1.75} />
         )}
+        {/* Le picto et son compte, sans le mot « Réagir » : un pouce n'a
+            pas besoin qu'on explique ce qu'il fait, et la carte du Fil ne
+            l'explique pas non plus. */}
         <Text style={[styles.triggerCount, total === 0 && styles.triggerCountEmpty]}>{total}</Text>
-        <Text style={styles.triggerLabel}>{mine ? 'Changer' : 'Réagir'}</Text>
       </Pressable>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
@@ -116,7 +118,6 @@ function createStyles(colors: Colors) {
     triggerEmoji: { fontSize: 21, lineHeight: 26 },
     triggerCount: { fontFamily: fonts.label, fontSize: 15, fontWeight: '700', color: colors.text },
     triggerCountEmpty: { color: colors.textFaint },
-    triggerLabel: { fontFamily: fonts.bodyEmphasis, fontSize: 15, color: colors.textMuted },
     backdrop: {
       flex: 1,
       backgroundColor: 'rgba(28, 39, 55, 0.55)',
