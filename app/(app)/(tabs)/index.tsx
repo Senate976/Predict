@@ -22,7 +22,8 @@ import { Text } from '../../../components/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
-import { Bookshelf, type ShelfBook } from '../../../components/Bookshelf';
+import type { ShelfBook } from '../../../components/Bookshelf';
+import { Library } from '../../../components/Library';
 import { CelebrationBurst } from '../../../components/CelebrationBurst';
 import { PredictWord } from '../../../components/PredictWord';
 import { WelcomeOnboarding } from '../../../components/WelcomeOnboarding';
@@ -530,43 +531,47 @@ export default function HomeScreen() {
           <ActivityIndicator style={styles.loader} color={colors.text} />
         ) : (
           <>
-            {/* Quatre caissons, deux par deux. Chacun garde sa place même
-                vide : une bibliothèque dont les rayons se déplacent selon ce
-                qu'on y range ne se mémorise pas, et c'est la mémoire du meuble
-                qui fait qu'on sait où aller sans lire les intitulés. */}
-            <View style={styles.shelfRow}>
-              <Bookshelf
-                title="Scellées"
-                books={rayonScellees.map(enLivre)}
-                emptyLabel="Aucun secret en attente."
-                onPressBook={ouvrirLivre}
-                onPressMore={() => router.push('/rayon/scellees')}
-              />
-              <Bookshelf
-                title="Les miennes"
-                books={rayonMiennes.map(enLivre)}
-                emptyLabel="Tu ne gardes aucun secret."
-                onPressBook={ouvrirLivre}
-                onPressMore={() => router.push('/rayon/miennes')}
-              />
-            </View>
+            {/* UN SEUL MEUBLE, pas quatre boîtes. La corniche, les montants,
+                les tablettes et la plinthe sont dessinés dans `Library` : ce
+                sont eux qui font la bibliothèque, pas les caissons.
 
-            <View style={styles.shelfRow}>
-              <Bookshelf
-                title="Révélées"
-                books={rayonRevelees.map(enLivre)}
-                emptyLabel="Rien n'est encore sorti."
-                onPressBook={ouvrirLivre}
-                onPressMore={() => router.push('/rayon/revelees')}
-              />
-              <Bookshelf
-                title="Sondages"
-                books={rayonSondages.map(enLivre)}
-                emptyLabel="Aucune question posée."
-                onPressBook={ouvrirLivre}
-                onPressMore={() => router.push('/rayon/sondages')}
-              />
-            </View>
+                Les quatre rayons gardent leur place même vides — une
+                bibliothèque dont les étagères se déplacent selon ce qu'on y
+                range ne se mémorise pas, et c'est la mémoire du meuble qui
+                fait qu'on sait où aller sans lire les plaques. */}
+            <Library
+              onPressBook={ouvrirLivre}
+              bays={[
+                {
+                  key: 'scellees',
+                  label: 'Scellées',
+                  books: rayonScellees.map(enLivre),
+                  emptyLabel: 'Aucun secret en attente.',
+                  onPressMore: () => router.push('/rayon/scellees'),
+                },
+                {
+                  key: 'miennes',
+                  label: 'Les miennes',
+                  books: rayonMiennes.map(enLivre),
+                  emptyLabel: 'Tu ne gardes aucun secret.',
+                  onPressMore: () => router.push('/rayon/miennes'),
+                },
+                {
+                  key: 'revelees',
+                  label: 'Révélées',
+                  books: rayonRevelees.map(enLivre),
+                  emptyLabel: "Rien n'est encore sorti.",
+                  onPressMore: () => router.push('/rayon/revelees'),
+                },
+                {
+                  key: 'sondages',
+                  label: 'Sondages',
+                  books: rayonSondages.map(enLivre),
+                  emptyLabel: 'Aucune question posée.',
+                  onPressMore: () => router.push('/rayon/sondages'),
+                },
+              ]}
+            />
           </>
         )}
       </ScrollView>
@@ -577,8 +582,6 @@ export default function HomeScreen() {
 function createStyles(colors: Colors) {
   return StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
-  // Deux caissons par rangée, de largeur égale : c'est la grille du meuble.
-  shelfRow: { flexDirection: 'row', gap: 12, marginBottom: 14 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -726,7 +729,9 @@ function createStyles(colors: Colors) {
     borderBottomColor: colors.border,
   },
   menuBackText: { fontSize: 14, fontWeight: '700', color: colors.text },
-  scroll: { padding: spacing.lg, paddingBottom: 88, flexGrow: 1 },
+  // Marge latérale resserrée : le meuble occupe la pièce, il ne flotte pas au
+  // milieu d'une page.
+  scroll: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: 88, flexGrow: 1 },
   loader: { marginTop: 32 },
   empty: { paddingVertical: 24, alignItems: 'center' },
   emptyTitle: { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 6 },
