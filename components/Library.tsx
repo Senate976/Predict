@@ -361,6 +361,7 @@ function Bay({
               accessibilityRole="button"
               accessibilityLabel={`Voir les ${reste} autres`}
             >
+              <View style={styles.serreBiseau} pointerEvents="none" />
               <Text style={styles.serreSigne}>+</Text>
               <Text style={styles.serreCompte}>{reste}</Text>
             </Pressable>
@@ -417,18 +418,24 @@ function createStyles(colors: Colors, b: ReturnType<typeof bois>) {
     vide: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
     videTexte: { fontFamily: fonts.label, fontSize: 12, color: 'rgba(122, 184, 194, 0.5)', textAlign: 'center' },
 
+    /* LE SERRE-LIVRES. En pointillé fin, il disparaissait : on ne voyait plus
+       qu'un trait, alors que c'est LUI qui donne accès au reste du rayon.
+       C'est maintenant une pièce de laiton pleine, de la largeur d'un livre,
+       posée au bout de la rangée — impossible à manquer, et cohérente avec
+       les plaques gravées du meuble. */
     serreLivres: {
-      width: 32,
-      borderWidth: 1.5,
-      borderStyle: 'dashed',
-      borderColor: b.laiton,
+      width: 40,
+      backgroundColor: b.laiton,
+      borderWidth: 1,
+      borderColor: b.laitonMat,
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 2,
-      opacity: 0.85,
+      gap: 1,
+      boxShadow: [{ offsetX: 1, offsetY: 2, blurRadius: 4, color: 'rgba(20, 29, 40, 0.4)' }],
     },
-    serreSigne: { fontFamily: fonts.display, fontSize: 19, color: b.laiton, lineHeight: 21 },
-    serreCompte: { fontFamily: fonts.label, fontSize: 11, color: b.laiton },
+    serreBiseau: { position: 'absolute', left: 0, right: 0, top: 0, height: 2, backgroundColor: '#fbe0a8', opacity: 0.85 },
+    serreSigne: { fontFamily: fonts.display, fontSize: 24, color: '#241a08', lineHeight: 26 },
+    serreCompte: { fontFamily: fonts.label, fontSize: 12, color: '#241a08', fontWeight: '700' },
 
     tablette: { width: '100%' },
     tabletteNez: { height: 3, backgroundColor: b.vif },

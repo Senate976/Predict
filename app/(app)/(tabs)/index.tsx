@@ -551,7 +551,7 @@ export default function HomeScreen() {
                 },
                 {
                   key: 'miennes',
-                  label: 'Les miennes',
+                  label: 'Mes predicts',
                   books: rayonMiennes.map(enLivre),
                   emptyLabel: 'Tu ne gardes aucun secret.',
                   onPressMore: () => router.push('/rayon/miennes'),
