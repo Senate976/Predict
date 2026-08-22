@@ -152,7 +152,7 @@ function Ombre({ inverse = false }: { inverse?: boolean }) {
 /** Le papier et le cuir. Fixes : un livre garde sa matière quel que soit le
  *  thème — c'est un objet, pas une surface d'interface. */
 const PAPIER = '#fbf7ee';
-const COUV = '#6d3b2a';
+const COUV = '#5c2d2b';
 
 function createStyles(colors: Colors) {
   const papier = PAPIER;

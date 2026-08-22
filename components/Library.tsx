@@ -43,28 +43,38 @@ import { useColors } from '../lib/themeMode';
 /**
  * LE BOIS.
  *
- * Le meuble était en bleu d'ardoise — la couleur d'un vestiaire d'atelier,
- * pas d'une bibliothèque. Un meuble où l'on confie des secrets doit être
- * CHAUD : c'est la chaleur qui dit qu'on est à l'abri.
+ * Un meuble où l'on confie des secrets doit être CHAUD : c'est la chaleur qui
+ * dit qu'on est à l'abri. Mais chaud ne veut pas dire JAUNE.
  *
- * La rampe ci-dessous est l'or de la charte (#eca835) descendu dans l'ombre :
- * même dominante, même famille, mais du fauve au tabac brûlé. Elle ne dépend
- * PAS du thème clair/sombre — un meuble ne change pas d'essence quand on
- * allume la lumière, il change seulement d'éclairage, et c'est le fond des
- * niches qui s'en charge.
+ * La rampe précédente était trop claire et trop saturée : elle donnait du pin
+ * verni, et surtout elle mettait le meuble sur la même note que l'or de la
+ * charte. Tout devenait jaune — le bois, les plaques, le serre-livres, les
+ * portraits — et l'or, étalé partout, ne signalait plus rien.
+ *
+ * Celle-ci est un noyer sombre et ÉTEINT : la même famille chaude, mais
+ * désaturée et descendue de plusieurs crans. Le bois se tait pour que la
+ * lumière, les cuirs et les rares points d'or puissent parler.
+ *
+ * Elle ne dépend PAS du thème clair/sombre : un meuble ne change pas
+ * d'essence quand on allume la lumière, il change seulement d'éclairage — et
+ * c'est le fond des niches qui s'en charge.
  */
 function bois() {
   return {
-    vif: '#c49a5c',     // l'arête qui prend la lumière
-    lumiere: '#a37c42',
-    clair: '#805c31',
-    corps: '#654626',   // le ton du meuble
-    creux: '#4a341c',
-    ombre: '#332314',
-    nuit: '#180f07',    // le fond des niches
-    laiton: '#eca835',
-    laitonVif: '#fbdd99',
-    laitonMat: '#a8761f',
+    vif: '#8a7360',     // l'arête qui prend la lumière
+    lumiere: '#6e5a49',
+    clair: '#57463a',
+    corps: '#43352b',   // le ton du meuble
+    creux: '#33281f',
+    ombre: '#241c16',
+    nuit: '#120e0b',    // le fond des niches
+    // L'or ne sert plus qu'aux filets. `bronze` remplace le laiton partout
+    // où il faisait une surface : plaques, serre-livres.
+    or: '#c9a24a',
+    bronze: '#2b2119',
+    bronzeClair: '#3a2d22',
+    bronzeArete: '#8a6f3c',
+    ivoire: '#e6dcc4',
   };
 }
 
@@ -81,10 +91,10 @@ function grain(i: number, graine: number): number {
 function Veinage({ graine, opacite = 1 }: { graine: number; opacite?: number }) {
   const filets = useMemo(
     () =>
-      Array.from({ length: 26 }, (_, i) => ({
+      Array.from({ length: 16 }, (_, i) => ({
         left: `${grain(i, graine) * 100}%`,
-        width: 0.5 + grain(i + 40, graine) * 2.2,
-        opacity: (0.04 + grain(i + 80, graine) * 0.09) * opacite,
+        width: 0.5 + grain(i + 40, graine) * 1.4,
+        opacity: (0.02 + grain(i + 80, graine) * 0.05) * opacite,
         sombre: grain(i + 120, graine) > 0.45,
       })),
     [graine, opacite]
@@ -100,7 +110,7 @@ function Veinage({ graine, opacite = 1 }: { graine: number; opacite?: number }) 
             bottom: 0,
             left: f.left as `${number}%`,
             width: f.width,
-            backgroundColor: f.sombre ? '#1a1006' : '#f0d9ab',
+            backgroundColor: f.sombre ? '#140f0a' : '#d9c6ac',
             opacity: f.opacity,
           }}
         />
@@ -200,7 +210,7 @@ export type LibraryBay = {
 };
 
 const PILASTRE = 16;
-/** Le jeu entre deux dos, et la largeur du serre-livres de laiton. */
+/** Le jeu entre deux dos, et la largeur du serre-livres de bronze. */
 const JEU = 3;
 const SERRE = 40;
 /** Retrait intérieur de la niche, de chaque côté. */
@@ -299,7 +309,7 @@ export function Library({
 
   return (
     <View style={styles.meuble} onLayout={(e) => setHauteur(e.nativeEvent.layout.height)}>
-      {/* LA CORNICHE — quatre moulures enchaînées, deux filets de laiton.
+      {/* LA CORNICHE — quatre moulures enchaînées, deux filets d'or fins.
           C'est la pièce qui donne sa noblesse au meuble : on la voit avant
           tout le reste. */}
       <View style={styles.corniche}>
@@ -413,11 +423,11 @@ function Bay({
           sens="v"
           bandes={22}
           etapes={[
-            { couleur: melangeCouleur(b.nuit, b.laiton, 0.34), a: 0 },
-            { couleur: melangeCouleur(b.nuit, b.laiton, 0.13), a: 0.14 },
+            { couleur: melangeCouleur(b.nuit, b.or, 0.2), a: 0 },
+            { couleur: melangeCouleur(b.nuit, b.or, 0.08), a: 0.14 },
             { couleur: b.nuit, a: 0.52 },
             { couleur: melangeCouleur(b.nuit, '#000000', 0.4), a: 0.86 },
-            { couleur: melangeCouleur(b.nuit, b.laiton, 0.08), a: 1 },
+            { couleur: melangeCouleur(b.nuit, b.or, 0.05), a: 1 },
           ]}
         />
       </View>
@@ -493,13 +503,14 @@ function Bay({
  *    largeur de son contenu, donc la plaque n'avait jamais deux fois la même
  *    taille. Elle a maintenant une largeur minimale, et le texte est centré
  *    dedans.
- * 2. Le contraste : gravé en presque-noir sur un laiton éclairci, et non plus
- *    en brun sur brun.
+ * 2. Le contraste : gravé en ivoire sur un bronze sombre. En noir sur laiton,
+ *    la plaque était certes lisible, mais six surfaces dorées par écran
+ *    jaunissaient tout le meuble et l'or cessait d'être un accent.
  * 3. La taille : 10 px espacés de 1,4, c'était un filigrane. On monte à 12,
  *    en gras.
  *
- * Le laiton est dégradé du plus clair en haut au plus mat en bas : c'est ce
- * qui fait une plaque polie plutôt qu'une étiquette jaune.
+ * Le bronze est dégradé du plus clair en haut au plus sombre en bas : c'est ce
+ * qui fait une plaque coulée plutôt qu'une étiquette collée.
  */
 function Plaque({
   texte,
@@ -516,9 +527,9 @@ function Plaque({
         sens="v"
         bandes={10}
         etapes={[
-          { couleur: b.laitonVif, a: 0 },
-          { couleur: b.laiton, a: 0.45 },
-          { couleur: b.laitonMat, a: 1 },
+          { couleur: b.bronzeClair, a: 0 },
+          { couleur: b.bronze, a: 0.5 },
+          { couleur: melangeCouleur(b.bronze, '#000000', 0.4), a: 1 },
         ]}
       />
       <View style={styles.plaqueBiseau} pointerEvents="none" />
@@ -543,8 +554,8 @@ function createStyles(colors: Colors, b: ReturnType<typeof bois>) {
     },
 
     corniche: { height: CORNICHE, backgroundColor: b.corps, overflow: 'hidden' },
-    filet: { height: 2, backgroundColor: b.laiton, opacity: 0.9 },
-    filetFin: { height: 1, backgroundColor: b.laitonMat, opacity: 0.75 },
+    filet: { height: 1.5, backgroundColor: b.or, opacity: 0.6 },
+    filetFin: { height: 1, backgroundColor: b.bronzeArete, opacity: 0.5 },
     cornicheAssise: { flex: 1, backgroundColor: b.clair },
 
     // Le corps se retire de 5 px de chaque côté : c'est ce retrait qui fait
@@ -562,31 +573,31 @@ function createStyles(colors: Colors, b: ReturnType<typeof bois>) {
     caisson: { flex: 1, justifyContent: 'flex-end', paddingHorizontal: RETRAIT, paddingBottom: 4 },
     plaqueTete: { position: 'absolute', left: 0, right: 0, top: 10, alignItems: 'center' },
     fond: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: b.nuit },
-    reglette: { position: 'absolute', left: 8, right: 8, top: 0, height: 2, backgroundColor: '#f7d089', opacity: 0.55 },
+    reglette: { position: 'absolute', left: 8, right: 8, top: 0, height: 2, backgroundColor: '#e8cf9e', opacity: 0.4 },
     plateau: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 3, backgroundColor: b.clair, opacity: 0.8 },
 
     rangeeLivres: { flexDirection: 'row', alignItems: 'flex-end', gap: JEU },
     vide: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, paddingTop: 26 },
-    videTexte: { fontFamily: fonts.label, fontSize: 12, color: 'rgba(232, 199, 148, 0.55)', textAlign: 'center' },
+    videTexte: { fontFamily: fonts.label, fontSize: 12, color: 'rgba(214, 201, 176, 0.42)', textAlign: 'center' },
 
     /* LE SERRE-LIVRES. En pointillé fin, il disparaissait : on ne voyait plus
        qu'un trait, alors que c'est LUI qui donne accès au reste du rayon.
-       C'est maintenant une pièce de laiton pleine, de la largeur d'un livre,
+       C'est maintenant une pièce de bronze pleine, de la largeur d'un livre,
        posée au bout de la rangée — impossible à manquer, et cohérente avec
        les plaques gravées du meuble. */
     serreLivres: {
       width: SERRE,
-      backgroundColor: b.laiton,
+      backgroundColor: b.bronzeClair,
       borderWidth: 1,
-      borderColor: b.laitonMat,
+      borderColor: b.bronzeArete,
       alignItems: 'center',
       justifyContent: 'center',
       gap: 1,
-      boxShadow: [{ offsetX: 1, offsetY: 2, blurRadius: 4, color: 'rgba(18, 10, 3, 0.45)' }],
+      boxShadow: [{ offsetX: 1, offsetY: 2, blurRadius: 4, color: 'rgba(10, 7, 5, 0.6)' }],
     },
-    serreBiseau: { position: 'absolute', left: 0, right: 0, top: 0, height: 2, backgroundColor: '#fff0cd', opacity: 0.9 },
-    serreSigne: { fontFamily: fonts.display, fontSize: 24, color: '#170e02', lineHeight: 26 },
-    serreCompte: { fontFamily: fonts.label, fontSize: 12, color: '#170e02', fontWeight: '800' },
+    serreBiseau: { position: 'absolute', left: 0, right: 0, top: 0, height: 2, backgroundColor: '#c2a271', opacity: 0.8 },
+    serreSigne: { fontFamily: fonts.display, fontSize: 24, color: b.ivoire, lineHeight: 26 },
+    serreCompte: { fontFamily: fonts.label, fontSize: 12, color: b.ivoire, fontWeight: '800' },
 
     tablette: { width: '100%' },
     tabletteNez: { height: 3, backgroundColor: b.vif },
@@ -602,20 +613,20 @@ function createStyles(colors: Colors, b: ReturnType<typeof bois>) {
       paddingHorizontal: 14,
       paddingVertical: 3,
       borderWidth: 1,
-      borderColor: '#6d4a12',
+      borderColor: b.bronzeArete,
       alignItems: 'center',
       justifyContent: 'center',
       overflow: 'hidden',
       boxShadow: [{ offsetX: 0, offsetY: 1, blurRadius: 3, color: 'rgba(12, 7, 3, 0.5)' }],
     },
     // Le biseau de la plaque : une lumière en haut, comme un métal poli.
-    plaqueBiseau: { position: 'absolute', left: 0, right: 0, top: 0, height: 1.5, backgroundColor: '#fff0cd', opacity: 0.9 },
-    vis: { position: 'absolute', top: '50%', marginTop: -1.25, width: 2.5, height: 2.5, borderRadius: 1.25, backgroundColor: '#5a3b0d', opacity: 0.5 },
+    plaqueBiseau: { position: 'absolute', left: 0, right: 0, top: 0, height: 1, backgroundColor: '#c2a271', opacity: 0.55 },
+    vis: { position: 'absolute', top: '50%', marginTop: -1.25, width: 2.5, height: 2.5, borderRadius: 1.25, backgroundColor: '#9c825a', opacity: 0.45 },
     plaqueTexte: {
       fontFamily: fonts.label,
       fontSize: 12,
       letterSpacing: 1.1,
-      color: '#170e02',
+      color: b.ivoire,
       fontWeight: '800',
       textAlign: 'center',
     },

@@ -8,32 +8,34 @@ import { fonts, type Colors } from '../lib/theme';
 /* ===========================================================================
  * LA TRANCHE DE LIVRE
  *
- * On remplace l'enveloppe par un livre rangé dans une bibliothèque : de face,
- * on n'en voit que la tranche, avec le nom de son auteur écrit de bas en haut
- * et son portrait en médaillon au pied.
+ * L'ANATOMIE, et c'est elle qui sépare un livre d'un rectangle de couleur.
+ * De haut en bas, un dos relié c'est :
  *
- * DEUX RÈGLES, et elles se contredisent en apparence :
+ *   1. LA TRANCHE DE TÊTE — le bloc de papier vu du dessus, en retrait des
+ *      plats. C'est LE détail qui dit « c'est une pile de feuilles » : sans
+ *      lui, on regarde un carré de cuir, pas un livre.
+ *   2. LA COIFFE — le cuir qui se replie sur le bloc, un bourrelet sombre.
+ *   3. LES NERFS — les nervures en travers du dos. Chacune est une arête
+ *      éclairée par-dessus et une ombre par-dessous. Elles sont la signature
+ *      d'une reliure ; deux bandes plates n'en sont que la caricature.
+ *   4. LES CAISSONS — les compartiments entre les nerfs. Le titre vit dans
+ *      l'un d'eux, jamais à cheval.
+ *   5. LES CHASSES — les plats débordent du bloc de papier, sur les deux
+ *      bords. Un liseré sombre de chaque côté, et le dos cesse d'être à ras.
  *
- * 1. TOUS LES LIVRES ONT LA MÊME HAUTEUR. Des dos de tailles inégales font
- *    une pile de brochures ; une reliure d'éditeur, elle, se range à hauteur
- *    constante. C'est cette régularité qui donne le sentiment de rangement —
- *    donc de sécurité — qu'on attend d'une bibliothèque.
+ * L'OR EST UN ACCENT, PAS UNE COULEUR DE FOND. Il ne sert qu'aux filets qui
+ * encadrent le titre et à la pastille du non-lu. Étalé partout, il jaunit
+ * l'étagère entière et ne signale plus rien.
  *
- * 2. TOUT LE RESTE VARIE, ET SE TIRE DE L'IDENTIFIANT : l'épaisseur du dos,
- *    le cuir, sa couleur. Jamais au hasard — un livre qui changerait d'aspect
- *    d'un écran à l'autre cesserait d'être reconnaissable. Le même Predict a
- *    donc toujours exactement le même dos.
- *
- * Les cuirs sont la charte prise dans la chaleur : l'or (#eca835) descendu
- * vers le fauve et le tabac, plus les deux bleus de la charte qui font les
- * quelques dos froids d'une vraie étagère. Une rangée uniquement bleue est
- * glaciale ; une rangée uniquement fauve est monotone.
+ * TOUS LES LIVRES ONT LA MÊME HAUTEUR. Ce qui varie — épaisseur, cuir — est
+ * TIRÉ DE L'IDENTIFIANT, jamais au hasard : le même Predict a toujours
+ * exactement le même dos.
  * ========================================================================= */
 
 /** Hauteur de référence d'une tranche, quand la niche n'en impose pas. */
 export const SPINE_HEIGHT = 172;
-/** Un dos de livre est BEAUCOUP plus haut que large : en dessous de ce
- *  rapport (environ 1 pour 4), on lit une tuile, pas une tranche. */
+/** Un dos est BEAUCOUP plus haut que large : sous un rapport d'environ
+ *  1 pour 4, on lit une tuile, pas une tranche. */
 const SPINE_MIN_WIDTH = 32;
 const SPINE_MAX_WIDTH = 48;
 
@@ -43,52 +45,6 @@ function hash(id: string): number {
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
   return h;
 }
-
-type SpineSkin = {
-  /** Le cuir du dos. */
-  cloth: string;
-  /** Caissons en tête et en pied — la bande sombre des vraies reliures. */
-  band: string;
-  /** Filets dorés qui encadrent les caissons. */
-  rule: string;
-  /** Couleur du titre, choisie pour rester lisible sur `cloth`. */
-  ink: string;
-};
-
-/** Six reliures. Quatre cuirs chauds, deux dos froids de la charte — et
- *  chacune porte son propre contraste de titre, jamais deviné à l'exécution. */
-function skins(): SpineSkin[] {
-  const or = '#eca835';
-  /* Six cuirs, et ce qui compte est qu'ils soient ÉCARTÉS. Trois bruns
-     voisins font une rangée de cartons ; il faut un clair, un très sombre,
-     un rouge et un froid pour qu'une étagère respire. */
-  return [
-    { cloth: '#8a4f2c', band: '#5a3018', rule: or, ink: '#f7ead2' }, // fauve
-    { cloth: '#426170', band: '#2b4450', rule: or, ink: '#f9fcfe' }, // bleu charte
-    { cloth: '#b9862f', band: '#7d5619', rule: '#2a1a08', ink: '#241505' }, // or ciré
-    { cloth: '#7b2f28', band: '#4a1a16', rule: or, ink: '#f4e2c8' }, // bordeaux
-    { cloth: '#1c2737', band: '#0e1620', rule: or, ink: '#f9fcfe' }, // encre charte
-    { cloth: '#cbb98d', band: '#94805a', rule: '#4a3a1c', ink: '#2a1a08' }, // vélin
-  ];
-}
-
-export type BookSpineProps = {
-  /** Sert d'empreinte : c'est lui qui fixe l'aspect du dos, pour toujours. */
-  id: string;
-  /** Écrit de bas en haut sur la tranche, comme un titre de vrai livre. */
-  authorName: string;
-  authorAvatarUrl?: string | null;
-  /** Le livre demande un geste : un liseré doré le détache de la rangée.
-   *  PAS une hauteur différente — les livres sont tous à la même hauteur, et
-   *  c'est la lumière sur le liseré qui attire l'œil, pas une bosse. */
-  highlighted?: boolean;
-  /** Jamais lu : une pastille dorée en tête de tranche. */
-  unread?: boolean;
-  /** Hauteur imposée par la niche qui les accueille. Elle vaut pour TOUS les
-   *  livres de la rangée, sans exception. */
-  baseHeight?: number;
-  colors: Colors;
-};
 
 /**
  * L'épaisseur exacte d'un dos, sans avoir à le rendre.
@@ -101,6 +57,55 @@ export type BookSpineProps = {
 export function spineWidth(id: string): number {
   return SPINE_MIN_WIDTH + (hash(id) % (SPINE_MAX_WIDTH - SPINE_MIN_WIDTH + 1));
 }
+
+type SpineSkin = {
+  /** Le cuir du dos. */
+  cuir: string;
+  /** La tranche du bloc de papier, vue de tête. Jamais blanche : un papier
+   *  vieilli est ivoire, et un papier blanc pur fait du néon sur l'étagère. */
+  papier: string;
+  /** Couleur du titre, choisie pour rester lisible sur `cuir`. */
+  encre: string;
+};
+
+/**
+ * Six cuirs, et ce qui compte est qu'ils soient ÉCARTÉS ET ÉTEINTS.
+ *
+ * Écartés : un oxblood, un bleu, un fauve, un bleu-vert, une encre, un vélin.
+ * Trois bruns voisins font une rangée de cartons.
+ *
+ * Éteints : aucun n'est saturé. Une reliure ancienne est passée — c'est la
+ * lumière de la niche qui la réveille, pas le pigment. Des cuirs vifs sur un
+ * bois vif donnent une vitrine de bonbons.
+ */
+function skins(): SpineSkin[] {
+  return [
+    { cuir: '#6b3330', papier: '#d8cdb4', encre: '#e8dcc4' }, // oxblood
+    { cuir: '#3a5261', papier: '#d5cfc0', encre: '#eef3f6' }, // bleu charte éteint
+    { cuir: '#7a6242', papier: '#ddd3ba', encre: '#f6efdf' }, // fauve
+    { cuir: '#2f4a52', papier: '#d3cfc2', encre: '#e9f1f2' }, // bleu-vert
+    { cuir: '#1c2737', papier: '#cec9bc', encre: '#f9fcfe' }, // encre charte
+    { cuir: '#b3a689', papier: '#e3dcc8', encre: '#2c2418' }, // vélin
+  ];
+}
+
+export type BookSpineProps = {
+  /** Sert d'empreinte : c'est lui qui fixe l'aspect du dos, pour toujours. */
+  id: string;
+  /** Écrit de bas en haut sur la tranche, comme un titre de vrai livre. */
+  authorName: string;
+  authorAvatarUrl?: string | null;
+  /** Le livre demande un geste : un liseré doré le détache de la rangée.
+   *  PAS une hauteur différente — les livres sont tous à la même hauteur. */
+  highlighted?: boolean;
+  /** Jamais lu : un clou doré dans le caisson de tête. */
+  unread?: boolean;
+  /** Hauteur imposée par la niche. Elle vaut pour TOUS les livres. */
+  baseHeight?: number;
+  colors: Colors;
+};
+
+const OR = '#c9a24a';
 
 export function BookSpine({
   id,
@@ -119,105 +124,119 @@ export function BookSpine({
   const width = spineWidth(id);
   const height = baseHeight;
 
-  /* Les caissons de tête et de pied suivent la taille du livre : figés, ils
-     devenaient des liserés ridicules sur une grande tranche et mangeaient
-     tout sur une petite. Le pied est plus haut : c'est lui qui porte le
-     portrait. */
-  const bandeTete = Math.round(Math.max(14, Math.min(26, height * 0.09)));
-  const bandePied = Math.round(Math.max(30, Math.min(46, height * 0.18)));
-  const medaillon = Math.max(16, Math.min(width - 10, bandePied - 14));
+  const caissonTete = Math.round(Math.max(10, Math.min(20, height * 0.07)));
+  const caissonPied = Math.round(Math.max(28, Math.min(42, height * 0.17)));
+  const medaillon = Math.max(15, Math.min(width - 13, caissonPied - 15));
 
   return (
-    <View
-      style={[
-        styles.spine,
-        {
-          width,
-          height,
-          borderColor: highlighted ? '#eca835' : 'transparent',
-          borderWidth: highlighted ? 2 : 0,
-        },
-      ]}
-    >
-      {/* LE BOMBÉ DU DOS, et c'est tout ce qui sépare un livre d'une case.
-          Un dos de livre est une surface CYLINDRIQUE : la lumière vient de la
-          gauche, frappe l'arête, glisse en une bande claire un peu avant le
-          milieu, puis s'éteint jusqu'au bord droit où le voisin fait de
-          l'ombre. Cinq étapes suffisent à décrire cette courbe ; un aplat
-          n'en décrit aucune. */}
-      <Degrade
-        sens="h"
-        bandes={18}
-        etapes={[
-          { couleur: melange(skin.cloth, '#000000', 0.38), a: 0 },
-          { couleur: melange(skin.cloth, '#ffe6bd', 0.22), a: 0.16 },
-          { couleur: skin.cloth, a: 0.46 },
-          { couleur: melange(skin.cloth, '#000000', 0.2), a: 0.78 },
-          { couleur: melange(skin.cloth, '#000000', 0.46), a: 1 },
+    <View style={[styles.enveloppe, { width, height }]}>
+      {/* LA TRANCHE DE TÊTE — le bloc de papier, en retrait des plats. Elle
+          est posée AU-DESSUS du dos, pas dedans : c'est ce décalage qui fait
+          qu'on regarde le livre légèrement de haut, et donc qu'on voit un
+          volume plutôt qu'une façade. */}
+      <View style={styles.tranche}>
+        <Degrade
+          sens="h"
+          bandes={10}
+          etapes={[
+            { couleur: melange(skin.papier, '#000000', 0.34), a: 0 },
+            { couleur: skin.papier, a: 0.3 },
+            { couleur: melange(skin.papier, '#000000', 0.22), a: 1 },
+          ]}
+        />
+      </View>
+
+      <View
+        style={[
+          styles.dos,
+          {
+            borderColor: highlighted ? OR : 'transparent',
+            borderWidth: highlighted ? 1.5 : 0,
+          },
         ]}
-      />
-      {/* Le grain du cuir : quelques filets horizontaux à peine visibles.
-          Un cuir parfaitement lisse est du plastique. */}
-      <Grain hauteur={height} />
-
-      {/* Caisson de tête : bande sombre + filet doré, la signature d'une
-          reliure. Le même en pied, pour que la tranche ait deux bouts. */}
-      <View style={[styles.band, { height: bandeTete }]}>
+      >
+        {/* LE BOMBÉ DU DOS. Un dos de livre est CYLINDRIQUE : la lumière vient
+            de la gauche, frappe l'arête, glisse en une bande claire un peu
+            avant le milieu, puis s'éteint vers le bord droit où le voisin
+            fait de l'ombre. Un aplat ne décrit aucune de ces étapes. */}
         <Degrade
           sens="h"
-          bandes={12}
+          bandes={18}
           etapes={[
-            { couleur: melange(skin.band, '#000000', 0.32), a: 0 },
-            { couleur: melange(skin.band, '#ffe6bd', 0.16), a: 0.18 },
-            { couleur: skin.band, a: 0.5 },
-            { couleur: melange(skin.band, '#000000', 0.4), a: 1 },
+            { couleur: melange(skin.cuir, '#000000', 0.46), a: 0 },
+            { couleur: melange(skin.cuir, '#ffe9c9', 0.2), a: 0.18 },
+            { couleur: skin.cuir, a: 0.48 },
+            { couleur: melange(skin.cuir, '#000000', 0.24), a: 0.78 },
+            { couleur: melange(skin.cuir, '#000000', 0.52), a: 1 },
           ]}
         />
-        {unread && <View style={styles.unreadDot} />}
-      </View>
-      <View style={[styles.rule, { backgroundColor: skin.rule }]} />
+        <Grain hauteur={height} />
 
-      {/* LE TITRE, de bas en haut. `rotate: -90deg` sur un bloc dont on a fixé
-          la largeur à la hauteur disponible : c'est ce qui permet au texte de
-          courir sur toute la tranche au lieu d'être coupé à sa largeur. */}
-      <View style={styles.titleZone}>
-        <View style={[styles.titleRotor, { width: Math.max(40, height - bandeTete - bandePied - 16) }]}>
-          <Text style={[styles.title, { color: skin.ink }]} numberOfLines={1}>
-            {authorName}
-          </Text>
+        {/* LA COIFFE : le cuir qui se replie sur le bloc de papier. */}
+        <View style={styles.coiffe} pointerEvents="none" />
+
+        <View style={[styles.caisson, { height: caissonTete }]}>
+          {unread && <View style={styles.clou} />}
         </View>
-      </View>
 
-      <View style={[styles.rule, { backgroundColor: skin.rule }]} />
-      <View style={[styles.band, { height: bandePied }]}>
-        <Degrade
-          sens="h"
-          bandes={12}
-          etapes={[
-            { couleur: melange(skin.band, '#000000', 0.32), a: 0 },
-            { couleur: melange(skin.band, '#ffe6bd', 0.16), a: 0.18 },
-            { couleur: skin.band, a: 0.5 },
-            { couleur: melange(skin.band, '#000000', 0.4), a: 1 },
-          ]}
-        />
-        <Medaillon url={authorAvatarUrl} nom={authorName} taille={medaillon} styles={styles} />
-      </View>
+        <Nerf cuir={skin.cuir} />
 
-      {/* La coiffe : le tout petit renflement de cuir en haut et en bas d'un
-          dos relié. Deux traits, mais ce sont eux qui ferment l'objet. */}
-      <View style={styles.coiffe} pointerEvents="none" />
-      <View style={styles.coiffeBas} pointerEvents="none" />
+        {/* LE CAISSON DU TITRE, encadré de ses deux filets d'or — le seul or
+            de tout l'objet. `rotate: -90deg` sur un bloc dont on fixe la
+            largeur à la hauteur disponible : c'est ce qui permet au texte de
+            courir sur toute la tranche au lieu d'être coupé à sa largeur. */}
+        <View style={styles.filet} />
+        <View style={styles.titreCaisson}>
+          <View style={[styles.rotor, { width: Math.max(40, height - caissonTete - caissonPied - 40) }]}>
+            <Text style={[styles.titre, { color: skin.encre }]} numberOfLines={1}>
+              {authorName}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.filet} />
+
+        <Nerf cuir={skin.cuir} />
+
+        <View style={[styles.caisson, { height: caissonPied }]}>
+          <Medaillon url={authorAvatarUrl} nom={authorName} taille={medaillon} styles={styles} />
+        </View>
+
+        {/* LA COIFFE DE PIED, et les CHASSES : les plats débordent du bloc,
+            sur les deux bords. Sans elles le dos est à ras et se lit comme
+            une bande découpée. */}
+        <View style={styles.coiffeBas} pointerEvents="none" />
+        <View style={styles.chasseGauche} pointerEvents="none" />
+        <View style={styles.chasseDroite} pointerEvents="none" />
+      </View>
     </View>
   );
 }
 
 /**
- * LE MÉDAILLON : le portrait de l'auteur, serti d'un jonc de laiton au pied
- * du dos, comme une pièce rapportée sur une reliure.
+ * UN NERF : la nervure en travers du dos.
  *
- * Il ne réutilise pas `<Avatar>` : le repli de celui-ci pose l'initiale sur
- * un fond très pâle, invisible au fond d'une niche sombre. Ici l'initiale est
- * gravée en sombre sur laiton — le même contraste que les plaques du meuble.
+ * Trois traits, et l'ordre compte : une arête claire dessus, le renflement du
+ * cuir, une ombre dessous. C'est le relief qui vient de la lumière, pas d'une
+ * bordure — une simple ligne sombre ne ferait qu'une rayure.
+ */
+function Nerf({ cuir }: { cuir: string }) {
+  return (
+    <View style={{ width: '100%' }} pointerEvents="none">
+      <View style={{ height: 1, backgroundColor: melange(cuir, '#000000', 0.4) }} />
+      <View style={{ height: 1.5, backgroundColor: melange(cuir, '#ffe9c9', 0.34) }} />
+      <View style={{ height: 3, backgroundColor: melange(cuir, '#ffe9c9', 0.12) }} />
+      <View style={{ height: 2, backgroundColor: melange(cuir, '#000000', 0.34) }} />
+    </View>
+  );
+}
+
+/**
+ * LE MÉDAILLON : le portrait de l'auteur au pied du dos.
+ *
+ * Il ne réutilise pas `<Avatar>` : le repli de celui-ci pose l'initiale sur un
+ * fond très pâle, invisible au fond d'une niche sombre. Le jonc est sombre et
+ * non doré — un cercle d'or à chaque pied faisait six taches jaunes par
+ * étagère, et l'or ne signalait plus rien.
  */
 function Medaillon({
   url,
@@ -231,7 +250,7 @@ function Medaillon({
   styles: ReturnType<typeof createStyles>;
 }) {
   const rond = { width: taille, height: taille, borderRadius: taille / 2 };
-  const jonc = taille + 4;
+  const jonc = taille + 3;
   return (
     <View style={[styles.jonc, { width: jonc, height: jonc, borderRadius: jonc / 2 }]}>
       {url ? (
@@ -248,14 +267,15 @@ function Medaillon({
 }
 
 /** Le grain du cuir : des filets horizontaux d'opacité irrégulière, tirés
- *  d'une graine fixe pour ne pas danser d'un rendu à l'autre. */
+ *  d'une graine fixe pour ne pas danser d'un rendu à l'autre. Un cuir
+ *  parfaitement lisse est du plastique. */
 function Grain({ hauteur }: { hauteur: number }) {
   const filets = useMemo(() => {
-    const n = Math.max(6, Math.round(hauteur / 14));
+    const n = Math.max(6, Math.round(hauteur / 16));
     return Array.from({ length: n }, (_, i) => {
       const x = Math.sin((i + 1) * 91.7) * 43758.5453;
       const r = x - Math.floor(x);
-      return { top: `${(i / n) * 100 + r * 3}%`, opacity: 0.04 + r * 0.05, sombre: r > 0.5 };
+      return { top: `${(i / n) * 100 + r * 3}%`, opacity: 0.03 + r * 0.04, sombre: r > 0.5 };
     });
   }, [hauteur]);
   return (
@@ -269,7 +289,7 @@ function Grain({ hauteur }: { hauteur: number }) {
             right: 0,
             top: f.top as `${number}%`,
             height: 1,
-            backgroundColor: f.sombre ? '#000000' : '#ffe6bd',
+            backgroundColor: f.sombre ? '#000000' : '#ffe9c9',
             opacity: f.opacity,
           }}
         />
@@ -280,53 +300,61 @@ function Grain({ hauteur }: { hauteur: number }) {
 
 function createStyles(colors: Colors) {
   return StyleSheet.create({
-    spine: {
-      borderRadius: 3,
+    // L'enveloppe porte l'ombre ; le dos porte le cuir. Les séparer permet à
+    // la tranche de papier de dépasser en tête sans sortir du cadre coupé.
+    enveloppe: {
+      boxShadow: [{ offsetX: 2, offsetY: 3, blurRadius: 8, color: 'rgba(10, 7, 5, 0.6)' }],
+    },
+    tranche: { height: 4, marginHorizontal: 2, overflow: 'hidden' },
+    dos: {
+      flex: 1,
       overflow: 'hidden',
       alignItems: 'center',
       justifyContent: 'space-between',
-      // Le livre projette son ombre sur son voisin de droite et sur la
-      // tablette : c'est ce décalage qui les décolle les uns des autres.
-      boxShadow: [{ offsetX: 3, offsetY: 3, blurRadius: 7, color: 'rgba(12, 7, 3, 0.6)' }],
+      borderTopLeftRadius: 2,
+      borderTopRightRadius: 2,
     },
-    // Caissons volontairement fins : ce sont des filets de reliure, pas des
-    // bandeaux. Épais, ils mangeaient la tranche et écrasaient le titre.
-    band: { width: '100%', alignItems: 'center', justifyContent: 'center' },
-    rule: { width: '100%', height: 1.5, opacity: 0.9 },
-    titleZone: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+
+    caisson: { width: '100%', alignItems: 'center', justifyContent: 'center' },
+    // Les filets d'or : fins, discrets, et les SEULS de tout l'objet.
+    filet: { width: '100%', height: 1, backgroundColor: OR, opacity: 0.55 },
+    titreCaisson: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     // Tourné d'un quart de tour vers la gauche : le texte se lit du bas vers
     // le haut, comme sur les reliures françaises.
-    titleRotor: { transform: [{ rotate: '-90deg' }], alignItems: 'center' },
-    title: {
+    rotor: { transform: [{ rotate: '-90deg' }], alignItems: 'center' },
+    titre: {
       fontFamily: fonts.display,
-      fontSize: 13,
-      letterSpacing: 0.4,
+      fontSize: 12.5,
+      letterSpacing: 0.5,
       textAlign: 'center',
     },
-    unreadDot: {
-      width: 6,
-      height: 6,
-      borderRadius: 3,
-      backgroundColor: '#eca835',
+
+    // Le non-lu : un clou doré planté dans le caisson de tête. Petit, mais
+    // c'est le seul point de lumière franche du dos — donc on ne voit que lui.
+    clou: {
+      width: 5,
+      height: 5,
+      borderRadius: 2.5,
+      backgroundColor: OR,
+      boxShadow: [{ offsetX: 0, offsetY: 0, blurRadius: 4, color: 'rgba(201, 162, 74, 0.9)' }],
     },
 
     jonc: {
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#eca835',
-      boxShadow: [{ offsetX: 0, offsetY: 1, blurRadius: 3, color: 'rgba(12, 7, 3, 0.55)' }],
+      backgroundColor: 'rgba(10, 7, 5, 0.55)',
     },
-    portrait: { backgroundColor: '#2a1a08' },
-    initialeFond: { backgroundColor: '#f4c463', alignItems: 'center', justifyContent: 'center' },
-    initiale: { color: '#2a1a08', fontWeight: '800', fontFamily: fonts.display },
+    portrait: { backgroundColor: '#2a211b' },
+    initialeFond: { backgroundColor: '#cabca0', alignItems: 'center', justifyContent: 'center' },
+    initiale: { color: '#2c2418', fontWeight: '800', fontFamily: fonts.display },
 
     coiffe: {
       position: 'absolute',
       left: 0,
       right: 0,
       top: 0,
-      height: 1.5,
-      backgroundColor: 'rgba(255, 236, 205, 0.34)',
+      height: 2,
+      backgroundColor: 'rgba(10, 7, 5, 0.5)',
     },
     coiffeBas: {
       position: 'absolute',
@@ -334,7 +362,23 @@ function createStyles(colors: Colors) {
       right: 0,
       bottom: 0,
       height: 2,
-      backgroundColor: 'rgba(12, 7, 3, 0.5)',
+      backgroundColor: 'rgba(10, 7, 5, 0.5)',
+    },
+    chasseGauche: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      left: 0,
+      width: 1,
+      backgroundColor: 'rgba(255, 233, 201, 0.16)',
+    },
+    chasseDroite: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      right: 0,
+      width: 1.5,
+      backgroundColor: 'rgba(10, 7, 5, 0.5)',
     },
   });
 }
