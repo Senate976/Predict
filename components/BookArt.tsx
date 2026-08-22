@@ -26,8 +26,8 @@ export const SPINE_HEIGHT = 172;
 /** Largeur de référence. Un dos de livre est BEAUCOUP plus haut que large :
  *  en dessous de ce rapport (environ 1 pour 4), on lit une tuile, pas une
  *  tranche. */
-const SPINE_MIN_WIDTH = 26;
-const SPINE_MAX_WIDTH = 38;
+const SPINE_MIN_WIDTH = 32;
+const SPINE_MAX_WIDTH = 48;
 
 /** Empreinte stable et bornée, tirée de l'identifiant. */
 function hash(id: string): number {
@@ -71,6 +71,11 @@ export type BookSpineProps = {
   highlighted?: boolean;
   /** Jamais lu : une pastille dorée en tête de tranche. */
   unread?: boolean;
+  /** Hauteur de référence, imposée par la niche qui les accueille. La
+   *  variation propre à chaque livre se prend autour de cette valeur. Sans
+   *  elle, des tranches de taille fixe laisseraient un vide au-dessus d'elles
+   *  dans un meuble qui, lui, s'adapte à l'écran. */
+  baseHeight?: number;
   colors: Colors;
 };
 
@@ -80,6 +85,7 @@ export function BookSpine({
   authorAvatarUrl,
   highlighted = false,
   unread = false,
+  baseHeight = SPINE_HEIGHT,
   colors,
 }: BookSpineProps) {
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -90,7 +96,17 @@ export function BookSpine({
   const width = SPINE_MIN_WIDTH + (h % (SPINE_MAX_WIDTH - SPINE_MIN_WIDTH + 1));
   // Les livres n'ont pas tous la même taille, mais ils reposent tous sur la
   // même étagère : la variation se prend EN HAUT, jamais en bas.
-  const height = SPINE_HEIGHT - ((h >> 3) % 22) + (highlighted ? 12 : 0);
+  // La variation reste proportionnelle : un livre est plus court d'un
+  // douzième environ, pas de 22 pixels — sinon la rangée se tasse dès que la
+  // niche grandit.
+  const height =
+    baseHeight - ((h >> 3) % Math.max(8, Math.round(baseHeight / 8))) + (highlighted ? 10 : 0);
+  /* Les caissons de tête et de pied suivent la taille du livre : figés, ils
+     devenaient des liserés ridicules sur une grande tranche et mangeaient
+     tout sur une petite. Un tiers de la largeur pour la tête, un peu plus
+     pour le pied, qui porte l'avatar. */
+  const bandeTete = Math.round(Math.max(14, Math.min(26, height * 0.09)));
+  const bandePied = Math.round(Math.max(24, Math.min(40, height * 0.15)));
 
   return (
     <View
@@ -107,7 +123,7 @@ export function BookSpine({
     >
       {/* Caisson de tête : bande sombre + filet doré, la signature d'une
           reliure. Le même en pied, pour que la tranche ait deux bouts. */}
-      <View style={[styles.band, { backgroundColor: skin.band }]}>
+      <View style={[styles.band, { height: bandeTete, backgroundColor: skin.band }]}>
         {unread && <View style={styles.unreadDot} />}
       </View>
       <View style={[styles.rule, { backgroundColor: skin.rule }]} />
@@ -116,7 +132,7 @@ export function BookSpine({
           la largeur à la hauteur disponible : c'est ce qui permet au texte de
           courir sur toute la tranche au lieu d'être coupé à sa largeur. */}
       <View style={styles.titleZone}>
-        <View style={[styles.titleRotor, { width: height - 58 }]}>
+        <View style={[styles.titleRotor, { width: Math.max(40, height - bandeTete - bandePied - 16) }]}>
           <Text style={[styles.title, { color: skin.ink }]} numberOfLines={1}>
             {authorName}
           </Text>
@@ -124,8 +140,12 @@ export function BookSpine({
       </View>
 
       <View style={[styles.rule, { backgroundColor: skin.rule }]} />
-      <View style={[styles.band, styles.bandFoot, { backgroundColor: skin.band }]}>
-        <Avatar url={authorAvatarUrl ?? null} username={authorName} size={width - 12} />
+      <View style={[styles.band, { height: bandePied, backgroundColor: skin.band }]}>
+        <Avatar
+          url={authorAvatarUrl ?? null}
+          username={authorName}
+          size={Math.min(width - 12, bandePied - 8)}
+        />
       </View>
 
       {/* Deux voiles verticaux, et rien de plus : un éclat sur le bord gauche
@@ -150,8 +170,7 @@ function createStyles(colors: Colors) {
     },
     // Caissons volontairement fins : ce sont des filets de reliure, pas des
     // bandeaux. Épais, ils mangeaient la tranche et écrasaient le titre.
-    band: { width: '100%', height: 16, alignItems: 'center', justifyContent: 'center' },
-    bandFoot: { height: 28 },
+    band: { width: '100%', alignItems: 'center', justifyContent: 'center' },
     rule: { width: '100%', height: 1.5, opacity: 0.9 },
     titleZone: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     // Tourné d'un quart de tour vers la gauche : le texte se lit du bas vers
@@ -159,7 +178,7 @@ function createStyles(colors: Colors) {
     titleRotor: { transform: [{ rotate: '-90deg' }], alignItems: 'center' },
     title: {
       fontFamily: fonts.display,
-      fontSize: 12,
+      fontSize: 13,
       letterSpacing: 0.4,
       textAlign: 'center',
     },

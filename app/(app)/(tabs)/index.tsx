@@ -731,7 +731,9 @@ function createStyles(colors: Colors) {
   menuBackText: { fontSize: 14, fontWeight: '700', color: colors.text },
   // Marge latérale resserrée : le meuble occupe la pièce, il ne flotte pas au
   // milieu d'une page.
-  scroll: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: 88, flexGrow: 1 },
+  // `flexGrow` + marges resserrées : le meuble prend toute la place laissée
+  // entre l'en-tête et la barre d'icônes. Il n'y a rien d'autre à mettre.
+  scroll: { paddingHorizontal: spacing.sm, paddingTop: spacing.sm, paddingBottom: 78, flexGrow: 1 },
   loader: { marginTop: 32 },
   empty: { paddingVertical: 24, alignItems: 'center' },
   emptyTitle: { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 6 },
