@@ -1,9 +1,10 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { MessageCircle } from 'lucide-react-native';
+import { Flag, MessageCircle, MoreHorizontal, Trash2 } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -18,6 +19,7 @@ import { Avatar } from '../../../components/Avatar';
 import { BottomNavBar } from '../../../components/BottomNavBar';
 import { InlineComments } from '../../../components/InlineComments';
 import { ReactionPicker } from '../../../components/ReactionPicker';
+import { ReportDialog } from '../../../components/ReportDialog';
 import { PhotoAttachButton } from '../../../components/PhotoAttachButton';
 import { PredictionPhoto } from '../../../components/PredictionPhoto';
 import { PredictWord } from '../../../components/PredictWord';
@@ -28,6 +30,7 @@ import { fetchFriendships, otherProfile, type FriendProfile } from '../../../lib
 import { uploadVerdictPhoto } from '../../../lib/photos';
 import {
   addRecipient,
+  deletePrediction,
   fetchPrediction,
   fetchPredictionRecipients,
   isRevealed,
@@ -54,6 +57,33 @@ export default function PredictionDetailScreen() {
   /* Fermée par défaut, comme sur la carte : on vient lire une prédiction, pas
      une conversation. La bulle l'ouvre quand on la veut. */
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+
+  /** Définitive, et confirmée : c'est le seul recours de l'auteur sur un
+   *  contenu qui parle de quelqu'un d'autre. */
+  async function handleDelete() {
+    const message =
+      'Cette action est définitive : le contenu, les réactions et les commentaires seront perdus pour tout le Cercle.';
+    const go = async () => {
+      const { error: deleteError } = await deletePrediction(id);
+      if (deleteError) {
+        setError(`Suppression impossible : ${deleteError.message}`);
+        return;
+      }
+      router.back();
+    };
+    // `Alert.alert` de React Native Web ne fait rien : sans ce repli, le
+    // bouton semblerait ne pas répondre du tout sur le web.
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Supprimer ce Predict ?\n\n${message}`)) await go();
+      return;
+    }
+    Alert.alert('Supprimer ce Predict ?', message, [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Supprimer', style: 'destructive', onPress: go },
+    ]);
+  }
   const [author, setAuthor] = useState<{ username: string; avatar_url: string | null } | null>(null);
   const [recipients, setRecipients] = useState<PredictionRecipient[] | null>(null);
   const [friends, setFriends] = useState<FriendProfile[] | null>(null);
@@ -278,8 +308,51 @@ export default function PredictionDetailScreen() {
         <Text style={styles.headerTitle}>
           <PredictWord />
         </Text>
-        <View style={styles.headerSpacer} />
+        {/* Le menu de gestion vit ICI depuis que l'accueil est une
+            bibliothèque : la carte du Fil, qui le portait, n'existe plus. Sans
+            ce déplacement, supprimer une prédiction serait devenu impossible —
+            et l'auteur doit toujours pouvoir revenir en arrière. */}
+        <Pressable onPress={() => setMenuOpen(true)} hitSlop={8} style={styles.headerMenu}>
+          <MoreHorizontal size={22} color={colors.icon} strokeWidth={1.75} />
+        </Pressable>
       </View>
+
+      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+        <Pressable style={styles.menuOverlay} onPress={() => setMenuOpen(false)}>
+          <Pressable style={styles.menuBox} onPress={() => {}}>
+            {isAuthor ? (
+              <Pressable
+                onPress={() => {
+                  setMenuOpen(false);
+                  handleDelete();
+                }}
+                style={styles.menuRow}
+              >
+                <Trash2 size={20} color={colors.danger} strokeWidth={1.75} />
+                <Text style={[styles.menuRowText, styles.menuRowDanger]}>Supprimer</Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={() => {
+                  setMenuOpen(false);
+                  setReportOpen(true);
+                }}
+                style={styles.menuRow}
+              >
+                <Flag size={20} color={colors.icon} strokeWidth={1.75} />
+                <Text style={styles.menuRowText}>Signaler</Text>
+              </Pressable>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <ReportDialog
+        visible={reportOpen}
+        target={{ kind: 'prediction', id }}
+        reporterId={userId ?? ''}
+        onClose={() => setReportOpen(false)}
+      />
 
       <ScrollView contentContainerStyle={styles.scroll}>
         {error && <Text style={styles.error}>{error}</Text>}
@@ -635,6 +708,26 @@ function createStyles(colors: Colors) {
   },
   back: { fontSize: 15, color: colors.text, width: 56 },
   headerSpacer: { width: 56 },
+  headerMenu: { width: 56, alignItems: 'flex-end' },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(28, 39, 55, 0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  menuBox: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  menuRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 },
+  menuRowText: { fontSize: 16, color: colors.text },
+  menuRowDanger: { color: colors.danger },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   loader: { marginTop: 24 },
   eyebrow: { ...eyebrow(colors) },
