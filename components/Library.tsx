@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 
 import { BookSpine } from './BookArt';
+import { Degrade, melange as melangeCouleur } from './Degrade';
 import type { ShelfBook } from './Bookshelf';
 import { fonts, type Colors } from '../lib/theme';
 import { useColors } from '../lib/themeMode';
@@ -95,15 +96,6 @@ function Veinage({ graine, opacite = 1 }: { graine: number; opacite?: number }) 
   );
 }
 
-/** Mélange deux couleurs hexadécimales. */
-function melange(a: string, b: string, t: number): string {
-  const lire = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
-  const [ar, ag, ab] = lire(a);
-  const [br, bg, bb] = lire(b);
-  const c = (x: number, y: number) => Math.round(x + (y - x) * t).toString(16).padStart(2, '0');
-  return `#${c(ar, br)}${c(ag, bg)}${c(ab, bb)}`;
-}
-
 /**
  * Une moulure : `n` bandes fines dont le ton glisse de `de` vers `vers`.
  *
@@ -128,7 +120,7 @@ function Moulure({
       {Array.from({ length: bandes }, (_, i) => (
         <View
           key={i}
-          style={{ height: epaisseur, backgroundColor: melange(de, vers, i / (bandes - 1 || 1)) }}
+          style={{ height: epaisseur, backgroundColor: melangeCouleur(de, vers, i / (bandes - 1 || 1)) }}
         />
       ))}
     </View>
@@ -140,7 +132,21 @@ function Moulure({
 function Pilastre({ b, largeur }: { b: ReturnType<typeof bois>; largeur: number }) {
   const gorges = [0.26, 0.5, 0.74];
   return (
-    <View style={{ width: largeur, backgroundColor: b.corps }}>
+    <View style={{ width: largeur }}>
+      {/* Un pilastre est ROND. La lumière frappe son arête gauche, culmine au
+          premier tiers puis s'éteint vers le montant — sans ce galbe, on ne
+          voit qu'une bande de couleur, et les cannelures se posent sur du
+          plat au lieu de creuser un cylindre. */}
+      <Degrade
+        sens="h"
+        bandes={14}
+        etapes={[
+          { couleur: melangeCouleur(b.corps, '#000000', 0.3), a: 0 },
+          { couleur: b.vif, a: 0.22 },
+          { couleur: b.corps, a: 0.58 },
+          { couleur: melangeCouleur(b.ombre, '#000000', 0.15), a: 1 },
+        ]}
+      />
       <Veinage graine={3} />
       {gorges.map((x, i) => (
         <View key={i} style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -188,7 +194,10 @@ const PIEDS = 34;
 export function Library({
   bays,
   onPressBook,
-  maxVisible = 4,
+  /* Trois, et pas quatre. Un livre fait jusqu'à 48 px, le serre-livres 40 :
+     à quatre, la rangée dépassait la niche et c'est le serre-livres — donc
+     l'accès au reste du rayon — qui se faisait écraser contre le montant. */
+  maxVisible = 3,
 }: {
   bays: LibraryBay[];
   onPressBook: (id: string) => void;
@@ -235,6 +244,18 @@ export function Library({
     <View style={styles.tablette}>
       <View style={styles.tabletteNez} />
       <View style={styles.tabletteCorps}>
+        {/* Le chant d'une tablette est un bandeau qui reçoit la lumière du
+            dessus et la perd vers le bas : c'est ce qui lui donne son
+            épaisseur, plus sûrement qu'un trait clair. */}
+        <Degrade
+          sens="v"
+          bandes={12}
+          etapes={[
+            { couleur: b.vif, a: 0 },
+            { couleur: b.corps, a: 0.4 },
+            { couleur: b.ombre, a: 1 },
+          ]}
+        />
         <Veinage graine={11} opacite={0.7} />
         <View style={styles.plaqueZone}>
           <Plaque texte={gauche} styles={styles} />
@@ -318,7 +339,19 @@ function Bay({
 
   return (
     <View style={styles.caisson}>
-      <View style={styles.fond} pointerEvents="none" />
+      {/* Le fond de la niche : plus noir en haut, où rien n'atteint. Un fond
+          uniforme donnait une découpe de papier noir. */}
+      <View style={styles.fond} pointerEvents="none">
+        <Degrade
+          sens="v"
+          bandes={18}
+          etapes={[
+            { couleur: '#080d14', a: 0 },
+            { couleur: b.nuit, a: 0.55 },
+            { couleur: melangeCouleur(b.nuit, b.creux, 0.35), a: 1 },
+          ]}
+        />
+      </View>
       {/* Le fond de niche est en bois lui aussi, mais dans l'ombre : on l'y
           devine, on ne l'y voit pas. */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -441,7 +474,6 @@ function createStyles(colors: Colors, b: ReturnType<typeof bois>) {
     tabletteNez: { height: 3, backgroundColor: b.vif },
     tabletteCorps: {
       height: TABLETTE - 7,
-      backgroundColor: b.corps,
       flexDirection: 'row',
       alignItems: 'center',
       overflow: 'hidden',

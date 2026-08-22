@@ -1,6 +1,7 @@
 import { useMemo, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { Degrade, melange } from './Degrade';
 import { fonts, type Colors } from '../lib/theme';
 import { useColors } from '../lib/themeMode';
 
@@ -51,18 +52,40 @@ export function BookSpread({
         />
       ))}
 
-      {/* LA COUVERTURE — elle déborde le bloc-papier de trois pixels. */}
+      {/* LA COUVERTURE — galbée elle aussi : le cuir accroche la lumière au
+          bord et s'assombrit vers la reliure, des deux côtés. */}
       <View style={styles.couverture}>
+        <Degrade
+          sens="h"
+          bandes={20}
+          etapes={[
+            { couleur: melange(COUV, '#ffffff', 0.14), a: 0 },
+            { couleur: COUV, a: 0.2 },
+            { couleur: melange(COUV, '#000000', 0.3), a: 0.5 },
+            { couleur: COUV, a: 0.8 },
+            { couleur: melange(COUV, '#ffffff', 0.14), a: 1 },
+          ]}
+        />
+
         <View style={styles.blocPapier}>
+          <Tranche cote="gauche" styles={styles} />
+
           <View style={styles.page}>
-            {/* Tranche extérieure : les feuillets empilés qu'on voit par la
-                gouttière du côté opposé à la reliure. */}
-            <View style={[styles.trancheGauche]} pointerEvents="none" />
+            {/* Le papier n'est pas blanc partout : il s'éteint vers la
+                reliure, où la page plonge. */}
+            <Degrade
+              sens="h"
+              bandes={16}
+              etapes={[
+                { couleur: PAPIER, a: 0 },
+                { couleur: PAPIER, a: 0.55 },
+                { couleur: melange(PAPIER, '#1c2737', 0.1), a: 1 },
+              ]}
+            />
             <View style={styles.pageContenu}>{left}</View>
           </View>
 
-          {/* LA RELIURE — deux dégradés symétriques qui creusent le pli, et
-              la couture au milieu. */}
+          {/* LA RELIURE — deux creux symétriques et la couture. */}
           <View style={styles.gouttiere} pointerEvents="none">
             <Ombre inverse />
             <View style={styles.couture} />
@@ -70,11 +93,40 @@ export function BookSpread({
           </View>
 
           <View style={styles.page}>
+            <Degrade
+              sens="h"
+              bandes={16}
+              etapes={[
+                { couleur: melange(PAPIER, '#1c2737', 0.1), a: 0 },
+                { couleur: PAPIER, a: 0.45 },
+                { couleur: PAPIER, a: 1 },
+              ]}
+            />
             <View style={styles.pageContenu}>{right}</View>
-            <View style={[styles.trancheDroite]} pointerEvents="none" />
           </View>
+
+          <Tranche cote="droite" styles={styles} />
         </View>
       </View>
+    </View>
+  );
+}
+
+/**
+ * La tranche du bloc-papier : les feuillets empilés, vus par le côté.
+ *
+ * Un trait unique donnait un liseré. Ce sont des dizaines de feuilles : des
+ * traits alternés, clairs et sombres, d'épaisseurs inégales. C'est ce qui
+ * fait qu'un livre a une ÉPAISSEUR et non un contour.
+ */
+function Tranche({ cote, styles }: { cote: 'gauche' | 'droite'; styles: ReturnType<typeof createStyles> }) {
+  const feuilles = [0.55, 0.15, 0.4, 0.1, 0.5, 0.2, 0.35];
+  const ordre = cote === 'gauche' ? feuilles : [...feuilles].reverse();
+  return (
+    <View style={styles.tranche} pointerEvents="none">
+      {ordre.map((o, i) => (
+        <View key={i} style={{ flex: 1, backgroundColor: '#1c2737', opacity: o * 0.35 }} />
+      ))}
     </View>
   );
 }
@@ -97,10 +149,14 @@ function Ombre({ inverse = false }: { inverse?: boolean }) {
   );
 }
 
+/** Le papier et le cuir. Fixes : un livre garde sa matière quel que soit le
+ *  thème — c'est un objet, pas une surface d'interface. */
+const PAPIER = '#fbf7ee';
+const COUV = '#3f5e6c';
+
 function createStyles(colors: Colors) {
-  const sombre = colors.background === '#1c2737';
-  const papier = sombre ? '#22303f' : '#fbfdfe';
-  const couverture = sombre ? '#3f5e6c' : '#3f5e6c';
+  const papier = PAPIER;
+  const couverture = COUV;
   return StyleSheet.create({
     livre: { width: '100%' },
     feuillet: {
@@ -112,16 +168,13 @@ function createStyles(colors: Colors) {
     },
     couverture: {
       backgroundColor: couverture,
-      padding: 3,
+      padding: 5,
       boxShadow: [{ offsetX: 0, offsetY: 6, blurRadius: 16, color: 'rgba(20, 29, 40, 0.32)' }],
     },
     blocPapier: { flexDirection: 'row', backgroundColor: papier, minHeight: 260 },
     page: { flex: 1, flexDirection: 'row' },
     pageContenu: { flex: 1, padding: 14, gap: 8 },
-    // Les feuillets vus par la tranche : trois traits, du plus clair au plus
-    // marqué, côté opposé à la reliure.
-    trancheGauche: { width: 3, backgroundColor: colors.border, opacity: 0.7 },
-    trancheDroite: { width: 3, backgroundColor: colors.border, opacity: 0.7 },
+    tranche: { width: 7, flexDirection: 'row' },
     gouttiere: { width: 32, flexDirection: 'row' },
     couture: { width: 1, backgroundColor: '#1c2737', opacity: 0.28 },
   });

@@ -425,11 +425,14 @@ export default function PredictionDetailScreen() {
                     )}
                   </>
                 ) : (
+                  /* Rien. Une page blanche se comprend sans qu'on l'explique —
+                     et un texte disant « cette page est vide » est la seule
+                     façon de la rendre bavarde. Le sceau doré suffit à dire
+                     que quelque chose y est retenu. */
                   <View style={styles.pageVierge}>
-                    <Text style={styles.pageViergeTexte}>
-                      Cette page reste blanche{'\n'}tant que {author?.username ?? 'son auteur'}{' '}
-                      ne l'a pas révélée.
-                    </Text>
+                    <View style={styles.pageSceau}>
+                      <Text style={styles.pageSceauLettre}>P</Text>
+                    </View>
                   </View>
                 )
               }
@@ -749,8 +752,20 @@ function createStyles(colors: Colors) {
   pageContenu: { fontSize: 15, color: colors.text, lineHeight: 22 },
   pageEspace: { flex: 1, minHeight: 8 },
   pageDate: { fontFamily: fonts.label, fontSize: 11, color: colors.textFaint },
-  pageVierge: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 20 },
-  pageViergeTexte: { fontSize: 13, color: colors.textFaint, textAlign: 'center', lineHeight: 20 },
+  pageVierge: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 24 },
+  // Un cachet de cire pâli, imprimé dans le papier plutôt que posé dessus :
+  // discret, mais il dit que la page attend.
+  pageSceau: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    borderWidth: 2,
+    borderColor: colors.accent,
+    opacity: 0.35,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pageSceauLettre: { fontFamily: fonts.display, fontSize: 24, color: colors.accent },
   // Un peu plus marqué que les autres repères secondaires de cet écran :
   // savoir quand le Predict a été scellé reste une information importante,
   // pas un simple détail à estomper.

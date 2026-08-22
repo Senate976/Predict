@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 
 import { Avatar } from './Avatar';
+import { Degrade, melange } from './Degrade';
 import { fonts, type Colors } from '../lib/theme';
 
 /* ===========================================================================
@@ -115,15 +116,41 @@ export function BookSpine({
         {
           width,
           height,
-          backgroundColor: skin.cloth,
           borderColor: highlighted ? '#eca835' : 'transparent',
           borderWidth: highlighted ? 2 : 0,
         },
       ]}
     >
+      {/* LE BOMBÉ DU DOS, et c'est tout ce qui séparait un livre d'une case.
+          Un dos de livre est une surface CYLINDRIQUE : la lumière vient de la
+          gauche, frappe l'arête, glisse en une bande claire un peu avant le
+          milieu, puis s'éteint jusqu'au bord droit où le voisin fait de
+          l'ombre. Cinq étapes suffisent à décrire cette courbe ; un aplat
+          n'en décrit aucune. */}
+      <Degrade
+        sens="h"
+        bandes={16}
+        etapes={[
+          { couleur: melange(skin.cloth, '#000000', 0.34), a: 0 },
+          { couleur: melange(skin.cloth, '#ffffff', 0.16), a: 0.16 },
+          { couleur: skin.cloth, a: 0.46 },
+          { couleur: melange(skin.cloth, '#000000', 0.18), a: 0.78 },
+          { couleur: melange(skin.cloth, '#000000', 0.42), a: 1 },
+        ]}
+      />
       {/* Caisson de tête : bande sombre + filet doré, la signature d'une
           reliure. Le même en pied, pour que la tranche ait deux bouts. */}
-      <View style={[styles.band, { height: bandeTete, backgroundColor: skin.band }]}>
+      <View style={[styles.band, { height: bandeTete }]}>
+        <Degrade
+          sens="h"
+          bandes={12}
+          etapes={[
+            { couleur: melange(skin.band, '#000000', 0.3), a: 0 },
+            { couleur: melange(skin.band, '#ffffff', 0.12), a: 0.18 },
+            { couleur: skin.band, a: 0.5 },
+            { couleur: melange(skin.band, '#000000', 0.38), a: 1 },
+          ]}
+        />
         {unread && <View style={styles.unreadDot} />}
       </View>
       <View style={[styles.rule, { backgroundColor: skin.rule }]} />
@@ -140,7 +167,17 @@ export function BookSpine({
       </View>
 
       <View style={[styles.rule, { backgroundColor: skin.rule }]} />
-      <View style={[styles.band, { height: bandePied, backgroundColor: skin.band }]}>
+      <View style={[styles.band, { height: bandePied }]}>
+        <Degrade
+          sens="h"
+          bandes={12}
+          etapes={[
+            { couleur: melange(skin.band, '#000000', 0.3), a: 0 },
+            { couleur: melange(skin.band, '#ffffff', 0.12), a: 0.18 },
+            { couleur: skin.band, a: 0.5 },
+            { couleur: melange(skin.band, '#000000', 0.38), a: 1 },
+          ]}
+        />
         <Avatar
           url={authorAvatarUrl ?? null}
           username={authorName}
@@ -148,12 +185,10 @@ export function BookSpine({
         />
       </View>
 
-      {/* Deux voiles verticaux, et rien de plus : un éclat sur le bord gauche
-          (la lumière qui accroche l'arête) et une ombre à droite (le livre
-          suivant qui la mange). C'est ce qui donne l'épaisseur — sans quoi la
-          tranche est un simple rectangle de couleur. */}
-      <View style={styles.sheen} pointerEvents="none" />
-      <View style={styles.shade} pointerEvents="none" />
+      {/* La coiffe : le tout petit renflement de cuir en haut et en bas d'un
+          dos relié. Deux traits, mais ce sont eux qui ferment l'objet. */}
+      <View style={styles.coiffe} pointerEvents="none" />
+      <View style={styles.coiffeBas} pointerEvents="none" />
     </View>
   );
 }
@@ -166,7 +201,9 @@ function createStyles(colors: Colors) {
       alignItems: 'center',
       justifyContent: 'space-between',
       // Le livre pose son ombre sur l'étagère, pas dans le vide.
-      boxShadow: [{ offsetX: 1, offsetY: 2, blurRadius: 4, color: 'rgba(28, 39, 55, 0.35)' }],
+      // Le livre projette son ombre sur son voisin de droite et sur la
+      // tablette : c'est ce décalage qui les décolle les uns des autres.
+      boxShadow: [{ offsetX: 3, offsetY: 3, blurRadius: 7, color: 'rgba(8, 13, 20, 0.55)' }],
     },
     // Caissons volontairement fins : ce sont des filets de reliure, pas des
     // bandeaux. Épais, ils mangeaient la tranche et écrasaient le titre.
@@ -188,21 +225,21 @@ function createStyles(colors: Colors) {
       borderRadius: 3,
       backgroundColor: '#eca835',
     },
-    sheen: {
+    coiffe: {
       position: 'absolute',
       left: 0,
-      top: 0,
-      bottom: 0,
-      width: 3,
-      backgroundColor: 'rgba(249, 252, 254, 0.22)',
-    },
-    shade: {
-      position: 'absolute',
       right: 0,
       top: 0,
+      height: 1.5,
+      backgroundColor: 'rgba(249, 252, 254, 0.30)',
+    },
+    coiffeBas: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
       bottom: 0,
-      width: 6,
-      backgroundColor: 'rgba(15, 23, 33, 0.28)',
+      height: 2,
+      backgroundColor: 'rgba(10, 16, 24, 0.45)',
     },
   });
 }
