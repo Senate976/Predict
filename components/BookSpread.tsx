@@ -79,7 +79,7 @@ export function BookSpread({
               etapes={[
                 { couleur: PAPIER, a: 0 },
                 { couleur: PAPIER, a: 0.55 },
-                { couleur: melange(PAPIER, '#1c2737', 0.1), a: 1 },
+                { couleur: melange(PAPIER, '#3a2413', 0.12), a: 1 },
               ]}
             />
             <View style={styles.pageContenu}>{left}</View>
@@ -97,7 +97,7 @@ export function BookSpread({
               sens="h"
               bandes={16}
               etapes={[
-                { couleur: melange(PAPIER, '#1c2737', 0.1), a: 0 },
+                { couleur: melange(PAPIER, '#3a2413', 0.12), a: 0 },
                 { couleur: PAPIER, a: 0.45 },
                 { couleur: PAPIER, a: 1 },
               ]}
@@ -125,7 +125,7 @@ function Tranche({ cote, styles }: { cote: 'gauche' | 'droite'; styles: ReturnTy
   return (
     <View style={styles.tranche} pointerEvents="none">
       {ordre.map((o, i) => (
-        <View key={i} style={{ flex: 1, backgroundColor: '#1c2737', opacity: o * 0.35 }} />
+        <View key={i} style={{ flex: 1, backgroundColor: '#3a2413', opacity: o * 0.35 }} />
       ))}
     </View>
   );
@@ -141,7 +141,7 @@ function Ombre({ inverse = false }: { inverse?: boolean }) {
         return (
           <View
             key={i}
-            style={{ flex: 1, backgroundColor: '#1c2737', opacity: 0.02 + t * t * 0.24 }}
+            style={{ flex: 1, backgroundColor: '#3a2413', opacity: 0.02 + t * t * 0.24 }}
           />
         );
       })}
@@ -152,7 +152,7 @@ function Ombre({ inverse = false }: { inverse?: boolean }) {
 /** Le papier et le cuir. Fixes : un livre garde sa matière quel que soit le
  *  thème — c'est un objet, pas une surface d'interface. */
 const PAPIER = '#fbf7ee';
-const COUV = '#3f5e6c';
+const COUV = '#6d3b2a';
 
 function createStyles(colors: Colors) {
   const papier = PAPIER;
@@ -176,7 +176,7 @@ function createStyles(colors: Colors) {
     pageContenu: { flex: 1, padding: 14, gap: 8 },
     tranche: { width: 7, flexDirection: 'row' },
     gouttiere: { width: 32, flexDirection: 'row' },
-    couture: { width: 1, backgroundColor: '#1c2737', opacity: 0.28 },
+    couture: { width: 1, backgroundColor: '#3a2413', opacity: 0.28 },
   });
 }
 

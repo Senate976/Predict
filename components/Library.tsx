@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 
-import { BookSpine } from './BookArt';
+import { BookSpine, spineWidth } from './BookArt';
 import { Degrade, melange as melangeCouleur } from './Degrade';
 import type { ShelfBook } from './Bookshelf';
 import { fonts, type Colors } from '../lib/theme';
@@ -40,18 +40,31 @@ import { useColors } from '../lib/themeMode';
  * le touche jamais) → livres → bois (le plus clair, ce qui prend la lumière).
  * ========================================================================= */
 
-function bois(colors: Colors) {
-  const sombre = colors.background === '#1c2737';
+/**
+ * LE BOIS.
+ *
+ * Le meuble était en bleu d'ardoise — la couleur d'un vestiaire d'atelier,
+ * pas d'une bibliothèque. Un meuble où l'on confie des secrets doit être
+ * CHAUD : c'est la chaleur qui dit qu'on est à l'abri.
+ *
+ * La rampe ci-dessous est l'or de la charte (#eca835) descendu dans l'ombre :
+ * même dominante, même famille, mais du fauve au tabac brûlé. Elle ne dépend
+ * PAS du thème clair/sombre — un meuble ne change pas d'essence quand on
+ * allume la lumière, il change seulement d'éclairage, et c'est le fond des
+ * niches qui s'en charge.
+ */
+function bois() {
   return {
-    vif: sombre ? '#7d9fac' : '#6d919f',
-    lumiere: sombre ? '#658c9a' : '#5b8290',
-    clair: sombre ? '#4f7482' : '#4a6c7a',
-    corps: sombre ? '#436574' : '#3f5e6c',
-    creux: sombre ? '#35525f' : '#334d59',
-    ombre: sombre ? '#294049' : '#263b45',
-    nuit: '#141d28',
+    vif: '#c49a5c',     // l'arête qui prend la lumière
+    lumiere: '#a37c42',
+    clair: '#805c31',
+    corps: '#654626',   // le ton du meuble
+    creux: '#4a341c',
+    ombre: '#332314',
+    nuit: '#180f07',    // le fond des niches
     laiton: '#eca835',
-    laitonMat: '#b9832a',
+    laitonVif: '#fbdd99',
+    laitonMat: '#a8761f',
   };
 }
 
@@ -87,7 +100,7 @@ function Veinage({ graine, opacite = 1 }: { graine: number; opacite?: number }) 
             bottom: 0,
             left: f.left as `${number}%`,
             width: f.width,
-            backgroundColor: f.sombre ? '#0d141c' : '#cfe4ea',
+            backgroundColor: f.sombre ? '#1a1006' : '#f0d9ab',
             opacity: f.opacity,
           }}
         />
@@ -187,6 +200,11 @@ export type LibraryBay = {
 };
 
 const PILASTRE = 16;
+/** Le jeu entre deux dos, et la largeur du serre-livres de laiton. */
+const JEU = 3;
+const SERRE = 40;
+/** Retrait intérieur de la niche, de chaque côté. */
+const RETRAIT = 7;
 const TABLETTE = 26;
 const CORNICHE = 52;
 const PIEDS = 34;
@@ -204,7 +222,7 @@ export function Library({
   maxVisible?: number;
 }) {
   const colors = useColors();
-  const b = useMemo(() => bois(colors), [colors]);
+  const b = useMemo(() => bois(), []);
   const styles = useMemo(() => createStyles(colors, b), [colors, b]);
 
   /* Le meuble prend toute la hauteur qu'on lui laisse. Les niches se
@@ -222,9 +240,19 @@ export function Library({
      toute façon. */
   const tailleLivre = niche > 0 ? Math.min(236, Math.max(110, Math.round(niche - 40))) : 0;
 
-  const rangee = (gauche: LibraryBay, droite: LibraryBay) => (
+  /* `titreEnTete` : la plaque est vissée au fond de la niche, au-dessus des
+     livres, au lieu d'être gravée sur le chant de la tablette.
+
+     Pourquoi seulement la rangée du haut : une plaque sur un chant désigne
+     naturellement les livres POSÉS DESSUS. Pour la rangée du bas, la plaque
+     du bas ne peut désigner qu'elle — aucune ambiguïté. Pour la rangée du
+     haut, la plaque de la tablette du milieu était prise en tenaille entre
+     deux rangées et pouvait se lire dans les deux sens. En la remontant, on
+     encadre le meuble : un titre tout en haut, un titre tout en bas, et rien
+     d'équivoque au milieu. */
+  const rangee = (gauche: LibraryBay, droite: LibraryBay, titreEnTete = false) => (
     <View style={[styles.rangee, niche > 0 && { height: niche }]}>
-      <Bay bay={gauche} styles={styles} colors={colors} b={b}
+      <Bay bay={gauche} styles={styles} colors={colors} b={b} titreEnTete={titreEnTete}
         onPressBook={onPressBook} maxVisible={maxVisible} tailleLivre={tailleLivre} />
       {/* Le montant central : une vraie pièce debout, cannelée comme les
           pilastres, avec son arête éclairée. */}
@@ -233,14 +261,14 @@ export function Library({
         <View style={styles.montantArete} pointerEvents="none" />
         <View style={styles.montantOmbre} pointerEvents="none" />
       </View>
-      <Bay bay={droite} styles={styles} colors={colors} b={b}
+      <Bay bay={droite} styles={styles} colors={colors} b={b} titreEnTete={titreEnTete}
         onPressBook={onPressBook} maxVisible={maxVisible} tailleLivre={tailleLivre} />
     </View>
   );
 
   /** La tablette, vue de face : un chant mouluré, le corps du bois, et
    *  l'ombre qu'elle jette dans la niche du dessous. */
-  const tablette = (gauche: string, droite: string) => (
+  const tablette = (gauche?: string, droite?: string) => (
     <View style={styles.tablette}>
       <View style={styles.tabletteNez} />
       <View style={styles.tabletteCorps}>
@@ -258,11 +286,11 @@ export function Library({
         />
         <Veinage graine={11} opacite={0.7} />
         <View style={styles.plaqueZone}>
-          <Plaque texte={gauche} styles={styles} />
+          {gauche != null && <Plaque texte={gauche} styles={styles} b={b} />}
         </View>
         <View style={{ width: PILASTRE }} />
         <View style={styles.plaqueZone}>
-          <Plaque texte={droite} styles={styles} />
+          {droite != null && <Plaque texte={droite} styles={styles} b={b} />}
         </View>
       </View>
       <Moulure de={b.creux} vers={b.ombre} bandes={4} epaisseur={1} />
@@ -287,8 +315,10 @@ export function Library({
       <View style={styles.corps}>
         <Pilastre b={b} largeur={PILASTRE} />
         <View style={styles.interieur}>
-          {bays.length >= 2 && rangee(bays[0], bays[1])}
-          {bays.length >= 2 && tablette(bays[0].label, bays[1].label)}
+          {bays.length >= 2 && rangee(bays[0], bays[1], true)}
+          {/* La tablette du milieu ne porte aucune plaque : les titres du haut
+              sont remontés dans la niche, au-dessus des livres. */}
+          {bays.length >= 2 && tablette()}
           {bays.length >= 4 && rangee(bays[2], bays[3])}
           {bays.length >= 4 && tablette(bays[2].label, bays[3].label)}
         </View>
@@ -325,6 +355,7 @@ function Bay({
   onPressBook,
   maxVisible,
   tailleLivre,
+  titreEnTete = false,
 }: {
   bay: LibraryBay;
   styles: ReturnType<typeof createStyles>;
@@ -333,32 +364,80 @@ function Bay({
   onPressBook: (id: string) => void;
   maxVisible: number;
   tailleLivre: number;
+  titreEnTete?: boolean;
 }) {
-  const visibles = bay.books.slice(0, maxVisible);
+  /* COMBIEN DE LIVRES RENTRENT VRAIMENT.
+     `maxVisible` ne suffit pas : trois dos peuvent faire 96 px comme 144, et
+     sur un écran étroit une niche n'a que 150 px de large. On empilait alors
+     trois livres plus le serre-livres sur 190 px, et c'est le serre-livres —
+     donc l'accès au reste du rayon — qui passait sous le montant, coupé.
+     On mesure la niche, on additionne les épaisseurs réelles (elles sont
+     connues d'avance, tirées des identifiants) et on s'arrête AVANT de
+     déborder, en réservant toujours la place du serre-livres tant qu'il reste
+     des livres derrière. */
+  const [largeur, setLargeur] = useState(0);
+  const visibles = useMemo(() => {
+    const dispo = largeur - 2 * RETRAIT;
+    if (dispo <= 0) return bay.books.slice(0, maxVisible);
+    let pris = 0;
+    let n = 0;
+    for (const livre of bay.books) {
+      if (n >= maxVisible) break;
+      const largeurLivre = spineWidth(livre.id) + (n > 0 ? JEU : 0);
+      // S'il reste des livres derrière celui-ci, il faudra aussi la place du
+      // serre-livres : on la réserve dès maintenant.
+      const reserve = bay.books.length > n + 1 ? SERRE + JEU : 0;
+      if (pris + largeurLivre + reserve > dispo) break;
+      pris += largeurLivre;
+      n++;
+    }
+    // Au moins un livre, toujours : une niche pleine mais qui paraît vide
+    // serait pire qu'une rangée un peu serrée.
+    return bay.books.slice(0, Math.max(1, n));
+  }, [bay.books, largeur, maxVisible]);
   const reste = bay.books.length - visibles.length;
 
   return (
-    <View style={styles.caisson}>
-      {/* Le fond de la niche : plus noir en haut, où rien n'atteint. Un fond
-          uniforme donnait une découpe de papier noir. */}
+    <View style={styles.caisson} onLayout={(e) => setLargeur(e.nativeEvent.layout.width)}>
+      {/* LA LUMIÈRE DE LA NICHE, et c'est elle qui fait toute la différence
+          entre un caisson et un refuge.
+
+          Une réglette est cachée sous la tablette du dessus. Sa lumière est
+          CHAUDE : elle éclabousse le haut du fond en ambre, retombe vite dans
+          l'ombre, puis rebondit faiblement sur la tablette pour éclairer le
+          pied des livres. Un fond uniformément noir donnait une découpe de
+          papier ; un fond dégradé mais froid donnait une vitrine de magasin.
+          C'est le halo tiède qui donne le sentiment d'être à l'abri. */}
       <View style={styles.fond} pointerEvents="none">
         <Degrade
           sens="v"
-          bandes={18}
+          bandes={22}
           etapes={[
-            { couleur: '#080d14', a: 0 },
-            { couleur: b.nuit, a: 0.55 },
-            { couleur: melangeCouleur(b.nuit, b.creux, 0.35), a: 1 },
+            { couleur: melangeCouleur(b.nuit, b.laiton, 0.34), a: 0 },
+            { couleur: melangeCouleur(b.nuit, b.laiton, 0.13), a: 0.14 },
+            { couleur: b.nuit, a: 0.52 },
+            { couleur: melangeCouleur(b.nuit, '#000000', 0.4), a: 0.86 },
+            { couleur: melangeCouleur(b.nuit, b.laiton, 0.08), a: 1 },
           ]}
         />
       </View>
+      {/* La réglette elle-même : un trait franc, sinon le halo semble venir
+          de nulle part. */}
+      <View style={styles.reglette} pointerEvents="none" />
       {/* Le fond de niche est en bois lui aussi, mais dans l'ombre : on l'y
           devine, on ne l'y voit pas. */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
         <Veinage graine={5} opacite={0.5} />
       </View>
-      <View style={styles.fondOmbre} pointerEvents="none" />
       <View style={styles.plateau} pointerEvents="none" />
+
+      {/* La plaque vissée au fond de la niche, en plein dans le halo de la
+          réglette : c'est la première chose éclairée, donc la première lue. */}
+      {titreEnTete && (
+        <View style={styles.plaqueTete} pointerEvents="box-none">
+          <Plaque texte={bay.label} styles={styles} b={b} />
+        </View>
+      )}
 
       {bay.books.length === 0 ? (
         <View style={styles.vide}>
@@ -405,11 +484,49 @@ function Bay({
   );
 }
 
-function Plaque({ texte, styles }: { texte: string; styles: ReturnType<typeof createStyles> }) {
+/**
+ * LA PLAQUE GRAVÉE.
+ *
+ * Trois choses la rendaient illisible et elles sont corrigées ensemble :
+ *
+ * 1. Le texte n'était pas centré — il flottait dans une plaque qui prenait la
+ *    largeur de son contenu, donc la plaque n'avait jamais deux fois la même
+ *    taille. Elle a maintenant une largeur minimale, et le texte est centré
+ *    dedans.
+ * 2. Le contraste : gravé en presque-noir sur un laiton éclairci, et non plus
+ *    en brun sur brun.
+ * 3. La taille : 10 px espacés de 1,4, c'était un filigrane. On monte à 12,
+ *    en gras.
+ *
+ * Le laiton est dégradé du plus clair en haut au plus mat en bas : c'est ce
+ * qui fait une plaque polie plutôt qu'une étiquette jaune.
+ */
+function Plaque({
+  texte,
+  styles,
+  b,
+}: {
+  texte: string;
+  styles: ReturnType<typeof createStyles>;
+  b: ReturnType<typeof bois>;
+}) {
   return (
     <View style={styles.plaque}>
+      <Degrade
+        sens="v"
+        bandes={10}
+        etapes={[
+          { couleur: b.laitonVif, a: 0 },
+          { couleur: b.laiton, a: 0.45 },
+          { couleur: b.laitonMat, a: 1 },
+        ]}
+      />
       <View style={styles.plaqueBiseau} pointerEvents="none" />
-      <Text style={styles.plaqueTexte} numberOfLines={1}>
+      {/* Les deux vis qui la tiennent. Sans elles, la plaque est posée ;
+          avec, elle est fixée — et un objet fixé est un objet sûr. */}
+      <View style={[styles.vis, { left: 4 }]} pointerEvents="none" />
+      <View style={[styles.vis, { right: 4 }]} pointerEvents="none" />
+      <Text style={styles.plaqueTexte} numberOfLines={1} adjustsFontSizeToFit>
         {texte.toUpperCase()}
       </Text>
     </View>
@@ -422,7 +539,7 @@ function createStyles(colors: Colors, b: ReturnType<typeof bois>) {
     meuble: {
       flex: 1,
       backgroundColor: 'transparent',
-      boxShadow: [{ offsetX: 0, offsetY: 10, blurRadius: 24, color: 'rgba(20, 29, 40, 0.38)' }],
+      boxShadow: [{ offsetX: 0, offsetY: 10, blurRadius: 24, color: 'rgba(24, 14, 5, 0.42)' }],
     },
 
     corniche: { height: CORNICHE, backgroundColor: b.corps, overflow: 'hidden' },
@@ -442,14 +559,15 @@ function createStyles(colors: Colors, b: ReturnType<typeof bois>) {
     montantArete: { position: 'absolute', top: 0, bottom: 0, left: 0, width: 2, backgroundColor: b.vif, opacity: 0.45 },
     montantOmbre: { position: 'absolute', top: 0, bottom: 0, right: 0, width: 4, backgroundColor: b.ombre, opacity: 0.6 },
 
-    caisson: { flex: 1, justifyContent: 'flex-end', paddingHorizontal: 7, paddingBottom: 4 },
+    caisson: { flex: 1, justifyContent: 'flex-end', paddingHorizontal: RETRAIT, paddingBottom: 4 },
+    plaqueTete: { position: 'absolute', left: 0, right: 0, top: 10, alignItems: 'center' },
     fond: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: b.nuit },
-    fondOmbre: { position: 'absolute', left: 0, right: 0, top: 0, height: 34, backgroundColor: '#000', opacity: 0.42 },
+    reglette: { position: 'absolute', left: 8, right: 8, top: 0, height: 2, backgroundColor: '#f7d089', opacity: 0.55 },
     plateau: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 3, backgroundColor: b.clair, opacity: 0.8 },
 
-    rangeeLivres: { flexDirection: 'row', alignItems: 'flex-end', gap: 3 },
-    vide: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
-    videTexte: { fontFamily: fonts.label, fontSize: 12, color: 'rgba(122, 184, 194, 0.5)', textAlign: 'center' },
+    rangeeLivres: { flexDirection: 'row', alignItems: 'flex-end', gap: JEU },
+    vide: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, paddingTop: 26 },
+    videTexte: { fontFamily: fonts.label, fontSize: 12, color: 'rgba(232, 199, 148, 0.55)', textAlign: 'center' },
 
     /* LE SERRE-LIVRES. En pointillé fin, il disparaissait : on ne voyait plus
        qu'un trait, alors que c'est LUI qui donne accès au reste du rayon.
@@ -457,18 +575,18 @@ function createStyles(colors: Colors, b: ReturnType<typeof bois>) {
        posée au bout de la rangée — impossible à manquer, et cohérente avec
        les plaques gravées du meuble. */
     serreLivres: {
-      width: 40,
+      width: SERRE,
       backgroundColor: b.laiton,
       borderWidth: 1,
       borderColor: b.laitonMat,
       alignItems: 'center',
       justifyContent: 'center',
       gap: 1,
-      boxShadow: [{ offsetX: 1, offsetY: 2, blurRadius: 4, color: 'rgba(20, 29, 40, 0.4)' }],
+      boxShadow: [{ offsetX: 1, offsetY: 2, blurRadius: 4, color: 'rgba(18, 10, 3, 0.45)' }],
     },
-    serreBiseau: { position: 'absolute', left: 0, right: 0, top: 0, height: 2, backgroundColor: '#fbe0a8', opacity: 0.85 },
-    serreSigne: { fontFamily: fonts.display, fontSize: 24, color: '#241a08', lineHeight: 26 },
-    serreCompte: { fontFamily: fonts.label, fontSize: 12, color: '#241a08', fontWeight: '700' },
+    serreBiseau: { position: 'absolute', left: 0, right: 0, top: 0, height: 2, backgroundColor: '#fff0cd', opacity: 0.9 },
+    serreSigne: { fontFamily: fonts.display, fontSize: 24, color: '#170e02', lineHeight: 26 },
+    serreCompte: { fontFamily: fonts.label, fontSize: 12, color: '#170e02', fontWeight: '800' },
 
     tablette: { width: '100%' },
     tabletteNez: { height: 3, backgroundColor: b.vif },
@@ -480,16 +598,27 @@ function createStyles(colors: Colors, b: ReturnType<typeof bois>) {
     },
     plaqueZone: { flex: 1, alignItems: 'center' },
     plaque: {
-      backgroundColor: b.laiton,
-      paddingHorizontal: 12,
-      paddingVertical: 2,
+      minWidth: 116,
+      paddingHorizontal: 14,
+      paddingVertical: 3,
       borderWidth: 1,
-      borderColor: b.laitonMat,
+      borderColor: '#6d4a12',
+      alignItems: 'center',
+      justifyContent: 'center',
       overflow: 'hidden',
+      boxShadow: [{ offsetX: 0, offsetY: 1, blurRadius: 3, color: 'rgba(12, 7, 3, 0.5)' }],
     },
     // Le biseau de la plaque : une lumière en haut, comme un métal poli.
-    plaqueBiseau: { position: 'absolute', left: 0, right: 0, top: 0, height: 2, backgroundColor: '#fbe0a8', opacity: 0.8 },
-    plaqueTexte: { fontFamily: fonts.label, fontSize: 10, letterSpacing: 1.4, color: '#241a08', fontWeight: '700' },
+    plaqueBiseau: { position: 'absolute', left: 0, right: 0, top: 0, height: 1.5, backgroundColor: '#fff0cd', opacity: 0.9 },
+    vis: { position: 'absolute', top: '50%', marginTop: -1.25, width: 2.5, height: 2.5, borderRadius: 1.25, backgroundColor: '#5a3b0d', opacity: 0.5 },
+    plaqueTexte: {
+      fontFamily: fonts.label,
+      fontSize: 12,
+      letterSpacing: 1.1,
+      color: '#170e02',
+      fontWeight: '800',
+      textAlign: 'center',
+    },
 
     ceinture: { width: '100%', backgroundColor: b.corps, marginHorizontal: 0 },
     ceintureCorps: { height: 10, backgroundColor: b.corps },
