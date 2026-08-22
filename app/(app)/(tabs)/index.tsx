@@ -22,16 +22,14 @@ import { Text } from '../../../components/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../../../components/Avatar';
+import type { ShelfBook } from '../../../components/Bookshelf';
+import { Library } from '../../../components/Library';
 import { CelebrationBurst } from '../../../components/CelebrationBurst';
-import { PredictionCard } from '../../../components/PredictionCard';
 import { PredictWord } from '../../../components/PredictWord';
 import { WelcomeOnboarding } from '../../../components/WelcomeOnboarding';
 import { useAuth } from '../../../lib/auth';
-import { fetchFriendships } from '../../../lib/friends';
 import { fetchNotifications, markNotificationRead } from '../../../lib/notifications';
 import {
-  buildMentionLabel,
-  deletePrediction,
   feedErrorMessage,
   fetchPredictionsFeed,
   isRevealed,
@@ -50,8 +48,6 @@ import { useColors } from '../../../lib/themeMode';
  */
 const TICK_MS = 30_000;
 
-/** Nombre de cartes montrées par zone avant de devoir la déplier. */
-const ZONE_PREVIEW = 5;
 
 type AuthorInfo = { username: string; avatar_url: string | null };
 type AuthorMap = Record<string, AuthorInfo>;
@@ -84,15 +80,12 @@ export default function HomeScreen() {
   const [authors, setAuthors] = useState<AuthorMap>({});
   // Amis acceptés du viewer — sert uniquement à choisir, parmi plusieurs
   // personnes citées dans un teaser, un nom que le viewer reconnaîtra.
-  const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
   const [celebration, setCelebration] = useState<{ visible: boolean; message: ReactNode }>({
     visible: false,
     message: '',
   });
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [sealedExpanded, setSealedExpanded] = useState(false);
-  const [openedExpanded, setOpenedExpanded] = useState(false);
   const [now, setNow] = useState(() => new Date());
   // « Predict » par défaut, à gauche — c'est ce qu'on veut voir en premier en
   // ouvrant l'app : ce qui reste à découvrir, pas ce qui est déjà joué.
@@ -193,12 +186,6 @@ export default function HomeScreen() {
     }
     setAuthors(map);
 
-    const { data: friendships } = await fetchFriendships(userId);
-    const accepted = (friendships ?? []).filter((f) => f.status === 'accepted');
-    setFriendIds(
-      new Set(accepted.map((f) => (f.requester_id === userId ? f.addressee_id : f.requester_id)))
-    );
-
     // La première approbation non vue déclenche la célébration, une seule
     // fois — marquée lue tout de suite pour qu'un focus ultérieur de cet
     // écran ne la rejoue pas.
@@ -250,29 +237,11 @@ export default function HomeScreen() {
     await markOnboarded();
   }
 
-  async function handleDeletePrediction(predictionId: string) {
-    const { error: deleteError } = await deletePrediction(predictionId);
-    if (deleteError) {
-      setError(`Suppression impossible : ${deleteError.message}`);
-      return;
-    }
-    setFeed((prev) => (prev ?? []).filter((item) => item.id !== predictionId));
-  }
 
   // Tient `feed` à jour immédiatement quand une carte bascule favori/masqué —
   // sans ça, les filtres de cet écran resteraient basés sur l'état chargé au
   // départ jusqu'au prochain rafraîchissement complet.
-  function handleFavoriteChange(predictionId: string, isFavorite: boolean) {
-    setFeed((prev) =>
-      (prev ?? []).map((item) => (item.id === predictionId ? { ...item, is_favorite: isFavorite } : item))
-    );
-  }
 
-  function handleHiddenChange(predictionId: string, isHidden: boolean) {
-    setFeed((prev) =>
-      (prev ?? []).map((item) => (item.id === predictionId ? { ...item, is_hidden: isHidden } : item))
-    );
-  }
 
   /** « X masquées — afficher » ne rouvre pas une simple vue temporaire : les
    * démasquer les rend à nouveau visibles pour de bon, comme si on avait
@@ -291,11 +260,6 @@ export default function HomeScreen() {
   // Une fois l'auteur affirme le verdict de l'une de ses cartes : même
   // synchronisation immédiate que favori/masqué, pour que l'onglet « Mes
   // Predicts » reflète tout de suite le nouveau statut.
-  function handleVerdictChange(predictionId: string, verdict: 'realized' | 'missed') {
-    setFeed((prev) =>
-      (prev ?? []).map((item) => (item.id === predictionId ? { ...item, final_status: verdict } : item))
-    );
-  }
 
   // Posé à l'ouverture de la carte — c'est ce qui fait baisser le compteur du
   // badge d'onglet et retire le surlignage « non lue ».
@@ -334,95 +298,53 @@ export default function HomeScreen() {
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
-  /* Les deux zones du Fil, découpées après filtrage ET tri : chacune garde
-     donc l'ordre choisi dans le menu, sans qu'on ait à trier deux fois.
-     « Predict » d'abord parce que c'est ce qui attend quelque chose de toi.
+  /* LES QUATRE COMPARTIMENTS DE LA BIBLIOTHÈQUE.
 
-     Une prédiction qui vient de se révéler reste dans « Predict » TANT QU'ON
-     NE L'A PAS OUVERTE. Elle basculait auparavant dans « Ouverts » à la
-     seconde où son auteur la révélait — c'est-à-dire qu'elle quittait la zone
-     qu'on regarde, en silence, pour aller se ranger au milieu de choses déjà
-     lues. Le moment le plus fort du produit passait donc inaperçu. Elle
-     appartient à « Ouverts » une fois décachetée, pas avant.
+     Le tri et les filtres n'ont pas bougé : c'est le même `shown`, réparti en
+     quatre caissons au lieu de deux zones qui défilaient. Les conditions sont
+     exclusives et couvrent tout — aucun livre ne peut se retrouver nulle part.
 
-     Et elle passe EN TÊTE : c'est la seule carte du Fil qui demande un geste
-     immédiat, elle ne doit pas se trouver derrière trente enveloppes encore
-     scellées rangées par date. */
-  /* Exactement la condition de `cardState.kind === 'to_open'` dans
-     `PredictionCard` : ni un Sondage (qui se clôt, il n'y a pas d'enveloppe à
-     décacheter), ni sa propre prédiction (on n'ouvre pas ce qu'on a écrit —
-     `is_opened` reste faux pour l'auteur, qui sinon verrait les siennes
-     coincées dans « Predict » à jamais). Toute divergence entre les deux
-     endroits ferait apparaître une carte « à ouvrir » qui ne propose pas de
-     l'ouvrir, ou l'inverse. */
-  const aOuvrir = (item: PredictionFeedItem) =>
-    item.type !== 'question' &&
-    item.author_id !== userId &&
-    isRevealed(item, now) &&
-    !item.is_opened;
-  const zoneSealed = [
-    ...shown.filter(aOuvrir),
-    ...shown.filter((item) => !isRevealed(item, now)),
-  ];
-  const zoneOpened = shown.filter((item) => isRevealed(item, now) && !aOuvrir(item));
-  /* « Non lu » ne s'applique jamais à ce qu'on a écrit soi-même : on ne
-     découvre pas sa propre prédiction. Deux conséquences, et la seconde est
-     celle qui se voyait :
-
-     — le surlignage jaune disparaît des cartes de l'auteur ;
-     — la pastille du titre cesse d'annoncer des nouveautés qui n'ont aucune
-       notification en face. Une prédiction ne notifie que ses DESTINATAIRES
-       (`generate_reveal_notifications` passe par `prediction_access`, où
-       l'auteur ne figure pas) : compter les siennes ici faisait donc une
-       pastille dorée sans rien dans la liste des notifications. */
+     La séparation est celle de la vie d'une prédiction, pas d'un statut
+     technique : ce que les autres gardent au chaud, ce que je garde moi, ce
+     qui est sorti, et les questions. */
+  const estQuestion = (item: PredictionFeedItem) => item.type === 'question';
   const estDeMoi = (item: PredictionFeedItem) => item.author_id === userId;
-  const nonLu = (item: PredictionFeedItem) => !item.is_seen && !estDeMoi(item);
-  const unreadSealed = zoneSealed.filter(nonLu).length;
-  const unreadOpened = zoneOpened.filter(nonLu).length;
-  /* Ce qu'on annonce en haut de l'écran : tout ce qui est nouveau, les deux
-     zones confondues. Les compter séparément par zone garde son sens une fois
-     qu'on fait défiler ; en titre, c'est « combien de choses m'attendent »
-     qu'on veut lire, pas une répartition. */
-  const nouveautes = unreadSealed + unreadOpened;
 
-  /* Chaque zone ne montre que ses premières cartes, et se déplie d'un geste.
-     Sans ça, quelqu'un qui a cent Predicts scellés ne voyait jamais la zone
-     des Ouverts : il aurait fallu faire défiler cent enveloppes pour
-     l'atteindre. Les deux zones restent donc à portée d'écran, et on ouvre
-     celle qu'on veut lire. */
-  const visibleSealed = sealedExpanded ? zoneSealed : zoneSealed.slice(0, ZONE_PREVIEW);
-  const visibleOpened = openedExpanded ? zoneOpened : zoneOpened.slice(0, ZONE_PREVIEW);
-
-  /* La carte est rendue à l'identique dans les deux zones : une seule
-     fonction, pour qu'une correction faite d'un côté ne manque jamais de
-     l'autre. */
-  const renderCard = (item: PredictionFeedItem) => (
-    <PredictionCard
-      key={item.id}
-      item={item}
-      now={now}
-      authorLabel={authors[item.author_id]?.username ?? '…'}
-      authorId={item.author_id}
-      authorAvatarUrl={authors[item.author_id]?.avatar_url}
-      mentionLabel={buildMentionLabel(
-        item.id,
-        item.mentioned_user_ids,
-        Object.fromEntries(item.mentioned_user_ids.map((id) => [id, authors[id]?.username])),
-        userId!,
-        friendIds
-      )}
-      userId={userId!}
-      unseen={nonLu(item)}
-      onPress={() => {
-        handleMarkSeen(item.id);
-        router.push(`/prediction/${item.id}`);
-      }}
-      onDelete={() => handleDeletePrediction(item.id)}
-      onFavoriteChange={(isFavorite) => handleFavoriteChange(item.id, isFavorite)}
-      onHiddenChange={(isHidden) => handleHiddenChange(item.id, isHidden)}
-      onVerdictChange={(verdict) => handleVerdictChange(item.id, verdict)}
-    />
+  const rayonScellees = shown.filter(
+    (item) => !estQuestion(item) && !estDeMoi(item) && !isRevealed(item, now)
   );
+  const rayonMiennes = shown.filter(
+    (item) => !estQuestion(item) && estDeMoi(item) && !isRevealed(item, now)
+  );
+  const rayonRevelees = shown.filter((item) => !estQuestion(item) && isRevealed(item, now));
+  const rayonSondages = shown.filter(estQuestion);
+
+  /* « Non lu » ne s'applique jamais à ce qu'on a écrit soi-même : on ne
+     découvre pas sa propre prédiction, et elle ne notifie que ses
+     destinataires — la pastille annoncerait sinon des nouveautés sans rien en
+     face dans la liste des notifications. */
+  const nonLu = (item: PredictionFeedItem) => !item.is_seen && !estDeMoi(item);
+  const nouveautes = shown.filter(nonLu).length;
+
+  /* Une révélation qu'on n'a pas encore décachetée : le seul livre qui réclame
+     un geste, et le seul à porter le liseré doré. Condition reprise mot pour
+     mot de `cardState.kind === 'to_open'` (PredictionCard) — toute divergence
+     donnerait un livre mis en avant qui ne propose rien à faire. */
+  const aOuvrir = (item: PredictionFeedItem) =>
+    !estQuestion(item) && !estDeMoi(item) && isRevealed(item, now) && !item.is_opened;
+
+  const enLivre = (item: PredictionFeedItem): ShelfBook => ({
+    id: item.id,
+    authorName: authors[item.author_id]?.username ?? '…',
+    authorAvatarUrl: authors[item.author_id]?.avatar_url,
+    highlighted: aOuvrir(item),
+    unread: nonLu(item),
+  });
+
+  function ouvrirLivre(id: string) {
+    handleMarkSeen(id);
+    router.push(`/prediction/${id}`);
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -607,131 +529,53 @@ export default function HomeScreen() {
 
         {feed === null && !error ? (
           <ActivityIndicator style={styles.loader} color={colors.text} />
-        ) : shown.length === 0 ? (
-          <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>Ton Fil est vide.</Text>
-            <Text style={styles.emptyText}>
-              Les <PredictWord /> et les Sondages apparaîtront ici — les tiens comme ceux de
-              ton Cercle. Ceux qui attendent en haut, ceux qui sont révélés en dessous.
-            </Text>
-          </View>
         ) : (
           <>
-            {/* Le titre de zone n'apparaît que si la zone contient quelque
-                chose : un intitulé suivi de rien annoncerait un vide, ce qui
-                est pire que de ne rien annoncer. Et quand une seule des deux
-                zones est peuplée, aucun titre n'est nécessaire — il n'y a
-                rien à distinguer. */}
-            {zoneSealed.length > 0 && zoneOpened.length > 0 && (
-              <ZoneTitle
-                styles={styles}
-                label="Scellés"
-                count={zoneSealed.length}
-                unread={unreadSealed}
-              />
-            )}
-            {visibleSealed.map(renderCard)}
-            <ZoneMore
-              styles={styles}
-              colors={colors}
-              total={zoneSealed.length}
-              shown={visibleSealed.length}
-              expanded={sealedExpanded}
-              onToggle={() => setSealedExpanded((e) => !e)}
-            />
+            {/* UN SEUL MEUBLE, pas quatre boîtes. La corniche, les montants,
+                les tablettes et la plinthe sont dessinés dans `Library` : ce
+                sont eux qui font la bibliothèque, pas les caissons.
 
-            {zoneSealed.length > 0 && zoneOpened.length > 0 && (
-              <ZoneTitle
-                styles={styles}
-                label="Révélés"
-                count={zoneOpened.length}
-                unread={unreadOpened}
-              />
-            )}
-            {visibleOpened.map(renderCard)}
-            <ZoneMore
-              styles={styles}
-              colors={colors}
-              total={zoneOpened.length}
-              shown={visibleOpened.length}
-              expanded={openedExpanded}
-              onToggle={() => setOpenedExpanded((e) => !e)}
+                Les quatre rayons gardent leur place même vides — une
+                bibliothèque dont les étagères se déplacent selon ce qu'on y
+                range ne se mémorise pas, et c'est la mémoire du meuble qui
+                fait qu'on sait où aller sans lire les plaques. */}
+            <Library
+              onPressBook={ouvrirLivre}
+              bays={[
+                {
+                  key: 'scellees',
+                  label: 'Scellées',
+                  books: rayonScellees.map(enLivre),
+                  emptyLabel: 'Aucun secret en attente.',
+                  onPressMore: () => router.push('/rayon/scellees'),
+                },
+                {
+                  key: 'miennes',
+                  label: 'Mes predicts',
+                  books: rayonMiennes.map(enLivre),
+                  emptyLabel: 'Tu ne gardes aucun secret.',
+                  onPressMore: () => router.push('/rayon/miennes'),
+                },
+                {
+                  key: 'revelees',
+                  label: 'Révélées',
+                  books: rayonRevelees.map(enLivre),
+                  emptyLabel: "Rien n'est encore sorti.",
+                  onPressMore: () => router.push('/rayon/revelees'),
+                },
+                {
+                  key: 'sondages',
+                  label: 'Sondages',
+                  books: rayonSondages.map(enLivre),
+                  emptyLabel: 'Aucune question posée.',
+                  onPressMore: () => router.push('/rayon/sondages'),
+                },
+              ]}
             />
           </>
         )}
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-/**
- * L'intitulé d'une zone du Fil.
- *
- * Un titre, pas un bouton : il ne se touche pas, il n'ouvre rien. Il dit
- * seulement où on est arrivé en faisant défiler, et combien il reste. La
- * pastille compte ce qu'on n'a pas encore vu dans CETTE zone — c'est ce que
- * portaient les badges d'onglets, qui n'existent plus.
- */
-function ZoneTitle({
-  styles,
-  label,
-  count,
-  unread,
-}: {
-  styles: ReturnType<typeof createStyles>;
-  label: string;
-  count: number;
-  unread: number;
-}) {
-  return (
-    <View style={styles.zoneTitleRow}>
-      <Text style={styles.zoneTitle}>{label}</Text>
-      <Text style={styles.zoneCount}>{count}</Text>
-      {unread > 0 && (
-        <View style={styles.zoneBadge}>
-          <Text style={styles.zoneBadgeText}>{unread > 99 ? '99+' : unread}</Text>
-        </View>
-      )}
-    </View>
-  );
-}
-
-/**
- * Le bouton qui déplie ou replie une zone.
- *
- * Absent quand tout est déjà montré : proposer « voir les 0 autres » n'a pas
- * de sens, et un bouton qui ne fait rien coûte plus cher qu'il ne rapporte.
- */
-function ZoneMore({
-  styles,
-  colors,
-  total,
-  shown,
-  expanded,
-  onToggle,
-}: {
-  styles: ReturnType<typeof createStyles>;
-  colors: Colors;
-  total: number;
-  shown: number;
-  expanded: boolean;
-  onToggle: () => void;
-}) {
-  const rest = total - shown;
-  if (!expanded && rest <= 0) return null;
-  if (expanded && total <= ZONE_PREVIEW) return null;
-
-  return (
-    <Pressable onPress={onToggle} style={styles.zoneMore} hitSlop={6}>
-      <Text style={styles.zoneMoreText}>
-        {expanded ? 'Replier' : rest === 1 ? 'Voir la dernière' : `Voir les ${rest} autres`}
-      </Text>
-      {expanded ? (
-        <ChevronUp size={18} color={colors.text} strokeWidth={2} />
-      ) : (
-        <ChevronDown size={18} color={colors.text} strokeWidth={2} />
-      )}
-    </Pressable>
   );
 }
 
@@ -885,7 +729,11 @@ function createStyles(colors: Colors) {
     borderBottomColor: colors.border,
   },
   menuBackText: { fontSize: 14, fontWeight: '700', color: colors.text },
-  scroll: { padding: spacing.lg, paddingBottom: 88, flexGrow: 1 },
+  // Marge latérale resserrée : le meuble occupe la pièce, il ne flotte pas au
+  // milieu d'une page.
+  // `flexGrow` + marges resserrées : le meuble prend toute la place laissée
+  // entre l'en-tête et la barre d'icônes. Il n'y a rien d'autre à mettre.
+  scroll: { paddingHorizontal: spacing.sm, paddingTop: spacing.sm, paddingBottom: 78, flexGrow: 1 },
   loader: { marginTop: 32 },
   empty: { paddingVertical: 24, alignItems: 'center' },
   emptyTitle: { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 6 },

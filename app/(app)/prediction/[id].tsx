@@ -1,9 +1,10 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { MessageCircle } from 'lucide-react-native';
+import { Flag, MessageCircle, MoreHorizontal, Trash2 } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -18,6 +19,8 @@ import { Avatar } from '../../../components/Avatar';
 import { BottomNavBar } from '../../../components/BottomNavBar';
 import { InlineComments } from '../../../components/InlineComments';
 import { ReactionPicker } from '../../../components/ReactionPicker';
+import { ReportDialog } from '../../../components/ReportDialog';
+import { BookSpread } from '../../../components/BookSpread';
 import { PhotoAttachButton } from '../../../components/PhotoAttachButton';
 import { PredictionPhoto } from '../../../components/PredictionPhoto';
 import { PredictWord } from '../../../components/PredictWord';
@@ -28,6 +31,7 @@ import { fetchFriendships, otherProfile, type FriendProfile } from '../../../lib
 import { uploadVerdictPhoto } from '../../../lib/photos';
 import {
   addRecipient,
+  deletePrediction,
   fetchPrediction,
   fetchPredictionRecipients,
   isRevealed,
@@ -54,6 +58,33 @@ export default function PredictionDetailScreen() {
   /* Fermée par défaut, comme sur la carte : on vient lire une prédiction, pas
      une conversation. La bulle l'ouvre quand on la veut. */
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+
+  /** Définitive, et confirmée : c'est le seul recours de l'auteur sur un
+   *  contenu qui parle de quelqu'un d'autre. */
+  async function handleDelete() {
+    const message =
+      'Cette action est définitive : le contenu, les réactions et les commentaires seront perdus pour tout le Cercle.';
+    const go = async () => {
+      const { error: deleteError } = await deletePrediction(id);
+      if (deleteError) {
+        setError(`Suppression impossible : ${deleteError.message}`);
+        return;
+      }
+      router.back();
+    };
+    // `Alert.alert` de React Native Web ne fait rien : sans ce repli, le
+    // bouton semblerait ne pas répondre du tout sur le web.
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Supprimer ce Predict ?\n\n${message}`)) await go();
+      return;
+    }
+    Alert.alert('Supprimer ce Predict ?', message, [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Supprimer', style: 'destructive', onPress: go },
+    ]);
+  }
   const [author, setAuthor] = useState<{ username: string; avatar_url: string | null } | null>(null);
   const [recipients, setRecipients] = useState<PredictionRecipient[] | null>(null);
   const [friends, setFriends] = useState<FriendProfile[] | null>(null);
@@ -278,8 +309,51 @@ export default function PredictionDetailScreen() {
         <Text style={styles.headerTitle}>
           <PredictWord />
         </Text>
-        <View style={styles.headerSpacer} />
+        {/* Le menu de gestion vit ICI depuis que l'accueil est une
+            bibliothèque : la carte du Fil, qui le portait, n'existe plus. Sans
+            ce déplacement, supprimer une prédiction serait devenu impossible —
+            et l'auteur doit toujours pouvoir revenir en arrière. */}
+        <Pressable onPress={() => setMenuOpen(true)} hitSlop={8} style={styles.headerMenu}>
+          <MoreHorizontal size={22} color={colors.icon} strokeWidth={1.75} />
+        </Pressable>
       </View>
+
+      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+        <Pressable style={styles.menuOverlay} onPress={() => setMenuOpen(false)}>
+          <Pressable style={styles.menuBox} onPress={() => {}}>
+            {isAuthor ? (
+              <Pressable
+                onPress={() => {
+                  setMenuOpen(false);
+                  handleDelete();
+                }}
+                style={styles.menuRow}
+              >
+                <Trash2 size={20} color={colors.danger} strokeWidth={1.75} />
+                <Text style={[styles.menuRowText, styles.menuRowDanger]}>Supprimer</Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={() => {
+                  setMenuOpen(false);
+                  setReportOpen(true);
+                }}
+                style={styles.menuRow}
+              >
+                <Flag size={20} color={colors.icon} strokeWidth={1.75} />
+                <Text style={styles.menuRowText}>Signaler</Text>
+              </Pressable>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <ReportDialog
+        visible={reportOpen}
+        target={{ kind: 'prediction', id }}
+        reporterId={userId ?? ''}
+        onClose={() => setReportOpen(false)}
+      />
 
       <ScrollView contentContainerStyle={styles.scroll}>
         {error && <Text style={styles.error}>{error}</Text>}
@@ -288,76 +362,81 @@ export default function PredictionDetailScreen() {
           <ActivityIndicator color={colors.text} style={styles.loader} />
         ) : prediction ? (
           <>
-            {author && (
-              <Pressable
-                onPress={() => router.push(`/profile/${prediction.author_id}`)}
-                style={styles.authorBlock}
-                hitSlop={4}
-              >
-                <Avatar url={author.avatar_url} username={author.username} size={28} />
-                <Text style={styles.authorName}>{author.username}</Text>
-              </Pressable>
-            )}
+            {/* LE LIVRE OUVERT. À gauche qui parle, à droite ce qui est
+                dit — la double page remplace l'empilement vertical d'avant
+                (auteur, puis teaser, puis contenu), qui ne racontait rien.
 
-            {/* Pas de Teaser pour une Question : `content` (la question
-                elle-même) est déjà visible immédiatement juste en dessous —
-                un Teaser n'y ajouterait qu'un doublon (voir new-prediction.tsx,
-                dérivé du même texte pour satisfaire la contrainte SQL). */}
-            {!isQuestion && <Text style={styles.teaser}>{prediction.teaser}</Text>}
-
-            {/* Avant révélation, seul l'écart annoncé compte — les deux dates
-                elles-mêmes n'apportent rien de plus que le teaser et
-                l'indice « sera révélée le » juste en dessous. Une fois
-                révélée, la date de scellé redevient utile comme repère. */}
-            {revealed ? (
-              <View style={styles.datesBlock}>
-                <Text style={styles.sealedDate}>
-                  Scellé le {formatShortDateTime(new Date(prediction.created_at))}
-                </Text>
-                {!!advanceLabel && <Text style={styles.daysAdvance}>{advanceLabel}</Text>}
-              </View>
-            ) : (
-              !!advanceLabel && <Text style={styles.daysAdvanceCentered}>{advanceLabel}</Text>
-            )}
-
-            {/* Le cœur de l'écran : le contenu de la prédiction prime sur tout
-                le reste, y compris le verdict — repoussé tout en bas. Même
-                taille de police que le Teaser, volontairement : les deux sont
-                la promesse de l'auteur, avant et après révélation.
-                L'auteur voit toujours son propre contenu, même avant
-                révélation — seul un destinataire attend l'heure dite. */}
-            <View style={styles.contentHero}>
-              {/* Une Question est visible dès la création, jamais scellée —
-                  ce que la Clôture cache, ce sont les réponses des autres
-                  (`QuestionAnswerPanel` plus bas), jamais la question
-                  elle-même (RLS `prediction_contents_select`, schema.sql
-                  section 42). */}
-              {(isQuestion || revealed || isAuthor) && prediction.content ? (
+                La page de droite reste blanche tant que la prédiction n'est
+                pas révélée, et c'est tout le propos : un livre dont la
+                seconde page est vide se lit d'un coup d'œil, là où un texte
+                expliquant qu'il faut attendre demandait à être lu. */}
+            <BookSpread
+              underPages={(prediction.photo_path ? 1 : 0) + (prediction.verdict_photo_path ? 1 : 0)}
+              left={
                 <>
-                  {/* Le flou ne concerne que les destinataires d'une
-                      Déclaration avant révélation (ils n'ont de toute façon
-                      rien à cet endroit via la RLS) : l'auteur voit toujours
-                      son propre texte net, y compris avant révélation. */}
-                  <Text style={styles.contentHeroText}>{prediction.content}</Text>
-                  {prediction.audio_path && (
-                    <View style={styles.audioRow}>
-                      <AudioPlayerButton path={prediction.audio_path} />
-                    </View>
+                  <Pressable
+                    onPress={() => router.push(`/profile/${prediction.author_id}`)}
+                    style={styles.pageAuteur}
+                    hitSlop={4}
+                  >
+                    <Avatar
+                      url={author?.avatar_url ?? null}
+                      username={author?.username ?? ''}
+                      size={52}
+                    />
+                    <Text style={styles.pageAuteurNom}>{author?.username ?? '…'}</Text>
+                  </Pressable>
+                  <View style={styles.pageFilet} />
+
+                  {!isQuestion && !!prediction.teaser && (
+                    <>
+                      <Text style={styles.pageEyebrow}>Aperçu</Text>
+                      <Text style={styles.pageTeaser}>{prediction.teaser}</Text>
+                    </>
                   )}
-                  {prediction.photo_path && (
-                    <View style={styles.photoRow}>
-                      <PredictionPhoto bucket="content" path={prediction.photo_path} />
-                    </View>
+
+                  <View style={styles.pageEspace} />
+
+                  {revealed && (
+                    <Text style={styles.pageDate}>
+                      Scellé le {formatShortDateTime(new Date(prediction.created_at))}
+                    </Text>
                   )}
+                  {!!advanceLabel && <Text style={styles.pageDate}>{advanceLabel}</Text>}
                 </>
-              ) : (
-                <Text style={styles.sealedHint}>
-                  {prediction.open_ended
-                    ? 'L’auteur choisira quand la révéler.'
-                    : `Révélation le ${formatShortDateTime(new Date(prediction.reveal_at))}.`}
-                </Text>
-              )}
-            </View>
+              }
+              right={
+                (isQuestion || revealed || isAuthor) && prediction.content ? (
+                  <>
+                    <Text style={styles.pageEyebrow}>
+                      {isQuestion ? 'La question' : 'Le Predict'}
+                    </Text>
+                    <View style={styles.pageFilet} />
+                    <Text style={styles.pageContenu}>{prediction.content}</Text>
+                    {prediction.audio_path && (
+                      <View style={styles.audioRow}>
+                        <AudioPlayerButton path={prediction.audio_path} />
+                      </View>
+                    )}
+                    {prediction.photo_path && (
+                      <View style={styles.photoRow}>
+                        <PredictionPhoto bucket="content" path={prediction.photo_path} />
+                      </View>
+                    )}
+                  </>
+                ) : (
+                  /* Rien. Une page blanche se comprend sans qu'on l'explique —
+                     et un texte disant « cette page est vide » est la seule
+                     façon de la rendre bavarde. Le sceau doré suffit à dire
+                     que quelque chose y est retenu. */
+                  <View style={styles.pageVierge}>
+                    <View style={styles.pageSceau}>
+                      <Text style={styles.pageSceauLettre}>P</Text>
+                    </View>
+                  </View>
+                )
+              }
+            />
 
             {/* Réservé aux prédictions à révélation libre : une Programmée
                 tient sa date (voir `reveal_prediction_now` dans schema.sql,
@@ -635,38 +714,63 @@ function createStyles(colors: Colors) {
   },
   back: { fontSize: 15, color: colors.text, width: 56 },
   headerSpacer: { width: 56 },
+  headerMenu: { width: 56, alignItems: 'flex-end' },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(28, 39, 55, 0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  menuBox: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  menuRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 },
+  menuRowText: { fontSize: 16, color: colors.text },
+  menuRowDanger: { color: colors.danger },
   scroll: { padding: spacing.lg, paddingBottom: 48 },
   loader: { marginTop: 24 },
   eyebrow: { ...eyebrow(colors) },
-  authorBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginBottom: 12 },
-  authorName: { fontFamily: fonts.bodyEmphasis, fontSize: 16, color: colors.icon },
-  teaser: { fontFamily: fonts.sansBold, fontSize: 24, color: colors.text, lineHeight: 30 },
-  datesBlock: { marginTop: 10 },
+  // --- les deux pages du livre ---------------------------------------
+  pageAuteur: { alignItems: 'center', gap: 8 },
+  pageAuteurNom: { fontFamily: fonts.display, fontSize: 17, color: colors.text, textAlign: 'center' },
+  pageFilet: { height: 1, backgroundColor: colors.accent, opacity: 0.5, marginVertical: 8 },
+  pageEyebrow: {
+    fontFamily: fonts.label,
+    fontSize: 10,
+    letterSpacing: 1.4,
+    color: colors.textFaint,
+    textTransform: 'uppercase',
+  },
+  pageTeaser: { fontSize: 14, color: colors.textMuted, fontStyle: 'italic', lineHeight: 20 },
+  pageContenu: { fontSize: 15, color: colors.text, lineHeight: 22 },
+  pageEspace: { flex: 1, minHeight: 8 },
+  pageDate: { fontFamily: fonts.label, fontSize: 11, color: colors.textFaint },
+  pageVierge: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 24 },
+  // Un cachet de cire pâli, imprimé dans le papier plutôt que posé dessus :
+  // discret, mais il dit que la page attend.
+  pageSceau: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    borderWidth: 2,
+    borderColor: colors.accent,
+    opacity: 0.35,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pageSceauLettre: { fontFamily: fonts.display, fontSize: 24, color: colors.accent },
   // Un peu plus marqué que les autres repères secondaires de cet écran :
   // savoir quand le Predict a été scellé reste une information importante,
   // pas un simple détail à estomper.
-  sealedDate: { fontSize: 15, fontWeight: '700', color: colors.textMuted },
-  daysAdvance: { fontSize: 16, fontWeight: '600', color: colors.textMuted, marginTop: 2 },
-  daysAdvanceCentered: { fontSize: 16, fontWeight: '600', color: colors.textMuted, textAlign: 'center', marginTop: 10 },
-  contentHero: {
-    marginTop: spacing.xl,
-    marginBottom: spacing.lg,
-    alignItems: 'center',
-  },
-  contentHeroText: {
-    fontFamily: fonts.sansBold,
-    fontSize: 24,
-    color: colors.text,
-    lineHeight: 30,
-    textAlign: 'center',
-  },
   audioRow: { marginTop: 16 },
   photoRow: { marginTop: 16, width: '100%' },
-  sealedHint: {
-    fontSize: 14,
-    color: colors.textFaint,
-    textAlign: 'center',
-  },
   revealNowBox: { alignItems: 'center', marginTop: spacing.md },
   // Même contour noir sur fond blanc que les autres actions de cet écran
   // (« Ajouter », « Retirer ») — pas un remplissage jaune, réservé au FAB.
